@@ -10,6 +10,7 @@ const productoRoutes = require('./routes/productoRoutes');
 const inventarioRoutes = require('./routes/inventarioRoutes');
 const pedidoRoutes = require('./routes/pedidoRoutes');
 const cajaRoutes = require('./routes/cajaRoutes');
+const reporteRoutes = require('./routes/reporteRoutes');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api/catalogo', productoRoutes);
 app.use('/api/inventario', inventarioRoutes);
 app.use('/api/pedidos', pedidoRoutes);
 app.use('/api/caja', cajaRoutes);
+app.use('/api/reportes', reporteRoutes);
 
 app.get('/', (req, res) => {
     res.json({ mensaje: '🚀 API del Sistema SGIV funcionando correctamente' });
