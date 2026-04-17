@@ -7,6 +7,7 @@ const db = require('./config/db');
 
 // Importar rutas
 const userRoutes = require('./routes/userRoutes');
+const productoRoutes = require('./routes/productoRoutes'); // <-- LÍNEA NUEVA
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 
 // --- MONTAR RUTAS ---
 app.use('/api/usuarios', userRoutes); // Toda ruta de usuarios empezará con /api/usuarios
+app.use('/api/catalogo', productoRoutes);
 
 app.get('/', (req, res) => {
     res.json({ mensaje: '🚀 API del Sistema SGIV funcionando correctamente' });
