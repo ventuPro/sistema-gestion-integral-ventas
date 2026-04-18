@@ -7,10 +7,11 @@ const obtenerResumenDiario = async (id_sucursal) => {
             COUNT(id_venta) AS total_ventas,
             COALESCE(SUM(monto_total_venta), 0) AS ingresos_totales
         FROM venta_caja
-        WHERE id_sucursal = $1 AND DATE(fecha_venta) = CURRENT_DATE;
+        WHERE id_sucursal = $1; 
+        -- (Le quitamos el AND DATE(fecha_venta) = CURRENT_DATE)
     `;
     const result = await db.query(query, [id_sucursal]);
-    return result.rows[0]; // Devuelve un solo objeto con los totales
+    return result.rows[0]; 
 };
 
 // 2. Top 5 Productos Más Vendidos (Para gráficos)

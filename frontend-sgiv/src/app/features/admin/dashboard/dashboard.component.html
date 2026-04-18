@@ -2,7 +2,7 @@
   
   <aside class="w-64 bg-gray-900 text-white flex flex-col shadow-2xl">
     <div class="p-6 text-center text-2xl font-bold border-b border-gray-800 tracking-wider">
-      <span class="text-blue-500">SGIV</span> Admin
+      <span class="text-blue-500">Rickys</span> Admin
     </div>
     
     <nav class="flex-1 px-4 py-6 space-y-3 overflow-y-auto">
@@ -50,24 +50,37 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 class="text-gray-500 text-sm font-semibold uppercase tracking-wider">Ventas de Hoy</h3>
-          <p class="text-3xl font-bold mt-2 text-gray-800">Bs. 0.00</p>
+          <h3 class="text-gray-500 text-sm font-semibold uppercase tracking-wider">
+            Ventas de Hoy ({{ resumenDiario?.total_ventas || 0 }})
+          </h3>
+          <p class="text-3xl font-bold mt-2 text-gray-800">
+            Bs. {{ resumenDiario?.ingresos_totales || 0 }}
+          </p>
         </div>
 
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 class="text-gray-500 text-sm font-semibold uppercase tracking-wider">Productos Críticos</h3>
-          <p class="text-3xl font-bold mt-2 text-red-500">0</p>
+          <h3 class="text-gray-500 text-sm font-semibold uppercase tracking-wider">
+            Productos Críticos
+          </h3>
+          <p class="text-3xl font-bold mt-2 text-red-500">
+            {{ alertasStock.length }}
+          </p>
         </div>
 
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 class="text-gray-500 text-sm font-semibold uppercase tracking-wider">Turno de Caja</h3>
-          <p class="text-xl font-bold mt-2 text-green-600 mt-3">ABIERTO</p>
+          <h3 class="text-gray-500 text-sm font-semibold uppercase tracking-wider">
+            Estado del Sistema
+          </h3>
+          <p class="text-xl font-bold mt-2 text-green-600 mt-3">
+            <span *ngIf="cargando">Conectando...</span>
+            <span *ngIf="!cargando">EN LÍNEA</span>
+          </p>
         </div>
 
       </div>
 
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-64 flex items-center justify-center">
-         <p class="text-gray-400">Aquí irá el gráfico de productos más vendidos</p>
+         <p class="text-gray-400 font-medium">Aquí irá el gráfico de productos más vendidos</p>
       </div>
 
     </main>
