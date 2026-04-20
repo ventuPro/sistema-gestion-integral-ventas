@@ -22,34 +22,36 @@
       
       <tbody class="text-gray-700">
         
-        <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-          <td class="px-6 py-4 font-medium text-gray-900">Torta Tres Leches</td>
-          <td class="px-6 py-4 text-gray-500">Postres</td>
-          <td class="px-6 py-4 font-semibold text-gray-800">120.00</td>
-          <td class="px-6 py-4">15</td>
-          <td class="px-6 py-4">
-            <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Disponible</span>
+        <tr *ngIf="cargando">
+          <td colspan="6" class="px-6 py-4 text-center text-gray-500 font-medium">Conectando con la base de datos...</td>
+        </tr>
+
+        <tr *ngIf="!cargando && listaProductos.length === 0">
+          <td colspan="6" class="px-6 py-4 text-center text-red-500 font-medium">No hay productos registrados en el inventario.</td>
+        </tr>
+
+        <tr *ngFor="let prod of listaProductos" class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+          
+          <td class="px-6 py-4 font-medium text-gray-900">{{ prod.nombre_producto }}</td>
+          <td class="px-6 py-4 text-gray-500">{{ prod.nombre_categoria }}</td>
+          <td class="px-6 py-4 font-semibold text-gray-800">Bs. {{ prod.precio_unitario }}</td>
+          
+          <td class="px-6 py-4" [ngClass]="{'text-red-500 font-bold': prod.stock_actual <= 5}">
+            {{ prod.stock_actual }}
           </td>
+          
+          <td class="px-6 py-4">
+            <span *ngIf="prod.stock_actual > 5" class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Disponible</span>
+            <span *ngIf="prod.stock_actual <= 5" class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">Stock Bajo</span>
+          </td>
+          
           <td class="px-6 py-4 text-center">
             <button class="text-blue-500 hover:text-blue-700 font-medium mr-3">Editar</button>
             <button class="text-red-500 hover:text-red-700 font-medium">Borrar</button>
           </td>
-        </tr>
 
-        <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-          <td class="px-6 py-4 font-medium text-gray-900">Galletas de Chispas</td>
-          <td class="px-6 py-4 text-gray-500">Horneados</td>
-          <td class="px-6 py-4 font-semibold text-gray-800">15.00</td>
-          <td class="px-6 py-4 text-red-500 font-bold">3</td>
-          <td class="px-6 py-4">
-            <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">Stock Bajo</span>
-          </td>
-          <td class="px-6 py-4 text-center">
-            <button class="text-blue-500 hover:text-blue-700 font-medium mr-3">Editar</button>
-            <button class="text-red-500 hover:text-red-700 font-medium">Borrar</button>
-          </td>
         </tr>
-
+        
       </tbody>
     </table>
   </div>

@@ -1,14 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const productoController = require('../controllers/productoController');
-// 1. Importamos tu candado de seguridad
+// Importamos a nuestro nuevo guardia de seguridad
 const { verificarToken } = require('../middlewares/authMiddleware'); 
 
-// Rutas para Categorías (Protegidas)
+// Rutas protegidas (solo entran los que tienen Token)
 router.post('/categorias', verificarToken, productoController.agregarCategoria); 
 router.get('/categorias', verificarToken, productoController.listarCategorias);  
 
-// Rutas para Productos (Protegidas)
 router.post('/productos', verificarToken, productoController.agregarProducto);   
 router.get('/productos', verificarToken, productoController.listarProductos);    
 
