@@ -14,16 +14,21 @@ export class InventarioComponent implements OnInit {
   private productoService = inject(ProductoService);
   private cdr = inject(ChangeDetectorRef); 
 
-  // Variables de datos
+  // --- Variables de Datos ---
   listaProductos: any[] = [];
-  listaCategorias: any[] = []; // Guardará las categorías de la pastelería
+  listaCategorias: any[] = []; 
   cargando: boolean = true;
   
-  // Control del Modal
+  // --- Control de Modales (CRUD) ---
   mostrarModal: boolean = false;
-  editandoId: number | null = null; // Si es null, creamos. Si tiene un número, editamos.
+  editandoId: number | null = null; 
 
-  // Objeto para el formulario
+  // --- Control de Modal de Stock ---
+  mostrarModalStock: boolean = false;
+  productoSeleccionado: any = null;
+  cantidadIngreso: number = 0;
+
+  // --- Objetos para Formularios ---
   nuevoProducto: any = {
     nombre_producto: '',
     id_categoria: '',
@@ -33,9 +38,10 @@ export class InventarioComponent implements OnInit {
 
   ngOnInit() {
     this.cargarInventario();
-    this.cargarCategorias(); // Al iniciar, traemos productos y categorías
+    this.cargarCategorias(); 
   }
 
+  // --- Carga de Datos desde la BD ---
   cargarInventario() {
     this.productoService.obtenerInventario().subscribe({
       next: (datos) => {
@@ -62,17 +68,15 @@ export class InventarioComponent implements OnInit {
     });
   }
 
-  // Funciones de la Interfaz
-abrirModal() {
-    this.editandoId = null; // Nos aseguramos de que sepa que es uno NUEVO
+  // --- Funciones del Modal CRUD (Crear/Editar) ---
+  abrirModal() {
+    this.editandoId = null;
     this.nuevoProducto = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '' };
     this.mostrarModal = true;
   }
 
   abrirModalEditar(producto: any) {
-    this.editandoId = producto.id_producto; // Guardamos el ID del que vamos a editar
-    
-    // Hacemos una copia exacta de los datos para rellenar el formulario
+    this.editandoId = producto.id_producto;
     this.nuevoProducto = { 
       nombre_producto: producto.nombre_producto,
       id_categoria: producto.id_categoria,
@@ -88,7 +92,7 @@ abrirModal() {
     this.nuevoProducto = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '' };
   }
 
-guardarProducto() {
+  guardarProducto() {
     const productoAEnviar = {
       ...this.nuevoProducto,
       url_imagen: 'https://via.placeholder.com/150'
@@ -96,7 +100,6 @@ guardarProducto() {
 
     this.cargando = true;
 
-    // CAMINO 1: Si tenemos un ID guardado, significa que estamos EDITANDO
     if (this.editandoId) {
       this.productoService.actualizarProducto(this.editandoId, productoAEnviar).subscribe({
         next: (respuesta) => {
@@ -110,9 +113,7 @@ guardarProducto() {
           this.cargando = false;
         }
       });
-    } 
-    // CAMINO 2: Si el ID es null, significa que estamos CREANDO (Tu código de antes)
-    else {
+    } else {
       this.productoService.crearProducto(productoAEnviar).subscribe({
         next: (respuesta) => {
           console.log('¡Éxito! Producto guardado:', respuesta);
@@ -128,18 +129,47 @@ guardarProducto() {
     }
   }
 
+  // --- Funciones del Modal de Stock (Nueva Lógica) ---
+  abrirModalStock(producto: any) {
+    this.productoSeleccionado = producto;
+    this.cantidadIngreso = 0; 
+    this.mostrarModalStock = true;
+  }
+
+  cerrarModalStock() {
+    this.mostrarModalStock = false;
+    this.productoSeleccionado = null;
+  }
+
+  confirmarIngresoStock() {
+    if (this.cantidadIngreso <= 0) {
+      alert('Por favor, ingresa una cantidad válida.');
+      return;
+    }
+
+    this.cargando = true;
+    this.productoService.ingresarStock(this.productoSeleccionado.id_producto, this.cantidadIngreso).subscribe({
+      next: (res) => {
+        console.log(res.mensaje);
+        this.cerrarModalStock();
+        this.cargarInventario(); 
+      },
+      error: (err) => {
+        console.error('Error al ingresar stock:', err);
+        alert('No se pudo actualizar el stock.');
+        this.cargando = false;
+      }
+    });
+  }
+
+  // --- Función de Borrado ---
   borrarProducto(id: number, nombre: string) {
-    // 1. Pedimos confirmación para evitar borrados por accidente
     const confirmacion = confirm(`¿Estás seguro de que deseas eliminar el producto: "${nombre}"?`);
-    
     if (confirmacion) {
-      this.cargando = true; // Mostramos que estamos trabajando
-      
-      // 2. Llamamos al servicio
+      this.cargando = true;
       this.productoService.eliminarProducto(id).subscribe({
         next: (respuesta) => {
           console.log(respuesta.mensaje);
-          // 3. Volvemos a cargar la tabla para que el producto desaparezca de la vista
           this.cargarInventario();
         },
         error: (error) => {

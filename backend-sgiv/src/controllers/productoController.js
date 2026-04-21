@@ -93,7 +93,7 @@ const sumarStock = async (req, res) => {
         }
         
         res.json({ 
-            mensaje: `Stock ingresado correctamente. Nuevo stock: ${productoActualizado.stock_actual}`, 
+            mensaje: `Stock ingresado correctamente. Nuevo stock: ${productoActualizado.cantidad_actual}`, 
             producto: productoActualizado 
         });
     } catch (error) {

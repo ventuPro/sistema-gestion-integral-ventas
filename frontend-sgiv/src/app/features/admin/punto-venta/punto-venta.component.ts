@@ -29,8 +29,7 @@ export class PuntoVentaComponent implements OnInit {
   cargarCatalogo() {
     this.productoService.obtenerInventario().subscribe({
       next: (datos) => {
-        // TEMPORAL: Mostramos todos para probar el diseño
-        this.productosDisponibles = datos;
+        this.productosDisponibles = datos.filter((p: any) => (p.stock_actual || 0) > 0);
         this.cargando = false;
         this.cdr.detectChanges();
       },
@@ -42,21 +41,28 @@ export class PuntoVentaComponent implements OnInit {
     });
   }
 
-  agregarAlCarrito(producto: any) {
+ agregarAlCarrito(producto: any) {
     const itemExistente = this.carrito.find(item => item.id_producto === producto.id_producto);
+    
+    // 1. EL TRUCO DE ORO: Forzamos a que el stock y el precio sean Números reales, no textos.
+    const stockReal = Number(producto.stock_actual) || 0;
+    const precioReal = Number(producto.precio_unitario) || 0;
 
     if (itemExistente) {
-      if (itemExistente.cantidad < (producto.stock_actual || 0) || true) { // Temporalmente ignoramos stock para probar
+      // Ahora comparamos número contra número de forma segura
+      if (itemExistente.cantidad < stockReal) {
         itemExistente.cantidad++;
-        itemExistente.subtotal = itemExistente.cantidad * itemExistente.precio_unitario;
+        itemExistente.subtotal = itemExistente.cantidad * precioReal;
       } else {
-        alert(`No hay más stock de ${producto.nombre_producto}`);
+        alert(`No hay más stock de ${producto.nombre_producto}. Límite: ${stockReal} unidades.`);
       }
     } else {
+      // Si es nuevo en el carrito, lo insertamos con los números ya limpios
       this.carrito.push({
         ...producto,
         cantidad: 1,
-        subtotal: Number(producto.precio_unitario)
+        precio_unitario: precioReal, 
+        subtotal: precioReal
       });
     }
     
@@ -68,8 +74,12 @@ export class PuntoVentaComponent implements OnInit {
     this.calcularTotal();
   }
 
-  calcularTotal() {
-    this.total = this.carrito.reduce((suma, item) => suma + item.subtotal, 0);
+calcularTotal() {
+    // Nos aseguramos de sumar matemáticamente y no juntar textos
+    this.total = this.carrito.reduce((suma, item) => suma + Number(item.subtotal), 0);
+    
+    // Le damos un empujón a Angular para que actualice el HTML inmediatamente
+    this.cdr.detectChanges(); 
   }
 
   // 3. NUESTRA FUNCIÓN ESTRELLA

@@ -29,12 +29,19 @@ const crearProducto = async (productoData) => {
 };
 
 const obtenerProductos = async () => {
+
     const query = `
-        SELECT p.*, c.nombre_categoria 
+        SELECT 
+            p.*, 
+            c.nombre_categoria,
+            COALESCE(i.cantidad_actual, 0) AS stock_actual
         FROM producto p
-        JOIN categoria_producto c ON p.id_categoria = c.id_categoria
-        WHERE p.estado_activo = TRUE;
+        LEFT JOIN categoria_producto c ON p.id_categoria = c.id_categoria
+        LEFT JOIN inventario_sucursal i ON p.id_producto = i.id_producto AND i.id_sucursal = 1
+        WHERE p.estado_activo = TRUE
+        ORDER BY p.id_producto DESC;
     `;
+    
     const result = await db.query(query);
     return result.rows;
 };
@@ -65,15 +72,30 @@ const actualizarProducto = async (id_producto, productoData) => {
 };
 
 const agregarStock = async (id_producto, cantidad_agregada) => {
-    // COALESCE(stock_actual, 0) significa: Si el stock es NULL o vacío, asume que es 0 y luego súmale la cantidad.
-    const query = `
-        UPDATE producto 
-        SET stock_actual = COALESCE(stock_actual, 0) + $1 
-        WHERE id_producto = $2 
-        RETURNING *;
-    `;
-    const result = await db.query(query, [cantidad_agregada, id_producto]);
-    return result.rows[0];
+    // 1. Verificamos si el producto ya tiene un registro en la sucursal 1
+    const checkQuery = `SELECT * FROM inventario_sucursal WHERE id_sucursal = 1 AND id_producto = $1`;
+    const checkResult = await db.query(checkQuery, [id_producto]);
+
+    if (checkResult.rows.length > 0) {
+        // SI YA EXISTE: Simplemente le sumamos la cantidad (UPDATE)
+        const updateQuery = `
+            UPDATE inventario_sucursal 
+            SET cantidad_actual = cantidad_actual + $2 
+            WHERE id_sucursal = 1 AND id_producto = $1 
+            RETURNING *;
+        `;
+        const result = await db.query(updateQuery, [id_producto, cantidad_agregada]);
+        return result.rows[0];
+    } else {
+        // SI NO EXISTE: Es un producto nuevo, lo insertamos por primera vez (INSERT)
+        const insertQuery = `
+            INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) 
+            VALUES (1, $1, $2) 
+            RETURNING *;
+        `;
+        const result = await db.query(insertQuery, [id_producto, cantidad_agregada]);
+        return result.rows[0];
+    }
 };
 
 module.exports = { crearCategoria, obtenerCategorias, crearProducto, obtenerProductos, eliminarProducto, actualizarProducto, agregarStock };

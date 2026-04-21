@@ -53,5 +53,13 @@ export class ProductoService {
     // Usamos PUT y le enviamos el ID en la URL y los datos en el cuerpo
     return this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, productoData, { headers });
   }
+  // Función 6: Ingresar stock nuevo (Entrada de Inventario)
+  ingresarStock(id: number, cantidad: number): Observable<any> {
+    const token = localStorage.getItem('token_sgiv');
+    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    
+    // Enviamos el objeto { cantidad } a la ruta PATCH
+    return this.http.patch(`${this.apiUrl}/catalogo/productos/${id}/stock`, { cantidad }, { headers });
+  }
 }
 
