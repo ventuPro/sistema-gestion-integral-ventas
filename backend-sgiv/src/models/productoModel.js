@@ -52,4 +52,4 @@ const eliminarProducto = async (id_producto) => {
 };
 
 
-module.exports = { crearCategoria, obtenerCategorias, crearProducto, obtenerProductos };
+module.exports = { crearCategoria, obtenerCategorias, crearProducto, obtenerProductos, eliminarProducto };

@@ -43,7 +43,6 @@ const listarProductos = async (req, res) => {
     }
 };
 
-module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos };
 
 const eliminarProducto = async (req, res) => {
     try {
@@ -61,5 +60,4 @@ const eliminarProducto = async (req, res) => {
     }
 };
 
-// Y agrégalo a tu export:
-// module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos, eliminarProducto };
+module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos, eliminarProducto };
