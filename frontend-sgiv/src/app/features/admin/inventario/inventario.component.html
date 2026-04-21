@@ -36,18 +36,18 @@
           <td class="px-6 py-4 text-gray-500">{{ prod.nombre_categoria }}</td>
           <td class="px-6 py-4 font-semibold text-gray-800">Bs. {{ prod.precio_unitario }}</td>
           
-          <td class="px-6 py-4" [ngClass]="{'text-red-500 font-bold': prod.stock_actual <= 5}">
-            {{ prod.stock_actual }}
+          <td class="px-6 py-4" [ngClass]="{'text-red-500 font-bold': (prod.stock_actual || 0) <= 5}">
+            {{ prod.stock_actual || 0 }}
           </td>
           
           <td class="px-6 py-4">
-            <span *ngIf="prod.stock_actual > 5" class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Disponible</span>
-            <span *ngIf="prod.stock_actual <= 5" class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">Stock Bajo</span>
+            <span *ngIf="(prod.stock_actual || 0) > 5" class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Disponible</span>
+            <span *ngIf="(prod.stock_actual || 0) <= 5" class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">Stock Bajo</span>
           </td>
           
           <td class="px-6 py-4 text-center">
             <button class="text-blue-500 hover:text-blue-700 font-medium mr-3">Editar</button>
-            <button class="text-red-500 hover:text-red-700 font-medium">Borrar</button>
+            <button (click)="borrarProducto(prod.id_producto, prod.nombre_producto)" class="text-red-500 hover:text-red-700 font-medium">Borrar</button>
           </td>
 
         </tr>
@@ -82,8 +82,11 @@
             <select [(ngModel)]="nuevoProducto.id_categoria" name="categoria" required
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white">
               <option value="" disabled selected>Seleccione...</option>
-              <option value="1">Postres</option> 
-              <option value="2">Horneados</option>
+              
+              <option *ngFor="let cat of listaCategorias" [value]="cat.id_categoria">
+                {{ cat.nombre_categoria }}
+              </option>
+              
             </select>
           </div>
           <div>

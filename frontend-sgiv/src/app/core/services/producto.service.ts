@@ -24,7 +24,24 @@ export class ProductoService {
     const token = localStorage.getItem('token_sgiv');
     const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
     
+    
     // Aquí enviamos los datos por el método POST
     return this.http.post(`${this.apiUrl}/catalogo/productos`, productoData, { headers });
+  }
+
+  // Función 3: Pedir la lista de Categorías reales
+  obtenerCategorias(): Observable<any> {
+    const token = localStorage.getItem('token_sgiv');
+    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    
+    return this.http.get(`${this.apiUrl}/catalogo/categorias`, { headers });
+  }
+
+  // Función 4: Eliminar producto
+  eliminarProducto(id: number): Observable<any> {
+    const token = localStorage.getItem('token_sgiv');
+    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    
+    return this.http.delete(`${this.apiUrl}/catalogo/productos/${id}`, { headers });
   }
 }

@@ -10,5 +10,6 @@ router.get('/categorias', verificarToken, productoController.listarCategorias);
 
 router.post('/productos', verificarToken, productoController.agregarProducto);   
 router.get('/productos', verificarToken, productoController.listarProductos);    
-
+// Usamos router.delete y le pasamos un parámetro /:id
+router.delete('/productos/:id', verificarToken, productoController.eliminarProducto);
 module.exports = router;

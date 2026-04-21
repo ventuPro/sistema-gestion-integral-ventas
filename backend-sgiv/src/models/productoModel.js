@@ -39,4 +39,17 @@ const obtenerProductos = async () => {
     return result.rows;
 };
 
+const eliminarProducto = async (id_producto) => {
+    // En lugar de DELETE, usamos UPDATE para "apagar" el producto
+    const query = `
+        UPDATE producto 
+        SET estado_activo = FALSE 
+        WHERE id_producto = $1 
+        RETURNING *;
+    `;
+    const result = await db.query(query, [id_producto]);
+    return result.rows[0];
+};
+
+
 module.exports = { crearCategoria, obtenerCategorias, crearProducto, obtenerProductos };

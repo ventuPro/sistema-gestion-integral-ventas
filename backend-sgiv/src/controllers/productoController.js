@@ -44,3 +44,22 @@ const listarProductos = async (req, res) => {
 };
 
 module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos };
+
+const eliminarProducto = async (req, res) => {
+    try {
+        const { id } = req.params; // Capturamos el ID que viene en la URL
+        const productoEliminado = await productoModel.eliminarProducto(id);
+        
+        if (!productoEliminado) {
+            return res.status(404).json({ error: 'Producto no encontrado' });
+        }
+        
+        res.json({ mensaje: 'Producto eliminado (desactivado) exitosamente' });
+    } catch (error) {
+        console.error('Error en eliminarProducto:', error);
+        res.status(500).json({ error: 'Error al eliminar el producto' });
+    }
+};
+
+// Y agrégalo a tu export:
+// module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos, eliminarProducto };
