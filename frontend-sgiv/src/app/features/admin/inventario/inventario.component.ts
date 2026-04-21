@@ -21,7 +21,8 @@ export class InventarioComponent implements OnInit {
   
   // Control del Modal
   mostrarModal: boolean = false;
-  
+  editandoId: number | null = null; // Si es null, creamos. Si tiene un número, editamos.
+
   // Objeto para el formulario
   nuevoProducto: any = {
     nombre_producto: '',
@@ -62,39 +63,69 @@ export class InventarioComponent implements OnInit {
   }
 
   // Funciones de la Interfaz
-  abrirModal() {
+abrirModal() {
+    this.editandoId = null; // Nos aseguramos de que sepa que es uno NUEVO
+    this.nuevoProducto = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '' };
+    this.mostrarModal = true;
+  }
+
+  abrirModalEditar(producto: any) {
+    this.editandoId = producto.id_producto; // Guardamos el ID del que vamos a editar
+    
+    // Hacemos una copia exacta de los datos para rellenar el formulario
+    this.nuevoProducto = { 
+      nombre_producto: producto.nombre_producto,
+      id_categoria: producto.id_categoria,
+      precio_unitario: producto.precio_unitario,
+      descripcion_producto: producto.descripcion_producto || ''
+    };
     this.mostrarModal = true;
   }
 
   cerrarModal() {
     this.mostrarModal = false;
-    this.nuevoProducto = { 
-      nombre_producto: '', 
-      id_categoria: '', 
-      precio_unitario: null, 
-      descripcion_producto: '' 
-    };
+    this.editandoId = null;
+    this.nuevoProducto = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '' };
   }
 
-  guardarProducto() {
-    // Agregamos una imagen temporal para cumplir con la DB
+guardarProducto() {
     const productoAEnviar = {
       ...this.nuevoProducto,
-      url_imagen: 'https://via.placeholder.com/150' 
+      url_imagen: 'https://via.placeholder.com/150'
     };
 
-    this.productoService.crearProducto(productoAEnviar).subscribe({
-      next: (respuesta) => {
-        console.log('¡Éxito! Producto guardado:', respuesta);
-        this.cerrarModal(); 
-        this.cargando = true;
-        this.cargarInventario(); // Recargamos la tabla automáticamente
-      },
-      error: (error) => {
-        console.error('Error al guardar el producto:', error);
-        alert('Hubo un problema al guardar el producto.');
-      }
-    });
+    this.cargando = true;
+
+    // CAMINO 1: Si tenemos un ID guardado, significa que estamos EDITANDO
+    if (this.editandoId) {
+      this.productoService.actualizarProducto(this.editandoId, productoAEnviar).subscribe({
+        next: (respuesta) => {
+          console.log('¡Éxito! Producto actualizado:', respuesta);
+          this.cerrarModal();
+          this.cargarInventario();
+        },
+        error: (error) => {
+          console.error('Error al actualizar:', error);
+          alert('Hubo un error al editar el producto.');
+          this.cargando = false;
+        }
+      });
+    } 
+    // CAMINO 2: Si el ID es null, significa que estamos CREANDO (Tu código de antes)
+    else {
+      this.productoService.crearProducto(productoAEnviar).subscribe({
+        next: (respuesta) => {
+          console.log('¡Éxito! Producto guardado:', respuesta);
+          this.cerrarModal();
+          this.cargarInventario();
+        },
+        error: (error) => {
+          console.error('Error al guardar:', error);
+          alert('Hubo un problema al guardar el producto.');
+          this.cargando = false;
+        }
+      });
+    }
   }
 
   borrarProducto(id: number, nombre: string) {

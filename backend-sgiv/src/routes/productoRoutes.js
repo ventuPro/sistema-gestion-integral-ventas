@@ -13,3 +13,6 @@ router.get('/productos', verificarToken, productoController.listarProductos);
 // Usamos router.delete y le pasamos un parámetro /:id
 router.delete('/productos/:id', verificarToken, productoController.eliminarProducto);
 module.exports = router;
+
+// Ruta PUT para editar un producto específico
+router.put('/productos/:id', verificarToken, productoController.actualizarProducto);

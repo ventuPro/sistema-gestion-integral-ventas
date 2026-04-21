@@ -60,4 +60,20 @@ const eliminarProducto = async (req, res) => {
     }
 };
 
-module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos, eliminarProducto };
+const actualizarProducto = async (req, res) => {
+    try {
+        const { id } = req.params; // El ID del producto que vamos a editar
+        const productoActualizado = await productoModel.actualizarProducto(id, req.body);
+        
+        if (!productoActualizado) {
+            return res.status(404).json({ error: 'Producto no encontrado' });
+        }
+        
+        res.json({ mensaje: 'Producto actualizado exitosamente', producto: productoActualizado });
+    } catch (error) {
+        console.error('Error en actualizarProducto:', error);
+        res.status(500).json({ error: 'Error al actualizar el producto' });
+    }
+};
+
+module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos, eliminarProducto, actualizarProducto };

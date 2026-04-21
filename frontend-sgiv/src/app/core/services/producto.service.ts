@@ -44,4 +44,14 @@ export class ProductoService {
     
     return this.http.delete(`${this.apiUrl}/catalogo/productos/${id}`, { headers });
   }
+
+  // Función 5: Actualizar un producto existente (¡NUEVA!)
+  actualizarProducto(id: number, productoData: any): Observable<any> {
+    const token = localStorage.getItem('token_sgiv');
+    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    
+    // Usamos PUT y le enviamos el ID en la URL y los datos en el cuerpo
+    return this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, productoData, { headers });
+  }
 }
+

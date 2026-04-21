@@ -51,5 +51,17 @@ const eliminarProducto = async (id_producto) => {
     return result.rows[0];
 };
 
+const actualizarProducto = async (id_producto, productoData) => {
+    const { id_categoria, nombre_producto, descripcion_producto, precio_unitario } = productoData;
+    const query = `
+        UPDATE producto 
+        SET id_categoria = $1, nombre_producto = $2, descripcion_producto = $3, precio_unitario = $4
+        WHERE id_producto = $5 
+        RETURNING *;
+    `;
+    const values = [id_categoria, nombre_producto, descripcion_producto, precio_unitario, id_producto];
+    const result = await db.query(query, values);
+    return result.rows[0];
+};
 
-module.exports = { crearCategoria, obtenerCategorias, crearProducto, obtenerProductos, eliminarProducto };
+module.exports = { crearCategoria, obtenerCategorias, crearProducto, obtenerProductos, eliminarProducto, actualizarProducto };
