@@ -64,4 +64,16 @@ const actualizarProducto = async (id_producto, productoData) => {
     return result.rows[0];
 };
 
-module.exports = { crearCategoria, obtenerCategorias, crearProducto, obtenerProductos, eliminarProducto, actualizarProducto };
+const agregarStock = async (id_producto, cantidad_agregada) => {
+    // COALESCE(stock_actual, 0) significa: Si el stock es NULL o vacío, asume que es 0 y luego súmale la cantidad.
+    const query = `
+        UPDATE producto 
+        SET stock_actual = COALESCE(stock_actual, 0) + $1 
+        WHERE id_producto = $2 
+        RETURNING *;
+    `;
+    const result = await db.query(query, [cantidad_agregada, id_producto]);
+    return result.rows[0];
+};
+
+module.exports = { crearCategoria, obtenerCategorias, crearProducto, obtenerProductos, eliminarProducto, actualizarProducto, agregarStock };

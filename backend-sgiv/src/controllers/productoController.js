@@ -76,4 +76,30 @@ const actualizarProducto = async (req, res) => {
     }
 };
 
-module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos, eliminarProducto, actualizarProducto };
+const sumarStock = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { cantidad } = req.body; // Cuántas unidades nuevas llegaron
+
+        // Validamos que no nos envíen números negativos o vacíos
+        if (!cantidad || cantidad <= 0) {
+            return res.status(400).json({ error: 'La cantidad a ingresar debe ser mayor a cero.' });
+        }
+
+        const productoActualizado = await productoModel.agregarStock(id, cantidad);
+        
+        if (!productoActualizado) {
+            return res.status(404).json({ error: 'Producto no encontrado' });
+        }
+        
+        res.json({ 
+            mensaje: `Stock ingresado correctamente. Nuevo stock: ${productoActualizado.stock_actual}`, 
+            producto: productoActualizado 
+        });
+    } catch (error) {
+        console.error('Error en sumarStock:', error);
+        res.status(500).json({ error: 'Error al actualizar el stock del producto' });
+    }
+};
+
+module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos, eliminarProducto, actualizarProducto, sumarStock };

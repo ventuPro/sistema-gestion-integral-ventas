@@ -1,1 +1,71 @@
-<p>punto-venta works!</p>
+<div class="h-full flex flex-col md:flex-row gap-6">
+
+  <div class="w-full md:w-2/3 bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">Catálogo Ricky's</h2>
+
+    <div *ngIf="cargando" class="text-center text-gray-500 py-10">Cargando productos...</div>
+    
+    <div *ngIf="!cargando && productosDisponibles.length === 0" class="text-center text-gray-500 py-10">
+      No hay productos con stock disponible para vender.
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pr-2">
+      
+      <button *ngFor="let prod of productosDisponibles" 
+              (click)="agregarAlCarrito(prod)"
+              class="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-xl transition-all text-center h-32 relative active:scale-95 group">
+        
+        <span class="absolute top-2 right-2 bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded-full">
+          Stock: {{ prod.stock_actual || 0 }}
+        </span>
+
+        <span class="font-bold text-gray-800 mt-2 line-clamp-2">{{ prod.nombre_producto }}</span>
+        <span class="text-blue-600 font-black text-lg mt-1">Bs. {{ prod.precio_unitario }}</span>
+      </button>
+
+    </div>
+  </div>
+
+  <div class="w-full md:w-1/3 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full overflow-hidden">
+    
+    <div class="bg-gray-800 text-white p-4 text-center">
+      <h2 class="text-lg font-bold">Detalle de Venta</h2>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+      
+      <div *ngIf="carrito.length === 0" class="text-center text-gray-400 mt-10 italic">
+        El carrito está vacío. Haz clic en los productos para agregarlos.
+      </div>
+
+      <div *ngFor="let item of carrito; let i = index" class="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center shadow-sm">
+        <div class="flex-1">
+          <p class="font-bold text-gray-800 text-sm leading-tight">{{ item.nombre_producto }}</p>
+          <p class="text-gray-500 text-xs mt-1">Bs. {{ item.precio_unitario }} x {{ item.cantidad }} u.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+          <span class="font-black text-gray-800 text-sm">Bs. {{ item.subtotal }}</span>
+          <button (click)="quitarDelCarrito(i)" class="text-red-500 hover:text-red-700 p-1 bg-red-50 rounded-md">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="p-4 bg-white border-t border-gray-200">
+      <div class="flex justify-between items-center mb-4">
+        <span class="text-gray-600 font-bold">TOTAL A PAGAR:</span>
+        <span class="text-3xl font-black text-green-600">Bs. {{ total }}</span>
+      </div>
+      
+    <button [disabled]="carrito.length === 0" 
+        (click)="registrarVenta()"
+        class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors shadow-sm text-lg">
+        Registrar Venta
+    </button>
+    </div>
+
+  </div>
+
+</div>

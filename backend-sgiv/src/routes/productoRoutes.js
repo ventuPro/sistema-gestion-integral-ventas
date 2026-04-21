@@ -16,3 +16,6 @@ module.exports = router;
 
 // Ruta PUT para editar un producto específico
 router.put('/productos/:id', verificarToken, productoController.actualizarProducto);
+
+// Ruta PATCH para sumar stock a un producto específico
+router.patch('/productos/:id/stock', verificarToken, productoController.sumarStock);
