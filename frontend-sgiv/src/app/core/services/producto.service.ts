@@ -7,20 +7,24 @@ import { environment } from '../../../environments/environment';
   providedIn: 'root'
 })
 export class ProductoService {
-  private apiUrl = environment.apiUrl; // Esto es http://localhost:3000/api
+  private apiUrl = environment.apiUrl; 
 
   constructor(private http: HttpClient) { }
 
+  // Función 1: Pedir los productos 
   obtenerInventario(): Observable<any> {
     const token = localStorage.getItem('token_sgiv');
-    
-    // Si decidiste proteger la ruta en Node, enviamos el token. Si no, no pasa nada, igual lo enviamos por si acaso.
     const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
-
-    // Usamos TU ruta exacta: /catalogo/productos
-    // Le agregamos el truco de la hora para evitar la caché terca del navegador
     const url = `${this.apiUrl}/catalogo/productos?hora=${new Date().getTime()}`;
-
     return this.http.get(url, { headers });
+  }
+
+  // Función 2: ENVIAR un nuevo producto 
+  crearProducto(productoData: any): Observable<any> {
+    const token = localStorage.getItem('token_sgiv');
+    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    
+    // Aquí enviamos los datos por el método POST
+    return this.http.post(`${this.apiUrl}/catalogo/productos`, productoData, { headers });
   }
 }
