@@ -2,7 +2,7 @@ import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProductoService } from '../../../core/services/producto.service';
-import { HttpClient, HttpHeaders } from '@angular/common/http'; // 1. Importamos HttpClient
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 
 @Component({
@@ -14,13 +14,19 @@ import { environment } from '../../../../environments/environment';
 export class PuntoVentaComponent implements OnInit {
   private productoService = inject(ProductoService);
   private cdr = inject(ChangeDetectorRef);
-  private http = inject(HttpClient); // 2. Inyectamos HttpClient
+  private http = inject(HttpClient);
   private apiUrl = environment.apiUrl;
 
+  // Variables de Interfaz
   productosDisponibles: any[] = [];
   carrito: any[] = [];
   total: number = 0;
   cargando: boolean = true;
+
+  // --- 1. Variables para el Ticket ---
+  mostrarTicket: boolean = false;
+  datosTicket: any = null;
+  fechaTicket: Date = new Date();
 
   ngOnInit() {
     this.cargarCatalogo();
@@ -29,6 +35,7 @@ export class PuntoVentaComponent implements OnInit {
   cargarCatalogo() {
     this.productoService.obtenerInventario().subscribe({
       next: (datos) => {
+        // Mostramos solo productos con stock
         this.productosDisponibles = datos.filter((p: any) => (p.stock_actual || 0) > 0);
         this.cargando = false;
         this.cdr.detectChanges();
@@ -41,15 +48,12 @@ export class PuntoVentaComponent implements OnInit {
     });
   }
 
- agregarAlCarrito(producto: any) {
+  agregarAlCarrito(producto: any) {
     const itemExistente = this.carrito.find(item => item.id_producto === producto.id_producto);
-    
-    // 1. EL TRUCO DE ORO: Forzamos a que el stock y el precio sean Números reales, no textos.
     const stockReal = Number(producto.stock_actual) || 0;
     const precioReal = Number(producto.precio_unitario) || 0;
 
     if (itemExistente) {
-      // Ahora comparamos número contra número de forma segura
       if (itemExistente.cantidad < stockReal) {
         itemExistente.cantidad++;
         itemExistente.subtotal = itemExistente.cantidad * precioReal;
@@ -57,7 +61,6 @@ export class PuntoVentaComponent implements OnInit {
         alert(`No hay más stock de ${producto.nombre_producto}. Límite: ${stockReal} unidades.`);
       }
     } else {
-      // Si es nuevo en el carrito, lo insertamos con los números ya limpios
       this.carrito.push({
         ...producto,
         cantidad: 1,
@@ -65,7 +68,6 @@ export class PuntoVentaComponent implements OnInit {
         subtotal: precioReal
       });
     }
-    
     this.calcularTotal();
   }
 
@@ -74,35 +76,27 @@ export class PuntoVentaComponent implements OnInit {
     this.calcularTotal();
   }
 
-calcularTotal() {
-    // Nos aseguramos de sumar matemáticamente y no juntar textos
+  calcularTotal() {
     this.total = this.carrito.reduce((suma, item) => suma + Number(item.subtotal), 0);
-    
-    // Le damos un empujón a Angular para que actualice el HTML inmediatamente
     this.cdr.detectChanges(); 
   }
 
-  // 3. NUESTRA FUNCIÓN ESTRELLA
+  // --- 2. Función de Registro de Venta con Lógica de Ticket ---
   registrarVenta() {
     if (this.carrito.length === 0) return;
 
-    this.cargando = true; // Mostramos que estamos trabajando
-    
-    // Obtenemos el token de seguridad
+    this.cargando = true;
     const token = localStorage.getItem('token_sgiv');
     const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
     
-    // ARMAMOS EL PAQUETE EXACTAMENTE COMO LO PIDE TU CAJAMODEL.JS
     const datosVenta = {
-      id_sucursal: 1,           // Temporal: Asumimos sucursal 1
-      id_usuario_cajero: 1,     // Temporal: Asumimos usuario 1
-      id_cliente: null,         // Venta al paso (anónimo)
-      id_pedido_mesa: null,     // Venta directa
-      id_turno: 1,              // Temporal: Asumimos turno 1
+      id_sucursal: 1,
+      id_usuario_cajero: 1,
+      id_cliente: null,
+      id_pedido_mesa: null,
+      id_turno: 1,
       monto_total_venta: this.total,
       metodo_pago: 'Efectivo',  
-      
-      // Transformamos tu carrito de Angular a los detalles que pide tu Node.js
       detalles: this.carrito.map(item => ({
         id_producto: item.id_producto,
         cantidad: item.cantidad,
@@ -111,23 +105,39 @@ calcularTotal() {
       }))
     };
 
-    // Apuntamos a la ruta exacta de tu cajaRoutes.js: /api/caja/cobrar
     this.http.post(`${this.apiUrl}/caja/cobrar`, datosVenta, { headers }).subscribe({
       next: (respuesta: any) => {
-        console.log('¡Venta Exitosa!', respuesta);
-        alert(`¡Venta #${respuesta.id_venta} registrada con éxito!`);
+        this.datosTicket = {
+          id_venta: respuesta.id_venta,
+          items: [...this.carrito], // Copia de seguridad del carrito
+          total: this.total
+        };
+        this.fechaTicket = new Date();
+        this.mostrarTicket = true; // Abrimos el modal del ticket
         
-        // Limpiamos la pantalla
+        // Limpieza de la interfaz de venta
         this.carrito = [];
         this.total = 0;
-        this.cargarCatalogo(); // Recargamos para ver los nuevos stocks
+        this.cargarCatalogo(); // Actualizamos stocks
+        this.cargando = false;
+        this.cdr.detectChanges();
       },
       error: (error) => {
         console.error('Error al registrar venta:', error);
-        alert('Hubo un error al procesar la venta. Revisa la consola para más detalles.');
+        alert('Hubo un error al procesar la venta.');
         this.cargando = false;
         this.cdr.detectChanges();
       }
     });
+  }
+
+  // --- 3. Funciones del Ticket ---
+  imprimirVenta() {
+    window.print();
+  }
+
+  cerrarTicket() {
+    this.mostrarTicket = false;
+    this.datosTicket = null;
   }
 }

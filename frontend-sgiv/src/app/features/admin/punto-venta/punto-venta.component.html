@@ -69,3 +69,60 @@
   </div>
 
 </div>
+
+
+
+<div *ngIf="mostrarTicket" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 no-print">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+    
+    <div class="bg-gray-100 p-4 border-b flex justify-between items-center">
+      <h3 class="font-bold text-gray-700 text-lg">Comprobante de Venta</h3>
+      <button (click)="cerrarTicket()" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+
+    <div id="ticket-imprimible" class="p-8 bg-white overflow-y-auto font-mono text-sm text-gray-800">
+      <div class="text-center mb-4">
+        <h2 class="text-2xl font-black uppercase">Pastelería Ricky's</h2>
+        <p class="text-xs">Sucursal Central - Bolivia</p>
+        <p class="text-xs">Fecha: {{ fechaTicket | date:'dd/MM/yyyy HH:mm' }}</p>
+        <p class="text-xs font-bold mt-2">VENTA #{{ datosTicket?.id_venta }}</p>
+      </div>
+
+      <div class="border-b-2 border-dashed border-gray-300 my-4"></div>
+
+      <div class="flex justify-between font-bold mb-2">
+        <span class="w-1/2">Producto</span>
+        <span class="w-1/4 text-center">Cant.</span>
+        <span class="w-1/4 text-right">Subt.</span>
+      </div>
+
+      <div *ngFor="let item of datosTicket?.items" class="flex justify-between mb-1">
+        <span class="w-1/2 leading-tight">{{ item.nombre_producto }}</span>
+        <span class="w-1/4 text-center">{{ item.cantidad }}</span>
+        <span class="w-1/4 text-right">Bs. {{ item.subtotal }}</span>
+      </div>
+
+      <div class="border-b-2 border-dashed border-gray-300 my-4"></div>
+
+      <div class="flex justify-between text-lg font-black">
+        <span>TOTAL:</span>
+        <span>Bs. {{ datosTicket?.total }}</span>
+      </div>
+
+      <div class="text-center mt-8 italic text-xs">
+        <p>¡Gracias por su compra!</p>
+        <p>Vuelva pronto</p>
+      </div>
+    </div>
+
+    <div class="p-4 bg-gray-50 border-t flex gap-3">
+      <button (click)="imprimirVenta()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors shadow-md">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+        Imprimir Ticket
+      </button>
+    </div>
+
+  </div>
+</div>

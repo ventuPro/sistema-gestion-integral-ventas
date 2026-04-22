@@ -13,8 +13,16 @@ const abrirCaja = async (req, res) => {
 
 const cobrarVenta = async (req, res) => {
     try {
-        // Recibimos todos los datos y un arreglo de "detalles" con los productos vendidos
-        const id_venta = await cajaModel.registrarVenta(req.body);
+        // 1. Interceptamos los datos del carrito que vienen de Angular
+        const datosVenta = req.body;
+
+        // 2.Sobreescribimos cualquier ID falso e inyectamos el ID real del cajero logueado
+        // Nota: Asumo que en tu Token guardaste el ID como "id_usuario". Si lo guardaste solo como "id", cámbialo a req.usuario.id
+        datosVenta.id_usuario_cajero = req.usuario.id_usuario; 
+
+        // 3. Procesamos la venta con el modelo
+        const id_venta = await cajaModel.registrarVenta(datosVenta);
+        
         res.status(201).json({ mensaje: 'Venta registrada con éxito y stock descontado', id_venta });
     } catch (error) {
         console.error('Error en cobrarVenta:', error);

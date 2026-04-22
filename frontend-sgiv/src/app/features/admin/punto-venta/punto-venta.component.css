@@ -1,0 +1,27 @@
+@media print {
+  /* Ocultamos absolutamente todo lo que tenga la clase .no-print */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Hacemos visible solo el área del ticket */
+  #ticket-imprimible, #ticket-imprimible * {
+    visibility: visible;
+  }
+  
+  /* Posicionamos el ticket al principio de la hoja */
+  #ticket-imprimible {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Quitamos bordes y sombras del modal para que salga limpio en papel */
+  .fixed, .bg-opacity-50, .shadow-2xl {
+    background: none !important;
+    position: static !important;
+  }
+}
