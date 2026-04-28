@@ -1,0 +1,226 @@
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+
+  <!-- Cabecera -->
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-800">Gestión de Usuarios</h2>
+      <p class="text-sm text-gray-500 mt-1">Administra los cajeros y operadores del sistema</p>
+    </div>
+    <button (click)="abrirModalNuevo()"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors shadow-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      Nuevo Usuario
+    </button>
+  </div>
+
+  <!-- Tabla -->
+  <div class="overflow-x-auto">
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider border-b border-gray-200">
+          <th class="px-6 py-3 font-medium">Nombre</th>
+          <th class="px-6 py-3 font-medium">Correo</th>
+          <th class="px-6 py-3 font-medium">Rol</th>
+          <th class="px-6 py-3 font-medium">Sucursal</th>
+          <th class="px-6 py-3 font-medium">Estado</th>
+          <th class="px-6 py-3 font-medium text-center">Acciones</th>
+        </tr>
+      </thead>
+
+      <tbody class="text-gray-700 text-sm">
+
+        <!-- Estado de carga -->
+        <tr *ngIf="cargando">
+          <td colspan="6" class="px-6 py-10 text-center text-gray-400">
+            <div class="flex flex-col items-center gap-2">
+              <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <span>Cargando usuarios...</span>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Sin resultados -->
+        <tr *ngIf="!cargando && listaUsuarios.length === 0">
+          <td colspan="6" class="px-6 py-10 text-center text-gray-400">
+            No hay usuarios registrados en el sistema.
+          </td>
+        </tr>
+
+        <!-- Filas -->
+        <tr *ngFor="let usr of listaUsuarios"
+            class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+            [class.opacity-50]="!usr.estado_activo">
+          
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                {{ usr.nombre_completo?.charAt(0)?.toUpperCase() }}
+              </div>
+              <span class="font-medium text-gray-900">{{ usr.nombre_completo }}</span>
+            </div>
+          </td>
+
+          <td class="px-6 py-4 text-gray-500">{{ usr.correo_electronico }}</td>
+
+          <td class="px-6 py-4">
+            <span class="px-2 py-1 rounded-full text-xs font-bold" [ngClass]="getBadgeRol(usr.nombre_rol)">
+              {{ usr.nombre_rol || 'Sin rol' }}
+            </span>
+          </td>
+
+          <td class="px-6 py-4 text-gray-500">{{ usr.nombre_sucursal || '—' }}</td>
+
+          <td class="px-6 py-4">
+            <span *ngIf="usr.estado_activo"  class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Activo</span>
+            <span *ngIf="!usr.estado_activo" class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold">Inactivo</span>
+          </td>
+
+          <td class="px-6 py-4 text-center">
+            <button (click)="abrirModalEditar(usr)"
+                    class="text-blue-500 hover:text-blue-700 font-medium mr-4 text-sm">
+              Editar
+            </button>
+            <button *ngIf="usr.estado_activo"
+                    (click)="desactivarUsuario(usr.id_usuario, usr.nombre_completo)"
+                    class="text-red-500 hover:text-red-700 font-medium text-sm">
+              Desactivar
+            </button>
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- MODAL: CREAR / EDITAR USUARIO                          -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div *ngIf="mostrarModal"
+     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+
+    <!-- Cabecera del modal -->
+    <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+      <div>
+        <h3 class="text-lg font-bold text-gray-800">
+          {{ editandoId ? 'Editar Usuario' : 'Crear Nuevo Usuario' }}
+        </h3>
+        <p class="text-xs text-gray-500 mt-0.5">
+          {{ editandoId ? 'Modifica los datos del usuario' : 'Completa el formulario para crear un cajero' }}
+        </p>
+      </div>
+      <button (click)="cerrarModal()" class="text-gray-400 hover:text-red-500 transition-colors p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Cuerpo del modal -->
+    <div class="p-6 space-y-4">
+
+      <!-- Mensaje de error -->
+      <div *ngIf="mensajeError" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        {{ mensajeError }}
+      </div>
+
+      <!-- Nombre completo -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Nombre Completo <span class="text-red-500">*</span>
+        </label>
+        <input type="text"
+               [(ngModel)]="formulario.nombre_completo"
+               name="nombre"
+               placeholder="Ej: Juan Pérez"
+               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+      </div>
+
+      <!-- Correo -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Correo Electrónico <span class="text-red-500">*</span>
+        </label>
+        <input type="email"
+               [(ngModel)]="formulario.correo_electronico"
+               name="correo"
+               placeholder="cajero@rickys.com"
+               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+      </div>
+
+      <!-- Contraseña (solo al crear) -->
+      <div *ngIf="!editandoId">
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Contraseña <span class="text-red-500">*</span>
+        </label>
+        <input type="password"
+               [(ngModel)]="formulario.contrasena"
+               name="contrasena"
+               placeholder="Mínimo 8 caracteres"
+               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+        <p class="text-xs text-gray-400 mt-1">La contraseña se encriptará automáticamente.</p>
+      </div>
+
+      <!-- Aviso al editar -->
+      <div *ngIf="editandoId" class="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-xs">
+        Para cambiar la contraseña de este usuario, usa la opción "Restablecer Contraseña" (próximamente).
+      </div>
+
+      <!-- Rol y Sucursal en dos columnas -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Rol <span class="text-red-500">*</span>
+          </label>
+          <select [(ngModel)]="formulario.id_rol"
+                  name="rol"
+                  class="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            <option value="" disabled>Seleccionar...</option>
+            <option *ngFor="let rol of listaRoles" [value]="rol.id_rol">
+              {{ rol.nombre_rol }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Sucursal <span class="text-red-500">*</span>
+          </label>
+          <select [(ngModel)]="formulario.id_sucursal"
+                  name="sucursal"
+                  class="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+            <option value="" disabled>Seleccionar...</option>
+            <option *ngFor="let suc of listaSucursales" [value]="suc.id_sucursal">
+              {{ suc.nombre_sucursal }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer del modal -->
+    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+      <button (click)="cerrarModal()"
+              type="button"
+              class="px-4 py-2 text-gray-600 bg-white border border-gray-300 hover:bg-gray-100 rounded-lg font-medium text-sm transition-colors">
+        Cancelar
+      </button>
+      <button (click)="guardarUsuario()"
+              [disabled]="cargando"
+              type="button"
+              class="px-5 py-2 text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 rounded-lg font-medium text-sm flex items-center gap-2 shadow-sm transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        {{ editandoId ? 'Guardar Cambios' : 'Crear Usuario' }}
+      </button>
+    </div>
+
+  </div>
+</div>

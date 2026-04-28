@@ -1,11 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const { verificarToken } = require('../middlewares/authMiddleware');
 
-// Ruta para registrar: POST http://localhost:3000/api/usuarios/registro
+// --- Rutas Públicas (sin token) ---
 router.post('/registro', userController.registrarUsuario);
-
-// Ruta para login: POST http://localhost:3000/api/usuarios/login
 router.post('/login', userController.loginUsuario);
+
+// --- Rutas Protegidas (requieren token JWT) ---
+router.get('/',               verificarToken, userController.listarUsuarios);
+router.get('/formulario',     verificarToken, userController.obtenerFormularioDatos);
+router.put('/:id',            verificarToken, userController.editarUsuario);
+router.delete('/:id',         verificarToken, userController.eliminarUsuario);
 
 module.exports = router;

@@ -4,19 +4,20 @@ import { DashboardComponent } from './features/admin/dashboard/dashboard.compone
 import { ResumenComponent } from './features/admin/resumen/resumen.component';
 import { InventarioComponent } from './features/admin/inventario/inventario.component';
 import { PuntoVentaComponent } from './features/admin/punto-venta/punto-venta.component';
+import { UsuariosComponent } from './features/admin/usuarios/usuarios.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
-  { 
-    path: 'dashboard', 
+  {
+    path: 'dashboard',
     component: DashboardComponent,
     children: [
-      // Cuando entren a /dashboard, por defecto mostramos el resumen
       { path: '', redirectTo: 'resumen', pathMatch: 'full' },
-      { path: 'resumen', component: ResumenComponent },
-      { path: 'inventario', component: InventarioComponent },
-      { path: 'punto-venta', component: PuntoVentaComponent }
+      { path: 'resumen',      component: ResumenComponent },
+      { path: 'inventario',   component: InventarioComponent },
+      { path: 'punto-venta',  component: PuntoVentaComponent },
+      { path: 'usuarios',     component: UsuariosComponent }
     ]
   }
 ];
