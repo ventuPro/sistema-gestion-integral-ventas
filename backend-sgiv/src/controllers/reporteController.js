@@ -1,5 +1,6 @@
 const reporteModel = require('../models/reporteModel');
 
+// Dashboard antiguo (mantener compatibilidad)
 const obtenerDashboard = async (req, res) => {
     try {
         const { id_sucursal } = req.params;
@@ -10,7 +11,7 @@ const obtenerDashboard = async (req, res) => {
         ]);
         res.json({
             resumen_diario: {
-                total_ventas: parseInt(resumenDiario.total_ventas),
+                total_ventas:     parseInt(resumenDiario.total_ventas),
                 ingresos_totales: parseFloat(resumenDiario.ingresos_totales)
             },
             top_productos: topProductos,
@@ -22,18 +23,33 @@ const obtenerDashboard = async (req, res) => {
     }
 };
 
-// NUEVO: Reporte por período
+// Dashboard completo (nuevo)
+const obtenerDashboardCompleto = async (req, res) => {
+    try {
+        const id_sucursal  = req.params.id_sucursal || 1;
+        const id_categoria = req.query.categoria || null;
+        const datos = await reporteModel.obtenerDashboardCompleto(id_sucursal, id_categoria);
+        res.json(datos);
+    } catch (error) {
+        console.error('Error en obtenerDashboardCompleto:', error);
+        res.status(500).json({ error: 'Error al generar el dashboard' });
+    }
+};
+
+// Reporte por período — FIX fechas
 const obtenerReportePeriodo = async (req, res) => {
     try {
         const { id_sucursal = 1 } = req.params;
         const { fecha_inicio, fecha_fin } = req.query;
 
-        const fin = fecha_fin
-            ? new Date(fecha_fin + 'T23:59:59')
-            : new Date();
+        const ahora = new Date();
+        // FIX: construir fechas correctas con timezone local
         const inicio = fecha_inicio
             ? new Date(fecha_inicio + 'T00:00:00')
-            : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            : new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        const fin = fecha_fin
+            ? new Date(fecha_fin + 'T23:59:59')
+            : ahora;
 
         const datos = await reporteModel.obtenerReportePorPeriodo(id_sucursal, inicio, fin);
         res.json(datos);
@@ -43,4 +59,4 @@ const obtenerReportePeriodo = async (req, res) => {
     }
 };
 
-module.exports = { obtenerDashboard, obtenerReportePeriodo };
+module.exports = { obtenerDashboard, obtenerDashboardCompleto, obtenerReportePeriodo };

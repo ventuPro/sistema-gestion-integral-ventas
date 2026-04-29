@@ -15,33 +15,55 @@ import * as XLSX from 'xlsx';
 })
 export class ReportesComponent implements OnInit {
   private reporteService = inject(ReporteService);
-  private cdr = inject(ChangeDetectorRef);
+  private cdr            = inject(ChangeDetectorRef);
 
-  cargando = false;
+  cargando       = false;
   datosReporte: any = null;
   periodoActivo: 'hoy' | 'semana' | 'mes' | 'personalizado' = 'mes';
+
+  // FIX: inicializar con fechas válidas
   fechaInicio = '';
-  fechaFin = '';
-  tipoReporte: 'ingresos' | 'productos' | 'categorias' = 'ingresos';
+  fechaFin    = '';
 
   ngOnInit() { this.seleccionarPeriodo('mes'); }
+
+  private fmt(d: Date): string {
+    return d.toISOString().split('T')[0];
+  }
 
   seleccionarPeriodo(p: 'hoy' | 'semana' | 'mes' | 'personalizado') {
     this.periodoActivo = p;
     const hoy = new Date();
-    const fmt = (d: Date) => d.toISOString().split('T')[0];
-    if (p === 'hoy') { this.fechaInicio = fmt(hoy); this.fechaFin = fmt(hoy); }
-    else if (p === 'semana') { const l = new Date(hoy); l.setDate(hoy.getDate() - hoy.getDay() + 1); this.fechaInicio = fmt(l); this.fechaFin = fmt(hoy); }
-    else if (p === 'mes') { this.fechaInicio = fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1)); this.fechaFin = fmt(hoy); }
-    if (p !== 'personalizado') this.cargarReporte();
+
+    if (p === 'hoy') {
+      this.fechaInicio = this.fmt(hoy);
+      this.fechaFin    = this.fmt(hoy);
+      this.cargarReporte();
+    } else if (p === 'semana') {
+      const lunes = new Date(hoy);
+      lunes.setDate(hoy.getDate() - hoy.getDay() + 1);
+      this.fechaInicio = this.fmt(lunes);
+      this.fechaFin    = this.fmt(hoy);
+      this.cargarReporte();
+    } else if (p === 'mes') {
+      this.fechaInicio = this.fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+      this.fechaFin    = this.fmt(hoy);
+      this.cargarReporte();
+    }
+    // 'personalizado': no carga automáticamente, espera al botón "Generar"
   }
 
   cargarReporte() {
-    if (!this.fechaInicio || !this.fechaFin) return;
+    if (!this.fechaInicio || !this.fechaFin) {
+      alert('Selecciona las fechas de inicio y fin.'); return;
+    }
+    if (this.fechaInicio > this.fechaFin) {
+      alert('La fecha de inicio no puede ser mayor a la fecha final.'); return;
+    }
     this.cargando = true;
     this.reporteService.obtenerReportePeriodo(1, this.fechaInicio, this.fechaFin).subscribe({
-      next: (datos) => { this.datosReporte = datos; this.cargando = false; this.cdr.detectChanges(); },
-      error: () => { this.cargando = false; this.cdr.detectChanges(); }
+      next:  (datos) => { this.datosReporte = datos; this.cargando = false; this.cdr.detectChanges(); },
+      error: ()      => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
 
@@ -50,102 +72,76 @@ export class ReportesComponent implements OnInit {
     if (!this.datosReporte) return;
     const doc = new jsPDF();
     const { resumen, ventas_diarias, por_categoria, top_productos } = this.datosReporte;
-    const hoy = new Date().toLocaleDateString('es-BO');
 
-    // Encabezado
     doc.setFillColor(37, 99, 235);
     doc.rect(0, 0, 210, 38, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PASTELERÍA RICKY\'S', 105, 15, { align: 'center' });
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Sistema de Gestión de Ventas e Inventario', 105, 23, { align: 'center' });
-    doc.setFontSize(10);
-    doc.text(`Reporte de Ingresos — ${this.fechaInicio} al ${this.fechaFin}`, 105, 31, { align: 'center' });
-
-    // Fecha de generación
-    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(18); doc.setFont('helvetica', 'bold');
+    doc.text("PASTELERÍA RICKY'S", 105, 14, { align: 'center' });
+    doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+    doc.text('Reporte de Ingresos', 105, 22, { align: 'center' });
     doc.setFontSize(9);
-    doc.text(`Generado el: ${hoy}`, 200, 44, { align: 'right' });
+    doc.text(`Período: ${this.fechaInicio} al ${this.fechaFin}`, 105, 31, { align: 'center' });
 
-    // Resumen ejecutivo
-    doc.setTextColor(37, 99, 235);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(37, 99, 235); doc.setFontSize(12); doc.setFont('helvetica', 'bold');
     doc.text('RESUMEN EJECUTIVO', 14, 52);
-    doc.setDrawColor(37, 99, 235);
-    doc.line(14, 54, 196, 54);
+    doc.setDrawColor(37, 99, 235); doc.line(14, 54, 196, 54);
 
-    const r = resumen || {};
     autoTable(doc, {
       startY: 58,
       head: [['Indicador', 'Valor']],
       body: [
-        ['Total de Ventas Realizadas', `${r.total_ventas || 0} ventas`],
-        ['Ingresos Totales', `Bs. ${parseFloat(r.ingresos_totales || 0).toFixed(2)}`],
-        ['Ticket Promedio por Venta', `Bs. ${parseFloat(r.ticket_promedio || 0).toFixed(2)}`],
+        ['Total Ventas',      `${resumen?.total_ventas || 0} ventas`],
+        ['Ingresos Totales',  `Bs. ${parseFloat(resumen?.ingresos_totales || 0).toFixed(2)}`],
+        ['Ticket Promedio',   `Bs. ${parseFloat(resumen?.ticket_promedio  || 0).toFixed(2)}`],
       ],
       theme: 'striped',
-      headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', fontSize: 10 },
-      bodyStyles: { fontSize: 10 },
-      columnStyles: { 0: { cellWidth: 110 }, 1: { cellWidth: 60, halign: 'right', fontStyle: 'bold' } },
+      headStyles:  { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+      columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
       margin: { left: 14, right: 14 }
     });
 
-    // Ventas por categoría
     if (por_categoria?.length > 0) {
       const y1 = (doc as any).lastAutoTable.finalY + 10;
-      doc.setTextColor(37, 99, 235);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(37, 99, 235); doc.setFont('helvetica', 'bold');
       doc.text('VENTAS POR CATEGORÍA', 14, y1);
       doc.line(14, y1 + 2, 196, y1 + 2);
+      // FIX: usar campo correcto "ingresos"
       autoTable(doc, {
         startY: y1 + 6,
-        head: [['Categoría', 'Unidades Vendidas', 'Ingresos (Bs.)']],
-        body: por_categoria.map((c: any) => [c.nombre_categoria, c.unidades, `Bs. ${parseFloat(c.ingresos).toFixed(2)}`]),
+        head: [['Categoría', 'Unidades', 'Ingresos']],
+        body: por_categoria.map((c: any) => [c.nombre_categoria, c.unidades, `Bs. ${parseFloat(c.ingresos || 0).toFixed(2)}`]),
         theme: 'striped',
-        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', fontSize: 10 },
-        bodyStyles: { fontSize: 10 },
+        headStyles:  { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
         columnStyles: { 1: { halign: 'center' }, 2: { halign: 'right', fontStyle: 'bold' } },
         margin: { left: 14, right: 14 }
       });
     }
 
-    // Top productos
     if (top_productos?.length > 0) {
       const y2 = (doc as any).lastAutoTable.finalY + 10;
-      if (y2 > 240) doc.addPage();
-      const yFinal = y2 > 240 ? 20 : y2;
-      doc.setTextColor(37, 99, 235);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
+      const yFinal = y2 > 240 ? (doc.addPage(), 20) : y2;
+      doc.setTextColor(37, 99, 235); doc.setFont('helvetica', 'bold');
       doc.text('TOP PRODUCTOS MÁS VENDIDOS', 14, yFinal);
       doc.line(14, yFinal + 2, 196, yFinal + 2);
       autoTable(doc, {
         startY: yFinal + 6,
-        head: [['#', 'Producto', 'Categoría', 'Unidades', 'Ingresos (Bs.)']],
-        body: top_productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, p.unidades, `Bs. ${parseFloat(p.ingresos).toFixed(2)}`]),
+        head: [['#', 'Producto', 'Categoría', 'Unidades', 'Ingresos']],
+        body: top_productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, p.unidades, `Bs. ${parseFloat(p.ingresos || 0).toFixed(2)}`]),
         theme: 'striped',
-        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', fontSize: 10 },
-        bodyStyles: { fontSize: 9 },
+        headStyles:  { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
         columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'right', fontStyle: 'bold' } },
         margin: { left: 14, right: 14 }
       });
     }
 
-    // Pie de página en todas las páginas
-    const totalPags = doc.getNumberOfPages();
-    for (let i = 1; i <= totalPags; i++) {
+    const total = doc.getNumberOfPages();
+    for (let i = 1; i <= total; i++) {
       doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`Sistema SGIV — Pastelería Ricky's — Página ${i} de ${totalPags}`, 105, 290, { align: 'center' });
+      doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+      doc.text(`SGIV — Pastelería Ricky's — Pág. ${i}/${total}`, 105, 290, { align: 'center' });
     }
-
-    doc.save(`Reporte_Ricky's_${this.fechaInicio}_${this.fechaFin}.pdf`);
+    doc.save(`Reporte_Rickys_${this.fechaInicio}_${this.fechaFin}.pdf`);
   }
 
   // ─── Exportar Excel ───
@@ -154,50 +150,43 @@ export class ReportesComponent implements OnInit {
     const wb = XLSX.utils.book_new();
     const { resumen, ventas_diarias, por_categoria, top_productos } = this.datosReporte;
 
-    // Hoja 1: Resumen
-    const resumenData = [
-      ['REPORTE DE INGRESOS — PASTELERÍA RICKY\'S'],
+    const ws1 = XLSX.utils.aoa_to_sheet([
+      ["REPORTE DE INGRESOS — PASTELERÍA RICKY'S"],
       [`Período: ${this.fechaInicio} al ${this.fechaFin}`],
       [''],
-      ['RESUMEN EJECUTIVO'],
-      ['Total Ventas', resumen?.total_ventas || 0],
-      ['Ingresos Totales (Bs.)', parseFloat(resumen?.ingresos_totales || 0).toFixed(2)],
-      ['Ticket Promedio (Bs.)', parseFloat(resumen?.ticket_promedio || 0).toFixed(2)],
-    ];
-    const ws1 = XLSX.utils.aoa_to_sheet(resumenData);
+      ['RESUMEN'],
+      ['Total Ventas',     resumen?.total_ventas || 0],
+      ['Ingresos (Bs.)',   parseFloat(resumen?.ingresos_totales || 0).toFixed(2)],
+      ['Ticket Prom (Bs.)',parseFloat(resumen?.ticket_promedio  || 0).toFixed(2)],
+    ]);
     ws1['!cols'] = [{ wch: 30 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, ws1, 'Resumen');
 
-    // Hoja 2: Ventas por día
     if (ventas_diarias?.length > 0) {
-      const diasData = [
-        ['Fecha', 'Número de Ventas', 'Ingresos (Bs.)'],
+      const ws2 = XLSX.utils.aoa_to_sheet([
+        ['Fecha', 'Ventas', 'Ingresos (Bs.)'],
         ...ventas_diarias.map((d: any) => [d.dia, parseInt(d.ventas), parseFloat(d.ingresos).toFixed(2)])
-      ];
-      const ws2 = XLSX.utils.aoa_to_sheet(diasData);
-      ws2['!cols'] = [{ wch: 15 }, { wch: 20 }, { wch: 20 }];
-      XLSX.utils.book_append_sheet(wb, ws2, 'Ventas por Día');
+      ]);
+      ws2['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(wb, ws2, 'Por Día');
     }
 
-    // Hoja 3: Por categoría
     if (por_categoria?.length > 0) {
-      const catData = [
-        ['Categoría', 'Unidades Vendidas', 'Ingresos (Bs.)'],
-        ...por_categoria.map((c: any) => [c.nombre_categoria, parseInt(c.unidades), parseFloat(c.ingresos).toFixed(2)])
-      ];
-      const ws3 = XLSX.utils.aoa_to_sheet(catData);
-      ws3['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 20 }];
+      // FIX: usar campo correcto "ingresos"
+      const ws3 = XLSX.utils.aoa_to_sheet([
+        ['Categoría', 'Unidades', 'Ingresos (Bs.)'],
+        ...por_categoria.map((c: any) => [c.nombre_categoria, parseInt(c.unidades || 0), parseFloat(c.ingresos || 0).toFixed(2)])
+      ]);
+      ws3['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 18 }];
       XLSX.utils.book_append_sheet(wb, ws3, 'Por Categoría');
     }
 
-    // Hoja 4: Top productos
     if (top_productos?.length > 0) {
-      const prodData = [
+      const ws4 = XLSX.utils.aoa_to_sheet([
         ['#', 'Producto', 'Categoría', 'Unidades', 'Ingresos (Bs.)'],
-        ...top_productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, parseInt(p.unidades), parseFloat(p.ingresos).toFixed(2)])
-      ];
-      const ws4 = XLSX.utils.aoa_to_sheet(prodData);
-      ws4['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 20 }];
+        ...top_productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, parseInt(p.unidades || 0), parseFloat(p.ingresos || 0).toFixed(2)])
+      ]);
+      ws4['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 20 }, { wch: 12 }, { wch: 18 }];
       XLSX.utils.book_append_sheet(wb, ws4, 'Top Productos');
     }
 

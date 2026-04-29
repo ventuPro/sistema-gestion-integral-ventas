@@ -1,39 +1,181 @@
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 class="text-gray-500 text-sm font-semibold uppercase tracking-wider">
-            Ventas de Hoy ({{ resumenDiario?.total_ventas || 0 }})
-          </h3>
-          <p class="text-3xl font-bold mt-2 text-gray-800">
-            Bs. {{ resumenDiario?.ingresos_totales || 0 }}
-          </p>
-        </div>
+<div class="space-y-6">
 
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 class="text-gray-500 text-sm font-semibold uppercase tracking-wider">
-            Productos Críticos
-          </h3>
-          <p class="text-3xl font-bold mt-2 text-red-500">
-            {{ alertasStock.length }}
-          </p>
-        </div>
+  <!-- Barra superior: selector de sucursal + botón nueva sucursal -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-4 flex flex-wrap justify-between items-center gap-3">
+    <div class="flex items-center gap-3 flex-wrap">
+      <label class="text-sm font-semibold text-gray-600">Sucursal:</label>
+      <select [(ngModel)]="sucursalActual" (ngModelChange)="cambiarSucursal()"
+              class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 min-w-40">
+        <option *ngFor="let s of sucursales" [value]="s.id_sucursal">{{ s.nombre_sucursal }}</option>
+      </select>
+      <button (click)="abrirModalSucursal()"
+              class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+        <span class="text-lg leading-none">+</span> Nueva Sucursal
+      </button>
+    </div>
+    <span *ngIf="cargando" class="text-sm text-gray-400 flex items-center gap-2">
+      <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      Actualizando...
+    </span>
+    <span *ngIf="!cargando" class="text-xs text-gray-400">Datos de hoy · Auto-refresco 60s</span>
+  </div>
 
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 class="text-gray-500 text-sm font-semibold uppercase tracking-wider">
-            Estado del Sistema
-          </h3>
-          <p class="text-xl font-bold mt-2 text-green-600 mt-3">
-            <span *ngIf="cargando">Conectando...</span>
-            <span *ngIf="!cargando">EN LÍNEA</span>
-          </p>
-        </div>
+  <!-- Tarjetas KPI -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4" *ngIf="!cargando && datosAdmin">
 
+    <!-- Ventas del día -->
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+      <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Ventas de Hoy</p>
+      <p class="text-4xl font-black text-gray-800 mt-2">{{ resumen.total_ventas || 0 }}</p>
+      <p class="text-xs text-gray-400 mt-1">transacciones</p>
+    </div>
+
+    <!-- Efectivo -->
+    <div class="bg-green-50 p-5 rounded-xl shadow-sm border border-green-100">
+      <p class="text-xs font-bold text-green-600 uppercase tracking-wide">Efectivo</p>
+      <p class="text-3xl font-black text-green-700 mt-2">Bs. {{ totalEfectivo.toFixed(2) }}</p>
+      <p class="text-xs text-green-500 mt-1">pagos en efectivo</p>
+    </div>
+
+    <!-- QR -->
+    <div class="bg-purple-50 p-5 rounded-xl shadow-sm border border-purple-100">
+      <p class="text-xs font-bold text-purple-600 uppercase tracking-wide">QR</p>
+      <p class="text-3xl font-black text-purple-700 mt-2">Bs. {{ totalQr.toFixed(2) }}</p>
+      <p class="text-xs text-purple-500 mt-1">pagos por QR</p>
+    </div>
+
+    <!-- Estado Caja -->
+    <div class="p-5 rounded-xl shadow-sm border"
+         [class.bg-green-50]="turno"
+         [class.border-green-100]="turno"
+         [class.bg-red-50]="!turno"
+         [class.border-red-100]="!turno">
+      <p class="text-xs font-bold uppercase tracking-wide"
+         [class.text-green-600]="turno" [class.text-red-500]="!turno">
+        Estado de la Caja
+      </p>
+      <p class="text-2xl font-black mt-2"
+         [class.text-green-700]="turno" [class.text-red-600]="!turno">
+        {{ turno ? 'ABIERTA' : 'CERRADA' }}
+      </p>
+      <div *ngIf="turno" class="mt-1 space-y-0.5">
+        <p class="text-xs text-green-600 font-medium">{{ turno.cajero }}</p>
+        <p class="text-xs text-green-500">Apertura: Bs. {{ (+turno.monto_inicial).toFixed(2) }}</p>
       </div>
+      <p *ngIf="!turno" class="text-xs text-red-400 mt-1">Sin turno activo</p>
+    </div>
+  </div>
 
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8">
-        <h3 class="text-gray-800 font-bold text-lg mb-4">Productos Más Vendidos</h3>
-        
-        <div class="relative h-64 w-full">
-          <canvas id="graficoProductos"></canvas> 
+  <!-- Fila de gráficos: Pie + Barras diarias -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6" *ngIf="!cargando && datosAdmin">
+
+    <!-- Pie: métodos de pago -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <h3 class="font-bold text-gray-800 mb-4">Ventas por Método de Pago</h3>
+      <div class="relative h-52">
+        <canvas id="graficoPie"></canvas>
+        <div *ngIf="!datosAdmin.metodos_pago?.length"
+             class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+          Sin ventas hoy
         </div>
       </div>
+    </div>
+
+    <!-- Barras: ingresos últimos 7 días -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <h3 class="font-bold text-gray-800 mb-4">Ingresos Últimos 7 Días</h3>
+      <div class="relative h-52">
+        <canvas id="graficoBarras"></canvas>
+        <div *ngIf="!datosAdmin.ventas_por_dia?.length"
+             class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+          Sin datos en este período
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráfico productos con filtro de categoría -->
+  <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100" *ngIf="!cargando && datosAdmin">
+    <div class="flex flex-wrap justify-between items-center mb-4 gap-3">
+      <h3 class="font-bold text-gray-800">Productos Más Vendidos Hoy</h3>
+      <!-- Filtro de categoría -->
+      <div class="flex gap-2 flex-wrap">
+        <button (click)="filtrarCategoria(null)"
+                [class.bg-blue-600]="categoriaFiltroChart === null"
+                [class.text-white]="categoriaFiltroChart === null"
+                [class.bg-gray-100]="categoriaFiltroChart !== null"
+                [class.text-gray-600]="categoriaFiltroChart !== null"
+                class="px-3 py-1 rounded-full text-xs font-medium transition-colors">
+          Todas
+        </button>
+        <button *ngFor="let cat of listaCategorias"
+                (click)="filtrarCategoria(cat.id_categoria)"
+                [class.bg-blue-600]="categoriaFiltroChart === cat.id_categoria"
+                [class.text-white]="categoriaFiltroChart === cat.id_categoria"
+                [class.bg-gray-100]="categoriaFiltroChart !== cat.id_categoria"
+                [class.text-gray-600]="categoriaFiltroChart !== cat.id_categoria"
+                class="px-3 py-1 rounded-full text-xs font-medium transition-colors">
+          {{ cat.nombre_categoria }}
+        </button>
+      </div>
+    </div>
+    <div class="relative h-52">
+      <canvas id="graficoProductos"></canvas>
+      <div *ngIf="!datosAdmin.top_productos?.length"
+           class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+        Sin ventas hoy con este filtro
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading inicial -->
+  <div *ngIf="cargando" class="bg-white rounded-xl p-12 text-center border border-gray-100">
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-gray-400">Cargando datos del panel...</p>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══ MODAL: NUEVA SUCURSAL ═══ -->
+<div *ngIf="mostrarModalSucursal"
+     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+    <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+      <h3 class="text-lg font-bold text-gray-800">Nueva Sucursal</h3>
+      <button (click)="cerrarModalSucursal()" class="text-gray-400 hover:text-red-500 text-xl">✕</button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div *ngIf="errorSucursal" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+        {{ errorSucursal }}
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+        <input type="text" [(ngModel)]="nuevaSucursal.nombre_sucursal"
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+               placeholder="Ej: Sucursal Norte">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+        <input type="text" [(ngModel)]="nuevaSucursal.direccion_fisica"
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+               placeholder="Av. Principal #123">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+        <input type="text" [(ngModel)]="nuevaSucursal.telefono_contacto"
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+               placeholder="70000000">
+      </div>
+    </div>
+    <div class="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
+      <button (click)="cerrarModalSucursal()" class="px-4 py-2 bg-white border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100">Cancelar</button>
+      <button (click)="guardarSucursal()" [disabled]="cargandoSucursal"
+              class="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium">
+        {{ cargandoSucursal ? 'Guardando...' : 'Crear Sucursal' }}
+      </button>
+    </div>
+  </div>
+</div>

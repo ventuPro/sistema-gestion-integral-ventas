@@ -19,20 +19,34 @@ export class PuntoVentaComponent implements OnInit {
   private apiUrl = environment.apiUrl;
 
   productosDisponibles: any[] = [];
-  productosFiltrados: any[] = [];
+  productosFiltrados:   any[] = [];
   carrito: any[] = [];
   total = 0;
   cargando = true;
+
   busquedaPV = '';
   categoriaSeleccionada = 'todas';
   listaCategorias: any[] = [];
+
+  // Modal de cobro (checkout)
+  mostrarModalCobro = false;
+  metodoPago: 'Efectivo' | 'QR' = 'Efectivo';
+  montoRecibido = 0;
+  get cambio(): number {
+    if (this.metodoPago !== 'Efectivo') return 0;
+    const c = this.montoRecibido - this.total;
+    return c > 0 ? c : 0;
+  }
+  get pagoInsuficiente(): boolean {
+    return this.metodoPago === 'Efectivo' && this.montoRecibido < this.total;
+  }
 
   // Ticket
   mostrarTicket = false;
   datosTicket: any = null;
   fechaTicket = new Date();
 
-  // Historial de ventas de la sesión
+  // Historial sesión
   historialSesion: any[] = [];
   totalSesion = 0;
   vistaActual: 'catalogo' | 'historial' = 'catalogo';
@@ -46,7 +60,7 @@ export class PuntoVentaComponent implements OnInit {
     this.productoService.obtenerInventario().subscribe({
       next: (datos) => {
         this.productosDisponibles = datos.filter((p: any) => (p.stock_actual || 0) > 0);
-        this.productosFiltrados = [...this.productosDisponibles];
+        this.productosFiltrados   = [...this.productosDisponibles];
         this.cargando = false;
         this.cdr.detectChanges();
       },
@@ -72,7 +86,7 @@ export class PuntoVentaComponent implements OnInit {
   }
 
   agregarAlCarrito(producto: any) {
-    const item = this.carrito.find(i => i.id_producto === producto.id_producto);
+    const item  = this.carrito.find(i => i.id_producto === producto.id_producto);
     const stock = Number(producto.stock_actual) || 0;
     const precio = Number(producto.precio_unitario) || 0;
     if (item) {
@@ -91,44 +105,68 @@ export class PuntoVentaComponent implements OnInit {
     this.cdr.detectChanges();
   }
 
-  registrarVenta() {
+  // Abre el modal de cobro (ya NO guarda directamente)
+  abrirModalCobro() {
     if (this.carrito.length === 0) return;
+    this.metodoPago    = 'Efectivo';
+    this.montoRecibido = 0;
+    this.mostrarModalCobro = true;
+  }
+
+  cerrarModalCobro() { this.mostrarModalCobro = false; }
+
+  // Confirma y guarda la venta
+  confirmarPago() {
+    if (this.pagoInsuficiente) return;
+    this.mostrarModalCobro = false;
     this.cargando = true;
-    const token = localStorage.getItem('token_sgiv');
+
+    const token   = localStorage.getItem('token_sgiv');
     const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
     const datosVenta = {
-      id_sucursal: 1, id_usuario_cajero: 1, id_cliente: null, id_pedido_mesa: null, id_turno: 1,
-      monto_total_venta: this.total, metodo_pago: 'Efectivo',
-      detalles: this.carrito.map(i => ({ id_producto: i.id_producto, cantidad: i.cantidad, precio: i.precio_unitario, subtotal: i.subtotal }))
+      id_sucursal: 1, id_usuario_cajero: 1, id_cliente: null,
+      id_pedido_mesa: null, id_turno: 1,
+      monto_total_venta: this.total,
+      metodo_pago: this.metodoPago,
+      detalles: this.carrito.map(i => ({
+        id_producto: i.id_producto, cantidad: i.cantidad,
+        precio: i.precio_unitario, subtotal: i.subtotal
+      }))
     };
+
     this.http.post(`${this.apiUrl}/caja/cobrar`, datosVenta, { headers }).subscribe({
       next: (res: any) => {
         const ventaRegistrada = {
-          id_venta: res.id_venta,
-          hora: new Date(),
-          items: [...this.carrito],
-          total: this.total,
-          cajero: JSON.parse(localStorage.getItem('usuario_sgiv') || '{}')?.nombre_completo || 'Cajero'
+          id_venta:  res.id_venta,
+          hora:      new Date(),
+          items:     [...this.carrito],
+          total:     this.total,
+          metodo:    this.metodoPago,
+          cambio:    this.cambio,
+          cajero:    JSON.parse(localStorage.getItem('usuario_sgiv') || '{}')?.nombre_completo || 'Cajero'
         };
-        this.datosTicket = { ...ventaRegistrada };
-        this.fechaTicket = new Date();
+        this.datosTicket  = { ...ventaRegistrada };
+        this.fechaTicket  = new Date();
         this.mostrarTicket = true;
 
-        // Agregar al historial de sesión
         this.historialSesion.unshift(ventaRegistrada);
         this.totalSesion += this.total;
 
         this.carrito = [];
-        this.total = 0;
+        this.total   = 0;
         this.cargarCatalogo();
         this.cargando = false;
         this.cdr.detectChanges();
       },
-      error: () => { alert('Error al procesar la venta.'); this.cargando = false; this.cdr.detectChanges(); }
+      error: () => {
+        alert('Error al procesar la venta. Revise el stock.');
+        this.cargando = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 
   imprimirVenta() { window.print(); }
-  cerrarTicket() { this.mostrarTicket = false; this.datosTicket = null; }
-  cambiarVista(vista: 'catalogo' | 'historial') { this.vistaActual = vista; }
+  cerrarTicket()  { this.mostrarTicket = false; this.datosTicket = null; }
+  cambiarVista(v: 'catalogo' | 'historial') { this.vistaActual = v; }
 }

@@ -22,17 +22,13 @@ const cobrarVenta = async (req, res) => {
     }
 };
 
-// NUEVO: Arqueo de caja
 const obtenerArqueo = async (req, res) => {
     try {
         const id_sucursal = req.query.id_sucursal || 1;
-
-        // Fechas por defecto: hoy
         const ahora = new Date();
         const fin = req.query.fecha_fin
             ? new Date(req.query.fecha_fin + 'T23:59:59')
             : new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-
         const inicio = req.query.fecha_inicio
             ? new Date(req.query.fecha_inicio + 'T00:00:00')
             : new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0);
@@ -51,4 +47,26 @@ const obtenerArqueo = async (req, res) => {
     }
 };
 
-module.exports = { abrirCaja, cobrarVenta, obtenerArqueo };
+// NUEVO: Cierre diario — cierra el turno activo
+const cierreDiario = async (req, res) => {
+    try {
+        const id_sucursal       = req.body.id_sucursal || req.usuario.id_sucursal || 1;
+        const monto_declarado   = parseFloat(req.body.monto_declarado) || 0;
+
+        const turnoAbierto = await cajaModel.obtenerTurnoAbierto(id_sucursal);
+        if (!turnoAbierto) {
+            return res.status(400).json({ error: 'No hay turno abierto para cerrar en esta sucursal.' });
+        }
+
+        const turnoCerrado = await cajaModel.cerrarTurno(turnoAbierto.id_turno, monto_declarado);
+        res.json({
+            mensaje: 'Turno cerrado correctamente.',
+            turno:   turnoCerrado
+        });
+    } catch (error) {
+        console.error('Error en cierreDiario:', error);
+        res.status(500).json({ error: 'Error al cerrar el turno.' });
+    }
+};
+
+module.exports = { abrirCaja, cobrarVenta, obtenerArqueo, cierreDiario };

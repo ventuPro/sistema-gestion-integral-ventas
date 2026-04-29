@@ -4,26 +4,28 @@ require('dotenv').config();
 
 const db = require('./config/db');
 
-// Importar rutas
-const userRoutes = require('./routes/userRoutes');
-const productoRoutes = require('./routes/productoRoutes');
+const userRoutes      = require('./routes/userRoutes');
+const productoRoutes  = require('./routes/productoRoutes');
 const inventarioRoutes = require('./routes/inventarioRoutes');
-const pedidoRoutes = require('./routes/pedidoRoutes');
-const cajaRoutes = require('./routes/cajaRoutes');
-const reporteRoutes = require('./routes/reporteRoutes');
+const pedidoRoutes    = require('./routes/pedidoRoutes');
+const cajaRoutes      = require('./routes/cajaRoutes');
+const reporteRoutes   = require('./routes/reporteRoutes');
+const sucursalRoutes  = require('./routes/sucursalRoutes');
 
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+// FIX IMAGEN: aumentar límite para permitir base64 hasta 10MB
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// --- MONTAR RUTAS ---
-app.use('/api/usuarios', userRoutes); // Toda ruta de usuarios empezará con /api/usuarios
-app.use('/api/catalogo', productoRoutes);
+app.use('/api/usuarios',   userRoutes);
+app.use('/api/catalogo',   productoRoutes);
 app.use('/api/inventario', inventarioRoutes);
-app.use('/api/pedidos', pedidoRoutes);
-app.use('/api/caja', cajaRoutes);
-app.use('/api/reportes', reporteRoutes);
+app.use('/api/pedidos',    pedidoRoutes);
+app.use('/api/caja',       cajaRoutes);
+app.use('/api/reportes',   reporteRoutes);
+app.use('/api/sucursales', sucursalRoutes);
 
 app.get('/', (req, res) => {
     res.json({ mensaje: '🚀 API del Sistema SGIV funcionando correctamente' });
