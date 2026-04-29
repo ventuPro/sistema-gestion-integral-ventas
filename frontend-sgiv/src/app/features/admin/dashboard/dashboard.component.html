@@ -1,59 +1,77 @@
 <div class="flex h-screen bg-gray-100 font-sans">
-  
+
   <aside class="w-64 bg-gray-900 text-white flex flex-col shadow-2xl">
     <div class="p-6 text-center text-2xl font-bold border-b border-gray-800 tracking-wider">
-      <span class="text-blue-500">Rickys</span> Admin
+      <span class="text-blue-500">Ricky's</span> Admin
     </div>
-    
-    <nav class="flex-1 px-4 py-6 space-y-3 overflow-y-auto">
-      
-      <a routerLink="/dashboard/resumen" routerLinkActive="bg-blue-600 text-white" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
+
+    <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+      <a routerLink="/dashboard/resumen" routerLinkActive="bg-blue-600 text-white"
+         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
         <span class="font-medium">Panel Principal</span>
       </a>
-      
-      <a routerLink="/dashboard/inventario" routerLinkActive="bg-blue-600 text-white" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
+
+      <a routerLink="/dashboard/inventario" routerLinkActive="bg-blue-600 text-white"
+         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
         <span class="font-medium">Inventario</span>
       </a>
-      
-      <a routerLink="/dashboard/punto-venta" routerLinkActive="bg-blue-600 text-white" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
+
+      <a routerLink="/dashboard/punto-venta" routerLinkActive="bg-blue-600 text-white"
+         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
         <span class="font-medium">Punto de Venta</span>
       </a>
 
-<a routerLink="/dashboard/usuarios"
-   routerLinkActive="bg-blue-600 text-white"
-   class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
-  <span class="font-medium">Usuarios</span>
-</a>
+      <a routerLink="/dashboard/arqueo" routerLinkActive="bg-blue-600 text-white"
+         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
+        <span class="font-medium">Arqueo de Caja</span>
+      </a>
 
+      <!-- Solo visible para Administrador -->
+      <ng-container *ngIf="esAdmin">
+        <div class="pt-3 pb-1 px-4">
+          <p class="text-gray-600 text-xs font-bold uppercase tracking-widest">Administración</p>
+        </div>
+
+        <a routerLink="/dashboard/reportes" routerLinkActive="bg-blue-600 text-white"
+           class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
+          <span class="font-medium">Reportes</span>
+        </a>
+
+        <a routerLink="/dashboard/usuarios" routerLinkActive="bg-blue-600 text-white"
+           class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors">
+          <span class="font-medium">Usuarios</span>
+        </a>
+      </ng-container>
     </nav>
 
     <div class="p-4 border-t border-gray-800">
-      <button 
-        (click)="cerrarSesion()" 
-        class="w-full flex items-center justify-center px-4 py-2 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors duration-300">
+      <div class="px-4 py-2 mb-2 text-xs text-gray-500">
+        <p class="font-semibold text-gray-300 truncate">{{ usuario?.nombre_completo || 'Usuario' }}</p>
+        <p class="text-gray-600">{{ esAdmin ? 'Administrador' : 'Cajero' }}</p>
+      </div>
+      <button (click)="cerrarSesion()"
+              class="w-full flex items-center justify-center px-4 py-2 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors">
         <span class="font-bold">Cerrar Sesión</span>
       </button>
     </div>
   </aside>
 
   <div class="flex-1 flex flex-col overflow-hidden">
-    
     <header class="bg-white shadow-sm px-8 py-4 flex justify-between items-center z-10">
-      <h2 class="text-2xl font-semibold text-gray-800">Resumen del Día</h2>
-      
-      <div class="flex items-center space-x-4">
+      <h2 class="text-xl font-semibold text-gray-800">Pastelería Ricky's</h2>
+      <div class="flex items-center space-x-3">
         <div class="text-right">
-          <p class="text-sm font-bold text-gray-700">Administrador</p>
-          <p class="text-xs text-gray-500 text-green-500">● En línea</p>
+          <p class="text-sm font-bold text-gray-700">{{ usuario?.nombre_completo }}</p>
+          <p class="text-xs text-green-500">● En línea</p>
         </div>
         <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold shadow">
-          A
+          {{ usuario?.nombre_completo?.charAt(0) || 'U' }}
         </div>
       </div>
     </header>
 
     <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-8">
-     <router-outlet></router-outlet>
+      <router-outlet></router-outlet>
     </main>
   </div>
 </div>

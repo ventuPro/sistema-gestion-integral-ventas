@@ -1,128 +1,195 @@
-<div class="h-full flex flex-col md:flex-row gap-6">
+<div class="flex flex-col gap-4 h-full">
 
-  <div class="w-full md:w-2/3 bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full">
-    <h2 class="text-xl font-bold text-gray-800 mb-4">Catálogo Ricky's</h2>
-
-    <div *ngIf="cargando" class="text-center text-gray-500 py-10">Cargando productos...</div>
-    
-    <div *ngIf="!cargando && productosDisponibles.length === 0" class="text-center text-gray-500 py-10">
-      No hay productos con stock disponible para vender.
-    </div>
-
-    <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pr-2">
-      
-      <button *ngFor="let prod of productosDisponibles" 
-              (click)="agregarAlCarrito(prod)"
-              class="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-xl transition-all text-center h-32 relative active:scale-95 group">
-        
-        <span class="absolute top-2 right-2 bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded-full">
-          Stock: {{ prod.stock_actual || 0 }}
-        </span>
-
-        <span class="font-bold text-gray-800 mt-2 line-clamp-2">{{ prod.nombre_producto }}</span>
-        <span class="text-blue-600 font-black text-lg mt-1">Bs. {{ prod.precio_unitario }}</span>
+  <!-- Barra superior con filtros y pestañas -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-3 flex flex-wrap items-center gap-3">
+    <div class="flex rounded-lg overflow-hidden border border-gray-200">
+      <button (click)="cambiarVista('catalogo')"
+              [class.bg-blue-600]="vistaActual === 'catalogo'"
+              [class.text-white]="vistaActual === 'catalogo'"
+              [class.text-gray-600]="vistaActual !== 'catalogo'"
+              class="px-4 py-1.5 text-sm font-medium transition-colors">
+        Catálogo
       </button>
-
+      <button (click)="cambiarVista('historial')"
+              [class.bg-blue-600]="vistaActual === 'historial'"
+              [class.text-white]="vistaActual === 'historial'"
+              [class.text-gray-600]="vistaActual !== 'historial'"
+              class="px-4 py-1.5 text-sm font-medium transition-colors flex items-center gap-2">
+        Ventas del Día
+        <span *ngIf="historialSesion.length > 0" class="bg-green-500 text-white text-xs rounded-full px-1.5 py-0.5">
+          {{ historialSesion.length }}
+        </span>
+      </button>
     </div>
+    <input *ngIf="vistaActual === 'catalogo'" type="text" [(ngModel)]="busquedaPV" (ngModelChange)="filtrarProductos()"
+           placeholder="Buscar producto..." class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 w-48">
+    <select *ngIf="vistaActual === 'catalogo'" [(ngModel)]="categoriaSeleccionada" (ngModelChange)="filtrarProductos()"
+            class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500">
+      <option value="todas">Todas</option>
+      <option *ngFor="let cat of listaCategorias" [value]="cat.id_categoria">{{ cat.nombre_categoria }}</option>
+    </select>
   </div>
 
-  <div class="w-full md:w-1/3 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full overflow-hidden">
-    
-    <div class="bg-gray-800 text-white p-4 text-center">
-      <h2 class="text-lg font-bold">Detalle de Venta</h2>
-    </div>
+  <!-- Layout principal -->
+  <div class="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
 
-    <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-      
-      <div *ngIf="carrito.length === 0" class="text-center text-gray-400 mt-10 italic">
-        El carrito está vacío. Haz clic en los productos para agregarlos.
-      </div>
+    <!-- Panel izquierdo -->
+    <div class="w-full md:w-2/3 bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col overflow-hidden">
 
-      <div *ngFor="let item of carrito; let i = index" class="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center shadow-sm">
-        <div class="flex-1">
-          <p class="font-bold text-gray-800 text-sm leading-tight">{{ item.nombre_producto }}</p>
-          <p class="text-gray-500 text-xs mt-1">Bs. {{ item.precio_unitario }} x {{ item.cantidad }} u.</p>
-        </div>
-        <div class="flex items-center space-x-3">
-          <span class="font-black text-gray-800 text-sm">Bs. {{ item.subtotal }}</span>
-          <button (click)="quitarDelCarrito(i)" class="text-red-500 hover:text-red-700 p-1 bg-red-50 rounded-md">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+      <!-- VISTA: CATÁLOGO -->
+      <ng-container *ngIf="vistaActual === 'catalogo'">
+        <div *ngIf="cargando" class="text-center text-gray-400 py-10">Cargando productos...</div>
+        <div *ngIf="!cargando && productosFiltrados.length === 0" class="text-center text-gray-400 py-10">Sin productos disponibles.</div>
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto pr-1">
+          <button *ngFor="let prod of productosFiltrados" (click)="agregarAlCarrito(prod)"
+                  class="flex flex-col items-center p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-xl transition-all text-center relative active:scale-95">
+            <span class="absolute top-2 right-2 bg-gray-200 text-gray-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+              {{ prod.stock_actual || 0 }}
+            </span>
+            <!-- Imagen del producto -->
+            <div class="w-16 h-16 rounded-lg overflow-hidden mb-2 flex-shrink-0 border border-gray-200">
+              <img *ngIf="prod.url_imagen" [src]="prod.url_imagen" [alt]="prod.nombre_producto" class="w-full h-full object-cover">
+              <div *ngIf="!prod.url_imagen" class="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-blue-600 font-bold text-xl">
+                {{ prod.nombre_producto?.charAt(0) }}
+              </div>
+            </div>
+            <span class="font-bold text-gray-800 text-xs leading-tight line-clamp-2 w-full text-center">{{ prod.nombre_producto }}</span>
+            <span class="text-blue-600 font-black text-base mt-1">Bs. {{ prod.precio_unitario }}</span>
           </button>
         </div>
-      </div>
+      </ng-container>
 
+      <!-- VISTA: HISTORIAL DE SESIÓN -->
+      <ng-container *ngIf="vistaActual === 'historial'">
+        <!-- Resumen de sesión -->
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div class="bg-blue-50 rounded-xl p-4 text-center border border-blue-100">
+            <p class="text-xs text-blue-600 font-semibold uppercase tracking-wide">Ventas realizadas</p>
+            <p class="text-3xl font-black text-blue-700 mt-1">{{ historialSesion.length }}</p>
+          </div>
+          <div class="bg-green-50 rounded-xl p-4 text-center border border-green-100">
+            <p class="text-xs text-green-600 font-semibold uppercase tracking-wide">Total cobrado</p>
+            <p class="text-2xl font-black text-green-700 mt-1">Bs. {{ totalSesion.toFixed(2) }}</p>
+          </div>
+          <div class="bg-purple-50 rounded-xl p-4 text-center border border-purple-100">
+            <p class="text-xs text-purple-600 font-semibold uppercase tracking-wide">Ticket promedio</p>
+            <p class="text-2xl font-black text-purple-700 mt-1">
+              Bs. {{ historialSesion.length > 0 ? (totalSesion / historialSesion.length).toFixed(2) : '0.00' }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Lista de ventas -->
+        <div class="overflow-y-auto flex-1">
+          <div *ngIf="historialSesion.length === 0" class="text-center text-gray-400 py-10">
+            No hay ventas registradas en esta sesión.
+          </div>
+          <div *ngFor="let venta of historialSesion; let i = index"
+               class="border border-gray-200 rounded-xl p-4 mb-3 hover:bg-gray-50 transition-colors">
+            <div class="flex justify-between items-start mb-2">
+              <div>
+                <span class="font-bold text-gray-800">Venta #{{ venta.id_venta }}</span>
+                <span class="text-xs text-gray-500 ml-3">{{ venta.hora | date:'HH:mm:ss' }}</span>
+              </div>
+              <span class="font-black text-green-600 text-lg">Bs. {{ venta.total.toFixed(2) }}</span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <span *ngFor="let item of venta.items" class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">
+                {{ item.nombre_producto }} x{{ item.cantidad }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </ng-container>
     </div>
 
-    <div class="p-4 bg-white border-t border-gray-200">
-      <div class="flex justify-between items-center mb-4">
-        <span class="text-gray-600 font-bold">TOTAL A PAGAR:</span>
-        <span class="text-3xl font-black text-green-600">Bs. {{ total }}</span>
+    <!-- Panel derecho: Carrito -->
+    <div class="w-full md:w-1/3 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col overflow-hidden">
+      <div class="bg-gray-800 text-white p-4 text-center">
+        <h2 class="text-lg font-bold">Carrito</h2>
       </div>
-      
-    <button [disabled]="carrito.length === 0" 
-        (click)="registrarVenta()"
-        class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors shadow-sm text-lg">
-        Registrar Venta
-    </button>
+      <div class="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50">
+        <div *ngIf="carrito.length === 0" class="text-center text-gray-400 mt-10 italic text-sm">
+          Selecciona productos del catálogo
+        </div>
+        <div *ngFor="let item of carrito; let i = index"
+             class="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center shadow-sm">
+          <div class="flex items-center gap-2">
+            <div class="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+              <img *ngIf="item.url_imagen" [src]="item.url_imagen" class="w-full h-full object-cover">
+              <div *ngIf="!item.url_imagen" class="w-full h-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
+                {{ item.nombre_producto?.charAt(0) }}
+              </div>
+            </div>
+            <div>
+              <p class="font-bold text-gray-800 text-xs leading-tight">{{ item.nombre_producto }}</p>
+              <p class="text-gray-500 text-xs">Bs.{{ item.precio_unitario }} × {{ item.cantidad }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-black text-gray-800 text-sm">Bs.{{ item.subtotal }}</span>
+            <button (click)="quitarDelCarrito(i)" class="text-red-400 hover:text-red-600 p-1 rounded">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 bg-white border-t">
+        <div class="flex justify-between items-center mb-4">
+          <span class="font-bold text-gray-600">TOTAL:</span>
+          <span class="text-3xl font-black text-green-600">Bs. {{ total.toFixed(2) }}</span>
+        </div>
+        <button [disabled]="carrito.length === 0 || cargando" (click)="registrarVenta()"
+                class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-lg transition-colors shadow-sm">
+          {{ cargando ? 'Procesando...' : 'Registrar Venta' }}
+        </button>
+      </div>
     </div>
-
   </div>
-
 </div>
 
 
-
+<!-- MODAL TICKET -->
 <div *ngIf="mostrarTicket" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 no-print">
   <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-    
     <div class="bg-gray-100 p-4 border-b flex justify-between items-center">
-      <h3 class="font-bold text-gray-700 text-lg">Comprobante de Venta</h3>
-      <button (click)="cerrarTicket()" class="text-gray-400 hover:text-gray-600">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-      </button>
+      <h3 class="font-bold text-gray-700">Comprobante de Venta</h3>
+      <button (click)="cerrarTicket()" class="text-gray-400 hover:text-gray-600">✕</button>
     </div>
-
     <div id="ticket-imprimible" class="p-8 bg-white overflow-y-auto font-mono text-sm text-gray-800">
       <div class="text-center mb-4">
         <h2 class="text-2xl font-black uppercase">Pastelería Ricky's</h2>
-        <p class="text-xs">Sucursal Central - Bolivia</p>
-        <p class="text-xs">Fecha: {{ fechaTicket | date:'dd/MM/yyyy HH:mm' }}</p>
+        <p class="text-xs">Sucursal Central — La Paz, Bolivia</p>
+        <p class="text-xs">{{ fechaTicket | date:'dd/MM/yyyy HH:mm:ss' }}</p>
         <p class="text-xs font-bold mt-2">VENTA #{{ datosTicket?.id_venta }}</p>
       </div>
-
-      <div class="border-b-2 border-dashed border-gray-300 my-4"></div>
-
-      <div class="flex justify-between font-bold mb-2">
+      <div class="border-b-2 border-dashed border-gray-300 my-3"></div>
+      <div class="flex justify-between font-bold mb-2 text-xs">
         <span class="w-1/2">Producto</span>
         <span class="w-1/4 text-center">Cant.</span>
         <span class="w-1/4 text-right">Subt.</span>
       </div>
-
-      <div *ngFor="let item of datosTicket?.items" class="flex justify-between mb-1">
+      <div *ngFor="let item of datosTicket?.items" class="flex justify-between mb-1 text-xs">
         <span class="w-1/2 leading-tight">{{ item.nombre_producto }}</span>
         <span class="w-1/4 text-center">{{ item.cantidad }}</span>
-        <span class="w-1/4 text-right">Bs. {{ item.subtotal }}</span>
+        <span class="w-1/4 text-right">Bs.{{ item.subtotal }}</span>
       </div>
-
-      <div class="border-b-2 border-dashed border-gray-300 my-4"></div>
-
+      <div class="border-b-2 border-dashed border-gray-300 my-3"></div>
       <div class="flex justify-between text-lg font-black">
         <span>TOTAL:</span>
-        <span>Bs. {{ datosTicket?.total }}</span>
+        <span>Bs. {{ datosTicket?.total?.toFixed(2) }}</span>
       </div>
-
       <div class="text-center mt-8 italic text-xs">
         <p>¡Gracias por su compra!</p>
-        <p>Vuelva pronto</p>
       </div>
     </div>
-
     <div class="p-4 bg-gray-50 border-t flex gap-3">
-      <button (click)="imprimirVenta()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors shadow-md">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+      <button (click)="imprimirVenta()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors">
         Imprimir Ticket
       </button>
+      <button (click)="cerrarTicket()" class="flex-1 bg-gray-200 text-gray-700 font-bold py-3 rounded-lg hover:bg-gray-300 transition-colors">
+        Cerrar
+      </button>
     </div>
-
   </div>
 </div>

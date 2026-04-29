@@ -1,26 +1,25 @@
-
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class ReporteService {
   private apiUrl = environment.apiUrl;
+  constructor(private http: HttpClient) {}
 
-  constructor(private http: HttpClient) { }
+  private headers(): HttpHeaders {
+    return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
+  }
 
-  // Función para traer los datos del dashboard de una sucursal
   obtenerDatosDashboard(id_sucursal: number): Observable<any> {
-    const token = localStorage.getItem('token_sgiv');
-    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    return this.http.get(`${this.apiUrl}/reportes/dashboard/${id_sucursal}?t=${Date.now()}`, { headers: this.headers() });
+  }
 
-    // TRUCO: Agregamos un "sello de tiempo" al final de la URL
-    // Ejemplo: /dashboard/1?hora=17089123456
-    const urlSinCache = `${this.apiUrl}/reportes/dashboard/${id_sucursal}?hora=${new Date().getTime()}`;
-
-    return this.http.get(urlSinCache, { headers });
+  obtenerReportePeriodo(id_sucursal: number, fechaInicio: string, fechaFin: string): Observable<any> {
+    const params = new HttpParams()
+      .set('fecha_inicio', fechaInicio)
+      .set('fecha_fin', fechaFin);
+    return this.http.get(`${this.apiUrl}/reportes/periodo/${id_sucursal}`, { headers: this.headers(), params });
   }
 }

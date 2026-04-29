@@ -14,169 +14,125 @@ export class UsuariosComponent implements OnInit {
   private usuarioService = inject(UsuarioService);
   private cdr = inject(ChangeDetectorRef);
 
-  // --- Datos ---
   listaUsuarios: any[] = [];
   listaRoles: any[] = [];
   listaSucursales: any[] = [];
-  cargando: boolean = true;
+  cargando = true;
+  filtroEstado: 'todos' | 'activos' | 'inactivos' = 'todos';
 
-  // --- Control de Modal ---
-  mostrarModal: boolean = false;
+  // Modal crear/editar
+  mostrarModal = false;
   editandoId: number | null = null;
-  mensajeError: string = '';
+  mensajeError = '';
+  formulario: any = { nombre_completo: '', correo_electronico: '', contrasena: '', id_rol: '', id_sucursal: '' };
 
-  // --- Formulario ---
-  formulario: any = {
-    nombre_completo: '',
-    correo_electronico: '',
-    contrasena: '',
-    id_rol: '',
-    id_sucursal: ''
-  };
+  // Modal cambio de contraseña
+  mostrarModalContrasena = false;
+  usuarioContrasena: any = null;
+  cambioContrasena = { nueva: '', confirmar: '' };
+  errorContrasena = '';
+  cargandoContrasena = false;
 
-  ngOnInit() {
-    this.cargarDatos();
-  }
+  ngOnInit() { this.cargarDatos(); }
 
   cargarDatos() {
     this.cargando = true;
-
-    // Cargamos usuarios y datos del formulario al mismo tiempo
-    this.usuarioService.obtenerDatosFormulario().subscribe({
-      next: (datos) => {
-        this.listaRoles = datos.roles;
-        this.listaSucursales = datos.sucursales;
-      },
-      error: (err) => console.error('Error cargando formulario:', err)
-    });
-
+    this.usuarioService.obtenerDatosFormulario().subscribe({ next: (d) => { this.listaRoles = d.roles; this.listaSucursales = d.sucursales; } });
     this.usuarioService.listarUsuarios().subscribe({
-      next: (usuarios) => {
-        this.listaUsuarios = usuarios;
-        this.cargando = false;
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        console.error('Error cargando usuarios:', err);
-        this.cargando = false;
-        this.cdr.detectChanges();
-      }
+      next: (u) => { this.listaUsuarios = u; this.cargando = false; this.cdr.detectChanges(); },
+      error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
 
-  // --- Modal: Nuevo Usuario ---
+  get usuariosFiltrados() {
+    if (this.filtroEstado === 'activos') return this.listaUsuarios.filter(u => u.estado_activo);
+    if (this.filtroEstado === 'inactivos') return this.listaUsuarios.filter(u => !u.estado_activo);
+    return this.listaUsuarios;
+  }
+
+  // ─── Modal CRUD ───
   abrirModalNuevo() {
-    this.editandoId = null;
-    this.mensajeError = '';
-    this.formulario = {
-      nombre_completo: '',
-      correo_electronico: '',
-      contrasena: '',
-      id_rol: '',
-      id_sucursal: ''
-    };
+    this.editandoId = null; this.mensajeError = '';
+    this.formulario = { nombre_completo: '', correo_electronico: '', contrasena: '', id_rol: '', id_sucursal: '' };
     this.mostrarModal = true;
   }
 
-  // --- Modal: Editar Usuario ---
-  abrirModalEditar(usuario: any) {
-    this.editandoId = usuario.id_usuario;
-    this.mensajeError = '';
-    this.formulario = {
-      nombre_completo: usuario.nombre_completo,
-      correo_electronico: usuario.correo_electronico,
-      contrasena: '',           // Se deja vacío al editar
-      id_rol: usuario.id_rol,
-      id_sucursal: usuario.id_sucursal
-    };
+  abrirModalEditar(usr: any) {
+    this.editandoId = usr.id_usuario; this.mensajeError = '';
+    this.formulario = { nombre_completo: usr.nombre_completo, correo_electronico: usr.correo_electronico, contrasena: '', id_rol: usr.id_rol, id_sucursal: usr.id_sucursal };
     this.mostrarModal = true;
   }
 
-  cerrarModal() {
-    this.mostrarModal = false;
-    this.editandoId = null;
-    this.mensajeError = '';
-  }
+  cerrarModal() { this.mostrarModal = false; this.editandoId = null; this.mensajeError = ''; }
 
-  // --- Guardar (Crear o Editar) ---
   guardarUsuario() {
-    // Validación básica
-    if (!this.formulario.nombre_completo || !this.formulario.correo_electronico ||
-        !this.formulario.id_rol || !this.formulario.id_sucursal) {
-      this.mensajeError = 'Por favor, completa todos los campos obligatorios.';
-      return;
+    if (!this.formulario.nombre_completo || !this.formulario.correo_electronico || !this.formulario.id_rol || !this.formulario.id_sucursal) {
+      this.mensajeError = 'Completa todos los campos obligatorios.'; return;
     }
     if (!this.editandoId && !this.formulario.contrasena) {
-      this.mensajeError = 'La contraseña es obligatoria al crear un usuario.';
-      return;
+      this.mensajeError = 'La contraseña es obligatoria al crear un usuario.'; return;
     }
-
-    this.cargando = true;
-    this.mensajeError = '';
+    this.cargando = true; this.mensajeError = '';
 
     if (this.editandoId) {
-      // Modo Edición: enviamos solo los campos sin contraseña
-      const datosEditar = {
-        nombre_completo: this.formulario.nombre_completo,
-        correo_electronico: this.formulario.correo_electronico,
-        id_rol: this.formulario.id_rol,
-        id_sucursal: this.formulario.id_sucursal
-      };
-
-      this.usuarioService.actualizarUsuario(this.editandoId, datosEditar).subscribe({
-        next: () => {
-          this.cerrarModal();
-          this.cargarDatos();
-        },
-        error: (err) => {
-          this.mensajeError = 'Error al actualizar. Verifica los datos.';
-          this.cargando = false;
-        }
+      const d = { nombre_completo: this.formulario.nombre_completo, correo_electronico: this.formulario.correo_electronico, id_rol: this.formulario.id_rol, id_sucursal: this.formulario.id_sucursal };
+      this.usuarioService.actualizarUsuario(this.editandoId, d).subscribe({
+        next: () => { this.cerrarModal(); this.cargarDatos(); },
+        error: () => { this.mensajeError = 'Error al actualizar.'; this.cargando = false; }
       });
-
     } else {
-      // Modo Creación
       this.usuarioService.crearUsuario(this.formulario).subscribe({
-        next: () => {
-          this.cerrarModal();
-          this.cargarDatos();
-        },
-        error: (err) => {
-          this.mensajeError = err.error?.error || 'Error al crear el usuario.';
-          this.cargando = false;
-        }
+        next: () => { this.cerrarModal(); this.cargarDatos(); },
+        error: (e) => { this.mensajeError = e.error?.error || 'Error al crear usuario.'; this.cargando = false; }
       });
     }
   }
 
-  // --- Desactivar Usuario ---
+  // ─── Desactivar / Reactivar ───
   desactivarUsuario(id: number, nombre: string) {
-    const confirmacion = confirm(
-      `¿Estás seguro de que deseas desactivar al usuario "${nombre}"?\n\nEl usuario no podrá iniciar sesión.`
-    );
-    if (!confirmacion) return;
-
+    if (!confirm(`¿Desactivar a "${nombre}"?`)) return;
     this.cargando = true;
     this.usuarioService.desactivarUsuario(id).subscribe({
-      next: (res) => {
-        console.log(res.mensaje);
-        this.cargarDatos();
-      },
-      error: (err) => {
-        console.error('Error al desactivar:', err);
-        alert('No se pudo desactivar el usuario.');
-        this.cargando = false;
-      }
+      next: () => this.cargarDatos(),
+      error: () => { alert('Error al desactivar.'); this.cargando = false; }
     });
   }
 
-  // --- Helper para el badge del rol ---
-  getBadgeRol(nombreRol: string): string {
-    const mapa: any = {
-      'Administrador': 'bg-purple-100 text-purple-700',
-      'Cajero': 'bg-blue-100 text-blue-700',
-      'Inventario': 'bg-green-100 text-green-700'
-    };
-    return mapa[nombreRol] || 'bg-gray-100 text-gray-700';
+  reactivarUsuario(id: number, nombre: string) {
+    if (!confirm(`¿Reactivar a "${nombre}"?`)) return;
+    this.cargando = true;
+    this.usuarioService.reactivarUsuario(id).subscribe({
+      next: () => this.cargarDatos(),
+      error: () => { alert('Error al reactivar.'); this.cargando = false; }
+    });
+  }
+
+  // ─── Modal cambio de contraseña ───
+  abrirModalContrasena(usr: any) {
+    this.usuarioContrasena = usr;
+    this.cambioContrasena = { nueva: '', confirmar: '' };
+    this.errorContrasena = '';
+    this.mostrarModalContrasena = true;
+  }
+
+  cerrarModalContrasena() { this.mostrarModalContrasena = false; this.usuarioContrasena = null; }
+
+  confirmarCambioContrasena() {
+    if (!this.cambioContrasena.nueva || this.cambioContrasena.nueva.length < 6) {
+      this.errorContrasena = 'La contraseña debe tener al menos 6 caracteres.'; return;
+    }
+    if (this.cambioContrasena.nueva !== this.cambioContrasena.confirmar) {
+      this.errorContrasena = 'Las contraseñas no coinciden.'; return;
+    }
+    this.cargandoContrasena = true; this.errorContrasena = '';
+    this.usuarioService.cambiarContrasena(this.usuarioContrasena.id_usuario, this.cambioContrasena.nueva).subscribe({
+      next: () => { this.cerrarModalContrasena(); this.cargandoContrasena = false; alert('Contraseña actualizada correctamente.'); },
+      error: () => { this.errorContrasena = 'Error al cambiar la contraseña.'; this.cargandoContrasena = false; }
+    });
+  }
+
+  getBadge(rol: string): string {
+    const m: any = { 'Administrador': 'bg-purple-100 text-purple-700', 'Cajero': 'bg-blue-100 text-blue-700', 'Inventario': 'bg-green-100 text-green-700' };
+    return m[rol] || 'bg-gray-100 text-gray-700';
   }
 }

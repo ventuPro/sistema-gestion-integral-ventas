@@ -9,7 +9,8 @@ import { environment } from '../../../../environments/environment';
   selector: 'app-punto-venta',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './punto-venta.component.html'
+  templateUrl: './punto-venta.component.html',
+  styleUrl: './punto-venta.component.css'
 })
 export class PuntoVentaComponent implements OnInit {
   private productoService = inject(ProductoService);
@@ -17,127 +18,117 @@ export class PuntoVentaComponent implements OnInit {
   private http = inject(HttpClient);
   private apiUrl = environment.apiUrl;
 
-  // Variables de Interfaz
   productosDisponibles: any[] = [];
+  productosFiltrados: any[] = [];
   carrito: any[] = [];
-  total: number = 0;
-  cargando: boolean = true;
+  total = 0;
+  cargando = true;
+  busquedaPV = '';
+  categoriaSeleccionada = 'todas';
+  listaCategorias: any[] = [];
 
-  // --- 1. Variables para el Ticket ---
-  mostrarTicket: boolean = false;
+  // Ticket
+  mostrarTicket = false;
   datosTicket: any = null;
-  fechaTicket: Date = new Date();
+  fechaTicket = new Date();
+
+  // Historial de ventas de la sesión
+  historialSesion: any[] = [];
+  totalSesion = 0;
+  vistaActual: 'catalogo' | 'historial' = 'catalogo';
 
   ngOnInit() {
     this.cargarCatalogo();
+    this.cargarCategorias();
   }
 
   cargarCatalogo() {
     this.productoService.obtenerInventario().subscribe({
       next: (datos) => {
-        // Mostramos solo productos con stock
         this.productosDisponibles = datos.filter((p: any) => (p.stock_actual || 0) > 0);
+        this.productosFiltrados = [...this.productosDisponibles];
         this.cargando = false;
         this.cdr.detectChanges();
       },
-      error: (error) => {
-        console.error('Error al cargar catálogo:', error);
-        this.cargando = false;
-        this.cdr.detectChanges();
-      }
+      error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
 
-  agregarAlCarrito(producto: any) {
-    const itemExistente = this.carrito.find(item => item.id_producto === producto.id_producto);
-    const stockReal = Number(producto.stock_actual) || 0;
-    const precioReal = Number(producto.precio_unitario) || 0;
+  cargarCategorias() {
+    this.productoService.obtenerCategorias().subscribe({
+      next: (datos) => { this.listaCategorias = datos; }
+    });
+  }
 
-    if (itemExistente) {
-      if (itemExistente.cantidad < stockReal) {
-        itemExistente.cantidad++;
-        itemExistente.subtotal = itemExistente.cantidad * precioReal;
-      } else {
-        alert(`No hay más stock de ${producto.nombre_producto}. Límite: ${stockReal} unidades.`);
-      }
+  filtrarProductos() {
+    let lista = [...this.productosDisponibles];
+    if (this.categoriaSeleccionada !== 'todas') {
+      lista = lista.filter(p => p.id_categoria == this.categoriaSeleccionada);
+    }
+    if (this.busquedaPV.trim()) {
+      lista = lista.filter(p => p.nombre_producto.toLowerCase().includes(this.busquedaPV.toLowerCase()));
+    }
+    this.productosFiltrados = lista;
+  }
+
+  agregarAlCarrito(producto: any) {
+    const item = this.carrito.find(i => i.id_producto === producto.id_producto);
+    const stock = Number(producto.stock_actual) || 0;
+    const precio = Number(producto.precio_unitario) || 0;
+    if (item) {
+      if (item.cantidad < stock) { item.cantidad++; item.subtotal = item.cantidad * precio; }
+      else { alert(`Límite de stock: ${stock} unidades.`); }
     } else {
-      this.carrito.push({
-        ...producto,
-        cantidad: 1,
-        precio_unitario: precioReal, 
-        subtotal: precioReal
-      });
+      this.carrito.push({ ...producto, cantidad: 1, precio_unitario: precio, subtotal: precio });
     }
     this.calcularTotal();
   }
 
-  quitarDelCarrito(index: number) {
-    this.carrito.splice(index, 1);
-    this.calcularTotal();
-  }
+  quitarDelCarrito(i: number) { this.carrito.splice(i, 1); this.calcularTotal(); }
 
   calcularTotal() {
-    this.total = this.carrito.reduce((suma, item) => suma + Number(item.subtotal), 0);
-    this.cdr.detectChanges(); 
+    this.total = this.carrito.reduce((s, i) => s + Number(i.subtotal), 0);
+    this.cdr.detectChanges();
   }
 
-  // --- 2. Función de Registro de Venta con Lógica de Ticket ---
   registrarVenta() {
     if (this.carrito.length === 0) return;
-
     this.cargando = true;
     const token = localStorage.getItem('token_sgiv');
     const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
-    
     const datosVenta = {
-      id_sucursal: 1,
-      id_usuario_cajero: 1,
-      id_cliente: null,
-      id_pedido_mesa: null,
-      id_turno: 1,
-      monto_total_venta: this.total,
-      metodo_pago: 'Efectivo',  
-      detalles: this.carrito.map(item => ({
-        id_producto: item.id_producto,
-        cantidad: item.cantidad,
-        precio: item.precio_unitario,
-        subtotal: item.subtotal
-      }))
+      id_sucursal: 1, id_usuario_cajero: 1, id_cliente: null, id_pedido_mesa: null, id_turno: 1,
+      monto_total_venta: this.total, metodo_pago: 'Efectivo',
+      detalles: this.carrito.map(i => ({ id_producto: i.id_producto, cantidad: i.cantidad, precio: i.precio_unitario, subtotal: i.subtotal }))
     };
-
     this.http.post(`${this.apiUrl}/caja/cobrar`, datosVenta, { headers }).subscribe({
-      next: (respuesta: any) => {
-        this.datosTicket = {
-          id_venta: respuesta.id_venta,
-          items: [...this.carrito], // Copia de seguridad del carrito
-          total: this.total
+      next: (res: any) => {
+        const ventaRegistrada = {
+          id_venta: res.id_venta,
+          hora: new Date(),
+          items: [...this.carrito],
+          total: this.total,
+          cajero: JSON.parse(localStorage.getItem('usuario_sgiv') || '{}')?.nombre_completo || 'Cajero'
         };
+        this.datosTicket = { ...ventaRegistrada };
         this.fechaTicket = new Date();
-        this.mostrarTicket = true; // Abrimos el modal del ticket
-        
-        // Limpieza de la interfaz de venta
+        this.mostrarTicket = true;
+
+        // Agregar al historial de sesión
+        this.historialSesion.unshift(ventaRegistrada);
+        this.totalSesion += this.total;
+
         this.carrito = [];
         this.total = 0;
-        this.cargarCatalogo(); // Actualizamos stocks
+        this.cargarCatalogo();
         this.cargando = false;
         this.cdr.detectChanges();
       },
-      error: (error) => {
-        console.error('Error al registrar venta:', error);
-        alert('Hubo un error al procesar la venta.');
-        this.cargando = false;
-        this.cdr.detectChanges();
-      }
+      error: () => { alert('Error al procesar la venta.'); this.cargando = false; this.cdr.detectChanges(); }
     });
   }
 
-  // --- 3. Funciones del Ticket ---
-  imprimirVenta() {
-    window.print();
-  }
-
-  cerrarTicket() {
-    this.mostrarTicket = false;
-    this.datosTicket = null;
-  }
+  imprimirVenta() { window.print(); }
+  cerrarTicket() { this.mostrarTicket = false; this.datosTicket = null; }
+  cambiarVista(vista: 'catalogo' | 'historial') { this.vistaActual = vista; }
 }

@@ -3,63 +3,41 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class ProductoService {
-  private apiUrl = environment.apiUrl; 
+  private apiUrl = environment.apiUrl;
+  constructor(private http: HttpClient) {}
 
-  constructor(private http: HttpClient) { }
+  private headers(): HttpHeaders {
+    return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
+  }
 
-  // Función 1: Pedir los productos 
   obtenerInventario(): Observable<any> {
-    const token = localStorage.getItem('token_sgiv');
-    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
-    const url = `${this.apiUrl}/catalogo/productos?hora=${new Date().getTime()}`;
-    return this.http.get(url, { headers });
+    return this.http.get(`${this.apiUrl}/catalogo/productos?t=${Date.now()}`, { headers: this.headers() });
   }
 
-  // Función 2: ENVIAR un nuevo producto 
-  crearProducto(productoData: any): Observable<any> {
-    const token = localStorage.getItem('token_sgiv');
-    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
-    
-    
-    // Aquí enviamos los datos por el método POST
-    return this.http.post(`${this.apiUrl}/catalogo/productos`, productoData, { headers });
+  crearProducto(data: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/catalogo/productos`, data, { headers: this.headers() });
   }
 
-  // Función 3: Pedir la lista de Categorías reales
-  obtenerCategorias(): Observable<any> {
-    const token = localStorage.getItem('token_sgiv');
-    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
-    
-    return this.http.get(`${this.apiUrl}/catalogo/categorias`, { headers });
+  actualizarProducto(id: number, data: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, data, { headers: this.headers() });
   }
 
-  // Función 4: Eliminar producto
   eliminarProducto(id: number): Observable<any> {
-    const token = localStorage.getItem('token_sgiv');
-    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
-    
-    return this.http.delete(`${this.apiUrl}/catalogo/productos/${id}`, { headers });
+    return this.http.delete(`${this.apiUrl}/catalogo/productos/${id}`, { headers: this.headers() });
   }
 
-  // Función 5: Actualizar un producto existente (¡NUEVA!)
-  actualizarProducto(id: number, productoData: any): Observable<any> {
-    const token = localStorage.getItem('token_sgiv');
-    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
-    
-    // Usamos PUT y le enviamos el ID en la URL y los datos en el cuerpo
-    return this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, productoData, { headers });
-  }
-  // Función 6: Ingresar stock nuevo (Entrada de Inventario)
   ingresarStock(id: number, cantidad: number): Observable<any> {
-    const token = localStorage.getItem('token_sgiv');
-    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
-    
-    // Enviamos el objeto { cantidad } a la ruta PATCH
-    return this.http.patch(`${this.apiUrl}/catalogo/productos/${id}/stock`, { cantidad }, { headers });
+    return this.http.patch(`${this.apiUrl}/catalogo/productos/${id}/stock`, { cantidad }, { headers: this.headers() });
+  }
+
+  obtenerCategorias(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/catalogo/categorias`, { headers: this.headers() });
+  }
+
+  // NUEVO
+  crearCategoria(nombre_categoria: string, descripcion_categoria: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/catalogo/categorias`, { nombre_categoria, descripcion_categoria }, { headers: this.headers() });
   }
 }
-

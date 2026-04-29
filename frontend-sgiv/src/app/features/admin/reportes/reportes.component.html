@@ -1,0 +1,181 @@
+<div class="space-y-6">
+
+  <!-- Cabecera -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div class="flex flex-wrap justify-between items-start gap-4 mb-5">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-800">Reportes</h2>
+        <p class="text-sm text-gray-500 mt-1">Genera y exporta reportes profesionales de ventas</p>
+      </div>
+      <div class="flex gap-3" *ngIf="datosReporte">
+        <button (click)="exportarExcel()"
+                class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Exportar Excel
+        </button>
+        <button (click)="exportarPDF()"
+                class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0013.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          Exportar PDF
+        </button>
+      </div>
+    </div>
+
+<!-- Selector de período -->
+<div class="flex flex-wrap gap-2">
+  <button (click)="seleccionarPeriodo('hoy')"
+          [class.bg-blue-600]="periodoActivo === 'hoy'"
+          [class.text-white]="periodoActivo === 'hoy'"
+          [class.bg-gray-100]="periodoActivo !== 'hoy'"
+          [class.text-gray-600]="periodoActivo !== 'hoy'"
+          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors">Hoy</button>
+  <button (click)="seleccionarPeriodo('semana')"
+          [class.bg-blue-600]="periodoActivo === 'semana'"
+          [class.text-white]="periodoActivo === 'semana'"
+          [class.bg-gray-100]="periodoActivo !== 'semana'"
+          [class.text-gray-600]="periodoActivo !== 'semana'"
+          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors">Esta Semana</button>
+  <button (click)="seleccionarPeriodo('mes')"
+          [class.bg-blue-600]="periodoActivo === 'mes'"
+          [class.text-white]="periodoActivo === 'mes'"
+          [class.bg-gray-100]="periodoActivo !== 'mes'"
+          [class.text-gray-600]="periodoActivo !== 'mes'"
+          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors">Este Mes</button>
+  <button (click)="seleccionarPeriodo('personalizado')"
+          [class.bg-blue-600]="periodoActivo === 'personalizado'"
+          [class.text-white]="periodoActivo === 'personalizado'"
+          [class.bg-gray-100]="periodoActivo !== 'personalizado'"
+          [class.text-gray-600]="periodoActivo !== 'personalizado'"
+          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors">Personalizado</button>
+</div>
+  <!-- Cargando -->
+  <div *ngIf="cargando" class="bg-white rounded-xl p-12 text-center border border-gray-100">
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-gray-400">Generando reporte...</p>
+    </div>
+  </div>
+
+  <ng-container *ngIf="!cargando && datosReporte">
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Ventas</p>
+        <p class="text-4xl font-black text-gray-800 mt-2">{{ resumen.total_ventas || 0 }}</p>
+        <p class="text-xs text-gray-400 mt-1">ventas en el período</p>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ingresos Totales</p>
+        <p class="text-4xl font-black text-green-600 mt-2">Bs. {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</p>
+        <p class="text-xs text-gray-400 mt-1">bolivianos</p>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ticket Promedio</p>
+        <p class="text-4xl font-black text-blue-600 mt-2">Bs. {{ (+resumen.ticket_promedio || 0).toFixed(2) }}</p>
+        <p class="text-xs text-gray-400 mt-1">por venta</p>
+      </div>
+    </div>
+
+    <!-- Tablas de detalle -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- Ventas por categoría -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+          <h3 class="font-bold text-gray-800">Ingresos por Categoría</h3>
+        </div>
+        <div class="p-4">
+          <div *ngIf="!datosReporte.por_categoria?.length" class="text-center text-gray-400 py-6 text-sm">Sin datos</div>
+          <div *ngFor="let cat of datosReporte.por_categoria" class="mb-3">
+            <div class="flex justify-between text-sm mb-1">
+              <span class="font-medium text-gray-700">{{ cat.nombre_categoria }}</span>
+              <span class="font-bold text-green-600">Bs. {{ (+cat.ingresos_categoria).toFixed(2) }}</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2">
+              <div class="bg-blue-500 h-2 rounded-full transition-all" [style.width.%]="datosReporte.por_categoria[0] ? (+cat.ingresos_categoria / +datosReporte.por_categoria[0].ingresos_categoria) * 100 : 0"></div>
+            </div>
+            <p class="text-xs text-gray-400 mt-0.5">{{ cat.unidades_vendidas }} unidades vendidas</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top productos -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+          <h3 class="font-bold text-gray-800">Top Productos</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr class="text-gray-500 text-xs uppercase">
+                <th class="px-4 py-2 text-left">#</th>
+                <th class="px-4 py-2 text-left">Producto</th>
+                <th class="px-4 py-2 text-center">Uds.</th>
+                <th class="px-4 py-2 text-right">Ingresos</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="!datosReporte.top_productos?.length">
+                <td colspan="4" class="px-4 py-6 text-center text-gray-400 text-sm">Sin datos</td>
+              </tr>
+              <tr *ngFor="let p of datosReporte.top_productos; let i = index" class="border-b border-gray-100">
+                <td class="px-4 py-2.5">
+                  <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                        [class.bg-yellow-400]="i === 0" [class.bg-gray-300]="i === 1" [class.bg-orange-300]="i === 2"
+                        [class.bg-gray-100]="i > 2" [class.text-white]="i <= 2">
+                    {{ i + 1 }}
+                  </span>
+                </td>
+                <td class="px-4 py-2.5">
+                  <p class="font-medium text-gray-800">{{ p.nombre_producto }}</p>
+                  <p class="text-xs text-gray-400">{{ p.nombre_categoria }}</p>
+                </td>
+                <td class="px-4 py-2.5 text-center text-gray-600">{{ p.unidades }}</td>
+                <td class="px-4 py-2.5 text-right font-bold text-green-600">Bs. {{ (+p.ingresos).toFixed(2) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ventas por día -->
+    <div *ngIf="datosReporte.ventas_diarias?.length > 0" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="font-bold text-gray-800">Detalle por Día</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr class="text-gray-500 text-xs uppercase">
+              <th class="px-6 py-3 text-left">Fecha</th>
+              <th class="px-6 py-3 text-center">Ventas</th>
+              <th class="px-6 py-3 text-right">Ingresos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let d of datosReporte.ventas_diarias" class="border-b border-gray-100 hover:bg-gray-50">
+              <td class="px-6 py-3 font-medium text-gray-700">{{ d.dia | date:'EEEE, dd MMMM yyyy':'':'es' }}</td>
+              <td class="px-6 py-3 text-center text-gray-600">{{ d.ventas }}</td>
+              <td class="px-6 py-3 text-right font-bold text-green-600">Bs. {{ (+d.ingresos).toFixed(2) }}</td>
+            </tr>
+          </tbody>
+          <tfoot class="bg-gray-50 font-bold text-gray-800">
+            <tr>
+              <td class="px-6 py-3">TOTAL</td>
+              <td class="px-6 py-3 text-center">{{ resumen.total_ventas || 0 }}</td>
+              <td class="px-6 py-3 text-right text-green-600">Bs. {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+  </ng-container>
+
+  <!-- Sin datos -->
+  <div *ngIf="!cargando && !datosReporte" class="bg-white rounded-xl p-12 text-center border border-gray-100">
+    <p class="text-gray-400">Selecciona un período para generar el reporte.</p>
+  </div>
+</div>

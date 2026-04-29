@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const reporteController = require('../controllers/reporteController');
+const { verificarToken } = require('../middlewares/authMiddleware');
 
-// Ruta principal para cargar todo el Dashboard de una sucursal
-router.get('/dashboard/:id_sucursal', reporteController.obtenerDashboard);
+router.get('/dashboard/:id_sucursal',          verificarToken, reporteController.obtenerDashboard);
+router.get('/periodo/:id_sucursal',            verificarToken, reporteController.obtenerReportePeriodo);
 
 module.exports = router;

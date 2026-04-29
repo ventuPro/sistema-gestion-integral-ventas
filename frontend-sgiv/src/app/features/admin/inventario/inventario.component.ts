@@ -1,7 +1,7 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core'; 
+import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ProductoService } from '../../../core/services/producto.service';
 import { FormsModule } from '@angular/forms';
+import { ProductoService } from '../../../core/services/producto.service';
 
 @Component({
   selector: 'app-inventario',
@@ -12,172 +12,166 @@ import { FormsModule } from '@angular/forms';
 })
 export class InventarioComponent implements OnInit {
   private productoService = inject(ProductoService);
-  private cdr = inject(ChangeDetectorRef); 
+  private cdr = inject(ChangeDetectorRef);
 
-  // --- Variables de Datos ---
   listaProductos: any[] = [];
-  listaCategorias: any[] = []; 
-  cargando: boolean = true;
-  
-  // --- Control de Modales (CRUD) ---
-  mostrarModal: boolean = false;
-  editandoId: number | null = null; 
+  listaProductosFiltrados: any[] = [];
+  listaCategorias: any[] = [];
+  cargando = true;
 
-  // --- Control de Modal de Stock ---
-  mostrarModalStock: boolean = false;
+  // Filtros
+  categoriaFiltro: string = 'todas';
+  busqueda: string = '';
+
+  // Modal CRUD
+  mostrarModal = false;
+  editandoId: number | null = null;
+  nuevoProducto: any = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '', url_imagen: '' };
+  imagenPreview: string = '';
+
+  // Modal Stock
+  mostrarModalStock = false;
   productoSeleccionado: any = null;
-  cantidadIngreso: number = 0;
+  cantidadIngreso = 0;
 
-  // --- Objetos para Formularios ---
-  nuevoProducto: any = {
-    nombre_producto: '',
-    id_categoria: '',
-    precio_unitario: null,
-    descripcion_producto: ''
-  };
+  // Modal Categorías
+  mostrarModalCategorias = false;
+  nuevaCategoria = { nombre_categoria: '', descripcion_categoria: '' };
+  cargandoCategoria = false;
+  mensajeCategoriaError = '';
 
   ngOnInit() {
     this.cargarInventario();
-    this.cargarCategorias(); 
+    this.cargarCategorias();
   }
 
-  // --- Carga de Datos desde la BD ---
   cargarInventario() {
+    this.cargando = true;
     this.productoService.obtenerInventario().subscribe({
       next: (datos) => {
         this.listaProductos = datos;
+        this.aplicarFiltros();
         this.cargando = false;
-        this.cdr.detectChanges(); 
+        this.cdr.detectChanges();
       },
-      error: (error) => {
-        console.error('Error al cargar inventario:', error);
-        this.cargando = false;
-        this.cdr.detectChanges(); 
-      }
+      error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
 
   cargarCategorias() {
     this.productoService.obtenerCategorias().subscribe({
-      next: (datos) => {
-        this.listaCategorias = datos;
-      },
-      error: (error) => {
-        console.error('Error al cargar categorías:', error);
-      }
+      next: (datos) => { this.listaCategorias = datos; }
     });
   }
 
-  // --- Funciones del Modal CRUD (Crear/Editar) ---
+  aplicarFiltros() {
+    let lista = [...this.listaProductos];
+    if (this.categoriaFiltro !== 'todas') {
+      lista = lista.filter(p => p.id_categoria == this.categoriaFiltro);
+    }
+    if (this.busqueda.trim()) {
+      const term = this.busqueda.toLowerCase();
+      lista = lista.filter(p => p.nombre_producto.toLowerCase().includes(term));
+    }
+    this.listaProductosFiltrados = lista;
+  }
+
+  // ─── Modal CRUD ───
   abrirModal() {
     this.editandoId = null;
-    this.nuevoProducto = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '' };
+    this.imagenPreview = '';
+    this.nuevoProducto = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '', url_imagen: '' };
     this.mostrarModal = true;
   }
 
-  abrirModalEditar(producto: any) {
-    this.editandoId = producto.id_producto;
-    this.nuevoProducto = { 
-      nombre_producto: producto.nombre_producto,
-      id_categoria: producto.id_categoria,
-      precio_unitario: producto.precio_unitario,
-      descripcion_producto: producto.descripcion_producto || ''
+  abrirModalEditar(p: any) {
+    this.editandoId = p.id_producto;
+    this.imagenPreview = p.url_imagen || '';
+    this.nuevoProducto = {
+      nombre_producto: p.nombre_producto,
+      id_categoria: p.id_categoria,
+      precio_unitario: p.precio_unitario,
+      descripcion_producto: p.descripcion_producto || '',
+      url_imagen: p.url_imagen || ''
     };
     this.mostrarModal = true;
   }
 
-  cerrarModal() {
-    this.mostrarModal = false;
-    this.editandoId = null;
-    this.nuevoProducto = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '' };
+  cerrarModal() { this.mostrarModal = false; this.editandoId = null; this.imagenPreview = ''; }
+
+  // Manejo de imagen (convierte a base64)
+  onImagenSeleccionada(event: any) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert('La imagen no debe superar 2MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      this.nuevoProducto.url_imagen = e.target.result;
+      this.imagenPreview = e.target.result;
+      this.cdr.detectChanges();
+    };
+    reader.readAsDataURL(file);
   }
+
+  quitarImagen() { this.nuevoProducto.url_imagen = ''; this.imagenPreview = ''; }
 
   guardarProducto() {
-    const productoAEnviar = {
-      ...this.nuevoProducto,
-      url_imagen: 'https://via.placeholder.com/150'
-    };
-
     this.cargando = true;
-
     if (this.editandoId) {
-      this.productoService.actualizarProducto(this.editandoId, productoAEnviar).subscribe({
-        next: (respuesta) => {
-          console.log('¡Éxito! Producto actualizado:', respuesta);
-          this.cerrarModal();
-          this.cargarInventario();
-        },
-        error: (error) => {
-          console.error('Error al actualizar:', error);
-          alert('Hubo un error al editar el producto.');
-          this.cargando = false;
-        }
+      this.productoService.actualizarProducto(this.editandoId, this.nuevoProducto).subscribe({
+        next: () => { this.cerrarModal(); this.cargarInventario(); },
+        error: () => { alert('Error al editar producto.'); this.cargando = false; }
       });
     } else {
-      this.productoService.crearProducto(productoAEnviar).subscribe({
-        next: (respuesta) => {
-          console.log('¡Éxito! Producto guardado:', respuesta);
-          this.cerrarModal();
-          this.cargarInventario();
-        },
-        error: (error) => {
-          console.error('Error al guardar:', error);
-          alert('Hubo un problema al guardar el producto.');
-          this.cargando = false;
-        }
+      this.productoService.crearProducto(this.nuevoProducto).subscribe({
+        next: () => { this.cerrarModal(); this.cargarInventario(); },
+        error: () => { alert('Error al guardar producto.'); this.cargando = false; }
       });
     }
   }
 
-  // --- Funciones del Modal de Stock (Nueva Lógica) ---
-  abrirModalStock(producto: any) {
-    this.productoSeleccionado = producto;
-    this.cantidadIngreso = 0; 
-    this.mostrarModalStock = true;
-  }
-
-  cerrarModalStock() {
-    this.mostrarModalStock = false;
-    this.productoSeleccionado = null;
-  }
+  // ─── Modal Stock ───
+  abrirModalStock(p: any) { this.productoSeleccionado = p; this.cantidadIngreso = 0; this.mostrarModalStock = true; }
+  cerrarModalStock() { this.mostrarModalStock = false; this.productoSeleccionado = null; }
 
   confirmarIngresoStock() {
-    if (this.cantidadIngreso <= 0) {
-      alert('Por favor, ingresa una cantidad válida.');
-      return;
-    }
-
+    if (this.cantidadIngreso <= 0) { alert('Ingresa una cantidad válida.'); return; }
     this.cargando = true;
     this.productoService.ingresarStock(this.productoSeleccionado.id_producto, this.cantidadIngreso).subscribe({
-      next: (res) => {
-        console.log(res.mensaje);
-        this.cerrarModalStock();
-        this.cargarInventario(); 
-      },
-      error: (err) => {
-        console.error('Error al ingresar stock:', err);
-        alert('No se pudo actualizar el stock.');
-        this.cargando = false;
-      }
+      next: () => { this.cerrarModalStock(); this.cargarInventario(); },
+      error: () => { alert('Error al ingresar stock.'); this.cargando = false; }
     });
   }
 
-  // --- Función de Borrado ---
+  // ─── Modal Categorías ───
+  abrirModalCategorias() { this.mostrarModalCategorias = true; this.mensajeCategoriaError = ''; this.nuevaCategoria = { nombre_categoria: '', descripcion_categoria: '' }; }
+  cerrarModalCategorias() { this.mostrarModalCategorias = false; }
+
+  guardarCategoria() {
+    if (!this.nuevaCategoria.nombre_categoria.trim()) { this.mensajeCategoriaError = 'El nombre es obligatorio.'; return; }
+    this.cargandoCategoria = true;
+    this.productoService.crearCategoria(this.nuevaCategoria.nombre_categoria, this.nuevaCategoria.descripcion_categoria).subscribe({
+      next: () => {
+        this.nuevaCategoria = { nombre_categoria: '', descripcion_categoria: '' };
+        this.mensajeCategoriaError = '';
+        this.cargandoCategoria = false;
+        this.cargarCategorias();
+      },
+      error: () => { this.mensajeCategoriaError = 'Error al crear categoría.'; this.cargandoCategoria = false; }
+    });
+  }
+
   borrarProducto(id: number, nombre: string) {
-    const confirmacion = confirm(`¿Estás seguro de que deseas eliminar el producto: "${nombre}"?`);
-    if (confirmacion) {
-      this.cargando = true;
-      this.productoService.eliminarProducto(id).subscribe({
-        next: (respuesta) => {
-          console.log(respuesta.mensaje);
-          this.cargarInventario();
-        },
-        error: (error) => {
-          console.error('Error al eliminar:', error);
-          alert('Hubo un error al intentar eliminar el producto.');
-          this.cargando = false;
-        }
-      });
-    }
+    if (!confirm(`¿Eliminar el producto "${nombre}"?`)) return;
+    this.cargando = true;
+    this.productoService.eliminarProducto(id).subscribe({
+      next: () => this.cargarInventario(),
+      error: () => { alert('Error al eliminar.'); this.cargando = false; }
+    });
+  }
+
+  getNombreCategoria(id: any): string {
+    const cat = this.listaCategorias.find(c => c.id_categoria == id);
+    return cat ? cat.nombre_categoria : 'Sin categoría';
   }
 }
