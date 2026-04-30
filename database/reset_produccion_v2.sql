@@ -1,0 +1,11 @@
+BEGIN;
+TRUNCATE TABLE historial_inventario    RESTART IDENTITY CASCADE;
+TRUNCATE TABLE detalle_venta          RESTART IDENTITY CASCADE;
+TRUNCATE TABLE venta_caja             RESTART IDENTITY CASCADE;
+TRUNCATE TABLE turno_caja             RESTART IDENTITY CASCADE;
+TRUNCATE TABLE detalle_pedido         RESTART IDENTITY CASCADE;
+TRUNCATE TABLE pedido_mesa            RESTART IDENTITY CASCADE;
+TRUNCATE TABLE notificacion_admin     RESTART IDENTITY CASCADE;
+UPDATE inventario_sucursal SET cantidad_actual = 0;
+UPDATE mesa_local SET estado_mesa = 'Libre';
+COMMIT;

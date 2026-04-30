@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { PermisoService } from '../../../core/services/permiso.service';
 
 @Component({
   selector: 'app-login',
@@ -12,42 +13,55 @@ import { AuthService } from '../../../core/services/auth.service';
   styleUrl: './login.component.css'
 })
 export class LoginComponent {
-  correo: string = '';
-  contrasena: string = '';
-  mensajeError: string = '';
-  cargando: boolean = false;
+  correo   = '';
+  contrasena = '';
+  mensajeError = '';
+  cargando = false;
 
-  private authService = inject(AuthService);
-  private router = inject(Router);
+  private authService    = inject(AuthService);
+  private permisoService = inject(PermisoService);
+  private router         = inject(Router);
 
   iniciarSesion() {
     if (!this.correo || !this.contrasena) {
-      this.mensajeError = 'Por favor, ingresa tu correo y contraseña.';
-      return;
+      this.mensajeError = 'Ingresa tu correo y contraseña.'; return;
     }
     this.cargando = true;
     this.mensajeError = '';
 
     this.authService.login(this.correo, this.contrasena).subscribe({
-      next: (respuesta) => {
-        this.authService.guardarToken(respuesta.token);
-        // Guardamos datos del usuario para permisos en el menú
+      next: (res) => {
+        this.authService.guardarToken(res.token);
         localStorage.setItem('usuario_sgiv', JSON.stringify({
-          id_usuario: respuesta.usuario.id_usuario,
-          nombre_completo: respuesta.usuario.nombre_completo,
-          id_rol: respuesta.usuario.id_rol,
-          id_sucursal: respuesta.usuario.id_sucursal
+          id_usuario:      res.usuario.id_usuario,
+          nombre_completo: res.usuario.nombre_completo,
+          id_rol:          res.usuario.id_rol,
+          id_sucursal:     res.usuario.id_sucursal
         }));
-        this.cargando = false;
-        this.router.navigate(['/dashboard']);
+
+        // Cargar permisos antes de redirigir
+        this.permisoService.cargarMisPermisos().subscribe({
+          next: () => {
+            this.cargando = false;
+            // Redirigir según rol
+            if (res.usuario.id_rol === 3) {
+              this.router.navigate(['/cocina']);
+            } else {
+              this.router.navigate(['/dashboard']);
+            }
+          },
+          error: () => {
+            // Si falla la carga de permisos, igual redirigir
+            this.cargando = false;
+            this.router.navigate(['/dashboard']);
+          }
+        });
       },
-      error: (errorBackend) => {
+      error: (e) => {
         this.cargando = false;
-        if (errorBackend.status === 401 || errorBackend.status === 404) {
-          this.mensajeError = 'Correo o contraseña incorrectos.';
-        } else {
-          this.mensajeError = 'Error al conectar con el servidor.';
-        }
+        this.mensajeError = e.status === 401 || e.status === 404
+          ? 'Correo o contraseña incorrectos.'
+          : 'Error al conectar con el servidor.';
       }
     });
   }

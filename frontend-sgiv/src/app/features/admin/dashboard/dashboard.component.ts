@@ -1,6 +1,8 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { Router, RouterOutlet, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { PermisoService } from '../../../core/services/permiso.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -10,23 +12,31 @@ import { CommonModule } from '@angular/common';
   styleUrl: './dashboard.component.css'
 })
 export class DashboardComponent implements OnInit {
-  private router = inject(Router);
+  private router         = inject(Router);
+  private permisoService = inject(PermisoService);
+  private authService    = inject(AuthService);
 
-  usuario: any = null;
-  esAdmin: boolean = false;
+  usuario: any  = null;
+  esAdmin       = false;
+  esCajero      = false;
 
   ngOnInit() {
     const raw = localStorage.getItem('usuario_sgiv');
     if (raw) {
-      this.usuario = JSON.parse(raw);
-      // id_rol = 1 → Administrador (nivel_permiso 1 = acceso total)
-      this.esAdmin = this.usuario.id_rol === 1;
+      this.usuario  = JSON.parse(raw);
+      this.esAdmin  = this.usuario.id_rol === 1;
+      this.esCajero = this.usuario.id_rol === 2;
     }
   }
 
+  tiene(modulo: string): boolean {
+    if (this.esAdmin) return true;
+    return this.permisoService.tienePermiso(modulo);
+  }
+
   cerrarSesion() {
-    localStorage.removeItem('token_sgiv');
-    localStorage.removeItem('usuario_sgiv');
+    this.authService.cerrarSesion();
+    this.permisoService.limpiarPermisos();
     this.router.navigate(['/login']);
   }
 }

@@ -1,0 +1,129 @@
+<div class="min-h-screen bg-gray-950 text-white font-sans">
+
+  <!-- Header KDS -->
+  <header class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex justify-between items-center sticky top-0 z-10">
+    <div class="flex items-center gap-4">
+      <div class="w-3 h-3 rounded-full bg-green-400 animate-pulse"></div>
+      <h1 class="text-xl font-black text-white">🍳 COCINA — KDS</h1>
+      <span class="text-gray-400 text-sm">Pastelería Ricky's</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <span class="text-gray-400 text-sm font-mono">{{ horaActual | date:'HH:mm:ss' }}</span>
+      <span class="bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+        {{ pedidos.length }} pedido(s) activo(s)
+      </span>
+      <button (click)="cargarPedidos()" class="text-gray-400 hover:text-white text-sm border border-gray-700 px-3 py-1 rounded-lg transition-colors">⟳ Actualizar</button>
+      <button (click)="cerrarSesion()" class="text-red-400 hover:text-red-300 text-sm">Salir</button>
+    </div>
+  </header>
+
+  <!-- Cargando -->
+  <div *ngIf="cargando" class="flex justify-center items-center h-64">
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-10 h-10 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-gray-400">Cargando pedidos...</p>
+    </div>
+  </div>
+
+  <!-- Sin pedidos -->
+  <div *ngIf="!cargando && pedidos.length === 0" class="flex flex-col items-center justify-center h-64 text-center">
+    <div class="text-6xl mb-4">😴</div>
+    <h2 class="text-2xl font-bold text-gray-400">Sin pedidos activos</h2>
+    <p class="text-gray-600 mt-2">Esperando nuevos pedidos...</p>
+  </div>
+
+  <!-- Grid de pedidos -->
+  <div *ngIf="!cargando && pedidos.length > 0"
+       class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-max">
+
+    <div *ngFor="let pedido of pedidos; let pi = index"
+         class="border-2 rounded-2xl overflow-hidden transition-all"
+         [ngClass]="getColorPedido(pedido)"
+         [class.opacity-75]="pedido.estado_pedido === 'Listo'">
+
+      <!-- Cabecera del pedido -->
+      <div class="px-4 py-3 flex justify-between items-center"
+           [class.bg-green-900]="pedido.estado_pedido === 'Listo'"
+           [class.bg-gray-800]="pedido.estado_pedido !== 'Listo'">
+        <div>
+          <span class="font-black text-white text-xl">Mesa {{ pedido.numero_mesa }}</span>
+          <span class="text-gray-400 text-xs ml-2">#{{ pedido.id_pedido }}</span>
+        </div>
+        <div class="text-right">
+          <div class="text-xs font-bold rounded-full px-2 py-0.5 inline-block"
+               [class.bg-green-500]="pedido.estado_pedido === 'Listo'"
+               [class.bg-amber-500]="pedido.estado_pedido !== 'Listo'">
+            {{ pedido.estado_pedido === 'Listo' ? '✅ LISTO' : '🍳 EN COCINA' }}
+          </div>
+          <p class="text-gray-400 text-xs mt-1">⏱ {{ tiempoDesde(pedido.fecha_aprobacion) }}</p>
+        </div>
+      </div>
+
+      <!-- Observación general -->
+      <div *ngIf="pedido.observacion_general" class="bg-yellow-900/40 border-b border-yellow-700 px-4 py-2">
+        <p class="text-yellow-300 text-xs font-medium">📋 {{ pedido.observacion_general }}</p>
+      </div>
+
+      <!-- Ítems -->
+      <div class="p-3 space-y-2 bg-gray-900">
+        <div *ngFor="let item of pedido.items; let ii = index"
+             class="border rounded-xl p-3 transition-all"
+             [ngClass]="getColorItem(item.estado_cocina)">
+
+          <div class="flex justify-between items-start mb-1">
+            <div class="flex-1">
+              <!-- Imagen pequeña si existe -->
+              <div class="flex items-center gap-2">
+                <div *ngIf="item.imagen" class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+                  <img [src]="item.imagen" [alt]="item.nombre" class="w-full h-full object-cover">
+                </div>
+                <div>
+                  <p class="font-bold text-gray-800 text-sm leading-tight">{{ item.nombre }}</p>
+                  <p class="text-xs text-gray-500">{{ item.categoria }}</p>
+                </div>
+              </div>
+            </div>
+            <span class="font-black text-gray-700 text-lg ml-2 flex-shrink-0">×{{ item.cantidad }}</span>
+          </div>
+
+          <!-- Nota del cliente (RESALTADA) -->
+          <div *ngIf="item.nota_cliente" class="bg-amber-100 border border-amber-300 rounded-lg px-2 py-1 mb-2">
+            <p class="text-amber-800 text-xs font-bold">📝 {{ item.nota_cliente }}</p>
+          </div>
+
+          <!-- Botón de estado -->
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold rounded-full px-2 py-0.5"
+                  [class.bg-gray-200]="item.estado_cocina === 'Pendiente'"
+                  [class.text-gray-600]="item.estado_cocina === 'Pendiente'"
+                  [class.bg-amber-200]="item.estado_cocina === 'En_Preparacion'"
+                  [class.text-amber-800]="item.estado_cocina === 'En_Preparacion'"
+                  [class.bg-green-200]="item.estado_cocina === 'Listo'"
+                  [class.text-green-800]="item.estado_cocina === 'Listo'">
+              {{ item.estado_cocina === 'Pendiente' ? '⏳ Pendiente'
+                : item.estado_cocina === 'En_Preparacion' ? '🔥 Preparando'
+                : '✅ Listo' }}
+            </span>
+
+            <button *ngIf="getSiguienteEstado(item.estado_cocina)"
+                    (click)="actualizarItem(item.id_detalle, getSiguienteEstado(item.estado_cocina)!, pi, ii)"
+                    class="text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                    [class.bg-amber-500]="item.estado_cocina === 'Pendiente'"
+                    [class.hover:bg-amber-600]="item.estado_cocina === 'Pendiente'"
+                    [class.text-white]="true"
+                    [class.bg-green-500]="item.estado_cocina === 'En_Preparacion'"
+                    [class.hover:bg-green-600]="item.estado_cocina === 'En_Preparacion'">
+              {{ getLabelBoton(item.estado_cocina) }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Total del pedido -->
+      <div class="bg-gray-800 px-4 py-2 flex justify-between items-center">
+        <span class="text-gray-400 text-xs">{{ pedido.items?.length || 0 }} ítems</span>
+        <span class="text-green-400 font-bold text-sm">Bs. {{ (+pedido.monto_total || 0).toFixed(2) }}</span>
+      </div>
+    </div>
+  </div>
+</div>

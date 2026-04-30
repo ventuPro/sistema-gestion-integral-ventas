@@ -45,43 +45,66 @@ const registrarVenta = async (datosVenta) => {
     try {
         await client.query('BEGIN');
 
+        // FIX: buscar turno abierto si id_turno no existe o es inválido
+        let turnoId = id_turno || null;
+        if (turnoId) {
+            const checkTurno = await client.query(
+                `SELECT id_turno FROM turno_caja WHERE id_turno = $1;`, [turnoId]
+            );
+            if (checkTurno.rows.length === 0) turnoId = null;
+        }
+        if (!turnoId) {
+            const turnoAbierto = await client.query(
+                `SELECT id_turno FROM turno_caja
+                 WHERE id_sucursal = $1 AND estado_turno = 'Abierto'
+                 ORDER BY fecha_hora_apertura DESC LIMIT 1;`,
+                [id_sucursal]
+            );
+            turnoId = turnoAbierto.rows[0]?.id_turno || null;
+        }
+
         const queryVenta = `
             INSERT INTO venta_caja (id_sucursal, id_usuario_cajero, id_cliente, id_pedido_mesa, id_turno, monto_total_venta, metodo_pago)
             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id_venta;
         `;
         const resVenta = await client.query(queryVenta, [
             id_sucursal, id_usuario_cajero, id_cliente, id_pedido_mesa,
-            id_turno, monto_total_venta, metodo_pago
+            turnoId, monto_total_venta, metodo_pago
         ]);
         const id_venta = resVenta.rows[0].id_venta;
 
-        for (let item of detalles) {
+        for (const item of detalles) {
             await client.query(
                 `INSERT INTO detalle_venta (id_venta, id_producto, cantidad_vendida, precio_unitario, subtotal_venta)
                  VALUES ($1, $2, $3, $4, $5);`,
                 [id_venta, item.id_producto, item.cantidad, item.precio, item.subtotal]
             );
             const resInv = await client.query(
-                `UPDATE inventario_sucursal 
+                `UPDATE inventario_sucursal
                  SET cantidad_actual = cantidad_actual - $1
-                 WHERE id_sucursal = $2 AND id_producto = $3 RETURNING id_inventario;`,
+                 WHERE id_sucursal = $2 AND id_producto = $3
+                   AND cantidad_actual >= $1
+                 RETURNING id_inventario, cantidad_actual;`,
                 [item.cantidad, id_sucursal, item.id_producto]
             );
-            if (resInv.rows.length > 0) {
-                await client.query(
-                    `INSERT INTO historial_inventario (id_inventario, id_usuario, tipo_movimiento, cantidad_movida, motivo_movimiento)
-                     VALUES ($1, $2, 'SALIDA', $3, 'Venta en Caja');`,
-                    [resInv.rows[0].id_inventario, id_usuario_cajero, item.cantidad]
-                );
+            if (resInv.rows.length === 0) {
+                throw new Error(`Stock insuficiente para el producto ID ${item.id_producto}`);
             }
+            await client.query(
+                `INSERT INTO historial_inventario (id_inventario, id_usuario, tipo_movimiento, cantidad_movida, motivo_movimiento)
+                 VALUES ($1, $2, 'SALIDA', $3, 'Venta en Caja');`,
+                [resInv.rows[0].id_inventario, id_usuario_cajero, item.cantidad]
+            );
         }
 
         if (id_pedido_mesa) {
-            await client.query(`UPDATE pedido_mesa SET estado_pedido = 'Pagado' WHERE id_pedido = $1`, [id_pedido_mesa]);
-            await client.query(`
-                UPDATE mesa_local SET estado_mesa = 'Libre'
-                WHERE id_mesa = (SELECT id_mesa FROM pedido_mesa WHERE id_pedido = $1)
-            `, [id_pedido_mesa]);
+            await client.query(
+                `UPDATE pedido_mesa SET estado_pedido = 'Pagado' WHERE id_pedido = $1`, [id_pedido_mesa]
+            );
+            await client.query(
+                `UPDATE mesa_local SET estado_mesa = 'Libre'
+                 WHERE id_mesa = (SELECT id_mesa FROM pedido_mesa WHERE id_pedido = $1)`, [id_pedido_mesa]
+            );
         }
 
         await client.query('COMMIT');

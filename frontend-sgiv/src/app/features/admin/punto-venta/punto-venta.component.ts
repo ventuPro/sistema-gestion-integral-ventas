@@ -85,20 +85,41 @@ export class PuntoVentaComponent implements OnInit {
     this.productosFiltrados = lista;
   }
 
-  agregarAlCarrito(producto: any) {
-    const item  = this.carrito.find(i => i.id_producto === producto.id_producto);
-    const stock = Number(producto.stock_actual) || 0;
-    const precio = Number(producto.precio_unitario) || 0;
-    if (item) {
-      if (item.cantidad < stock) { item.cantidad++; item.subtotal = item.cantidad * precio; }
-      else { alert(`Límite de stock: ${stock} unidades.`); }
-    } else {
-      this.carrito.push({ ...producto, cantidad: 1, precio_unitario: precio, subtotal: precio });
-    }
-    this.calcularTotal();
-  }
+agregarAlCarrito(producto: any) {
+  const item   = this.carrito.find(i => i.id_producto === producto.id_producto);
+  const stock  = Number(producto.stock_actual) || 0;
+  const precio = Number(producto.precio_unitario) || 0;
 
-  quitarDelCarrito(i: number) { this.carrito.splice(i, 1); this.calcularTotal(); }
+  if (item) {
+    if (item.cantidad < stock) {
+      item.cantidad++;
+      item.subtotal = item.cantidad * precio;
+      // FIX: decrementar visualmente el stock en el catálogo
+      producto.stock_actual = stock - item.cantidad;
+    } else {
+      alert(`Límite de stock: ${stock} unidades.`); return;
+    }
+  } else {
+    if (stock === 0) { alert('Sin stock disponible.'); return; }
+    this.carrito.push({ ...producto, cantidad: 1, precio_unitario: precio, subtotal: precio });
+    // FIX: decrementar visualmente
+    producto.stock_actual = stock - 1;
+  }
+  this.calcularTotal();
+}
+
+// También actualiza quitarDelCarrito para restituir el stock visual:
+quitarDelCarrito(i: number) {
+  const item    = this.carrito[i];
+  const prodIdx = this.productosDisponibles.findIndex(p => p.id_producto === item.id_producto);
+  if (prodIdx !== -1) {
+    this.productosDisponibles[prodIdx].stock_actual =
+      Number(this.productosDisponibles[prodIdx].stock_actual) + item.cantidad;
+  }
+  this.carrito.splice(i, 1);
+  this.filtrarProductos();
+  this.calcularTotal();
+}
 
   calcularTotal() {
     this.total = this.carrito.reduce((s, i) => s + Number(i.subtotal), 0);
