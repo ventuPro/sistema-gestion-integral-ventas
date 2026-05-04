@@ -20,6 +20,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   private http   = inject(HttpClient);
   private cdr    = inject(ChangeDetectorRef);
   private apiUrl = environment.apiUrl;
+  private socketUrl = environment.apiUrl.replace('/api', '');
 
   id_mesa      = 0;
   infoMesa:    any   = null;
@@ -151,7 +152,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   }
 
   iniciarTracking(id_pedido: number) {
-    this.socket = io('http://localhost:3000', { transports: ['websocket'] });
+    this.socket = io(this.socketUrl, { transports: ['websocket'] });
 
     this.socket.on('connect', () => {
       this.socket?.emit('unirse_sala', `mesa_${this.id_mesa}`);

@@ -1,17 +1,17 @@
 import { Injectable } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';  // ← 3 niveles, no 4
 
 @Injectable({ providedIn: 'root' })
 export class SocketService {
   private socket: Socket | null = null;
-  private readonly URL = 'http://localhost:3000';
+  private readonly URL = environment.apiUrl.replace('/api', '');
 
   conectar(sala: string) {
     if (this.socket?.connected) return;
     this.socket = io(this.URL, { transports: ['websocket'] });
     this.socket.on('connect', () => {
-      console.log('🔌 Socket conectado:', this.socket?.id);
       this.socket?.emit('unirse_sala', sala);
     });
   }

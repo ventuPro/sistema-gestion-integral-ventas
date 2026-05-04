@@ -1,4 +1,4 @@
 export const environment = {
   production: false,
-  apiUrl: 'http://localhost:3000/api' // La ruta base del servidor Node.js
+  apiUrl: 'http://192.168.0.39:3000/api'  // ← tu IP local
 };

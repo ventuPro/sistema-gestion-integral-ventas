@@ -23,13 +23,20 @@ const server = http.createServer(app);
 
 // Socket.IO con CORS
 const io = new Server(server, {
-    cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
 });
 
 // Exportar io para usarlo en controllers
 global.io = io;
 
-app.use(cors());
+app.use(cors({
+  origin: '*',   // En producción real limitarías esto, en desarrollo local está bien
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  credentials: false
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 

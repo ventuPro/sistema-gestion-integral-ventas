@@ -42,7 +42,7 @@ CREATE TABLE usuario (
     nombre_completo VARCHAR(100) NOT NULL,
     correo_electronico VARCHAR(100) UNIQUE NOT NULL,
     contrasena_hash VARCHAR(255) NOT NULL,
-    estado_active BOOLEAN DEFAULT TRUE
+    estado_activo BOOLEAN DEFAULT TRUE
 );
 
 -- ==========================================
