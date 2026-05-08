@@ -1,180 +1,192 @@
 <div class="space-y-6">
 
-  <!-- Cabecera con filtros -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-    <div class="flex flex-wrap justify-between items-center gap-4 mb-5">
-      <div>
-        <h2 class="text-2xl font-bold text-gray-800">Arqueo de Caja</h2>
-        <p class="text-sm text-gray-500 mt-1">Solo acepta Efectivo y QR</p>
-      </div>
-      <div class="flex gap-3 flex-wrap">
-        <button (click)="imprimirArqueo()"
-                class="flex items-center gap-2 border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg text-sm hover:bg-gray-50 transition-colors no-print">
-          Imprimir Vista
-        </button>
-        <button (click)="ejecutarCierreDiario()"
-                [disabled]="!datosArqueo || cargandoCierre || cargando"
-                class="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-bold py-2 px-5 rounded-lg text-sm transition-colors shadow-sm no-print">
-          {{ cargandoCierre ? 'Cerrando...' : '🔒 Cierre Diario + PDF' }}
-        </button>
-      </div>
+  <!-- Header -->
+  <div class="flex flex-wrap justify-between items-center gap-3">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-800">Arqueo de Caja</h2>
+      <p class="text-sm text-gray-500 mt-1">
+        Resumen del día — {{ hoy | date:'EEEE d MMMM yyyy':'':'es' }}
+      </p>
     </div>
-
-    <!-- Selector de período (solo Hoy o Personalizado) -->
-    <div class="flex flex-wrap gap-2 no-print">
-      <button (click)="seleccionarPeriodo('hoy')"
-              [class.bg-blue-600]="periodoActivo === 'hoy'"
-              [class.text-white]="periodoActivo === 'hoy'"
-              [class.bg-gray-100]="periodoActivo !== 'hoy'"
-              [class.text-gray-600]="periodoActivo !== 'hoy'"
-              class="px-4 py-2 rounded-lg text-sm font-medium transition-colors">Hoy</button>
-      <button (click)="periodoActivo = 'personalizado'"
-              [class.bg-blue-600]="periodoActivo === 'personalizado'"
-              [class.text-white]="periodoActivo === 'personalizado'"
-              [class.bg-gray-100]="periodoActivo !== 'personalizado'"
-              [class.text-gray-600]="periodoActivo !== 'personalizado'"
-              class="px-4 py-2 rounded-lg text-sm font-medium transition-colors">Personalizado</button>
-    </div>
-
-    <!-- Rango personalizado -->
-    <div *ngIf="periodoActivo === 'personalizado'" class="flex gap-3 mt-4 flex-wrap no-print">
-      <div class="flex items-center gap-2">
-        <label class="text-sm font-medium text-gray-600">Desde:</label>
-        <input type="date" [(ngModel)]="fechaInicio"
-               class="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-      </div>
-      <div class="flex items-center gap-2">
-        <label class="text-sm font-medium text-gray-600">Hasta:</label>
-        <input type="date" [(ngModel)]="fechaFin"
-               class="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-      </div>
-      <button (click)="cargarArqueo()"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Buscar</button>
-    </div>
+    <button (click)="cargarArqueo()"
+            class="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+      ⟳ Actualizar
+    </button>
   </div>
 
   <!-- Cargando -->
-  <div *ngIf="cargando" class="bg-white rounded-xl p-12 text-center border border-gray-100">
+  <div *ngIf="cargando" class="flex justify-center items-center py-20">
     <div class="flex flex-col items-center gap-3">
-      <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      <p class="text-gray-400">Cargando datos del arqueo...</p>
+      <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-gray-400 text-sm">Cargando datos del día...</p>
     </div>
   </div>
 
-  <ng-container *ngIf="!cargando && datosArqueo">
+  <ng-container *ngIf="!cargando">
 
-    <!-- KPIs — SIN tarjeta Tarjeta -->
+    <!-- KPIs -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-xs font-semibold text-gray-500 uppercase">Total Ventas</p>
-        <p class="text-3xl font-black text-gray-800 mt-1">{{ resumen.total_ventas || 0 }}</p>
+        <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Total Ventas</p>
+        <p class="text-3xl font-black text-gray-800">{{ arqueo.resumen?.total_ventas || 0 }}</p>
+        <p class="text-xs text-gray-400 mt-1">transacciones hoy</p>
       </div>
+
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-xs font-semibold text-gray-500 uppercase">Ingresos Totales</p>
-        <p class="text-2xl font-black text-green-600 mt-1">Bs. {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</p>
+        <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Ingresos Totales</p>
+        <p class="text-3xl font-black text-green-600">
+          Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
+        </p>
+        <p class="text-xs text-gray-400 mt-1">del día</p>
       </div>
-      <div class="bg-green-50 p-5 rounded-xl shadow-sm border border-green-100">
-        <p class="text-xs font-semibold text-green-600 uppercase">Efectivo</p>
-        <p class="text-2xl font-black text-green-700 mt-1">Bs. {{ (+resumen.total_efectivo || 0).toFixed(2) }}</p>
+
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">💵 Efectivo</p>
+        <p class="text-3xl font-black text-blue-600">
+          Bs. {{ (+arqueo.resumen?.total_efectivo || 0).toFixed(2) }}
+        </p>
       </div>
-      <div class="bg-purple-50 p-5 rounded-xl shadow-sm border border-purple-100">
-        <p class="text-xs font-semibold text-purple-600 uppercase">QR</p>
-        <p class="text-2xl font-black text-purple-700 mt-1">Bs. {{ (+resumen.total_qr || 0).toFixed(2) }}</p>
+
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">📱 QR</p>
+        <p class="text-3xl font-black text-purple-600">
+          Bs. {{ (+arqueo.resumen?.total_qr || 0).toFixed(2) }}
+        </p>
       </div>
+
     </div>
 
-    <!-- Gráficos -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6"
-         *ngIf="datosArqueo.por_dia?.length > 0 || datosArqueo.por_categoria?.length > 0">
-      <div *ngIf="datosArqueo.por_dia?.length > 0" class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 class="font-bold text-gray-800 mb-4">Ingresos por Día</h3>
-        <div class="relative h-48"><canvas id="graficoLinea"></canvas></div>
-      </div>
-      <div *ngIf="datosArqueo.por_categoria?.length > 0" class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 class="font-bold text-gray-800 mb-4">Ventas por Categoría</h3>
-        <div class="relative h-48"><canvas id="graficoBarras"></canvas></div>
-      </div>
-    </div>
-
-    <!-- Tabla detallada -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-      <div class="px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
-        <h3 class="font-bold text-gray-800">Detalle de Ventas ({{ ventasFiltradas.length }})</h3>
-        <div class="flex gap-2 flex-wrap no-print">
-          <button (click)="filtrarPorCategoria('todas')"
-                  [class.bg-gray-800]="categoriaFiltroTabla === 'todas'"
-                  [class.text-white]="categoriaFiltroTabla === 'todas'"
-                  [class.bg-gray-100]="categoriaFiltroTabla !== 'todas'"
-                  class="px-3 py-1 rounded-full text-xs font-medium transition-colors">Todas</button>
-          <button *ngFor="let cat of categoriasDisponibles"
-                  (click)="filtrarPorCategoria(cat)"
-                  [class.bg-gray-800]="categoriaFiltroTabla === cat"
-                  [class.text-white]="categoriaFiltroTabla === cat"
-                  [class.bg-gray-100]="categoriaFiltroTabla !== cat"
-                  class="px-3 py-1 rounded-full text-xs font-medium transition-colors">{{ cat }}</button>
+    <!-- Estado del turno -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h3 class="font-bold text-gray-700 mb-3">Estado del Turno</h3>
+      <div *ngIf="arqueo.turno_activo" class="flex items-center gap-3">
+        <div class="w-3 h-3 rounded-full bg-green-400 animate-pulse"></div>
+        <div>
+          <p class="text-sm font-semibold text-gray-800">Turno activo</p>
+          <p class="text-xs text-gray-500">
+            Abierto el {{ arqueo.turno_activo.fecha_hora_apertura | date:'dd/MM/yyyy HH:mm' }} —
+            Monto inicial: Bs. {{ arqueo.turno_activo.monto_inicial }}
+          </p>
         </div>
       </div>
+      <div *ngIf="!arqueo.turno_activo" class="flex items-center gap-3">
+        <div class="w-3 h-3 rounded-full bg-gray-300"></div>
+        <p class="text-sm text-gray-500">Sin turno abierto hoy</p>
+      </div>
+    </div>
 
-      <div class="overflow-x-auto">
+    <!-- Detalle de ventas -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+        <h3 class="font-bold text-gray-700">Ventas del Día</h3>
+        <span class="text-sm text-gray-400">{{ arqueo.ventas?.length || 0 }} registros</span>
+      </div>
+
+      <div *ngIf="!arqueo.ventas || arqueo.ventas.length === 0"
+           class="text-center py-10 text-gray-400">
+        <div class="text-4xl mb-2">📭</div>
+        <p>Sin ventas registradas hoy.</p>
+      </div>
+
+      <div class="overflow-x-auto" *ngIf="arqueo.ventas?.length > 0">
         <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+          <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
             <tr>
-              <th class="px-4 py-3 text-left">ID</th>
-              <th class="px-4 py-3 text-left">Fecha / Hora</th>
-              <th class="px-4 py-3 text-left">Cajero</th>
+              <th class="px-4 py-3 text-left">#Venta</th>
+              <th class="px-4 py-3 text-left">Hora</th>
+              <th class="px-4 py-3 text-left">Ítems</th>
               <th class="px-4 py-3 text-left">Método</th>
               <th class="px-4 py-3 text-right">Total</th>
-              <th class="px-4 py-3 text-center no-print">Detalle</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngIf="ventasFiltradas.length === 0">
-              <td colspan="6" class="px-4 py-10 text-center text-gray-400">Sin ventas en este período.</td>
+            <tr *ngFor="let venta of arqueo.ventas"
+                class="border-b border-gray-100 hover:bg-gray-50">
+              <td class="px-4 py-3 font-bold text-gray-700">#{{ venta.id_venta }}</td>
+              <td class="px-4 py-3 text-gray-500">
+                {{ venta.fecha_venta | date:'HH:mm' }}
+              </td>
+              <td class="px-4 py-3 text-gray-500">{{ venta.num_items }} ítem(s)</td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 rounded-full text-xs font-bold"
+                      [class.bg-green-100]="venta.metodo_pago === 'Efectivo'"
+                      [class.text-green-700]="venta.metodo_pago === 'Efectivo'"
+                      [class.bg-purple-100]="venta.metodo_pago === 'QR'"
+                      [class.text-purple-700]="venta.metodo_pago === 'QR'">
+                  {{ venta.metodo_pago }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-right font-black text-gray-800">
+                Bs. {{ (+venta.monto_total_venta).toFixed(2) }}
+              </td>
             </tr>
-            <ng-container *ngFor="let venta of ventasFiltradas">
-              <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <td class="px-4 py-3 font-medium text-gray-800">#{{ venta.id_venta }}</td>
-                <td class="px-4 py-3 text-gray-500">{{ venta.fecha_venta | date:'dd/MM/yyyy HH:mm' }}</td>
-                <td class="px-4 py-3 text-gray-700">{{ venta.cajero }}</td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 rounded-full text-xs font-bold"
-                        [class.bg-green-100]="venta.metodo_pago === 'Efectivo'"
-                        [class.text-green-700]="venta.metodo_pago === 'Efectivo'"
-                        [class.bg-purple-100]="venta.metodo_pago === 'QR'"
-                        [class.text-purple-700]="venta.metodo_pago === 'QR'">
-                    {{ venta.metodo_pago }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-right font-bold text-green-600">Bs. {{ (+venta.monto_total_venta).toFixed(2) }}</td>
-                <td class="px-4 py-3 text-center no-print">
-                  <button (click)="toggleDetalle(venta.id_venta)" class="text-blue-500 hover:text-blue-700 text-xs font-medium">
-                    {{ ventaExpandida === venta.id_venta ? 'Ocultar' : 'Ver detalle' }}
-                  </button>
-                </td>
-              </tr>
-              <tr *ngIf="ventaExpandida === venta.id_venta" class="bg-blue-50">
-                <td colspan="6" class="px-6 py-3">
-                  <div class="flex flex-wrap gap-2">
-                    <span *ngFor="let item of venta.detalles"
-                          class="bg-white border border-blue-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs">
-                      <span class="font-bold">{{ item.nombre_producto }}</span>
-                      <span class="text-gray-400 ml-1">({{ item.categoria }})</span>
-                      × {{ item.cantidad }} =
-                      <span class="font-bold text-green-600">Bs. {{ item.subtotal }}</span>
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            </ng-container>
           </tbody>
+          <tfoot class="bg-gray-50">
+            <tr>
+              <td colspan="4" class="px-4 py-3 font-black text-gray-700 text-right">TOTAL DEL DÍA:</td>
+              <td class="px-4 py-3 text-right font-black text-green-600 text-lg">
+                Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
 
-  </ng-container>
+    <!-- Botón cerrar caja (solo cajeros) -->
+    <div *ngIf="!esAdmin" class="bg-white rounded-xl shadow-sm border border-red-200 p-6">
+      <div class="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h3 class="font-bold text-gray-800 text-lg">Cerrar Caja</h3>
+          <p class="text-sm text-gray-500 mt-1">
+            Al cerrar, no podrás registrar más ventas hoy.<br>
+            El administrador deberá habilitarte nuevamente mañana.
+          </p>
+        </div>
+        <button (click)="confirmarCierre()"
+                [disabled]="arqueo.resumen?.total_ventas === 0"
+                class="bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold px-6 py-3 rounded-xl transition-colors shadow-sm">
+          🔒 Cerrar Caja del Día
+        </button>
+      </div>
+    </div>
 
-  <!-- Sin datos -->
-  <div *ngIf="!cargando && !datosArqueo" class="bg-white rounded-xl p-12 text-center border border-gray-100">
-    <p class="text-gray-400">Selecciona un período para ver el arqueo.</p>
+  </ng-container>
+</div>
+
+
+<!-- MODAL CONFIRMACIÓN CIERRE -->
+<div *ngIf="mostrarConfirmCierre"
+     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+    <div class="bg-red-600 p-5 text-white text-center">
+      <div class="text-4xl mb-2">🔒</div>
+      <h3 class="font-black text-xl">Cerrar Caja</h3>
+    </div>
+    <div class="p-6 text-center">
+      <p class="text-gray-700 font-medium mb-2">¿Confirmas el cierre de caja?</p>
+      <div class="bg-gray-50 rounded-xl p-4 my-4 text-left space-y-1">
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-500">Ventas del día:</span>
+          <span class="font-bold">{{ arqueo.resumen?.total_ventas || 0 }}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-500">Total ingresado:</span>
+          <span class="font-bold text-green-600">Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}</span>
+        </div>
+      </div>
+      <p class="text-xs text-red-500 font-medium">Esta acción bloqueará el punto de venta.</p>
+    </div>
+    <div class="px-6 pb-6 flex gap-3">
+      <button (click)="cancelarCierre()"
+              class="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">
+        Cancelar
+      </button>
+      <button (click)="ejecutarCierreCaja()" [disabled]="cerrando"
+              class="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-black rounded-xl transition-colors">
+        {{ cerrando ? 'Cerrando...' : 'Confirmar Cierre' }}
+      </button>
+    </div>
   </div>
 </div>

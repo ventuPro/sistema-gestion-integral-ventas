@@ -105,6 +105,53 @@
   </div>
 </ng-container>
 
+<!-- ═══ HISTORIAL VENTAS DEL DÍA ═══ -->
+<div *ngIf="!verificandoCaja && cajaHabilitada" class="mt-4">
+  <button (click)="mostrarHistorial = !mostrarHistorial; !mostrarHistorial || cargarVentasHoy()"
+          class="w-full flex items-center justify-between px-5 py-3 bg-white rounded-xl shadow-sm border border-gray-100 hover:bg-gray-50 transition-colors text-sm font-semibold text-gray-600">
+    <span>📋 Ventas del día ({{ ventasHoy.length }})</span>
+    <span class="font-black text-green-600">Bs. {{ totalVentasHoy.toFixed(2) }}</span>
+  </button>
+
+  <div *ngIf="mostrarHistorial" class="bg-white rounded-xl shadow-sm border border-gray-100 mt-2 overflow-hidden">
+    <div *ngIf="cargandoVentas" class="text-center py-6">
+      <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+    </div>
+    <div *ngIf="!cargandoVentas && ventasHoy.length === 0" class="text-center py-6 text-gray-400 text-sm">
+      Sin ventas aún hoy.
+    </div>
+    <table *ngIf="!cargandoVentas && ventasHoy.length > 0" class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+        <tr>
+          <th class="px-4 py-2 text-left">#</th>
+          <th class="px-4 py-2 text-left">Hora</th>
+          <th class="px-4 py-2 text-left">Productos</th>
+          <th class="px-4 py-2 text-left">Método</th>
+          <th class="px-4 py-2 text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let v of ventasHoy" class="border-b border-gray-100">
+          <td class="px-4 py-2 font-bold text-gray-600">#{{ v.id_venta }}</td>
+          <td class="px-4 py-2 text-gray-500">{{ v.fecha_venta | date:'HH:mm' }}</td>
+          <td class="px-4 py-2 text-gray-500 text-xs">{{ v.productos?.join(', ') }}</td>
+          <td class="px-4 py-2">
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+                  [class.bg-green-100]="v.metodo_pago === 'Efectivo'"
+                  [class.text-green-700]="v.metodo_pago === 'Efectivo'"
+                  [class.bg-purple-100]="v.metodo_pago === 'QR'"
+                  [class.text-purple-700]="v.metodo_pago === 'QR'">
+              {{ v.metodo_pago }}
+            </span>
+          </td>
+          <td class="px-4 py-2 text-right font-black text-gray-800">
+            Bs. {{ (+v.monto_total_venta).toFixed(2) }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
 <!-- ═══ MODAL COBRO ═══ -->
 <div *ngIf="mostrarModalCobro"
@@ -173,7 +220,6 @@
     </div>
   </div>
 </div>
-
 
 <!-- ═══ TICKET ═══ -->
 <div *ngIf="mostrarTicket"

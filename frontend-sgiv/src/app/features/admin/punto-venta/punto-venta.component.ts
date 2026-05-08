@@ -30,6 +30,11 @@ export class PuntoVentaComponent implements OnInit {
   total     = 0;
   cargando  = true;
 
+  // ─── Historial Ventas ───
+  ventasHoy:       any[]   = [];
+  cargandoVentas   = false;
+  mostrarHistorial = false;
+
   // ─── Ticket ───
   mostrarTicket = false;
   datosTicket:  any = null;
@@ -39,8 +44,13 @@ export class PuntoVentaComponent implements OnInit {
   mostrarModalCobro = false;
   metodoPago        = 'Efectivo';
   montoPagado       = 0;
+  
   get cambio(): number {
     return Math.max(0, this.montoPagado - this.total);
+  }
+
+  get totalVentasHoy(): number {
+    return this.ventasHoy.reduce((s, v) => s + (+v.monto_total_venta), 0);
   }
 
   ngOnInit() {
@@ -56,6 +66,7 @@ export class PuntoVentaComponent implements OnInit {
       this.cajaHabilitada = true;
       this.verificandoCaja = false;
       this.cargarCatalogo();
+      this.cargarVentasHoy(); // ← Historial de ventas
       return;
     }
 
@@ -63,8 +74,12 @@ export class PuntoVentaComponent implements OnInit {
       next: (res) => {
         this.cajaHabilitada  = res.caja_habilitada;
         this.verificandoCaja = false;
-        if (this.cajaHabilitada) this.cargarCatalogo();
-        else this.cargando = false;
+        if (this.cajaHabilitada) {
+          this.cargarCatalogo();
+          this.cargarVentasHoy(); // ← Historial de ventas
+        } else {
+          this.cargando = false;
+        }
         this.cdr.detectChanges();
       },
       error: () => {
@@ -85,6 +100,15 @@ export class PuntoVentaComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: () => { this.cargando = false; this.cdr.detectChanges(); }
+    });
+  }
+
+  cargarVentasHoy() {
+    this.cargandoVentas = true;
+    const id_sucursal   = this.usuarioActual?.id_sucursal || 1;
+    this.cajaService.obtenerVentasHoy(id_sucursal).subscribe({
+      next: (v) => { this.ventasHoy = v; this.cargandoVentas = false; this.cdr.detectChanges(); },
+      error: () => { this.cargandoVentas = false; }
     });
   }
 
@@ -175,6 +199,7 @@ export class PuntoVentaComponent implements OnInit {
         this.carrito      = [];
         this.total        = 0;
         this.cargarCatalogo();
+        this.cargarVentasHoy();  // ← Actualizar el historial de ventas
         this.cargando     = false;
         this.cdr.detectChanges();
       },
