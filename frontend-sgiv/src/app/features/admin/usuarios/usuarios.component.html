@@ -1,4 +1,3 @@
-<!-- Reemplaza TODO el archivo con este contenido -->
 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
 
   <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
@@ -37,12 +36,13 @@
           <th class="px-4 py-3">Rol</th>
           <th class="px-4 py-3">Sucursal</th>
           <th class="px-4 py-3">Estado</th>
+          <th class="px-4 py-3 font-medium">Caja</th>
           <th class="px-4 py-3 text-center">Acciones</th>
         </tr>
       </thead>
       <tbody class="text-gray-700">
-        <tr *ngIf="cargando"><td colspan="6" class="px-4 py-10 text-center"><div class="flex flex-col items-center gap-2 text-gray-400"><div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>Cargando...</div></td></tr>
-        <tr *ngIf="!cargando && usuariosFiltrados.length === 0"><td colspan="6" class="px-4 py-10 text-center text-gray-400">Sin usuarios con este filtro.</td></tr>
+        <tr *ngIf="cargando"><td colspan="7" class="px-4 py-10 text-center"><div class="flex flex-col items-center gap-2 text-gray-400"><div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>Cargando...</div></td></tr>
+        <tr *ngIf="!cargando && usuariosFiltrados.length === 0"><td colspan="7" class="px-4 py-10 text-center text-gray-400">Sin usuarios con este filtro.</td></tr>
 
         <tr *ngFor="let usr of usuariosFiltrados"
             class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
@@ -65,6 +65,22 @@
             <span *ngIf="usr.estado_activo"  class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">Activo</span>
             <span *ngIf="!usr.estado_activo" class="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold">Inactivo</span>
           </td>
+          
+          <!-- Estado de Caja (solo cajeros) -->
+          <td class="px-4 py-3">
+            <ng-container *ngIf="usr.id_rol === 2 && usr.estado_activo">
+              <span *ngIf="usr.caja_habilitada"
+                    class="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold w-fit">
+                💰 Caja Abierta
+              </span>
+              <span *ngIf="!usr.caja_habilitada"
+                    class="flex items-center gap-1 bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold w-fit">
+                🔒 Caja Cerrada
+              </span>
+            </ng-container>
+            <span *ngIf="usr.id_rol !== 2" class="text-gray-300 text-xs">—</span>
+          </td>
+
           <td class="px-4 py-3">
             <div class="flex items-center justify-center gap-2 flex-wrap">
               <button (click)="abrirModalEditar(usr)"       class="text-blue-500 hover:text-blue-700 font-medium text-xs">Editar</button>
@@ -73,6 +89,18 @@
               <button *ngIf="usr.estado_activo && usr.id_rol !== 1"
                       (click)="abrirModalPermisos(usr)"
                       class="text-indigo-600 hover:text-indigo-800 font-medium text-xs">Permisos</button>
+
+              <!-- Dentro del div de acciones, para cajeros activos -->
+              <button *ngIf="usr.id_rol === 2 && usr.estado_activo"
+                      (click)="toggleCaja(usr)"
+                      class="font-medium text-xs transition-colors"
+                      [class.text-green-600]="!usr.caja_habilitada"
+                      [class.hover:text-green-800]="!usr.caja_habilitada"
+                      [class.text-orange-500]="usr.caja_habilitada"
+                      [class.hover:text-orange-700]="usr.caja_habilitada">
+                {{ usr.caja_habilitada ? '🔒 Cerrar Caja' : '💰 Abrir Caja' }}
+              </button>
+
               <button *ngIf="usr.estado_activo"  (click)="desactivarUsuario(usr.id_usuario, usr.nombre_completo)" class="text-red-500 hover:text-red-700 font-medium text-xs">Desactivar</button>
               <button *ngIf="!usr.estado_activo" (click)="reactivarUsuario(usr.id_usuario, usr.nombre_completo)"  class="text-green-600 hover:text-green-800 font-medium text-xs">Reactivar</button>
             </div>

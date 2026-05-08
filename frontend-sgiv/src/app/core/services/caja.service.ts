@@ -8,14 +8,36 @@ export class CajaService {
   private apiUrl = environment.apiUrl;
   constructor(private http: HttpClient) {}
 
-  private headers(): HttpHeaders {
+  private h(): HttpHeaders {
     return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
   }
 
-  obtenerArqueo(idSucursal: number = 1, fechaInicio?: string, fechaFin?: string): Observable<any> {
-    let params = new HttpParams().set('id_sucursal', idSucursal.toString());
-    if (fechaInicio) params = params.set('fecha_inicio', fechaInicio);
-    if (fechaFin) params = params.set('fecha_fin', fechaFin);
-    return this.http.get(`${this.apiUrl}/caja/arqueo`, { headers: this.headers(), params });
+  // ─── Estado y control de caja ───
+  obtenerEstadoCaja(id_usuario: number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/caja/estado/${id_usuario}`, { headers: this.h() });
+  }
+
+  habilitarCaja(id_usuario: number): Observable<any> {
+    return this.http.patch(`${this.apiUrl}/caja/habilitar/${id_usuario}`, {}, { headers: this.h() });
+  }
+
+  deshabilitarCaja(id_usuario: number): Observable<any> {
+    return this.http.patch(`${this.apiUrl}/caja/deshabilitar/${id_usuario}`, {}, { headers: this.h() });
+  }
+
+  // ─── Turno y ventas ───
+  obtenerArqueo(id_sucursal: number, fecha_inicio?: string, fecha_fin?: string): Observable<any> {
+    let params = new HttpParams();
+    if (fecha_inicio) params = params.set('fecha_inicio', fecha_inicio);
+    if (fecha_fin)    params = params.set('fecha_fin', fecha_fin);
+    return this.http.get(`${this.apiUrl}/caja/arqueo/${id_sucursal}`, { headers: this.h(), params });
+  }
+
+  abrirTurno(datos: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/caja/turnos/abrir`, datos, { headers: this.h() });
+  }
+
+  cierreDiario(datos: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/caja/cierre`, datos, { headers: this.h() });
   }
 }

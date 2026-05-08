@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { UsuarioService } from '../../../core/services/usuario.service';
 import { PermisoService, MODULOS } from '../../../core/services/permiso.service';
+import { CajaService } from '../../../core/services/caja.service'; // <-- Import agregado
 
 @Component({
   selector: 'app-usuarios',
@@ -15,6 +16,7 @@ export class UsuariosComponent implements OnInit {
   private usuarioService = inject(UsuarioService);
   private permisoService = inject(PermisoService);
   private cdr            = inject(ChangeDetectorRef);
+  private cajaService    = inject(CajaService); // <-- Inject agregado
 
   listaUsuarios:  any[] = [];
   listaRoles:     any[] = [];
@@ -175,5 +177,22 @@ export class UsuariosComponent implements OnInit {
   getBadge(rol: string): string {
     const m: any = { 'Administrador': 'bg-purple-100 text-purple-700', 'Cajero': 'bg-blue-100 text-blue-700', 'Cocina': 'bg-orange-100 text-orange-700' };
     return m[rol] || 'bg-gray-100 text-gray-700';
+  }
+
+  // ─── Control de Caja desde Usuarios (Función agregada) ───
+  toggleCaja(usr: any) {
+    if (usr.caja_habilitada) {
+      if (!confirm(`¿Cerrar caja de "${usr.nombre_completo}"? No podrá realizar ventas hasta que la vuelvas a abrir.`)) return;
+      this.cajaService.deshabilitarCaja(usr.id_usuario).subscribe({
+        next: () => { usr.caja_habilitada = false; this.cdr.detectChanges(); },
+        error: () => alert('Error al cerrar caja.')
+      });
+    } else {
+      if (!confirm(`¿Abrir caja para "${usr.nombre_completo}"? Podrá realizar ventas.`)) return;
+      this.cajaService.habilitarCaja(usr.id_usuario).subscribe({
+        next: () => { usr.caja_habilitada = true; this.cdr.detectChanges(); },
+        error: () => alert('Error al abrir caja.')
+      });
+    }
   }
 }
