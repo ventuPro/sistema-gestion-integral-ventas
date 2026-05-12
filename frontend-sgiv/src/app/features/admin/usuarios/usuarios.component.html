@@ -68,7 +68,7 @@
           
           <!-- Estado de Caja (solo cajeros) -->
           <td class="px-4 py-3">
-            <ng-container *ngIf="usr.id_rol === 2 && usr.estado_activo">
+            <ng-container *ngIf="+usr.id_rol === 2 && usr.estado_activo">
               <span *ngIf="usr.caja_habilitada"
                     class="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold w-fit">
                 💰 Caja Abierta
@@ -91,7 +91,7 @@
                       class="text-indigo-600 hover:text-indigo-800 font-medium text-xs">Permisos</button>
 
               <!-- Dentro del div de acciones, para cajeros activos -->
-              <button *ngIf="usr.id_rol === 2 && usr.estado_activo"
+              <button *ngIf="+usr.id_rol === 2 && usr.estado_activo"
                       (click)="toggleCaja(usr)"
                       class="font-medium text-xs transition-colors"
                       [class.text-green-600]="!usr.caja_habilitada"

@@ -24,6 +24,13 @@ export class PuntoVentaComponent implements OnInit {
   cajaHabilitada   = false;
   usuarioActual:   any = null;
 
+  // ─── Control de turno ───
+  turnoActivo:       any   = null;
+  mostrarAbrirTurno        = false;
+  montoInicial             = 0;
+  abriendoTurno            = false;
+  errorTurno               = '';
+
   // ─── Catálogo y carrito ───
   productosDisponibles: any[] = [];
   carrito:  any[] = [];
@@ -60,32 +67,79 @@ export class PuntoVentaComponent implements OnInit {
   }
 
   // ─── Verificar si la caja está habilitada ───
-  verificarAccesoCaja() {
-    // Administrador siempre tiene acceso
-    if (this.usuarioActual?.id_rol === 1) {
-      this.cajaHabilitada = true;
-      this.verificandoCaja = false;
-      this.cargarCatalogo();
-      this.cargarVentasHoy(); // ← Historial de ventas
-      return;
-    }
+verificarAccesoCaja() {
+  if (this.usuarioActual?.id_rol === 1) {
+    this.cajaHabilitada  = true;
+    this.verificandoCaja = false;
+    this.cargarCatalogo();  // Admin no necesita turno
+    return;
+  }
 
-    this.cajaService.obtenerEstadoCaja(this.usuarioActual.id_usuario).subscribe({
+  this.cajaService.obtenerEstadoCaja(this.usuarioActual.id_usuario).subscribe({
+    next: (res) => {
+      this.cajaHabilitada  = res.caja_habilitada;
+      this.verificandoCaja = false;
+      if (this.cajaHabilitada) {
+        this.verificarTurnoActivo();  // ← cambio aquí
+      } else {
+        this.cargando = false;
+      }
+      this.cdr.detectChanges();
+    },
+    error: () => {
+      this.cajaHabilitada  = false;
+      this.verificandoCaja = false;
+      this.cargando        = false;
+      this.cdr.detectChanges();
+    }
+  });
+}
+
+  // ─── Verificar el turno actual ───
+  verificarTurnoActivo() {
+    this.cajaService.obtenerTurnoHoy().subscribe({
       next: (res) => {
-        this.cajaHabilitada  = res.caja_habilitada;
-        this.verificandoCaja = false;
-        if (this.cajaHabilitada) {
+        this.turnoActivo = res.turno;
+        // Si tiene turno (abierto o cerrado hoy), no puede abrir otro
+        if (this.turnoActivo?.estado_turno === 'Abierto') {
+          this.mostrarAbrirTurno = false;
           this.cargarCatalogo();
-          this.cargarVentasHoy(); // ← Historial de ventas
+        } else if (this.turnoActivo?.estado_turno === 'Cerrado') {
+          // Ya cerró caja hoy, no puede reabrir solo
+          this.mostrarAbrirTurno = false;
+          this.cajaHabilitada    = false; // bloquear POS
         } else {
-          this.cargando = false;
+          // No ha abierto turno hoy, mostrar formulario
+          this.mostrarAbrirTurno = true;
+          this.cargando          = false;
         }
         this.cdr.detectChanges();
       },
       error: () => {
-        this.cajaHabilitada  = false;
-        this.verificandoCaja = false;
-        this.cargando        = false;
+        this.mostrarAbrirTurno = true;
+        this.cargando          = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  confirmarAbrirTurno() {
+    if (this.montoInicial < 0) { this.errorTurno = 'Ingresa un monto válido.'; return; }
+    this.abriendoTurno = true;
+    this.errorTurno    = '';
+    const id_sucursal  = this.usuarioActual?.id_sucursal || 1;
+
+    this.cajaService.abrirTurno({ id_sucursal, monto_inicial: this.montoInicial }).subscribe({
+      next: (res) => {
+        this.turnoActivo       = res.turno;
+        this.mostrarAbrirTurno = false;
+        this.abriendoTurno     = false;
+        this.cargarCatalogo();
+        this.cdr.detectChanges();
+      },
+      error: (e) => {
+        this.errorTurno    = e.error?.error || 'Error al abrir turno.';
+        this.abriendoTurno = false;
         this.cdr.detectChanges();
       }
     });
@@ -213,4 +267,21 @@ export class PuntoVentaComponent implements OnInit {
 
   imprimirVenta() { window.print(); }
   cerrarTicket()  { this.mostrarTicket = false; this.datosTicket = null; }
+
+  // ─── Control de Caja desde Usuarios ───
+  toggleCaja(usr: any) {
+    if (usr.caja_habilitada) {
+      if (!confirm(`¿Cerrar caja de "${usr.nombre_completo}"? No podrá realizar ventas hasta que la vuelvas a abrir.`)) return;
+      this.cajaService.deshabilitarCaja(usr.id_usuario).subscribe({
+        next: () => { usr.caja_habilitada = false; this.cdr.detectChanges(); },
+        error: () => alert('Error al cerrar caja.')
+      });
+    } else {
+      if (!confirm(`¿Abrir caja para "${usr.nombre_completo}"? Podrá realizar ventas.`)) return;
+      this.cajaService.habilitarCaja(usr.id_usuario).subscribe({
+        next: () => { usr.caja_habilitada = true; this.cdr.detectChanges(); },
+        error: () => alert('Error al abrir caja.')
+      });
+    }
+  }
 }

@@ -7,53 +7,60 @@
 
     <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
 
-      <a *ngIf="tiene('dashboard')"
-         routerLink="/dashboard/resumen" routerLinkActive="bg-blue-600 text-white"
-         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
-        <span class="mr-3">📊</span> Panel Principal
-      </a>
+  <!-- SOLO CAJERO -->
+  <ng-container *ngIf="esCajero">
+    <a *ngIf="tiene('dashboard')"
+       routerLink="/dashboard/resumen" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">📊</span> Panel Principal
+    </a>
+    <a *ngIf="tiene('punto_venta')"
+       routerLink="/dashboard/punto-venta" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">💳</span> Punto de Venta
+    </a>
+    <a *ngIf="tiene('mesas')"
+       routerLink="/dashboard/mesas" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">🪑</span> Mesas
+    </a>
+    <a *ngIf="tiene('arqueo')"
+       routerLink="/dashboard/arqueo" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">🧾</span> Arqueo de Caja
+    </a>
+    <a *ngIf="tiene('inventario')"
+       routerLink="/dashboard/inventario" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">📦</span> Inventario
+    </a>
+  </ng-container>
 
-      <a *ngIf="tiene('inventario')"
-         routerLink="/dashboard/inventario" routerLinkActive="bg-blue-600 text-white"
-         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
-        <span class="mr-3">📦</span> Inventario
-      </a>
+  <!-- SOLO ADMINISTRADOR -->
+  <ng-container *ngIf="esAdmin">
+    <a routerLink="/dashboard/resumen" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">📊</span> Panel Principal
+    </a>
+    <a routerLink="/dashboard/inventario" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">📦</span> Inventario
+    </a>
+    <a routerLink="/dashboard/reportes" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">📈</span> Reportes
+    </a>
+    <a routerLink="/dashboard/cierres-caja" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">🏦</span> Cierres de Caja
+    </a>
+    <a routerLink="/dashboard/usuarios" routerLinkActive="bg-blue-600 text-white"
+       class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
+      <span class="mr-3">👥</span> Usuarios
+    </a>
+  </ng-container>
 
-      <a *ngIf="tiene('punto_venta')"
-         routerLink="/dashboard/punto-venta" routerLinkActive="bg-blue-600 text-white"
-         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
-        <span class="mr-3">💳</span> Punto de Venta
-      </a>
-
-      <a *ngIf="tiene('mesas')"
-         routerLink="/dashboard/mesas" routerLinkActive="bg-blue-600 text-white"
-         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
-        <span class="mr-3">🪑</span> Mesas
-      </a>
-
-      <a *ngIf="tiene('arqueo')"
-         routerLink="/dashboard/arqueo" routerLinkActive="bg-blue-600 text-white"
-         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
-        <span class="mr-3">🧾</span> Arqueo de Caja
-      </a>
-
-      <!-- Solo administrador -->
-      <ng-container *ngIf="esAdmin">
-        <div class="pt-4 pb-1 px-4">
-          <p class="text-gray-600 text-xs font-bold uppercase tracking-widest">Administración</p>
-        </div>
-
-        <a routerLink="/dashboard/reportes" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
-          <span class="mr-3">📈</span> Reportes
-        </a>
-
-        <a routerLink="/dashboard/usuarios" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm">
-          <span class="mr-3">👥</span> Usuarios
-        </a>
-      </ng-container>
-    </nav>
+</nav>
 
     <div class="p-4 border-t border-gray-800">
       <div class="px-4 py-2 mb-2">

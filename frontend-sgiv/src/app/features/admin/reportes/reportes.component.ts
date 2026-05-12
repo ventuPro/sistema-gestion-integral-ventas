@@ -2,6 +2,8 @@ import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ReporteService } from '../../../core/services/reporte.service';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -16,6 +18,8 @@ import * as XLSX from 'xlsx';
 export class ReportesComponent implements OnInit {
   private reporteService = inject(ReporteService);
   private cdr            = inject(ChangeDetectorRef);
+  private http           = inject(HttpClient);
+  private apiUrl         = environment.apiUrl;
 
   cargando       = false;
   datosReporte: any = null;
@@ -25,10 +29,35 @@ export class ReportesComponent implements OnInit {
   fechaInicio = '';
   fechaFin    = '';
 
-  ngOnInit() { this.seleccionarPeriodo('mes'); }
+  // ─── Sucursales ───
+  sucursales:      any[] = [];
+  sucursalSeleccionada = 1;
+
+  ngOnInit() {
+    this.cargarSucursales();
+    this.seleccionarPeriodo('mes');
+  }
 
   private fmt(d: Date): string {
     return d.toISOString().split('T')[0];
+  }
+
+  cargarSucursales() {
+    const token = localStorage.getItem('token_sgiv');
+    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    
+    this.http.get<any>(`${this.apiUrl}/usuarios/form-data`, { headers }).subscribe({
+      next: (d: any) => { 
+        this.sucursales = d.sucursales; 
+        this.cdr.detectChanges();
+      },
+      error: () => console.error('Error al cargar sucursales')
+    });
+  }
+
+  cambiarSucursal(id: number) {
+    this.sucursalSeleccionada = id;
+    this.cargarReporte(); 
   }
 
   seleccionarPeriodo(p: 'hoy' | 'semana' | 'mes' | 'personalizado') {
@@ -61,7 +90,7 @@ export class ReportesComponent implements OnInit {
       alert('La fecha de inicio no puede ser mayor a la fecha final.'); return;
     }
     this.cargando = true;
-    this.reporteService.obtenerReportePeriodo(1, this.fechaInicio, this.fechaFin).subscribe({
+    this.reporteService.obtenerReportePeriodo(this.sucursalSeleccionada, this.fechaInicio, this.fechaFin).subscribe({
       next:  (datos) => { this.datosReporte = datos; this.cargando = false; this.cdr.detectChanges(); },
       error: ()      => { this.cargando = false; this.cdr.detectChanges(); }
     });

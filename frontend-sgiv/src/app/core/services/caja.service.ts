@@ -38,7 +38,15 @@ export class CajaService {
     return this.http.get<any[]>(`${this.apiUrl}/caja/ventas-hoy/${id_sucursal}`, { headers: this.h() });
   }
 
-  abrirTurno(datos: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/caja/turnos/abrir`, datos, { headers: this.h() });
-  }
+  obtenerCierres(): Observable<any[]> {
+  return this.http.get<any[]>(`${this.apiUrl}/caja/cierres`, { headers: this.h() });
+}
+
+obtenerTurnoHoy(): Observable<any> {
+  return this.http.get<any>(`${this.apiUrl}/caja/turno-hoy`, { headers: this.h() });
+}
+
+abrirTurno(datos: { id_sucursal: number; monto_inicial: number }): Observable<any> {
+  return this.http.post(`${this.apiUrl}/caja/turnos/abrir`, datos, { headers: this.h() });
+}
 }

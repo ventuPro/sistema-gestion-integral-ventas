@@ -18,5 +18,7 @@ router.get   ('/ventas-hoy/:id_sucursal',    verificarToken, ctrl.getVentasHoyPO
 router.post  ('/turnos/abrir',               verificarToken, ctrl.abrirCaja);
 router.post  ('/cobrar',                     verificarToken, ctrl.cobrarVenta);
 router.post  ('/cerrar',                     verificarToken, ctrl.cerrarCaja);
+router.get('/cierres',                       verificarToken, ctrl.getCierresCaja);
+router.get('/turno-hoy',                     verificarToken, ctrl.getTurnoHoy);
 
 module.exports = router;

@@ -74,7 +74,11 @@ const cambiarContrasena = async (id_usuario, contrasena_hash) => {
 };
 
 const obtenerRoles = async () => {
-    const result = await db.query(`SELECT id_rol, nombre_rol FROM rol_usuario ORDER BY id_rol`);
+    const result = await db.query(
+        `SELECT DISTINCT ON (nombre_rol) id_rol, nombre_rol 
+         FROM rol_usuario 
+         ORDER BY nombre_rol, id_rol ASC`
+    );
     return result.rows;
 };
 

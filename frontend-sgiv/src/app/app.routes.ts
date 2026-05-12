@@ -12,6 +12,7 @@ import { KdsComponent }         from './features/cocina/kds/kds.component';
 import { MenuDigitalComponent } from './features/cliente/menu-digital/menu-digital.component';
 import { SinAccesoComponent }   from './features/shared/sin-acceso/sin-acceso.component';
 import { permisoGuard }         from './core/guards/permiso.guard';
+import { CierresCajaComponent } from './features/admin/cierres-caja/cierres-caja.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -64,7 +65,9 @@ export const routes: Routes = [
         path: 'reportes',
         component: ReportesComponent,
         canActivate: [permisoGuard('reportes')]
-      }
+      },
+
+      { path: 'cierres-caja', component: CierresCajaComponent }
     ]
   }
 ];

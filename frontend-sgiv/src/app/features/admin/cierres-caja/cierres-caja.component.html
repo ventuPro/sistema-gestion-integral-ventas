@@ -1,0 +1,87 @@
+<div class="space-y-6">
+
+  <div class="flex justify-between items-center">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-800">Cierres de Caja</h2>
+      <p class="text-sm text-gray-500 mt-1">Historial de todos los cierres por sucursal</p>
+    </div>
+    <button (click)="cargar()"
+            class="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+      ⟳ Actualizar
+    </button>
+  </div>
+
+  <!-- Cargando -->
+  <div *ngIf="cargando" class="flex justify-center py-20">
+    <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+
+  <!-- Sin datos -->
+  <div *ngIf="!cargando && cierres.length === 0"
+       class="bg-white rounded-xl p-12 text-center text-gray-400 border border-gray-100 shadow-sm">
+    <div class="text-5xl mb-3">📭</div>
+    <p>No hay cierres de caja registrados.</p>
+  </div>
+
+  <!-- Tabla de cierres -->
+  <div *ngIf="!cargando && cierres.length > 0"
+       class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+          <tr>
+            <th class="px-4 py-3 text-left">Cajero</th>
+            <th class="px-4 py-3 text-left">Sucursal</th>
+            <th class="px-4 py-3 text-left">Apertura</th>
+            <th class="px-4 py-3 text-left">Cierre</th>
+            <th class="px-4 py-3 text-center">Ventas</th>
+            <th class="px-4 py-3 text-right">💵 Efectivo</th>
+            <th class="px-4 py-3 text-right">📱 QR</th>
+            <th class="px-4 py-3 text-right font-bold">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let c of cierres"
+              class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+            <td class="px-4 py-3">
+              <p class="font-semibold text-gray-800">{{ c.nombre_cajero }}</p>
+            </td>
+            <td class="px-4 py-3 text-gray-500">{{ c.nombre_sucursal }}</td>
+            <td class="px-4 py-3 text-gray-500 text-xs">
+              {{ c.fecha_hora_apertura | date:'dd/MM/yy HH:mm' }}
+            </td>
+            <td class="px-4 py-3 text-gray-500 text-xs">
+              {{ c.fecha_hora_cierre | date:'dd/MM/yy HH:mm' }}
+            </td>
+            <td class="px-4 py-3 text-center">
+              <span class="bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full text-xs">
+                {{ c.total_ventas }}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-right text-green-600 font-semibold">
+              Bs. {{ (+c.total_efectivo).toFixed(2) }}
+            </td>
+            <td class="px-4 py-3 text-right text-purple-600 font-semibold">
+              Bs. {{ (+c.total_qr).toFixed(2) }}
+            </td>
+            <td class="px-4 py-3 text-right font-black text-gray-800">
+              Bs. {{ (+c.total_recaudado).toFixed(2) }}
+            </td>
+          </tr>
+        </tbody>
+        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+          <tr>
+            <td colspan="7" class="px-4 py-3 text-right font-black text-gray-700">
+              TOTAL GENERAL:
+            </td>
+            <td class="px-4 py-3 text-right font-black text-green-600 text-lg">
+              Bs. {{ getTotalGeneral().toFixed(2) }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+</div>

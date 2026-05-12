@@ -100,8 +100,33 @@ const cobrarVenta = async (req, res) => {
     }
 };
 
+const getCierresCaja = async (req, res) => {
+    try {
+        if (req.usuario.id_rol !== 1)
+            return res.status(403).json({ error: 'Solo el administrador puede ver los cierres' });
+        const cierres = await cajaModel.obtenerCierresCaja();
+        res.json(cierres);
+    } catch (e) {
+        console.error('Error en getCierresCaja:', e);
+        res.status(500).json({ error: 'Error al obtener cierres de caja' });
+    }
+};
+
+const getTurnoHoy = async (req, res) => {
+    try {
+        const id_usuario_cajero = req.usuario.id_usuario;
+        const turno = await cajaModel.verificarTurnoHoy(id_usuario_cajero);
+        res.json({ turno });
+    } catch (e) {
+        console.error('Error en getTurnoHoy:', e);
+        res.status(500).json({ error: 'Error al verificar turno' });
+    }
+};
+
 module.exports = {
     getEstadoCaja, habilitarCajaUsuario, deshabilitarCajaUsuario,
     getArqueoHoy, getVentasHoyPOS,
-    cerrarCaja, abrirCaja, cobrarVenta
+    cerrarCaja, abrirCaja, cobrarVenta,
+    getCierresCaja,
+    getTurnoHoy
 };

@@ -217,9 +217,48 @@ const registrarVenta = async (datosVenta) => {
         client.release();
     }
 };
+const obtenerCierresCaja = async () => {
+    const result = await db.query(`
+        SELECT
+            t.id_turno,
+            t.fecha_hora_apertura,
+            t.fecha_hora_cierre,
+            t.monto_inicial,
+            u.nombre_completo           AS nombre_cajero,
+            s.nombre_sucursal,
+            COUNT(v.id_venta)::int       AS total_ventas,
+            COALESCE(SUM(v.monto_total_venta), 0)                                            AS total_recaudado,
+            COALESCE(SUM(CASE WHEN v.metodo_pago='Efectivo' THEN v.monto_total_venta END),0) AS total_efectivo,
+            COALESCE(SUM(CASE WHEN v.metodo_pago='QR'       THEN v.monto_total_venta END),0) AS total_qr
+        FROM turno_caja t
+        JOIN usuario  u ON t.id_usuario_cajero = u.id_usuario
+        JOIN sucursal s ON t.id_sucursal        = s.id_sucursal
+        LEFT JOIN venta_caja v ON v.id_turno = t.id_turno
+        WHERE t.estado_turno = 'Cerrado'
+        GROUP BY t.id_turno, t.fecha_hora_apertura, t.fecha_hora_cierre,
+                 t.monto_inicial, u.nombre_completo, s.nombre_sucursal
+        ORDER BY t.fecha_hora_cierre DESC
+    `);
+    return result.rows;
+};
+
+// Verificar si el cajero ya abrió turno hoy
+const verificarTurnoHoy = async (id_usuario_cajero) => {
+    const result = await db.query(`
+        SELECT id_turno, estado_turno, fecha_hora_apertura, monto_inicial
+        FROM turno_caja
+        WHERE id_usuario_cajero = $1
+          AND DATE(fecha_hora_apertura) = CURRENT_DATE
+        ORDER BY fecha_hora_apertura DESC
+        LIMIT 1
+    `, [id_usuario_cajero]);
+    return result.rows[0] || null;
+};
 
 module.exports = {
     obtenerEstadoCaja, habilitarCaja, deshabilitarCaja,
     obtenerArqueoHoy, obtenerVentasHoyPOS,
-    abrirTurno, cerrarCaja, registrarVenta
+    abrirTurno, cerrarCaja, registrarVenta,
+    obtenerCierresCaja,
+    verificarTurnoHoy  
 };

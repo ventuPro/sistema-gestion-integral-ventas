@@ -1,5 +1,18 @@
 <div class="space-y-6">
 
+  <!-- Selector de sucursal -->
+  <div class="flex flex-wrap gap-3 mb-6">
+    <button *ngFor="let s of sucursales"
+            (click)="cambiarSucursal(s.id_sucursal)"
+            [class.bg-blue-600]="sucursalSeleccionada === s.id_sucursal"
+            [class.text-white]="sucursalSeleccionada === s.id_sucursal"
+            [class.bg-white]="sucursalSeleccionada !== s.id_sucursal"
+            [class.text-gray-600]="sucursalSeleccionada !== s.id_sucursal"
+            class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold transition-colors shadow-sm">
+      {{ s.nombre_sucursal }}
+    </button>
+  </div>
+
   <!-- Cabecera -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
     <div class="flex flex-wrap justify-between items-start gap-4 mb-5">
