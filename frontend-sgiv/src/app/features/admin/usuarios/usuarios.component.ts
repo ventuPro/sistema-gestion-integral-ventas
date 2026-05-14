@@ -142,57 +142,109 @@ export class UsuariosComponent implements OnInit {
     });
   }
 
-  // ─── Modal permisos NUEVO ───
-  abrirModalPermisos(usr: any) {
-    this.usuarioPermisos = usr;
-    this.permisosEdicion = {};
-    this.cargandoPermisos = true;
-    this.mostrarModalPermisos = true;
+  // ─── Modal permisos  ───
+abrirModalPermisos(usr: any) {
+  this.usuarioPermisos  = usr;
+  this.permisosEdicion  = {};
+  this.cargandoPermisos = true;
+  this.mostrarModalPermisos = true;
 
-    this.permisoService.obtenerPermisosUsuario(usr.id_usuario).subscribe({
-      next: (res) => {
-        this.permisosEdicion = { ...res.permisos };
-        this.cargandoPermisos = false;
-        this.cdr.detectChanges();
-      },
-      error: () => { this.cargandoPermisos = false; }
-    });
-  }
+  this.permisoService.obtenerPermisosUsuario(Number(usr.id_usuario)).subscribe({
+    next: (res: any) => {
+      // Inicializar todos los módulos en false primero
+      this.modulosSistema.forEach(m => {
+        this.permisosEdicion[m.key] = false;
+      });
+      // Aplicar los permisos recibidos
+      if (res?.permisos) {
+        Object.keys(res.permisos).forEach(k => {
+          this.permisosEdicion[k] = res.permisos[k];
+        });
+      }
+      this.cargandoPermisos = false;
+      this.cdr.detectChanges();
+    },
+    error: (e: any) => {
+      console.error('Error cargando permisos:', e);
+      this.cargandoPermisos = false;
+      alert('Error al cargar permisos del usuario.');
+      this.cerrarModalPermisos();
+    }
+  });
+}
 
   cerrarModalPermisos() { this.mostrarModalPermisos = false; this.usuarioPermisos = null; }
 
-  guardarPermisos() {
-    if (!this.usuarioPermisos) return;
-    this.cargandoPermisos = true;
-    this.permisoService.guardarPermisosUsuario(this.usuarioPermisos.id_usuario, this.permisosEdicion).subscribe({
-      next: () => {
-        this.cargandoPermisos = false;
-        this.cerrarModalPermisos();
-        alert(`Permisos de "${this.usuarioPermisos.nombre_completo}" actualizados.`);
-      },
-      error: () => { this.cargandoPermisos = false; alert('Error al guardar permisos.'); }
-    });
-  }
+guardarPermisos() {
+  if (!this.usuarioPermisos) return;
+  this.cargandoPermisos = true;
 
+  this.permisoService.guardarPermisosUsuario(
+    Number(this.usuarioPermisos.id_usuario),
+    this.permisosEdicion
+  ).subscribe({
+    next: (res: any) => {
+      this.cargandoPermisos = false;
+      this.cerrarModalPermisos();
+      this.cdr.detectChanges();
+      // Confirmación visual
+      this.mostrarToastExito(`Permisos de "${this.usuarioPermisos.nombre_completo}" guardados.`);
+    },
+    error: (e: any) => {
+      console.error('Error guardando permisos:', e);
+      this.cargandoPermisos = false;
+      alert('Error al guardar permisos. Verifica la conexión.');
+    }
+  });
+}
+
+mensajeExito: string | null = null;
+
+mostrarToastExito(msg: string) {
+  this.mensajeExito = msg;
+  setTimeout(() => {
+    this.mensajeExito = null;
+    this.cdr.detectChanges();
+  }, 3500);
+}
   getBadge(rol: string): string {
     const m: any = { 'Administrador': 'bg-purple-100 text-purple-700', 'Cajero': 'bg-blue-100 text-blue-700', 'Cocina': 'bg-orange-100 text-orange-700' };
     return m[rol] || 'bg-gray-100 text-gray-700';
   }
 
   // ─── Control de Caja desde Usuarios (Función agregada) ───
-  toggleCaja(usr: any) {
-    if (usr.caja_habilitada) {
-      if (!confirm(`¿Cerrar caja de "${usr.nombre_completo}"? No podrá realizar ventas hasta que la vuelvas a abrir.`)) return;
-      this.cajaService.deshabilitarCaja(usr.id_usuario).subscribe({
-        next: () => { usr.caja_habilitada = false; this.cdr.detectChanges(); },
-        error: () => alert('Error al cerrar caja.')
-      });
-    } else {
-      if (!confirm(`¿Abrir caja para "${usr.nombre_completo}"? Podrá realizar ventas.`)) return;
-      this.cajaService.habilitarCaja(usr.id_usuario).subscribe({
-        next: () => { usr.caja_habilitada = true; this.cdr.detectChanges(); },
-        error: () => alert('Error al abrir caja.')
-      });
-    }
+toggleCaja(usr: any) {
+  const nombre = usr.nombre_completo;
+  const id     = Number(usr.id_usuario);
+
+  if (usr.caja_habilitada) {
+    if (!confirm(`¿Cerrar caja de "${nombre}"?`)) return;
+
+    this.cajaService.deshabilitarCaja(id).subscribe({
+      next: () => {
+        usr.caja_habilitada = false;
+        this.mostrarToastExito(`Caja de "${nombre}" cerrada.`);
+        this.cdr.detectChanges();
+      },
+      error: (e: any) => {
+        console.error('Error cerrando caja:', e);
+        alert(e?.error?.error || 'Error al cerrar la caja.');
+      }
+    });
+  } else {
+    if (!confirm(`¿Abrir caja para "${nombre}"?`)) return;
+
+    this.cajaService.habilitarCaja(id).subscribe({
+      next: () => {
+        usr.caja_habilitada = true;
+        this.mostrarToastExito(`Caja de "${nombre}" habilitada. Ya puede ingresar al Punto de Venta.`);
+        this.cdr.detectChanges();
+      },
+      error: (e: any) => {
+        console.error('Error habilitando caja:', e);
+        alert(e?.error?.error || 'Error al habilitar la caja.');
+      }
+    });
   }
+}
 }

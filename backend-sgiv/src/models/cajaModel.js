@@ -81,24 +81,47 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
 
 // ─── VENTAS HOY PARA PANEL POS ───
 const obtenerVentasHoyPOS = async (id_sucursal, id_usuario_cajero) => {
-    const result = await db.query(`
-        SELECT 
+    const resVentas = await db.query(`
+        SELECT
             v.id_venta,
             v.monto_total_venta,
             v.metodo_pago,
-            v.fecha_venta,
-            ARRAY_AGG(p.nombre_producto) AS productos
+            v.fecha_venta
         FROM venta_caja v
-        JOIN detalle_venta dv ON v.id_venta = dv.id_venta
-        JOIN producto p       ON dv.id_producto = p.id_producto
         WHERE v.id_sucursal       = $1
           AND v.id_usuario_cajero = $2
           AND DATE(v.fecha_venta AT TIME ZONE 'America/La_Paz') = CURRENT_DATE
-        GROUP BY v.id_venta, v.monto_total_venta, v.metodo_pago, v.fecha_venta
         ORDER BY v.fecha_venta DESC
-        LIMIT 20
+        LIMIT 30
     `, [id_sucursal, id_usuario_cajero]);
-    return result.rows;
+
+    if (resVentas.rows.length === 0) return [];
+
+    const ids = resVentas.rows.map(v => v.id_venta);
+
+    const resDetalle = await db.query(`
+        SELECT
+            dv.id_venta,
+            p.nombre_producto,
+            dv.cantidad_vendida,
+            dv.precio_unitario,
+            dv.subtotal_venta
+        FROM detalle_venta dv
+        JOIN producto p ON dv.id_producto = p.id_producto
+        WHERE dv.id_venta = ANY($1::int[])
+        ORDER BY dv.id_venta, p.nombre_producto
+    `, [ids]);
+
+    const detalleMap = {};
+    resDetalle.rows.forEach(d => {
+        if (!detalleMap[d.id_venta]) detalleMap[d.id_venta] = [];
+        detalleMap[d.id_venta].push(d);
+    });
+
+    return resVentas.rows.map(v => ({
+        ...v,
+        items: detalleMap[v.id_venta] || []
+    }));
 };
 
 // ─── TURNOS ───

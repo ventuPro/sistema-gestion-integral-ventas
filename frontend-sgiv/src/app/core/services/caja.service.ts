@@ -17,12 +17,20 @@ export class CajaService {
   }
 
   habilitarCaja(id_usuario: number): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/caja/habilitar/${id_usuario}`, {}, { headers: this.h() });
-  }
+  return this.http.patch(
+    `${this.apiUrl}/caja/habilitar/${id_usuario}`,
+    {},
+    { headers: this.h() }
+  );
+}
 
-  deshabilitarCaja(id_usuario: number): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/caja/deshabilitar/${id_usuario}`, {}, { headers: this.h() });
-  }
+deshabilitarCaja(id_usuario: number): Observable<any> {
+  return this.http.patch(
+    `${this.apiUrl}/caja/deshabilitar/${id_usuario}`,
+    {},
+    { headers: this.h() }
+  );
+}
 
   // FIX: sin parámetros de fecha, siempre es HOY
   obtenerArqueo(id_sucursal: number): Observable<any> {

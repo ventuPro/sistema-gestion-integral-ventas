@@ -12,22 +12,37 @@ const getEstadoCaja = async (req, res) => {
 
 const habilitarCajaUsuario = async (req, res) => {
     try {
-        if (req.usuario.id_rol !== 1)
+        // FIX: convertir a número para evitar comparación string vs number
+        if (Number(req.usuario.id_rol) !== 1)
             return res.status(403).json({ error: 'Solo el administrador puede habilitar la caja' });
-        const resultado = await cajaModel.habilitarCaja(req.params.id_usuario);
-        res.json({ mensaje: 'Caja habilitada', usuario: resultado });
+
+        const id_usuario = Number(req.params.id_usuario);
+        const resultado  = await cajaModel.habilitarCaja(id_usuario);
+
+        if (!resultado)
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        res.json({ mensaje: 'Caja habilitada correctamente', usuario: resultado });
     } catch (e) {
+        console.error('Error habilitarCajaUsuario:', e);
         res.status(500).json({ error: 'Error al habilitar caja' });
     }
 };
 
 const deshabilitarCajaUsuario = async (req, res) => {
     try {
-        if (req.usuario.id_rol !== 1)
+        if (Number(req.usuario.id_rol) !== 1)
             return res.status(403).json({ error: 'Solo el administrador puede cerrar la caja' });
-        const resultado = await cajaModel.deshabilitarCaja(req.params.id_usuario);
-        res.json({ mensaje: 'Caja cerrada', usuario: resultado });
+
+        const id_usuario = Number(req.params.id_usuario);
+        const resultado  = await cajaModel.deshabilitarCaja(id_usuario);
+
+        if (!resultado)
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        res.json({ mensaje: 'Caja cerrada correctamente', usuario: resultado });
     } catch (e) {
+        console.error('Error deshabilitarCajaUsuario:', e);
         res.status(500).json({ error: 'Error al deshabilitar caja' });
     }
 };
