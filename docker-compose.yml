@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+
+  # ─── Base de datos PostgreSQL ───
+  postgres:
+    image: postgres:15-alpine
+    container_name: sgiv_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       sgiv_db
+      POSTGRES_USER:     sgiv_user
+      POSTGRES_PASSWORD: sgiv_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    networks:
+      - sgiv_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sgiv_user -d sgiv_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend Node.js ───
+  backend:
+    build:
+      context:    ./backend-sgiv
+      dockerfile: Dockerfile
+    container_name: sgiv_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST:     postgres
+      DB_PORT:     5432
+      DB_NAME:     sgiv_db
+      DB_USER:     sgiv_user
+      DB_PASSWORD: sgiv_password
+      JWT_SECRET:  ventupro2503_Security_key
+      PORT:        3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sgiv_network
+
+  # ─── Frontend Angular ───
+  frontend:
+    build:
+      context:    ./frontend-sgiv
+      dockerfile: Dockerfile
+    container_name: sgiv_frontend
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    networks:
+      - sgiv_network
+
+# ─── Volúmenes persistentes ───
+volumes:
+  postgres_data:
+    name: sgiv_postgres_data
+
+# ─── Red interna ───
+networks:
+  sgiv_network:
+    driver: bridge
+    name:   sgiv_network
