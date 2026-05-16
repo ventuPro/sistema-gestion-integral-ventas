@@ -1,0 +1,269 @@
+<!-- Overlay -->
+<div class="fixed inset-0 bg-gray-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+     (click)="cerrarModal()">
+
+  <!-- Modal -->
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+       (click)="$event.stopPropagation()">
+
+    <!-- ═══ HEADER ═══ -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100"
+         [class.bg-green-600]="!cuentaActiva"
+         [class.bg-orange-500]="cuentaActiva"
+         [class.text-white]="true">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl font-black">Mesa {{ mesa?.numero_mesa }}</span>
+        <span class="text-sm font-medium opacity-90">
+          {{ cuentaActiva ? '● Cuenta Abierta' : '○ Disponible' }}
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Tabs -->
+        <button *ngIf="cuentaActiva"
+                (click)="vista = 'comanda'"
+                class="px-3 py-1 rounded-lg text-sm font-semibold transition-colors"
+                [class.bg-white]="vista === 'comanda'"
+                [class.text-orange-600]="vista === 'comanda'"
+                [class.text-white]="vista !== 'comanda'"
+                [class.opacity-70]="vista !== 'comanda'">
+          Comanda
+        </button>
+        <button (click)="verQR()"
+                class="px-3 py-1 rounded-lg text-sm font-semibold transition-colors"
+                [class.bg-white]="vista === 'qr'"
+                [class.text-green-700]="vista === 'qr'"
+                [class.text-white]="vista !== 'qr'"
+                [class.opacity-70]="vista !== 'qr'">
+          📱 QR
+        </button>
+        <button (click)="cerrarModal()" class="text-white opacity-80 hover:opacity-100 ml-2 text-xl">✕</button>
+      </div>
+    </div>
+
+    <!-- ═══ CARGANDO ═══ -->
+    <div *ngIf="cargando" class="flex justify-center items-center py-16">
+      <div class="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+
+    <!-- ═══ VISTA INFO (mesa libre) ═══ -->
+    <div *ngIf="!cargando && vista === 'info' && !cuentaActiva"
+         class="flex flex-col items-center justify-center py-16 px-8 text-center">
+      <div class="text-7xl mb-4">🟢</div>
+      <h3 class="text-2xl font-black text-gray-800 mb-2">Mesa Disponible</h3>
+      <p class="text-gray-500 mb-8">Abre la mesa para comenzar a registrar el consumo.</p>
+      <button (click)="abrirMesa()"
+              class="bg-green-600 hover:bg-green-700 text-white font-black px-10 py-4 rounded-2xl text-lg transition-colors shadow-lg">
+        ✓ Abrir Mesa
+      </button>
+    </div>
+
+    <!-- ═══ VISTA COMANDA ═══ -->
+    <div *ngIf="!cargando && vista === 'comanda' && cuentaActiva"
+         class="flex flex-col flex-1 overflow-hidden">
+
+      <div class="flex flex-1 overflow-hidden">
+
+        <!-- Panel izquierdo: Catálogo -->
+        <div class="w-1/2 border-r border-gray-100 flex flex-col">
+          <div class="p-3 border-b border-gray-100 space-y-2">
+            <input type="text" [(ngModel)]="busqueda"
+                   placeholder="Buscar producto..."
+                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-orange-400">
+            <div class="flex gap-1 overflow-x-auto pb-1">
+              <button (click)="categoriaFiltro = null"
+                      class="flex-shrink-0 px-2 py-1 rounded-full text-xs font-semibold transition-colors"
+                      [class.bg-orange-500]="categoriaFiltro === null"
+                      [class.text-white]="categoriaFiltro === null"
+                      [class.bg-gray-100]="categoriaFiltro !== null"
+                      [class.text-gray-600]="categoriaFiltro !== null">
+                Todos
+              </button>
+              <button *ngFor="let cat of categorias"
+                      (click)="categoriaFiltro = cat.id"
+                      class="flex-shrink-0 px-2 py-1 rounded-full text-xs font-semibold transition-colors"
+                      [class.bg-orange-500]="categoriaFiltro === cat.id"
+                      [class.text-white]="categoriaFiltro === cat.id"
+                      [class.bg-gray-100]="categoriaFiltro !== cat.id"
+                      [class.text-gray-600]="categoriaFiltro !== cat.id">
+                {{ cat.nombre }}
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-y-auto flex-1 p-2">
+            <div class="grid grid-cols-2 gap-2">
+              <button *ngFor="let prod of productosFiltrados"
+                      (click)="agregarProducto(prod)"
+                      class="flex flex-col items-start p-3 bg-gray-50 hover:bg-orange-50 border border-gray-200 hover:border-orange-300 rounded-xl text-left transition-all active:scale-95">
+                <div class="w-full h-14 rounded-lg overflow-hidden mb-2 bg-orange-100">
+                  <img *ngIf="prod.url_imagen" [src]="prod.url_imagen" [alt]="prod.nombre_producto"
+                       class="w-full h-full object-cover">
+                  <div *ngIf="!prod.url_imagen"
+                       class="w-full h-full flex items-center justify-center text-orange-400 font-black text-xl">
+                    {{ prod.nombre_producto?.charAt(0) }}
+                  </div>
+                </div>
+                <p class="font-bold text-gray-800 text-xs leading-tight line-clamp-2">{{ prod.nombre_producto }}</p>
+                <p class="text-orange-600 font-black text-sm mt-1">Bs. {{ prod.precio_unitario }}</p>
+                <span class="text-xs text-gray-400">Stock: {{ prod.stock_actual }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel derecho: Comanda actual -->
+        <div class="w-1/2 flex flex-col">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="font-bold text-gray-700 text-sm">Comanda</h3>
+            <span class="text-xs text-gray-400">
+              Abierta {{ cuentaActiva.fecha_apertura | date:'HH:mm' }}
+            </span>
+          </div>
+
+          <!-- Lista de items -->
+          <div class="flex-1 overflow-y-auto p-3 space-y-2">
+            <div *ngIf="!cuentaActiva.items || cuentaActiva.items.length === 0"
+                 class="text-center py-10 text-gray-400 text-sm">
+              Sin productos aún.<br>Selecciona del catálogo.
+            </div>
+
+            <div *ngFor="let item of cuentaActiva.items"
+                 class="flex items-center gap-2 bg-gray-50 rounded-xl p-2 border border-gray-100">
+              <div class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-orange-100">
+                <img *ngIf="item.url_imagen" [src]="item.url_imagen" class="w-full h-full object-cover">
+                <div *ngIf="!item.url_imagen" class="w-full h-full flex items-center justify-center text-orange-400 font-bold text-xs">
+                  {{ item.nombre_producto?.charAt(0) }}
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold text-gray-800 text-xs truncate">{{ item.nombre_producto }}</p>
+                <p class="text-gray-400 text-xs">
+                  Bs. {{ item.precio_unitario }} × {{ item.cantidad }}
+                  <span *ngIf="item.origen === 'qr'"
+                        class="ml-1 bg-blue-100 text-blue-600 px-1 rounded text-xs font-bold">QR</span>
+                </p>
+                <p *ngIf="item.nota" class="text-orange-500 text-xs italic">📝 {{ item.nota }}</p>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <p class="font-black text-gray-700 text-sm">Bs. {{ item.subtotal }}</p>
+                <button (click)="quitarProducto(item.id_detalle_cuenta)"
+                        class="text-red-400 hover:text-red-600 text-xs mt-1 transition-colors">
+                  ✕ quitar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Total y botón pagar -->
+          <div class="p-4 border-t border-gray-100 bg-white">
+            <div class="flex justify-between items-center mb-3">
+              <span class="font-bold text-gray-600">TOTAL:</span>
+              <span class="text-2xl font-black text-orange-600">
+                Bs. {{ (+cuentaActiva.total_acumulado || 0).toFixed(2) }}
+              </span>
+            </div>
+            <button (click)="irAPago()"
+                    [disabled]="!cuentaActiva.items?.length"
+                    class="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-black rounded-xl transition-colors text-base">
+              💳 Cerrar Cuenta y Cobrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ VISTA PAGO ═══ -->
+    <div *ngIf="!cargando && vista === 'pago'"
+         class="flex flex-col flex-1 overflow-y-auto p-6 space-y-4">
+
+      <button (click)="vista = 'comanda'" class="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm">
+        ← Volver a la comanda
+      </button>
+
+      <h3 class="text-xl font-black text-gray-800">Cobrar Mesa {{ mesa?.numero_mesa }}</h3>
+
+      <!-- Resumen de la cuenta -->
+      <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+        <div *ngFor="let item of cuentaActiva?.items"
+             class="flex justify-between text-sm py-1 border-b border-gray-100 last:border-0">
+          <span class="text-gray-700">{{ item.nombre_producto }} × {{ item.cantidad }}</span>
+          <span class="font-semibold">Bs. {{ item.subtotal }}</span>
+        </div>
+      </div>
+
+      <!-- Total -->
+      <div class="flex justify-between items-center bg-orange-50 border border-orange-200 rounded-xl p-4">
+        <span class="font-black text-orange-700 text-lg">TOTAL A COBRAR</span>
+        <span class="font-black text-orange-700 text-3xl">
+          Bs. {{ (+cuentaActiva?.total_acumulado || 0).toFixed(2) }}
+        </span>
+      </div>
+
+      <!-- Método de pago -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Método de pago</label>
+        <div class="grid grid-cols-2 gap-3">
+          <button (click)="metodoPago = 'Efectivo'"
+                  [class.bg-green-600]="metodoPago === 'Efectivo'"
+                  [class.text-white]="metodoPago === 'Efectivo'"
+                  [class.bg-gray-100]="metodoPago !== 'Efectivo'"
+                  class="py-3 rounded-xl font-bold transition-colors">
+            💵 Efectivo
+          </button>
+          <button (click)="metodoPago = 'QR'"
+                  [class.bg-blue-600]="metodoPago === 'QR'"
+                  [class.text-white]="metodoPago === 'QR'"
+                  [class.bg-gray-100]="metodoPago !== 'QR'"
+                  class="py-3 rounded-xl font-bold transition-colors">
+            📱 QR
+          </button>
+        </div>
+      </div>
+
+      <!-- Monto en efectivo -->
+      <div *ngIf="metodoPago === 'Efectivo'">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Monto recibido (Bs.)</label>
+        <input type="number" [(ngModel)]="montoPagado"
+               [min]="cuentaActiva?.total_acumulado"
+               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-2xl text-center font-black outline-none focus:border-green-500">
+        <div *ngIf="montoPagado >= (cuentaActiva?.total_acumulado || 0)"
+             class="mt-3 bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+          <p class="text-sm text-green-600">Cambio a devolver</p>
+          <p class="text-3xl font-black text-green-700">Bs. {{ cambio.toFixed(2) }}</p>
+        </div>
+      </div>
+
+      <!-- Confirmar -->
+      <button (click)="confirmarPago()"
+              [disabled]="cargando || (metodoPago === 'Efectivo' && montoPagado < (cuentaActiva?.total_acumulado || 0))"
+              class="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-black text-lg rounded-2xl transition-colors shadow-lg">
+        {{ cargando ? 'Procesando...' : '✓ Confirmar Pago y Liberar Mesa' }}
+      </button>
+    </div>
+
+    <!-- ═══ VISTA QR ═══ -->
+    <div *ngIf="vista === 'qr'" class="flex flex-col items-center justify-center p-8 text-center">
+      <h3 class="text-xl font-black text-gray-800 mb-2">
+        QR — Mesa {{ mesa?.numero_mesa }}
+      </h3>
+      <p class="text-gray-500 text-sm mb-6">
+        El cliente escanea este código para acceder al menú digital
+      </p>
+
+      <div *ngIf="!qrData" class="py-8">
+        <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+      </div>
+
+      <ng-container *ngIf="qrData">
+        <img [src]="qrData.qr" [alt]="'QR Mesa ' + mesa?.numero_mesa"
+             class="w-64 h-64 border-4 border-gray-100 rounded-2xl shadow-lg mb-4">
+        <p class="text-xs text-gray-400 mb-6 break-all px-4">{{ qrData.url }}</p>
+        <button (click)="descargarQR()"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-xl transition-colors">
+          ⬇ Descargar QR para imprimir
+        </button>
+      </ng-container>
+    </div>
+
+  </div>
+</div>

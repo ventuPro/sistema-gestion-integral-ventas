@@ -86,21 +86,32 @@ const listarPendientesCajero = async (req, res) => {
 // CAJERO: Aprobar pedido → va a cocina
 const aprobarPedido = async (req, res) => {
     try {
-        const { id_pedido } = req.params;
-        const pedido = await pedidoModel.aprobarPedido(id_pedido);
+        const id_pedido = Number(req.params.id_pedido);
+        const pedido    = await pm.aprobarPedido(id_pedido);
 
-        // Notificar a cocina
-        if (global.io) {
-            const pedidoCompleto = await pedidoModel.obtenerPedidoCompleto(id_pedido);
-            global.io.to('cocina').emit('nuevo_pedido_cocina', pedidoCompleto);
-            global.io.to(`mesa_${pedidoCompleto.id_mesa}`).emit('pedido_aprobado', {
-                id_pedido, estado: 'En_Cocina'
+        // Buscar si la mesa tiene cuenta abierta e integrar el pedido QR
+        const cuenta = await require('../models/cuentaModel').obtenerCuentaActiva(pedido.id_mesa);
+        if (cuenta) {
+            await require('../models/cuentaModel').integrarPedidoQR(cuenta.id_cuenta, id_pedido);
+
+            const cuentaActualizada = await require('../models/cuentaModel').obtenerCuentaActiva(pedido.id_mesa);
+            io()?.to('cajeros').emit('cuenta:qr_integrado', {
+                id_mesa:         pedido.id_mesa,
+                numero_mesa:     pedido.numero_mesa,
+                id_cuenta:       cuenta.id_cuenta,
+                total_acumulado: cuentaActualizada?.total_acumulado,
+                items:           cuentaActualizada?.items
             });
         }
 
-        res.json({ mensaje: 'Pedido aprobado y enviado a cocina', pedido });
-    } catch (error) {
-        res.status(500).json({ error: 'Error al aprobar pedido' });
+        io()?.to('cocina').emit('nuevo_pedido_cocina', pedido);
+        io()?.to(`mesa_${pedido.id_mesa}`).emit('pedido_aprobado', { id_pedido });
+        io()?.to('cajeros').emit('mesa:actualizada', { id_mesa: pedido.id_mesa });
+
+        res.json({ mensaje: 'Aprobado', pedido });
+    } catch(e) {
+        console.error('aprobarPedido:', e);
+        res.status(500).json({ error: e.message });
     }
 };
 

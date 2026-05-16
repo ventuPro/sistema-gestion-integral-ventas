@@ -52,6 +52,7 @@ app.use('/api/permisos',   permisoRoutes);
 app.use('/api/menu',       menuRoutes);    // Público (sin auth)
 app.use('/api/mesas',      mesaRoutes);
 app.use('/api/kds',        kdsRoutes);
+app.use('/api/cuentas', require('./routes/cuentaRoutes'));
 
 // Socket.IO eventos
 io.on('connection', (socket) => {

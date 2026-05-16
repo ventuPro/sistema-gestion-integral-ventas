@@ -1,41 +1,36 @@
 import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MesaService } from '../../../core/services/mesa.service';
+import { CuentaService } from '../../../core/services/cuenta.service';
 import { SocketService } from '../../../core/services/socket.service';
+import { MesaModalComponent } from './mesa-modal/mesa-modal.component';
+import { MesaService } from '../../../core/services/mesa.service';
 
 @Component({
   selector: 'app-mesas',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MesaModalComponent],
   templateUrl: './mesas.component.html',
-  styleUrl: './mesas.component.css'
+  styleUrl:    './mesas.component.css'
 })
 export class MesasComponent implements OnInit, OnDestroy {
-  private mesaService    = inject(MesaService);
-  private socketService  = inject(SocketService);
-  private cdr            = inject(ChangeDetectorRef);
+  private cuentaService = inject(CuentaService);
+  private mesaService   = inject(MesaService);
+  private socketService = inject(SocketService);
+  private cdr           = inject(ChangeDetectorRef);
 
-  mesas:          any[] = [];
+  mesas:           any[] = [];
   pedidosPendientes: any[] = [];
-  cargando        = true;
-  cargandoPedidos = false;
+  cargando         = true;
+  notificacion: string | null = null;
 
   // Modal nueva mesa
-  mostrarModalMesa  = false;
-  nuevaMesaNum      = '';
-  errorMesa         = '';
+  mostrarModalMesa = false;
+  nuevaMesaNum     = '';
+  errorMesa        = '';
 
-  // Modal QR
-  mostrarModalQR    = false;
-  qrActual: any     = null;
-
-  // Modal detalle pedido pendiente
-  mostrarModalPedido = false;
-  pedidoDetalle: any = null;
-
-  // Notificación toast
-  notificacion: string | null = null;
+  // Modal de mesa seleccionada
+  mesaSeleccionada: any = null;
 
   ngOnInit() {
     this.cargarMesas();
@@ -50,26 +45,31 @@ export class MesasComponent implements OnInit, OnDestroy {
   iniciarSocket() {
     this.socketService.conectar('cajeros');
 
-    // Nuevo pedido entrante
-    this.socketService.escuchar<any>('nuevo_pedido_pendiente').subscribe(data => {
-      this.mostrarToast(`🔔 Nuevo pedido — Mesa ${data.numero_mesa || data.id_mesa}`);
+    // Nuevo pedido QR pendiente
+    this.socketService.escuchar<any>('nuevo_pedido_pendiente').subscribe(() => {
+      this.mostrarToast('🔔 Nuevo pedido QR recibido');
       this.cargarPendientes();
       this.cargarMesas();
       this.cdr.detectChanges();
     });
 
-    // Mesa actualizada
-    this.socketService.escuchar<any>('mesa_actualizada').subscribe(() => {
+    // Mesa actualizada (cuenta abierta, cerrada, producto agregado)
+    this.socketService.escuchar<any>('mesa:actualizada').subscribe(() => {
       this.cargarMesas();
       this.cdr.detectChanges();
     });
 
-    // Ítem de cocina actualizado
-    this.socketService.escuchar<any>('item_cocina_actualizado').subscribe(data => {
-      if (data.pedido_listo) {
-        this.mostrarToast(`✅ Pedido #${data.id_pedido} listo para entregar`);
-        this.cargarMesas();
-      }
+    // Pedido QR integrado en comanda
+    this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
+      this.mostrarToast(`🍽 Pedido QR integrado en Mesa ${data.numero_mesa}`);
+      this.cargarMesas();
+      this.cdr.detectChanges();
+    });
+
+    // Cuenta cerrada
+    this.socketService.escuchar<any>('cuenta:cerrada').subscribe(() => {
+      this.cargarMesas();
+      this.cdr.detectChanges();
     });
   }
 
@@ -79,81 +79,79 @@ export class MesasComponent implements OnInit, OnDestroy {
   }
 
   cargarMesas() {
-    this.mesaService.listarMesas(1).subscribe({
+    const usr = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
+    const id_sucursal = usr.id_sucursal || 1;
+
+    this.cuentaService.getMesasConCuenta(id_sucursal).subscribe({
       next: (m) => { this.mesas = m; this.cargando = false; this.cdr.detectChanges(); },
-      error: () => { this.cargando = false; this.cdr.detectChanges(); }
+      error: () => { this.cargando = false; }
     });
   }
 
   cargarPendientes() {
-    this.cargandoPedidos = true;
-    this.mesaService.listarPendientesCajero(1).subscribe({
-      next: (p) => { this.pedidosPendientes = p; this.cargandoPedidos = false; this.cdr.detectChanges(); },
-      error: () => { this.cargandoPedidos = false; }
+    const usr = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
+    this.mesaService.listarPendientesCajero(usr.id_sucursal || 1).subscribe({
+      next: (p) => { this.pedidosPendientes = p; this.cdr.detectChanges(); }
     });
   }
 
-  // ─── Mesas ───
-  abrirModalMesa() { this.nuevaMesaNum = ''; this.errorMesa = ''; this.mostrarModalMesa = true; }
-  cerrarModalMesa() { this.mostrarModalMesa = false; }
-
-  crearMesa() {
-    if (!this.nuevaMesaNum || isNaN(+this.nuevaMesaNum)) { this.errorMesa = 'Ingresa un número válido.'; return; }
-    this.mesaService.crearMesa({ id_sucursal: 1, numero_mesa: +this.nuevaMesaNum }).subscribe({
-      next: () => { this.cerrarModalMesa(); this.cargarMesas(); },
-      error: () => { this.errorMesa = 'Error al crear la mesa.'; }
-    });
+  // Abre el modal al hacer clic en una mesa
+  seleccionarMesa(mesa: any) {
+    this.mesaSeleccionada = mesa;
   }
 
-  verQR(mesa: any) {
-    this.qrActual = null;
-    this.mostrarModalQR = true;
-    this.mesaService.obtenerQR(mesa.id_mesa).subscribe({
-      next: (res) => { this.qrActual = { ...res, numero_mesa: mesa.numero_mesa }; this.cdr.detectChanges(); },
-      error: () => { this.mostrarModalQR = false; alert('Error al generar QR.'); }
-    });
+  onModalCerrado() {
+    this.mesaSeleccionada = null;
   }
 
-  cerrarModalQR() { this.mostrarModalQR = false; this.qrActual = null; }
-
-  descargarQR() {
-    if (!this.qrActual) return;
-    const a = document.createElement('a');
-    a.href     = this.qrActual.qr;
-    a.download = `QR_Mesa_${this.qrActual.numero_mesa}.png`;
-    a.click();
+  onMesaActualizada() {
+    this.cargarMesas();
+    this.cargarPendientes();
   }
 
-  getColorMesa(mesa: any): string {
-    if (mesa.estado_pedido === 'Listo') return 'border-green-500 bg-green-50';
-    if (mesa.estado_mesa   === 'Ocupada') return 'border-orange-400 bg-orange-50';
-    return 'border-gray-200 bg-white';
+  // Colores y estilos del plano
+  getEstiloMesa(mesa: any) {
+    if (mesa.id_cuenta) {
+      // Mesa con comanda abierta
+      return 'border-orange-400 bg-orange-50 hover:bg-orange-100';
+    }
+    if (mesa.estado_mesa === 'Ocupada') {
+      return 'border-red-400 bg-red-50 hover:bg-red-100';
+    }
+    return 'border-green-300 bg-green-50 hover:bg-green-100';
   }
 
-  getIconoMesa(mesa: any): string {
-    if (mesa.estado_pedido === 'Listo')    return '✅';
-    if (mesa.estado_pedido === 'En_Cocina') return '🍳';
-    if (mesa.estado_mesa   === 'Ocupada')  return '🔴';
+  getIconoMesa(mesa: any) {
+    if (mesa.id_cuenta)           return '🟠';
+    if (mesa.estado_mesa === 'Ocupada') return '🔴';
     return '🟢';
   }
 
-  // ─── Pedidos pendientes ───
-  verDetallePedido(pedido: any) { this.pedidoDetalle = pedido; this.mostrarModalPedido = true; }
-  cerrarModalPedido() { this.mostrarModalPedido = false; this.pedidoDetalle = null; }
+  // Nueva mesa
+  abrirModalMesa()  { this.nuevaMesaNum = ''; this.errorMesa = ''; this.mostrarModalMesa = true; }
+  cerrarModalMesa() { this.mostrarModalMesa = false; }
 
+  crearMesa() {
+    if (!this.nuevaMesaNum || isNaN(+this.nuevaMesaNum)) { this.errorMesa = 'Número inválido'; return; }
+    const usr = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
+    this.mesaService.crearMesa({ id_sucursal: usr.id_sucursal || 1, numero_mesa: +this.nuevaMesaNum }).subscribe({
+      next: () => { this.cerrarModalMesa(); this.cargarMesas(); },
+      error: () => { this.errorMesa = 'Error al crear la mesa'; }
+    });
+  }
+
+  // Pedidos pendientes
   aprobarPedido(id_pedido: number) {
-    if (!confirm('¿Aprobar y enviar a cocina?')) return;
     this.mesaService.aprobarPedido(id_pedido).subscribe({
-      next: () => { this.cerrarModalPedido(); this.cargarPendientes(); this.cargarMesas(); },
-      error: () => alert('Error al aprobar.')
+      next: () => { this.cargarPendientes(); this.cargarMesas(); },
+      error: () => alert('Error al aprobar')
     });
   }
 
   rechazarPedido(id_pedido: number) {
-    if (!confirm('¿Rechazar este pedido?')) return;
     this.mesaService.rechazarPedido(id_pedido).subscribe({
-      next: () => { this.cerrarModalPedido(); this.cargarPendientes(); this.cargarMesas(); },
-      error: () => alert('Error al rechazar.')
+      next: () => this.cargarPendientes(),
+      error: () => alert('Error al rechazar')
     });
   }
 }
