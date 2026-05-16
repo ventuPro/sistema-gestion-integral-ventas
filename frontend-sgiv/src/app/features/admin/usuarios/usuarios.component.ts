@@ -188,7 +188,7 @@ guardarPermisos() {
       this.cerrarModalPermisos();
       this.cdr.detectChanges();
       // Confirmación visual
-      this.mostrarToastExito(`Permisos de "${this.usuarioPermisos.nombre_completo}" guardados.`);
+      this.mostrarToast(`Permisos de "${this.usuarioPermisos.nombre_completo}" guardados.`);
     },
     error: (e: any) => {
       console.error('Error guardando permisos:', e);
@@ -200,13 +200,12 @@ guardarPermisos() {
 
 mensajeExito: string | null = null;
 
-mostrarToastExito(msg: string) {
+private mostrarToast(msg: string) {
   this.mensajeExito = msg;
-  setTimeout(() => {
-    this.mensajeExito = null;
-    this.cdr.detectChanges();
-  }, 3500);
+  this.cdr.detectChanges();
+  setTimeout(() => { this.mensajeExito = null; this.cdr.detectChanges(); }, 3500);
 }
+
   getBadge(rol: string): string {
     const m: any = { 'Administrador': 'bg-purple-100 text-purple-700', 'Cajero': 'bg-blue-100 text-blue-700', 'Cocina': 'bg-orange-100 text-orange-700' };
     return m[rol] || 'bg-gray-100 text-gray-700';
@@ -214,37 +213,38 @@ mostrarToastExito(msg: string) {
 
   // ─── Control de Caja desde Usuarios (Función agregada) ───
 toggleCaja(usr: any) {
-  const nombre = usr.nombre_completo;
   const id     = Number(usr.id_usuario);
+  const nombre = usr.nombre_completo;
 
   if (usr.caja_habilitada) {
     if (!confirm(`¿Cerrar caja de "${nombre}"?`)) return;
 
     this.cajaService.deshabilitarCaja(id).subscribe({
       next: () => {
-        usr.caja_habilitada = false;
-        this.mostrarToastExito(`Caja de "${nombre}" cerrada.`);
-        this.cdr.detectChanges();
+        this.mostrarToast(`🔒 Caja de "${nombre}" cerrada.`);
+        this.cargarDatos(); // ← recarga completa del servidor
       },
       error: (e: any) => {
-        console.error('Error cerrando caja:', e);
-        alert(e?.error?.error || 'Error al cerrar la caja.');
+        const msg = e?.error?.error || 'Error al cerrar la caja.';
+        alert(`Error: ${msg}`);
+        console.error('toggleCaja error:', e);
       }
     });
   } else {
-    if (!confirm(`¿Abrir caja para "${nombre}"?`)) return;
+    if (!confirm(`¿Abrir caja para "${nombre}"? Podrá ingresar al Punto de Venta.`)) return;
 
     this.cajaService.habilitarCaja(id).subscribe({
       next: () => {
-        usr.caja_habilitada = true;
-        this.mostrarToastExito(`Caja de "${nombre}" habilitada. Ya puede ingresar al Punto de Venta.`);
-        this.cdr.detectChanges();
+        this.mostrarToast(`💰 Caja de "${nombre}" habilitada.`);
+        this.cargarDatos(); // ← recarga completa del servidor
       },
       error: (e: any) => {
-        console.error('Error habilitando caja:', e);
-        alert(e?.error?.error || 'Error al habilitar la caja.');
+        const msg = e?.error?.error || 'Error al habilitar la caja.';
+        alert(`Error: ${msg}`);
+        console.error('toggleCaja error:', e);
       }
     });
   }
 }
+
 }

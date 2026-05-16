@@ -282,6 +282,94 @@
   </div>
 </div>
 
+<!-- ═══ HISTORIAL DE VENTAS DEL DÍA ═══ -->
+<div *ngIf="!verificandoCaja && cajaHabilitada && !mostrarAbrirTurno"
+     class="mt-4">
+
+  <!-- Botón toggle -->
+  <button (click)="mostrarHistorial = !mostrarHistorial; mostrarHistorial && cargarVentasHoy()"
+          class="w-full flex items-center justify-between px-5 py-3 bg-white rounded-xl shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors">
+    <div class="flex items-center gap-3">
+      <span class="text-lg">📋</span>
+      <span class="font-semibold text-gray-700 text-sm">Mis ventas de hoy</span>
+      <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
+        {{ ventasHoy.length }} venta(s)
+      </span>
+    </div>
+    <span class="font-black text-green-600">
+      Bs. {{ totalVentasHoy.toFixed(2) }}
+    </span>
+  </button>
+
+  <!-- Panel desplegable -->
+  <div *ngIf="mostrarHistorial" class="mt-2 space-y-2">
+
+    <!-- Cargando -->
+    <div *ngIf="cargandoVentas"
+         class="bg-white rounded-xl p-6 text-center border border-gray-100">
+      <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <p class="text-gray-400 text-xs mt-2">Cargando ventas...</p>
+    </div>
+
+    <!-- Sin ventas -->
+    <div *ngIf="!cargandoVentas && ventasHoy.length === 0"
+         class="bg-white rounded-xl p-6 text-center border border-gray-100 text-gray-400 text-sm">
+      <div class="text-3xl mb-2">📭</div>
+      Sin ventas registradas hoy.
+    </div>
+
+    <!-- Tarjeta por venta -->
+    <div *ngFor="let venta of ventasHoy"
+         class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+
+      <!-- Cabecera -->
+      <div class="flex justify-between items-center px-4 py-2 bg-gray-50 border-b border-gray-100">
+        <div class="flex items-center gap-2">
+          <span class="font-black text-gray-600 text-sm">#{{ venta.id_venta }}</span>
+          <span class="text-gray-400 text-xs">{{ venta.fecha_venta | date:'HH:mm' }}</span>
+          <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+                [class.bg-green-100]="venta.metodo_pago === 'Efectivo'"
+                [class.text-green-700]="venta.metodo_pago === 'Efectivo'"
+                [class.bg-purple-100]="venta.metodo_pago === 'QR'"
+                [class.text-purple-700]="venta.metodo_pago === 'QR'">
+            {{ venta.metodo_pago }}
+          </span>
+        </div>
+        <span class="font-black text-gray-800 text-sm">
+          Bs. {{ (+venta.monto_total_venta).toFixed(2) }}
+        </span>
+      </div>
+
+      <!-- Detalle de productos -->
+      <div class="px-4 py-2">
+        <div *ngFor="let item of venta.items"
+             class="flex justify-between items-center py-1.5 border-b border-gray-50 last:border-0">
+          <div class="flex items-center gap-2 text-sm">
+            <span class="bg-gray-100 text-gray-600 text-xs font-bold px-1.5 py-0.5 rounded">
+              ×{{ item.cantidad_vendida }}
+            </span>
+            <span class="text-gray-700">{{ item.nombre_producto }}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-gray-400 mr-2">
+              Bs. {{ (+item.precio_unitario).toFixed(2) }} c/u
+            </span>
+            <span class="font-bold text-gray-800 text-sm">
+              Bs. {{ (+item.subtotal_venta).toFixed(2) }}
+            </span>
+          </div>
+        </div>
+
+        <div *ngIf="!venta.items || venta.items.length === 0"
+             class="text-xs text-gray-400 py-2 text-center italic">
+          Sin detalle registrado
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- ═══ TICKET ═══ -->
 <div *ngIf="mostrarTicket"
      class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 no-print">

@@ -12,20 +12,23 @@ const getEstadoCaja = async (req, res) => {
 
 const habilitarCajaUsuario = async (req, res) => {
     try {
-        // FIX: convertir a número para evitar comparación string vs number
-        if (Number(req.usuario.id_rol) !== 1)
+        const rolAdmin = Number(req.usuario.id_rol);
+        if (rolAdmin !== 1)
             return res.status(403).json({ error: 'Solo el administrador puede habilitar la caja' });
 
         const id_usuario = Number(req.params.id_usuario);
-        const resultado  = await cajaModel.habilitarCaja(id_usuario);
+        if (!id_usuario || isNaN(id_usuario))
+            return res.status(400).json({ error: 'ID de usuario inválido' });
 
+        const resultado = await cajaModel.habilitarCaja(id_usuario);
         if (!resultado)
             return res.status(404).json({ error: 'Usuario no encontrado' });
 
-        res.json({ mensaje: 'Caja habilitada correctamente', usuario: resultado });
+        console.log(`✅ Caja habilitada para usuario ${id_usuario} por admin ${req.usuario.id_usuario}`);
+        return res.json({ mensaje: 'Caja habilitada correctamente', usuario: resultado });
     } catch (e) {
         console.error('Error habilitarCajaUsuario:', e);
-        res.status(500).json({ error: 'Error al habilitar caja' });
+        return res.status(500).json({ error: 'Error interno al habilitar caja' });
     }
 };
 
@@ -36,14 +39,13 @@ const deshabilitarCajaUsuario = async (req, res) => {
 
         const id_usuario = Number(req.params.id_usuario);
         const resultado  = await cajaModel.deshabilitarCaja(id_usuario);
-
         if (!resultado)
             return res.status(404).json({ error: 'Usuario no encontrado' });
 
-        res.json({ mensaje: 'Caja cerrada correctamente', usuario: resultado });
+        return res.json({ mensaje: 'Caja cerrada correctamente', usuario: resultado });
     } catch (e) {
         console.error('Error deshabilitarCajaUsuario:', e);
-        res.status(500).json({ error: 'Error al deshabilitar caja' });
+        return res.status(500).json({ error: 'Error interno al deshabilitar caja' });
     }
 };
 
