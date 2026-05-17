@@ -36,8 +36,15 @@ export class CuentaService {
     return this.http.post(`${this.apiUrl}/cuentas/${id_cuenta}/cerrar`, { metodo_pago, id_sucursal }, { headers: this.h() });
   }
 
-  getProductos(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/catalogo/productos`, { headers: this.h() });
+getProductos(id_sucursal: number = 1): Observable<any[]> {
+  return this.http.get<any[]>(
+    `${this.apiUrl}/catalogo/productos?id_sucursal=${id_sucursal}`,
+    { headers: this.h() }
+  );
+}
+
+  resetMesa(id_mesa: number): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/cuentas/reset-mesa`, { id_mesa }, { headers: this.h() });
   }
 
   getQR(id_mesa: number): Observable<any> {

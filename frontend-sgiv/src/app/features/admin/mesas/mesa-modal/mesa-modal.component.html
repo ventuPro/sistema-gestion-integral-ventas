@@ -1,11 +1,9 @@
-<!-- Overlay -->
 <div class="fixed inset-0 bg-gray-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
      (click)="cerrarModal()">
 
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
        (click)="$event.stopPropagation()">
 
-    <!-- HEADER -->
     <div class="flex items-center justify-between px-6 py-4 border-b"
          [class.bg-green-600]="!cuentaActiva"
          [class.bg-orange-500]="!!cuentaActiva"
@@ -17,6 +15,13 @@
         </span>
       </div>
       <div class="flex items-center gap-2">
+        <button *ngIf="esAdmin && (cuentaActiva || mesa?.estado_mesa === 'Ocupada')"
+                (click)="forzarReset()"
+                title="Forzar reset de la mesa"
+                class="px-2 py-1 text-xs text-red-300 hover:text-red-200 hover:bg-red-500/20 rounded-lg transition-colors">
+          Reset
+        </button>
+
         <button *ngIf="cuentaActiva && vista !== 'ticket'"
                 (click)="vista = 'comanda'"
                 class="px-3 py-1 rounded-lg text-sm font-semibold transition-colors"
@@ -34,12 +39,10 @@
       </div>
     </div>
 
-    <!-- CARGANDO -->
     <div *ngIf="cargando" class="flex justify-center items-center py-16 flex-1">
       <div class="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
     </div>
 
-    <!-- ═══ VISTA: MESA LIBRE ═══ -->
     <div *ngIf="!cargando && vista === 'info'"
          class="flex flex-col items-center justify-center flex-1 py-16 text-center px-8">
       <div class="text-7xl mb-5">🟢</div>
@@ -51,10 +54,8 @@
       </button>
     </div>
 
-    <!-- ═══ VISTA: COMANDA ═══ -->
     <div *ngIf="!cargando && vista === 'comanda'" class="flex flex-1 overflow-hidden">
 
-      <!-- Panel izquierdo: catálogo -->
       <div class="w-1/2 border-r border-gray-100 flex flex-col">
         <div class="p-3 border-b border-gray-100 space-y-2">
           <input type="text" [(ngModel)]="busqueda"
@@ -97,7 +98,6 @@
           </div>
         </div>
 
-        <!-- Nota para el siguiente producto -->
         <div class="p-3 border-t border-gray-100">
           <input type="text" [(ngModel)]="notaProducto"
                  placeholder="📝 Nota para el próximo producto..."
@@ -105,7 +105,6 @@
         </div>
       </div>
 
-      <!-- Panel derecho: comanda -->
       <div class="w-1/2 flex flex-col">
         <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
           <h3 class="font-bold text-gray-700 text-sm">Consumo actual</h3>
@@ -159,7 +158,6 @@
       </div>
     </div>
 
-    <!-- ═══ VISTA: PAGO ═══ -->
     <div *ngIf="!cargando && vista === 'pago'" class="flex-1 overflow-y-auto p-6 space-y-4">
 
       <button (click)="vista = 'comanda'" class="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1">
@@ -168,7 +166,6 @@
 
       <h3 class="text-xl font-black text-gray-800">Cobrar — Mesa {{ mesa?.numero_mesa }}</h3>
 
-      <!-- Resumen -->
       <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 max-h-40 overflow-y-auto">
         <div *ngFor="let item of cuentaActiva?.items"
              class="flex justify-between text-sm py-1 border-b border-gray-100 last:border-0">
@@ -177,7 +174,6 @@
         </div>
       </div>
 
-      <!-- Total -->
       <div class="flex justify-between items-center bg-orange-50 border border-orange-200 rounded-xl p-4">
         <span class="font-black text-orange-700">TOTAL A COBRAR</span>
         <span class="font-black text-orange-700 text-3xl">
@@ -185,7 +181,6 @@
         </span>
       </div>
 
-      <!-- Método de pago -->
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">Método de pago</label>
         <div class="grid grid-cols-2 gap-3">
@@ -200,7 +195,6 @@
         </div>
       </div>
 
-      <!-- Efectivo -->
       <div *ngIf="metodoPago === 'Efectivo'">
         <label class="block text-sm font-medium text-gray-700 mb-1">Monto recibido (Bs.)</label>
         <input type="number" [(ngModel)]="montoPagado"
@@ -224,13 +218,11 @@
       </button>
     </div>
 
-    <!-- ═══ VISTA: TICKET (igual que POS) ═══ -->
     <div *ngIf="vista === 'ticket'" class="flex flex-col flex-1 overflow-hidden">
       <div class="bg-gray-100 p-4 border-b flex justify-between items-center">
         <h3 class="font-bold text-gray-700">Comprobante — Mesa {{ datosTicket?.numero_mesa }}</h3>
       </div>
 
-      <!-- Contenido del ticket -->
       <div id="ticket-imprimible" class="flex-1 overflow-y-auto p-8 font-mono text-sm text-gray-800">
         <div class="text-center mb-5">
           <h2 class="text-2xl font-black uppercase">Pastelería Ricky's</h2>
@@ -283,7 +275,6 @@
       </div>
     </div>
 
-    <!-- ═══ VISTA: QR ═══ -->
     <div *ngIf="vista === 'qr'" class="flex flex-col items-center justify-center flex-1 p-8 text-center">
       <h3 class="text-xl font-black text-gray-800 mb-2">QR — Mesa {{ mesa?.numero_mesa }}</h3>
       <p class="text-gray-500 text-sm mb-6">El cliente escanea este código para pedir desde su celular</p>

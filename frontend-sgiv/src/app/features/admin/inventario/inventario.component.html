@@ -1,34 +1,18 @@
 <div class="space-y-5">
 
   <!-- ═══ SELECTOR DE SUCURSAL (solo admin) ═══ -->
-  <div *ngIf="esAdmin" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-    <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
-      📍 Selecciona la Sucursal
-    </h3>
-    <div class="flex flex-wrap gap-3">
-      <button *ngFor="let suc of sucursales"
-              (click)="seleccionarSucursal(suc)"
-              class="flex items-center gap-2 px-5 py-3 rounded-xl border-2 font-semibold transition-all"
-              [class.border-blue-600]="sucursalSeleccionada?.id_sucursal === suc.id_sucursal"
-              [class.bg-blue-600]="sucursalSeleccionada?.id_sucursal === suc.id_sucursal"
-              [class.text-white]="sucursalSeleccionada?.id_sucursal === suc.id_sucursal"
-              [class.border-gray-200]="sucursalSeleccionada?.id_sucursal !== suc.id_sucursal"
-              [class.bg-white]="sucursalSeleccionada?.id_sucursal !== suc.id_sucursal"
-              [class.text-gray-600]="sucursalSeleccionada?.id_sucursal !== suc.id_sucursal">
-        <span class="text-lg">🏪</span>
-        <div class="text-left">
-          <p class="text-sm font-bold">{{ suc.nombre_sucursal }}</p>
-          <p *ngIf="sucursalSeleccionada?.id_sucursal === suc.id_sucursal"
-             class="text-xs opacity-80">Seleccionada</p>
-        </div>
-        <span *ngIf="sucursalSeleccionada?.id_sucursal === suc.id_sucursal"
-              class="text-lg">✓</span>
-      </button>
-    </div>
-    <p class="text-xs text-gray-400 mt-3">
-      Mostrando inventario de: <strong class="text-blue-600">{{ sucursalSeleccionada?.nombre_sucursal }}</strong>
-    </p>
-  </div>
+<!-- Selector sucursal admin — igual que reportes -->
+<div *ngIf="esAdmin && sucursales.length > 0" class="flex flex-wrap gap-2 mb-6">
+  <button *ngFor="let suc of sucursales"
+          (click)="seleccionarSucursal(suc)"
+          class="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+          [class.bg-blue-600]="sucursalSeleccionada?.id_sucursal === suc.id_sucursal"
+          [class.text-white]="sucursalSeleccionada?.id_sucursal === suc.id_sucursal"
+          [class.bg-gray-100]="sucursalSeleccionada?.id_sucursal !== suc.id_sucursal"
+          [class.text-gray-600]="sucursalSeleccionada?.id_sucursal !== suc.id_sucursal">
+    {{ suc.nombre_sucursal }}
+  </button>
+</div>
 
   <!-- Banner sucursal para cajero -->
   <div *ngIf="!esAdmin" class="bg-blue-50 border border-blue-200 rounded-xl px-5 py-3 flex items-center gap-3">

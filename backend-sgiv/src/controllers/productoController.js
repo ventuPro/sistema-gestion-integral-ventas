@@ -1,105 +1,99 @@
-const productoModel = require('../models/productoModel');
+const m = require('../models/productoModel');
+const { guardarBase64ComoArchivo } = require('../middlewares/uploadMiddleware');
 
-// --- CATEGORÍAS ---
-const agregarCategoria = async (req, res) => {
+const agregarCategoria  = async (req, res) => {
     try {
-        const { nombre_categoria, descripcion_categoria } = req.body;
-        const nuevaCategoria = await productoModel.crearCategoria(nombre_categoria, descripcion_categoria);
-        res.status(201).json({ mensaje: 'Categoría creada exitosamente', categoria: nuevaCategoria });
-    } catch (error) {
-        console.error('Error en agregarCategoria:', error);
-        res.status(500).json({ error: 'Error al crear la categoría' });
-    }
+        const cat = await m.crearCategoria(req.body.nombre_categoria, req.body.descripcion_categoria || '');
+        res.status(201).json({ categoria: cat });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
-const listarCategorias = async (req, res) => {
-    try {
-        const categorias = await productoModel.obtenerCategorias();
-        res.json(categorias);
-    } catch (error) {
-        console.error('Error en listarCategorias:', error);
-        res.status(500).json({ error: 'Error al obtener las categorías' });
-    }
+const listarCategorias  = async (req, res) => {
+    try { res.json(await m.obtenerCategorias()); }
+    catch(e) { res.status(500).json({ error: e.message }); }
 };
 
-// --- PRODUCTOS ---
-const agregarProducto = async (req, res) => {
+// Listar productos — SOLO los de esa sucursal (INNER JOIN)
+const listarProductos   = async (req, res) => {
     try {
-        const nuevoProducto = await productoModel.crearProducto(req.body);
-        res.status(201).json({ mensaje: 'Producto creado exitosamente', producto: nuevoProducto });
-    } catch (error) {
-        console.error('Error en agregarProducto:', error);
-        res.status(500).json({ error: 'Error al crear el producto' });
-    }
+        const id_sucursal = Number(req.query.id_sucursal) || 1;
+        res.json(await m.obtenerProductos(id_sucursal));
+    } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
-const listarProductos = async (req, res) => {
+// Crear producto Y asignarlo a la sucursal seleccionada
+const agregarProducto   = async (req, res) => {
     try {
-        const productos = await productoModel.obtenerProductos();
-        res.json(productos);
-    } catch (error) {
-        console.error('Error en listarProductos:', error);
-        res.status(500).json({ error: 'Error al obtener los productos' });
-    }
-};
+        const {
+            id_categoria, nombre_producto, descripcion_producto,
+            precio_unitario, id_sucursal, stock_inicial
+        } = req.body;
 
-
-const eliminarProducto = async (req, res) => {
-    try {
-        const { id } = req.params; // Capturamos el ID que viene en la URL
-        const productoEliminado = await productoModel.eliminarProducto(id);
-        
-        if (!productoEliminado) {
-            return res.status(404).json({ error: 'Producto no encontrado' });
+        // Resolver imagen
+        let url_imagen = null;
+        if (req.file) {
+            url_imagen = `/uploads/productos/${req.file.filename}`;
+        } else if (req.body.url_imagen?.startsWith('data:')) {
+            url_imagen = guardarBase64ComoArchivo(req.body.url_imagen);
+        } else if (req.body.url_imagen) {
+            url_imagen = req.body.url_imagen;
         }
-        
-        res.json({ mensaje: 'Producto eliminado (desactivado) exitosamente' });
-    } catch (error) {
-        console.error('Error en eliminarProducto:', error);
-        res.status(500).json({ error: 'Error al eliminar el producto' });
+
+        // 1. Crear el producto en el catálogo global
+        const prod = await m.crearProducto({
+            id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen
+        });
+
+        // 2. ASIGNAR el producto a la sucursal seleccionada con su stock inicial
+        //    Sin este paso el producto NO aparece en ninguna sucursal
+        const id_suc      = Number(id_sucursal) || 1;
+        const stock_ini   = Number(stock_inicial) || 0;
+        await m.asignarProductoASucursal(prod.id_producto, id_suc, stock_ini);
+
+        res.status(201).json({ producto: prod });
+    } catch(e) {
+        console.error('agregarProducto:', e);
+        res.status(500).json({ error: e.message });
     }
 };
 
+// Actualizar producto
 const actualizarProducto = async (req, res) => {
     try {
-        const { id } = req.params; // El ID del producto que vamos a editar
-        const productoActualizado = await productoModel.actualizarProducto(id, req.body);
-        
-        if (!productoActualizado) {
-            return res.status(404).json({ error: 'Producto no encontrado' });
+        const { id_categoria, nombre_producto, descripcion_producto, precio_unitario } = req.body;
+
+        let url_imagen = req.body.url_imagen || null;
+        if (req.file) {
+            url_imagen = `/uploads/productos/${req.file.filename}`;
+        } else if (req.body.url_imagen?.startsWith('data:')) {
+            url_imagen = guardarBase64ComoArchivo(req.body.url_imagen);
         }
-        
-        res.json({ mensaje: 'Producto actualizado exitosamente', producto: productoActualizado });
-    } catch (error) {
-        console.error('Error en actualizarProducto:', error);
-        res.status(500).json({ error: 'Error al actualizar el producto' });
-    }
+
+        const prod = await m.actualizarProducto(req.params.id, {
+            id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen
+        });
+        res.json({ producto: prod });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
+const eliminarProducto  = async (req, res) => {
+    try {
+        await m.eliminarProducto(req.params.id);
+        res.json({ mensaje: 'Producto eliminado' });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+};
+
+// Agregar stock a una sucursal específica
 const sumarStock = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { cantidad } = req.body; // Cuántas unidades nuevas llegaron
-
-        // Validamos que no nos envíen números negativos o vacíos
-        if (!cantidad || cantidad <= 0) {
-            return res.status(400).json({ error: 'La cantidad a ingresar debe ser mayor a cero.' });
-        }
-
-        const productoActualizado = await productoModel.agregarStock(id, cantidad);
-        
-        if (!productoActualizado) {
-            return res.status(404).json({ error: 'Producto no encontrado' });
-        }
-        
-        res.json({ 
-            mensaje: `Stock ingresado correctamente. Nuevo stock: ${productoActualizado.cantidad_actual}`, 
-            producto: productoActualizado 
-        });
-    } catch (error) {
-        console.error('Error en sumarStock:', error);
-        res.status(500).json({ error: 'Error al actualizar el stock del producto' });
-    }
+        const id_sucursal = Number(req.body.id_sucursal) || 1;
+        const cantidad    = Number(req.body.cantidad)    || 0;
+        const r = await m.agregarStock(req.params.id, cantidad, id_sucursal);
+        res.json({ mensaje: `Stock actualizado: ${r.cantidad_actual}`, inventario: r });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
-module.exports = { agregarCategoria, listarCategorias, agregarProducto, listarProductos, eliminarProducto, actualizarProducto, sumarStock };
+module.exports = {
+    agregarCategoria, listarCategorias, listarProductos,
+    agregarProducto,  actualizarProducto, eliminarProducto, sumarStock
+};

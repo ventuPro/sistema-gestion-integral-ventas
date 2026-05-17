@@ -1,18 +1,27 @@
 <div class="space-y-6">
 
-  <!-- Barra superior: selector de sucursal + botón nueva sucursal -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-4 flex flex-wrap justify-between items-center gap-3">
     <div class="flex items-center gap-3 flex-wrap">
       <label class="text-sm font-semibold text-gray-600">Sucursal:</label>
-      <select [(ngModel)]="sucursalActual" (ngModelChange)="cambiarSucursal()"
-              class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 min-w-40">
-        <option *ngFor="let s of sucursales" [value]="s.id_sucursal">{{ s.nombre_sucursal }}</option>
-      </select>
+      
+      <div *ngIf="esAdmin && sucursales.length > 0" class="flex flex-wrap gap-2">
+        <button *ngFor="let suc of sucursales"
+                (click)="cambiarSucursal(suc.id_sucursal)"
+                class="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+                [class.bg-blue-600]="sucursalActual === suc.id_sucursal"
+                [class.text-white]="sucursalActual === suc.id_sucursal"
+                [class.bg-gray-100]="sucursalActual !== suc.id_sucursal"
+                [class.text-gray-600]="sucursalActual !== suc.id_sucursal">
+          {{ suc.nombre_sucursal }}
+        </button>
+      </div>
+
       <button (click)="abrirModalSucursal()"
-              class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+              class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 ml-2">
         <span class="text-lg leading-none">+</span> Nueva Sucursal
       </button>
     </div>
+    
     <span *ngIf="cargando" class="text-sm text-gray-400 flex items-center gap-2">
       <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       Actualizando...
@@ -20,31 +29,26 @@
     <span *ngIf="!cargando" class="text-xs text-gray-400">Datos de hoy · Auto-refresco 60s</span>
   </div>
 
-  <!-- Tarjetas KPI -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4" *ngIf="!cargando && datosAdmin">
 
-    <!-- Ventas del día -->
     <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
       <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Ventas de Hoy</p>
       <p class="text-4xl font-black text-gray-800 mt-2">{{ resumen.total_ventas || 0 }}</p>
       <p class="text-xs text-gray-400 mt-1">transacciones</p>
     </div>
 
-    <!-- Efectivo -->
     <div class="bg-green-50 p-5 rounded-xl shadow-sm border border-green-100">
       <p class="text-xs font-bold text-green-600 uppercase tracking-wide">Efectivo</p>
       <p class="text-3xl font-black text-green-700 mt-2">Bs. {{ totalEfectivo.toFixed(2) }}</p>
       <p class="text-xs text-green-500 mt-1">pagos en efectivo</p>
     </div>
 
-    <!-- QR -->
     <div class="bg-purple-50 p-5 rounded-xl shadow-sm border border-purple-100">
       <p class="text-xs font-bold text-purple-600 uppercase tracking-wide">QR</p>
       <p class="text-3xl font-black text-purple-700 mt-2">Bs. {{ totalQr.toFixed(2) }}</p>
       <p class="text-xs text-purple-500 mt-1">pagos por QR</p>
     </div>
 
-    <!-- Estado Caja -->
     <div class="p-5 rounded-xl shadow-sm border"
          [class.bg-green-50]="turno"
          [class.border-green-100]="turno"
@@ -66,10 +70,8 @@
     </div>
   </div>
 
-  <!-- Fila de gráficos: Pie + Barras diarias -->
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6" *ngIf="!cargando && datosAdmin">
 
-    <!-- Pie: métodos de pago -->
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
       <h3 class="font-bold text-gray-800 mb-4">Ventas por Método de Pago</h3>
       <div class="relative h-52">
@@ -81,7 +83,6 @@
       </div>
     </div>
 
-    <!-- Barras: ingresos últimos 7 días -->
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
       <h3 class="font-bold text-gray-800 mb-4">Ingresos Últimos 7 Días</h3>
       <div class="relative h-52">
@@ -94,11 +95,9 @@
     </div>
   </div>
 
-  <!-- Gráfico productos con filtro de categoría -->
   <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100" *ngIf="!cargando && datosAdmin">
     <div class="flex flex-wrap justify-between items-center mb-4 gap-3">
       <h3 class="font-bold text-gray-800">Productos Más Vendidos Hoy</h3>
-      <!-- Filtro de categoría -->
       <div class="flex gap-2 flex-wrap">
         <button (click)="filtrarCategoria(null)"
                 [class.bg-blue-600]="categoriaFiltroChart === null"
@@ -128,7 +127,6 @@
     </div>
   </div>
 
-  <!-- Loading inicial -->
   <div *ngIf="cargando" class="bg-white rounded-xl p-12 text-center border border-gray-100">
     <div class="flex flex-col items-center gap-3">
       <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -139,7 +137,6 @@
 </div>
 
 
-<!-- ═══ MODAL: NUEVA SUCURSAL ═══ -->
 <div *ngIf="mostrarModalSucursal"
      class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
   <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">

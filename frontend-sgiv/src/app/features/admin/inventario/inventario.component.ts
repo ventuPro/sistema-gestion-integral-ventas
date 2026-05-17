@@ -188,46 +188,45 @@ export class InventarioComponent implements OnInit {
     reader.readAsDataURL(file);
   }
 
-  guardarProducto() {
-    if (!this.formulario.nombre_producto || !this.formulario.precio_unitario || !this.formulario.id_categoria) {
-      this.errorModal = 'Completa todos los campos obligatorios.'; return;
-    }
+guardarProducto() {
+  if (!this.formulario.nombre_producto || !this.formulario.precio_unitario || !this.formulario.id_categoria) {
+    this.errorModal = 'Completa todos los campos obligatorios.'; return;
+  }
 
-    this.cargando   = true;
-    this.errorModal = '';
+  this.cargando   = true;
+  this.errorModal = '';
 
+  if (this.editandoId) {
+    // ─── EDITAR: actualiza solo los datos del producto (no el inventario) ───
     const datos = {
       nombre_producto:      this.formulario.nombre_producto,
-      descripcion_producto: this.formulario.descripcion_producto,
+      descripcion_producto: this.formulario.descripcion_producto || '',
       precio_unitario:      this.formulario.precio_unitario,
       id_categoria:         this.formulario.id_categoria
     };
-
-    if (this.editandoId) {
-      this.productoService.actualizarProducto(this.editandoId, datos, this.archivoImagen || undefined).subscribe({
-        next: () => { this.cerrarModal(); this.cargarProductos(); },
-        error: () => { this.errorModal = 'Error al actualizar.'; this.cargando = false; }
-      });
-    } else {
-      this.productoService.crearProducto(datos, this.archivoImagen || undefined).subscribe({
-        next: (res: any) => {
-          // Si hay stock inicial, agregarlo
-          if (this.formulario.stock_inicial > 0 && res.producto?.id_producto) {
-            this.productoService.agregarStock(
-              res.producto.id_producto,
-              this.formulario.stock_inicial,
-              this.idSucursal
-            ).subscribe({ next: () => { this.cerrarModal(); this.cargarProductos(); } });
-          } else {
-            this.cerrarModal();
-            this.cargarProductos();
-          }
-        },
-        error: () => { this.errorModal = 'Error al crear.'; this.cargando = false; }
-      });
-    }
+    this.productoService.actualizarProducto(this.editandoId, datos, this.archivoImagen || undefined).subscribe({
+      next: () => { this.cerrarModal(); this.cargarProductos(); },
+      error: () => { this.errorModal = 'Error al actualizar.'; this.cargando = false; }
+    });
+  } else {
+    // ─── CREAR: incluye id_sucursal y stock_inicial para asignar a esta sucursal ───
+    const datos = {
+      nombre_producto:      this.formulario.nombre_producto,
+      descripcion_producto: this.formulario.descripcion_producto || '',
+      precio_unitario:      this.formulario.precio_unitario,
+      id_categoria:         this.formulario.id_categoria,
+      id_sucursal:          this.idSucursal,              // ← CLAVE: sucursal seleccionada
+      stock_inicial:        this.formulario.stock_inicial || 0   // ← stock inicial
+    };
+    this.productoService.crearProducto(datos, this.archivoImagen || undefined).subscribe({
+      next: () => { this.cerrarModal(); this.cargarProductos(); },
+      error: (e: any) => {
+        this.errorModal = e?.error?.error || 'Error al crear el producto.';
+        this.cargando = false;
+      }
+    });
   }
-
+}
   eliminarProducto(id: number, nombre: string) {
     if (!confirm(`¿Eliminar "${nombre}" del inventario?`)) return;
     this.productoService.eliminarProducto(id).subscribe({

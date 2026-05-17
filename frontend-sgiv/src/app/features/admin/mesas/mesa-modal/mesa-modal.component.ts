@@ -21,6 +21,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   private cdr           = inject(ChangeDetectorRef);
 
   // Estado general
+  esAdmin         = false;
   cargando        = false;
   cuentaActiva:   any = null;
   vista: 'info' | 'comanda' | 'pago' | 'qr' | 'ticket' = 'info';
@@ -51,6 +52,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   private subs: Subscription[] = [];
 
   ngOnInit() {
+    const usr = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
+    this.esAdmin = usr.id_rol === 1;
     this.cargarEstadoMesa();
     this.cargarProductos();
     this.escucharSocket();
@@ -85,18 +88,40 @@ export class MesaModalComponent implements OnInit, OnDestroy {
       error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
+forzarReset() {
+  if (!confirm(`¿Resetear la Mesa ${this.mesa.numero_mesa}?\nEsto cancelará la cuenta actual y liberará la mesa.`)) return;
+  if (!this.esAdmin) { alert('Solo el administrador puede hacer esto.'); return; }
 
-  cargarProductos() {
-    this.cuentaService.getProductos().subscribe({
-      next: (prods: any[]) => {
-        this.productos = prods.filter(p => Number(p.stock_actual) > 0);
-        const cats = new Map();
-        this.productos.forEach(p => cats.set(p.id_categoria, p.nombre_categoria));
-        this.categorias = Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre }));
-        this.cdr.detectChanges();
-      }
-    });
-  }
+  this.cargando = true;
+  this.cuentaService.resetMesa(this.mesa.id_mesa).subscribe({
+    next: () => {
+      this.cargando = false;
+      this.mesaActualizada.emit();
+      this.cerrarModal();
+    },
+    error: () => { this.cargando = false; alert('Error al resetear.'); }
+  });
+}
+cargarProductos() {
+  // FIX: usar la sucursal de la mesa, no la sucursal por defecto
+  const id_sucursal = Number(this.mesa?.id_sucursal) || 1;
+
+  this.cuentaService.getProductos(id_sucursal).subscribe({
+    next: (prods: any[]) => {
+      // Solo productos con stock > 0 en ESA sucursal
+      this.productos = prods.filter(p => Number(p.stock_actual) > 0);
+
+      const cats = new Map<number, string>();
+      this.productos.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
+      this.categorias = Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre }));
+
+      this.cdr.detectChanges();
+    },
+    error: () => {
+      console.error('Error al cargar catálogo de la mesa');
+    }
+  });
+}
 
   get productosFiltrados(): any[] {
     return this.productos.filter(p => {

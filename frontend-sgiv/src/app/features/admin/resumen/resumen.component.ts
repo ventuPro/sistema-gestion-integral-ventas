@@ -101,7 +101,8 @@ export class ResumenComponent implements OnInit, OnDestroy {
     });
   }
 
-  cambiarSucursal() {
+  cambiarSucursal(id_sucursal: number) {
+    this.sucursalActual = id_sucursal;
     this.cargando = true;
     this.destruirGraficos();
     this.cargarDatos();

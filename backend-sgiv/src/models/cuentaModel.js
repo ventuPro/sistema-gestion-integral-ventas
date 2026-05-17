@@ -206,14 +206,20 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, id_sucurs
 const obtenerMesasConCuenta = async (id_sucursal) => {
     const r = await db.query(`
         SELECT
-            m.id_mesa, m.numero_mesa, m.estado_mesa, m.codigo_qr,
-            c.id_cuenta, c.total_acumulado, c.fecha_apertura,
+            m.id_mesa,
+            m.numero_mesa,
+            m.estado_mesa,
+            m.codigo_qr,
+            m.id_sucursal,
+            c.id_cuenta,
+            c.total_acumulado,
+            c.fecha_apertura,
             COUNT(dc.id_detalle_cuenta)::int AS num_items
         FROM mesa_local m
-        LEFT JOIN cuenta_mesa c ON c.id_mesa=m.id_mesa AND c.estado='Abierta'
-        LEFT JOIN detalle_cuenta dc ON dc.id_cuenta=c.id_cuenta
-        WHERE m.id_sucursal=$1
-        GROUP BY m.id_mesa, m.numero_mesa, m.estado_mesa, m.codigo_qr,
+        LEFT JOIN cuenta_mesa    c  ON c.id_mesa  = m.id_mesa AND c.estado = 'Abierta'
+        LEFT JOIN detalle_cuenta dc ON dc.id_cuenta = c.id_cuenta
+        WHERE m.id_sucursal = $1
+        GROUP BY m.id_mesa, m.numero_mesa, m.estado_mesa, m.codigo_qr, m.id_sucursal,
                  c.id_cuenta, c.total_acumulado, c.fecha_apertura
         ORDER BY m.numero_mesa ASC
     `, [id_sucursal]);

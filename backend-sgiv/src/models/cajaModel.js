@@ -183,68 +183,96 @@ const cerrarCaja = async (id_sucursal, id_usuario_cajero) => {
 };
 
 // ─── REGISTRO DE VENTA ───
-const registrarVenta = async (datosVenta) => {
-    const { id_sucursal, id_usuario_cajero, id_cliente, id_pedido_mesa, monto_total_venta, metodo_pago, detalles } = datosVenta;
-
+const registrarVenta = async ({
+    id_sucursal, id_usuario_cajero, id_cliente,
+    id_pedido_mesa, monto_total_venta, metodo_pago, detalles
+}) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
 
-        // Buscar turno abierto (opcional)
-        const resTurno = await client.query(`
+        // 1. Buscar turno abierto del cajero (opcional — no falla si no hay)
+        const rTurno = await client.query(`
             SELECT id_turno FROM turno_caja
             WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto'
             ORDER BY fecha_hora_apertura DESC LIMIT 1
         `, [id_usuario_cajero]);
-        const id_turno = resTurno.rows[0]?.id_turno || null;
+        const id_turno = rTurno.rows[0]?.id_turno || null;
 
-        const resVenta = await client.query(`
-            INSERT INTO venta_caja 
-                (id_sucursal, id_usuario_cajero, id_cliente, id_pedido_mesa, id_turno, monto_total_venta, metodo_pago)
-            VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id_venta
-        `, [id_sucursal, id_usuario_cajero, id_cliente, id_pedido_mesa, id_turno, monto_total_venta, metodo_pago]);
-        const id_venta = resVenta.rows[0].id_venta;
+        // 2. Registrar la venta principal
+        const rVenta = await client.query(`
+            INSERT INTO venta_caja
+                (id_sucursal, id_usuario_cajero, id_cliente, id_pedido_mesa,
+                 id_turno, monto_total_venta, metodo_pago)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id_venta
+        `, [
+            Number(id_sucursal),
+            Number(id_usuario_cajero),
+            id_cliente    || null,
+            id_pedido_mesa|| null,
+            id_turno,
+            Number(monto_total_venta),
+            metodo_pago
+        ]);
+        const id_venta = rVenta.rows[0].id_venta;
 
+        // 3. Procesar cada ítem del carrito
         for (const item of detalles) {
+            const cantidad       = Number(item.cantidad)    || 1;
+            const precio         = Number(item.precio)      || 0;
+            const subtotal       = Number(item.subtotal)    || (cantidad * precio);
+            const id_prod        = Number(item.id_producto);
+
+            // 3a. Registrar detalle de venta
             await client.query(`
-                INSERT INTO detalle_venta (id_venta, id_producto, cantidad_vendida, precio_unitario, subtotal_venta)
-                VALUES ($1,$2,$3,$4,$5)
-            `, [id_venta, item.id_producto, item.cantidad, item.precio, item.subtotal]);
+                INSERT INTO detalle_venta
+                    (id_venta, id_producto, cantidad_vendida, precio_unitario, subtotal_venta)
+                VALUES ($1, $2, $3, $4, $5)
+            `, [id_venta, id_prod, cantidad, precio, subtotal]);
 
-            const resInv = await client.query(`
+            // 3b. Descontar del inventario de ESA sucursal
+            const rInv = await client.query(`
                 UPDATE inventario_sucursal
-                SET cantidad_actual = cantidad_actual - $1
-                WHERE id_sucursal=$2 AND id_producto=$3
-                RETURNING id_inventario
-            `, [item.cantidad, id_sucursal, item.id_producto]);
+                SET cantidad_actual = GREATEST(0, cantidad_actual - $1)
+                WHERE id_sucursal = $2 AND id_producto = $3
+                RETURNING id_inventario, cantidad_actual
+            `, [cantidad, Number(id_sucursal), id_prod]);
 
-            if (resInv.rows.length > 0) {
+            // 3c. Registrar en historial (solo si existe entrada en inventario)
+            if (rInv.rows.length > 0) {
                 await client.query(`
-                    INSERT INTO historial_inventario (id_inventario, id_usuario, tipo_movimiento, cantidad_movida, motivo_movimiento)
-                    VALUES ($1,$2,'SALIDA',$3,'Venta en Caja')
-                `, [resInv.rows[0].id_inventario, id_usuario_cajero, item.cantidad]);
+                    INSERT INTO historial_inventario
+                        (id_inventario, id_usuario, tipo_movimiento, cantidad_movida, motivo_movimiento)
+                    VALUES ($1, $2, 'SALIDA', $3, 'Venta en Caja')
+                `, [rInv.rows[0].id_inventario, Number(id_usuario_cajero), cantidad]);
             }
         }
 
+        // 4. Si viene de pedido QR → liberar mesa
         if (id_pedido_mesa) {
             await client.query(
-                `UPDATE pedido_mesa SET estado_pedido='Pagado' WHERE id_pedido=$1`, [id_pedido_mesa]
+                `UPDATE pedido_mesa SET estado_pedido = 'Pagado' WHERE id_pedido = $1`,
+                [id_pedido_mesa]
             );
             await client.query(`
-                UPDATE mesa_local SET estado_mesa='Libre'
-                WHERE id_mesa=(SELECT id_mesa FROM pedido_mesa WHERE id_pedido=$1)
+                UPDATE mesa_local SET estado_mesa = 'Libre'
+                WHERE id_mesa = (SELECT id_mesa FROM pedido_mesa WHERE id_pedido = $1)
             `, [id_pedido_mesa]);
         }
 
         await client.query('COMMIT');
         return id_venta;
+
     } catch (e) {
         await client.query('ROLLBACK');
+        console.error('❌ registrarVenta ROLLBACK:', e.message);
         throw e;
     } finally {
         client.release();
     }
 };
+
 const obtenerCierresCaja = async () => {
     const result = await db.query(`
         SELECT

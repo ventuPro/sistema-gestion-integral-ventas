@@ -1,86 +1,91 @@
 const db = require('../config/db');
 
-const crearCategoria = async (nombre, descripcion) => {
-    const query = `
-        INSERT INTO categoria_producto (nombre_categoria, descripcion_categoria) 
-        VALUES ($1, $2) RETURNING *;
-    `;
-    const result = await db.query(query, [nombre, descripcion]);
-    return result.rows[0];
+const crearCategoria    = async (nombre, desc) =>
+    (await db.query(`INSERT INTO categoria_producto(nombre_categoria,descripcion_categoria) VALUES($1,$2) RETURNING *`,[nombre,desc])).rows[0];
+
+const obtenerCategorias = async () =>
+    (await db.query(`SELECT * FROM categoria_producto ORDER BY nombre_categoria ASC`)).rows;
+
+const crearProducto = async ({ id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen }) => {
+    const r = await db.query(`
+        INSERT INTO producto(id_categoria,nombre_producto,descripcion_producto,precio_unitario,url_imagen)
+        VALUES($1,$2,$3,$4,$5) RETURNING *
+    `, [id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen || null]);
+    return r.rows[0];
 };
 
-const obtenerCategorias = async () => {
-    const query = `SELECT * FROM categoria_producto ORDER BY nombre_categoria ASC;`;
-    const result = await db.query(query);
-    return result.rows;
-};
-
-const crearProducto = async (productoData) => {
-    const { id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen } = productoData;
-    const query = `
-        INSERT INTO producto (id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen)
-        VALUES ($1, $2, $3, $4, $5) RETURNING *;
-    `;
-    const result = await db.query(query, [id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen || null]);
-    return result.rows[0];
-};
-
-const obtenerProductos = async () => {
-    const query = `
-        SELECT 
-            p.*, 
+// ─── FIX DEFINITIVO: INNER JOIN → solo muestra productos de ESA sucursal ───
+const obtenerProductos = async (id_sucursal = 1) => {
+    const r = await db.query(`
+        SELECT
+            p.id_producto,
+            p.nombre_producto,
+            p.descripcion_producto,
+            p.precio_unitario,
+            p.url_imagen,
+            p.estado_activo,
+            c.id_categoria,
             c.nombre_categoria,
-            COALESCE(i.cantidad_actual, 0) AS stock_actual
+            i.cantidad_actual   AS stock_actual,
+            i.stock_minimo_alerta
         FROM producto p
-        LEFT JOIN categoria_producto c ON p.id_categoria = c.id_categoria
-        LEFT JOIN inventario_sucursal i ON p.id_producto = i.id_producto AND i.id_sucursal = 1
+        JOIN categoria_producto   c ON p.id_categoria = c.id_categoria
+        JOIN inventario_sucursal  i ON i.id_producto  = p.id_producto
+                                   AND i.id_sucursal  = $1
         WHERE p.estado_activo = TRUE
-        ORDER BY p.id_producto DESC;
-    `;
-    const result = await db.query(query);
-    return result.rows;
+        ORDER BY c.nombre_categoria ASC, p.nombre_producto ASC
+    `, [id_sucursal]);
+    return r.rows;
 };
 
-const eliminarProducto = async (id_producto) => {
-    const query = `UPDATE producto SET estado_activo = FALSE WHERE id_producto = $1 RETURNING *;`;
-    const result = await db.query(query, [id_producto]);
-    return result.rows[0];
-};
+const eliminarProducto = async (id) =>
+    (await db.query(`UPDATE producto SET estado_activo=FALSE WHERE id_producto=$1 RETURNING *`,[id])).rows[0];
 
-// ACTUALIZADO: incluye url_imagen
-const actualizarProducto = async (id_producto, productoData) => {
-    const { id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen } = productoData;
-    const query = `
-        UPDATE producto 
-        SET id_categoria = $1, nombre_producto = $2, descripcion_producto = $3, 
-            precio_unitario = $4, url_imagen = $5
-        WHERE id_producto = $6 
-        RETURNING *;
-    `;
-    const result = await db.query(query, [id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen || null, id_producto]);
-    return result.rows[0];
-};
-
-const agregarStock = async (id_producto, cantidad_agregada) => {
-    const checkQuery = `SELECT * FROM inventario_sucursal WHERE id_sucursal = 1 AND id_producto = $1`;
-    const checkResult = await db.query(checkQuery, [id_producto]);
-    if (checkResult.rows.length > 0) {
-        const updateQuery = `
-            UPDATE inventario_sucursal 
-            SET cantidad_actual = cantidad_actual + $2 
-            WHERE id_sucursal = 1 AND id_producto = $1 
-            RETURNING *;
-        `;
-        const result = await db.query(updateQuery, [id_producto, cantidad_agregada]);
-        return result.rows[0];
+const actualizarProducto = async (id, { id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen }) => {
+    const vals  = [id_categoria, nombre_producto, descripcion_producto, precio_unitario, id];
+    let   query = `UPDATE producto
+                   SET id_categoria=$1, nombre_producto=$2, descripcion_producto=$3, precio_unitario=$4`;
+    if (url_imagen !== undefined && url_imagen !== null) {
+        vals.splice(4, 0, url_imagen);
+        query += `, url_imagen=$5 WHERE id_producto=$6 RETURNING *`;
     } else {
-        const insertQuery = `
-            INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) 
-            VALUES (1, $1, $2) RETURNING *;
-        `;
-        const result = await db.query(insertQuery, [id_producto, cantidad_agregada]);
-        return result.rows[0];
+        query += ` WHERE id_producto=$5 RETURNING *`;
     }
+    return (await db.query(query, vals)).rows[0];
 };
 
-module.exports = { crearCategoria, obtenerCategorias, crearProducto, obtenerProductos, eliminarProducto, actualizarProducto, agregarStock };
+// ─── Agregar o actualizar stock para una sucursal específica ───
+const agregarStock = async (id_producto, cantidad, id_sucursal = 1) => {
+    // Upsert: si existe el registro actualiza, si no existe lo crea
+    const r = await db.query(`
+        INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual, stock_minimo_alerta)
+        VALUES ($1, $2, $3, 5)
+        ON CONFLICT (id_sucursal, id_producto)
+        DO UPDATE SET cantidad_actual = inventario_sucursal.cantidad_actual + $3
+        RETURNING *
+    `, [id_sucursal, id_producto, cantidad]);
+    return r.rows[0];
+};
+
+// ─── Crear entrada en inventario con stock 0 (para asignar producto a sucursal) ───
+const asignarProductoASucursal = async (id_producto, id_sucursal, stock_inicial = 0) => {
+    const r = await db.query(`
+        INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual, stock_minimo_alerta)
+        VALUES ($1, $2, $3, 5)
+        ON CONFLICT (id_sucursal, id_producto)
+        DO UPDATE SET cantidad_actual = $3
+        RETURNING *
+    `, [id_sucursal, id_producto, stock_inicial]);
+    return r.rows[0];
+};
+
+module.exports = {
+    crearCategoria,
+    obtenerCategorias,
+    crearProducto,
+    obtenerProductos,
+    eliminarProducto,
+    actualizarProducto,
+    agregarStock,
+    asignarProductoASucursal
+};

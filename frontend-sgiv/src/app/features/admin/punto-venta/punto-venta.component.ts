@@ -157,17 +157,25 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   }
 
   // ─── CATÁLOGO ───
-  cargarCatalogo() {
-    this.cargando = true;
-    this.productoService.obtenerInventario().subscribe({
-      next: (datos: any[]) => {
-        this.productosDisponibles = datos.filter(p => Number(p.stock_actual) > 0);
-        this.cargando = false;
-        this.cdr.detectChanges();
-      },
-      error: () => { this.cargando = false; this.cdr.detectChanges(); }
-    });
-  }
+cargarCatalogo() {
+  this.cargando = true;
+
+  // FIX: usar la sucursal del usuario logueado
+  const id_sucursal = this.usuarioActual?.id_sucursal || 1;
+
+  this.productoService.obtenerInventario(id_sucursal).subscribe({
+    next: (datos: any[]) => {
+      // Solo productos con stock disponible en ESA sucursal
+      this.productosDisponibles = datos.filter(p => Number(p.stock_actual) > 0);
+      this.cargando = false;
+      this.cdr.detectChanges();
+    },
+    error: () => {
+      this.cargando = false;
+      this.cdr.detectChanges();
+    }
+  });
+}
 
   // ─── CARRITO ───
   agregarAlCarrito(producto: any) {
@@ -220,42 +228,56 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.registrarVenta();
   }
 
-  registrarVenta() {
-    this.cargando = true;
-    const payload = {
-      id_sucursal:      this.usuarioActual?.id_sucursal || 1,
-      id_usuario_cajero: this.usuarioActual?.id_usuario,
-      id_cliente:       null,
-      id_pedido_mesa:   null,
-      monto_total_venta: this.total,
-      metodo_pago:      this.metodoPago,
-      detalles: this.carrito.map(i => ({
-        id_producto: i.id_producto,
-        cantidad:    i.cantidad,
-        precio:      i.precio_unitario,
-        subtotal:    i.subtotal
-      }))
-    };
+registrarVenta() {
+  this.cargando = true;
 
-    this.http.post<any>(`${this.apiUrl}/caja/cobrar`, payload, { headers: this.headers() }).subscribe({
-      next: (res) => {
-        this.datosTicket   = { id_venta: res.id_venta, items: [...this.carrito], total: this.total, metodo: this.metodoPago, cambio: this.cambio };
-        this.fechaTicket   = new Date();
-        this.mostrarTicket = true;
-        this.carrito       = [];
-        this.total         = 0;
-        this.cargarCatalogo();
-        this.cargarVentasHoy();  // actualizar historial tras cada venta
-        this.cargando = false;
-        this.cdr.detectChanges();
-      },
-      error: () => {
-        alert('Error al registrar la venta.');
-        this.cargando = false;
-        this.cdr.detectChanges();
-      }
-    });
-  }
+  const datosVenta = {
+    id_sucursal:       this.usuarioActual?.id_sucursal || 1,
+    id_usuario_cajero: this.usuarioActual?.id_usuario,
+    id_cliente:        null,
+    id_pedido_mesa:    null,
+    monto_total_venta: this.total,
+    metodo_pago:       this.metodoPago,
+    detalles: this.carrito.map(item => ({
+      id_producto: item.id_producto,
+      cantidad:    item.cantidad,
+      precio:      Number(item.precio_unitario),
+      subtotal:    Number(item.subtotal)
+    }))
+  };
+
+  this.http.post<any>(
+    `${this.apiUrl}/caja/cobrar`,
+    datosVenta,
+    { headers: this.headers() }
+  ).subscribe({
+    next: (res) => {
+      this.datosTicket = {
+        id_venta: res.id_venta,
+        items:    [...this.carrito],
+        total:    this.total,
+        metodo:   this.metodoPago,
+        cambio:   this.cambio
+      };
+      this.fechaTicket   = new Date();
+      this.mostrarTicket = true;
+      this.carrito       = [];
+      this.total         = 0;
+      this.cargarCatalogo();
+      this.cargarVentasHoy();
+      this.cargando = false;
+      this.cdr.detectChanges();
+    },
+    error: (e: any) => {
+      // FIX: mostrar el error real del backend
+      const msg = e?.error?.detalle || e?.error?.error || 'Error desconocido al registrar la venta.';
+      console.error('Error venta:', msg);
+      alert(`Error al registrar: ${msg}`);
+      this.cargando = false;
+      this.cdr.detectChanges();
+    }
+  });
+}
 
   // ─── HISTORIAL VENTAS DEL DÍA ───
   cargarVentasHoy() {
