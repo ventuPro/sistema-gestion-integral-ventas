@@ -84,17 +84,23 @@
                 🔒 Caja Cerrada
               </span>
             </ng-container>
-            <span *ngIf="usr.id_rol !== 2" class="text-gray-300 text-xs">—</span>
+            <span *ngIf="+usr.id_rol !== 2" class="text-gray-300 text-xs">—</span>
           </td>
 
           <td class="px-4 py-3">
             <div class="flex items-center justify-center gap-2 flex-wrap">
               <button (click)="abrirModalEditar(usr)"       class="text-blue-500 hover:text-blue-700 font-medium text-xs">Editar</button>
               <button *ngIf="usr.estado_activo" (click)="abrirModalContrasena(usr)" class="text-amber-600 hover:text-amber-800 font-medium text-xs">Contraseña</button>
-              <!-- NUEVO: Solo para cajeros/cocina, no para admins -->
-              <button *ngIf="usr.estado_activo && usr.id_rol !== 1"
+              <!-- Solo cajeros (id_rol === 2); cocina tiene rol fijo sin permisos configurables -->
+              <button *ngIf="usr.estado_activo && +usr.id_rol === 2"
                       (click)="abrirModalPermisos(usr)"
-                      class="text-indigo-600 hover:text-indigo-800 font-medium text-xs">Permisos</button>
+                      class="font-medium text-xs text-indigo-600 hover:text-indigo-800 transition-colors">
+                Permisos
+              </button>
+              <span *ngIf="usr.estado_activo && +usr.id_rol === 3"
+                    class="text-xs text-gray-400 italic">
+                Rol fijo
+              </span>
 
               <!-- Dentro del div de acciones, para cajeros activos -->
               <button *ngIf="+usr.id_rol === 2 && usr.estado_activo"

@@ -19,6 +19,7 @@ export class DashboardComponent implements OnInit {
   usuario: any  = null;
   esAdmin       = false;
   esCajero      = false;
+  nombreSucursal    = '';
 
   ngOnInit() {
     const raw = localStorage.getItem('usuario_sgiv');
@@ -26,6 +27,7 @@ export class DashboardComponent implements OnInit {
       this.usuario  = JSON.parse(raw);
       this.esAdmin  = this.usuario.id_rol === 1;
       this.esCajero = this.usuario.id_rol === 2;
+      this.nombreSucursal = this.usuario.nombre_sucursal || '';
     }
   }
 

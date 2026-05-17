@@ -41,7 +41,17 @@ export class CuentaService {
   }
 
   getQR(id_mesa: number): Observable<any> {
-    const base = `${window.location.protocol}//${window.location.hostname}:4200`;
-    return this.http.get<any>(`${this.apiUrl}/mesas/${id_mesa}/qr?base_url=${base}`, { headers: this.h() });
-  }
+  // Construir la URL base del frontend correctamente
+  const protocol = window.location.protocol;
+  const hostname  = window.location.hostname;
+  const port      = window.location.port;
+
+  // URL que el celular del cliente usará para escanear el QR
+  const frontendBase = port
+    ? `${protocol}//${hostname}:${port}`
+    : `${protocol}//${hostname}`;
+
+  const url = `${this.apiUrl}/mesas/${id_mesa}/qr?base_url=${encodeURIComponent(frontendBase)}`;
+  return this.http.get<any>(url, { headers: this.h() });
+}
 }

@@ -12,18 +12,18 @@ import { Subscription } from 'rxjs';
   templateUrl: './mesa-modal.component.html'
 })
 export class MesaModalComponent implements OnInit, OnDestroy {
-  @Input()  mesa:       any = null;  // La mesa seleccionada
-  @Output() cerrado     = new EventEmitter<void>();
-  @Output() mesaActualizada = new EventEmitter<void>();
+  @Input()  mesa:             any = null;
+  @Output() cerrado           = new EventEmitter<void>();
+  @Output() mesaActualizada   = new EventEmitter<void>();
 
   private cuentaService = inject(CuentaService);
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
 
-  // Estado
+  // Estado general
   cargando        = false;
   cuentaActiva:   any = null;
-  vista: 'info' | 'comanda' | 'pago' | 'qr' = 'info';
+  vista: 'info' | 'comanda' | 'pago' | 'qr' | 'ticket' = 'info';
 
   // Catálogo
   productos:      any[] = [];
@@ -34,14 +34,19 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   // Pago
   metodoPago      = 'Efectivo';
   montoPagado     = 0;
-  get cambio(): number { return Math.max(0, this.montoPagado - (this.cuentaActiva?.total_acumulado || 0)); }
+  get cambio(): number {
+    return Math.max(0, this.montoPagado - Number(this.cuentaActiva?.total_acumulado || 0));
+  }
+
+  // Ticket (igual que POS)
+  datosTicket: any = null;
+  fechaTicket = new Date();
 
   // QR
   qrData: any = null;
 
-  // Notas
-  notaProducto    = '';
-  productoSeleccionado: any = null;
+  // Nota por producto
+  notaProducto = '';
 
   private subs: Subscription[] = [];
 
@@ -55,21 +60,19 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     this.subs.forEach(s => s.unsubscribe());
   }
 
+  // ─── SOCKET: actualizar total cuando llega un pedido QR ───
   private escucharSocket() {
-    // Cuando llegue un pedido QR de esta mesa, actualizar la comanda
     const sub = this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
-      if (data.id_mesa === this.mesa?.id_mesa) {
-        this.cuentaActiva = {
-          ...this.cuentaActiva,
-          total_acumulado: data.total_acumulado,
-          items: data.items
-        };
+      if (data.id_mesa === this.mesa?.id_mesa && data.items) {
+        this.cuentaActiva.items          = data.items;
+        this.cuentaActiva.total_acumulado = data.total_acumulado;
         this.cdr.detectChanges();
       }
     });
     this.subs.push(sub);
   }
 
+  // ─── Carga inicial (solo una vez o al abrir) ───
   cargarEstadoMesa() {
     this.cargando = true;
     this.cuentaService.getCuentaActiva(this.mesa.id_mesa).subscribe({
@@ -79,16 +82,16 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         this.cargando     = false;
         this.cdr.detectChanges();
       },
-      error: () => { this.cargando = false; }
+      error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
 
   cargarProductos() {
     this.cuentaService.getProductos().subscribe({
-      next: (prods) => {
-        this.productos = prods.filter((p: any) => (p.stock_actual || 0) > 0);
+      next: (prods: any[]) => {
+        this.productos = prods.filter(p => Number(p.stock_actual) > 0);
         const cats = new Map();
-        this.productos.forEach((p: any) => cats.set(p.id_categoria, p.nombre_categoria));
+        this.productos.forEach(p => cats.set(p.id_categoria, p.nombre_categoria));
         this.categorias = Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre }));
         this.cdr.detectChanges();
       }
@@ -97,9 +100,9 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   get productosFiltrados(): any[] {
     return this.productos.filter(p => {
-      const porCategoria = !this.categoriaFiltro || p.id_categoria === this.categoriaFiltro;
-      const porBusqueda  = !this.busqueda || p.nombre_producto.toLowerCase().includes(this.busqueda.toLowerCase());
-      return porCategoria && porBusqueda;
+      const porCat    = !this.categoriaFiltro || p.id_categoria === this.categoriaFiltro;
+      const porNombre = !this.busqueda || p.nombre_producto.toLowerCase().includes(this.busqueda.toLowerCase());
+      return porCat && porNombre;
     });
   }
 
@@ -114,66 +117,120 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         this.mesaActualizada.emit();
         this.cdr.detectChanges();
       },
-      error: (e) => {
+      error: (e: any) => {
         alert(e?.error?.error || 'Error al abrir la mesa');
         this.cargando = false;
       }
     });
   }
 
-  // ─── AGREGAR PRODUCTO A LA COMANDA ───
+  // ─── AGREGAR PRODUCTO — SIN PARPADEO ───
   agregarProducto(producto: any) {
     if (!this.cuentaActiva) return;
 
+    const precio = Number(producto.precio_unitario);
+
     this.cuentaService.agregarProducto(this.cuentaActiva.id_cuenta, {
-      id_producto:    producto.id_producto,
-      cantidad:       1,
-      precio_unitario: Number(producto.precio_unitario),
+      id_producto:     producto.id_producto,
+      cantidad:        1,
+      precio_unitario: precio,
       nota:            this.notaProducto || undefined
     }).subscribe({
-      next: (res) => {
-        // Actualizar la lista de items y el total
-        this.cargarEstadoMesa();
+      next: (res: any) => {
+        // FIX: actualizar estado local sin recargar del servidor
+        if (!this.cuentaActiva.items) this.cuentaActiva.items = [];
+
+        const itemExistente = this.cuentaActiva.items.find(
+          (i: any) => i.id_producto === producto.id_producto && i.origen === 'cajero'
+        );
+
+        if (itemExistente) {
+          itemExistente.cantidad++;
+          itemExistente.subtotal = itemExistente.cantidad * precio;
+        } else {
+          this.cuentaActiva.items.push({
+            id_detalle_cuenta: res.detalle?.id_detalle_cuenta,
+            id_producto:       producto.id_producto,
+            nombre_producto:   producto.nombre_producto,
+            url_imagen:        producto.url_imagen,
+            precio_unitario:   precio,
+            cantidad:          1,
+            subtotal:          precio,
+            nota:              this.notaProducto || null,
+            origen:            'cajero'
+          });
+        }
+
+        // Actualizar total desde respuesta del backend
+        this.cuentaActiva.total_acumulado = res.total ?? this.calcularTotalLocal();
         this.notaProducto = '';
         this.cdr.detectChanges();
       },
-      error: (e) => alert(e?.error?.error || 'Error al agregar producto')
+      error: (e: any) => alert(e?.error?.error || 'Error al agregar producto')
     });
   }
 
-  // ─── QUITAR PRODUCTO ───
+  // ─── QUITAR PRODUCTO — SIN PARPADEO ───
   quitarProducto(id_detalle: number) {
-    if (!confirm('¿Quitar este producto de la comanda?')) return;
+    if (!confirm('¿Quitar este producto?')) return;
+
     this.cuentaService.quitarProducto(id_detalle).subscribe({
-      next: () => this.cargarEstadoMesa(),
-      error: (e) => alert(e?.error?.error || 'Error al quitar producto')
+      next: (res: any) => {
+        // FIX: quitar del estado local sin recargar
+        this.cuentaActiva.items = this.cuentaActiva.items.filter(
+          (i: any) => i.id_detalle_cuenta !== id_detalle
+        );
+        this.cuentaActiva.total_acumulado = res.total ?? this.calcularTotalLocal();
+        this.cdr.detectChanges();
+      },
+      error: (e: any) => alert(e?.error?.error || 'Error al quitar producto')
     });
   }
 
-  // ─── IR A PAGO ───
+  private calcularTotalLocal(): number {
+    return this.cuentaActiva?.items?.reduce(
+      (s: number, i: any) => s + Number(i.subtotal), 0
+    ) || 0;
+  }
+
+  // ─── PAGO ───
   irAPago() {
-    this.montoPagado = this.cuentaActiva?.total_acumulado || 0;
+    this.montoPagado = Number(this.cuentaActiva?.total_acumulado || 0);
     this.vista = 'pago';
   }
 
-  // ─── CERRAR CUENTA ───
   confirmarPago() {
-    if (this.metodoPago === 'Efectivo' && this.montoPagado < (this.cuentaActiva?.total_acumulado || 0)) {
-      alert('El monto pagado es insuficiente'); return;
+    if (this.metodoPago === 'Efectivo' &&
+        this.montoPagado < Number(this.cuentaActiva?.total_acumulado || 0)) {
+      alert('El monto es insuficiente'); return;
     }
 
     const usr         = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
     const id_sucursal = usr.id_sucursal || 1;
 
     this.cargando = true;
-    this.cuentaService.cerrarCuenta(this.cuentaActiva.id_cuenta, this.metodoPago, id_sucursal).subscribe({
-      next: (res) => {
-        this.cargando = false;
+    this.cuentaService.cerrarCuenta(
+      this.cuentaActiva.id_cuenta,
+      this.metodoPago,
+      id_sucursal
+    ).subscribe({
+      next: (res: any) => {
+        // FIX 3: guardar datos del ticket igual que en POS
+        this.datosTicket = {
+          id_venta:     res.id_venta,
+          numero_mesa:  this.mesa.numero_mesa,
+          items:        [...(this.cuentaActiva?.items || [])],
+          total:        this.cuentaActiva?.total_acumulado,
+          metodo:       this.metodoPago,
+          cambio:       this.cambio
+        };
+        this.fechaTicket = new Date();
+        this.cargando    = false;
+        this.vista       = 'ticket';  // ← mostrar ticket antes de cerrar
         this.mesaActualizada.emit();
-        window.print(); // imprimir ticket
-        this.cerrarModal();
+        this.cdr.detectChanges();
       },
-      error: (e) => {
+      error: (e: any) => {
         alert(e?.error?.error || 'Error al cerrar la cuenta');
         this.cargando = false;
       }
@@ -193,10 +250,12 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   descargarQR() {
     if (!this.qrData) return;
     const a = document.createElement('a');
-    a.href = this.qrData.qr;
+    a.href     = this.qrData.qr;
     a.download = `QR_Mesa_${this.mesa.numero_mesa}.png`;
     a.click();
   }
+
+  imprimirTicket() { window.print(); }
 
   cerrarModal() { this.cerrado.emit(); }
 }

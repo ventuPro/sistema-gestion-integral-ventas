@@ -110,10 +110,20 @@ const cobrarVenta = async (req, res) => {
         const datosVenta = req.body;
         datosVenta.id_usuario_cajero = req.usuario.id_usuario;
         const id_venta = await cajaModel.registrarVenta(datosVenta);
-        res.status(201).json({ mensaje: 'Venta registrada con éxito', id_venta });
-    } catch (e) {
-        console.error('Error en cobrarVenta:', e);
-        res.status(500).json({ error: 'Error al registrar la venta.' });
+
+        // Notificar al menú digital que el stock cambió
+        io()?.emit('stock:actualizado', {
+            id_sucursal: datosVenta.id_sucursal,
+            productos:   datosVenta.detalles.map(d => ({
+                id_producto: d.id_producto,
+                cantidad_vendida: d.cantidad
+            }))
+        });
+
+        res.status(201).json({ mensaje: 'Venta registrada', id_venta });
+    } catch(e) {
+        console.error('cobrarVenta:', e);
+        res.status(500).json({ error: e.message });
     }
 };
 

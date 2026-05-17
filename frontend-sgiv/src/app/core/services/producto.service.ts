@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
@@ -8,36 +8,56 @@ export class ProductoService {
   private apiUrl = environment.apiUrl;
   constructor(private http: HttpClient) {}
 
-  private headers(): HttpHeaders {
+  private h(): HttpHeaders {
     return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
   }
 
-  obtenerInventario(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/catalogo/productos?t=${Date.now()}`, { headers: this.headers() });
+  // FIX: acepta id_sucursal para filtrar stock correcto
+  obtenerInventario(id_sucursal = 1): Observable<any[]> {
+    return this.http.get<any[]>(
+      `${this.apiUrl}/catalogo/productos?id_sucursal=${id_sucursal}`,
+      { headers: this.h() }
+    );
   }
 
-  crearProducto(data: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/catalogo/productos`, data, { headers: this.headers() });
+  obtenerCategorias(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/catalogo/categorias`, { headers: this.h() });
   }
 
-  actualizarProducto(id: number, data: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, data, { headers: this.headers() });
+  crearCategoria(datos: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/catalogo/categorias`, datos, { headers: this.h() });
+  }
+
+  // FIX: usa FormData para subir archivos (o JSON si no hay imagen)
+  crearProducto(datos: any, archivo?: File): Observable<any> {
+    if (archivo) {
+      const form = new FormData();
+      Object.entries(datos).forEach(([k, v]) => { if (v != null) form.append(k, String(v)); });
+      form.append('imagen', archivo);
+      return this.http.post(`${this.apiUrl}/catalogo/productos`, form, { headers: new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`) });
+    }
+    return this.http.post(`${this.apiUrl}/catalogo/productos`, datos, { headers: this.h() });
+  }
+
+  actualizarProducto(id: number, datos: any, archivo?: File): Observable<any> {
+    if (archivo) {
+      const form = new FormData();
+      Object.entries(datos).forEach(([k, v]) => { if (v != null) form.append(k, String(v)); });
+      form.append('imagen', archivo);
+      return this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, form, { headers: new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`) });
+    }
+    return this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, datos, { headers: this.h() });
   }
 
   eliminarProducto(id: number): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/catalogo/productos/${id}`, { headers: this.headers() });
+    return this.http.delete(`${this.apiUrl}/catalogo/productos/${id}`, { headers: this.h() });
   }
 
-  ingresarStock(id: number, cantidad: number): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/catalogo/productos/${id}/stock`, { cantidad }, { headers: this.headers() });
-  }
-
-  obtenerCategorias(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/catalogo/categorias`, { headers: this.headers() });
-  }
-
-  // NUEVO
-  crearCategoria(nombre_categoria: string, descripcion_categoria: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/catalogo/categorias`, { nombre_categoria, descripcion_categoria }, { headers: this.headers() });
+  agregarStock(id_producto: number, cantidad: number, id_sucursal = 1): Observable<any> {
+    return this.http.patch(
+      `${this.apiUrl}/catalogo/productos/${id_producto}/stock`,
+      { cantidad, id_sucursal },
+      { headers: this.h() }
+    );
   }
 }

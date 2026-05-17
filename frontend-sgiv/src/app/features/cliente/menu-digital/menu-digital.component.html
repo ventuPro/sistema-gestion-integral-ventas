@@ -1,32 +1,41 @@
 <div class="min-h-screen bg-gray-50 font-sans max-w-md mx-auto">
 
-  <!-- Cargando inicial -->
-  <div *ngIf="cargando" class="flex flex-col items-center justify-center min-h-screen gap-4">
+  <!-- Sin mesa válida -->
+  <div *ngIf="!id_mesa" class="flex flex-col items-center justify-center min-h-screen text-center p-8">
+    <div class="text-6xl mb-4">❌</div>
+    <h2 class="text-xl font-bold text-gray-700">Mesa no válida</h2>
+    <p class="text-gray-500 text-sm mt-2">El código QR no es correcto.</p>
+  </div>
+
+  <!-- Cargando -->
+  <div *ngIf="id_mesa && cargando" class="flex flex-col items-center justify-center min-h-screen gap-4">
     <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
     <p class="text-gray-500 text-sm">Cargando menú...</p>
   </div>
 
-  <ng-container *ngIf="!cargando">
+  <ng-container *ngIf="id_mesa && !cargando">
 
     <!-- Header -->
-    <div class="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-5 py-6 sticky top-0 z-30 shadow-lg">
-      <h1 class="text-2xl font-black">Pastelería Ricky's</h1>
-      <p class="text-blue-200 text-sm mt-0.5" *ngIf="infoMesa">
+    <div class="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-5 py-5 sticky top-0 z-30 shadow-lg">
+      <h1 class="text-xl font-black">Pastelería Ricky's</h1>
+      <p class="text-blue-200 text-sm" *ngIf="infoMesa">
         Mesa {{ infoMesa.numero_mesa }} — {{ infoMesa.nombre_sucursal }}
       </p>
-      <div class="flex mt-4 bg-blue-800/50 rounded-xl p-1 gap-1">
+
+      <!-- Navegación -->
+      <div class="flex mt-3 bg-blue-800/50 rounded-xl p-1 gap-1">
         <button (click)="vistaActual = 'catalogo'"
+                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center"
                 [class.bg-white]="vistaActual === 'catalogo'"
                 [class.text-blue-700]="vistaActual === 'catalogo'"
-                [class.text-blue-200]="vistaActual !== 'catalogo'"
-                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center">
+                [class.text-blue-200]="vistaActual !== 'catalogo'">
           🍽 Menú
         </button>
         <button (click)="vistaActual = 'carrito'"
+                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center relative"
                 [class.bg-white]="vistaActual === 'carrito'"
                 [class.text-blue-700]="vistaActual === 'carrito'"
-                [class.text-blue-200]="vistaActual !== 'carrito'"
-                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center relative">
+                [class.text-blue-200]="vistaActual !== 'carrito'">
           🛒 Carrito
           <span *ngIf="cantidadTotal > 0"
                 class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
@@ -34,63 +43,84 @@
           </span>
         </button>
         <button *ngIf="pedidoActual" (click)="vistaActual = 'tracking'"
+                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center"
                 [class.bg-white]="vistaActual === 'tracking'"
                 [class.text-blue-700]="vistaActual === 'tracking'"
-                [class.text-blue-200]="vistaActual !== 'tracking'"
-                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center">
-          📍 Mi Pedido
+                [class.text-blue-200]="vistaActual !== 'tracking'">
+          📍 Estado
         </button>
       </div>
     </div>
 
     <!-- ════ CATÁLOGO ════ -->
-    <div *ngIf="vistaActual === 'catalogo'" class="pb-24">
+    <div *ngIf="vistaActual === 'catalogo'" class="pb-28">
 
-      <!-- Filtro categorías -->
-      <div class="flex gap-2 px-4 py-3 overflow-x-auto sticky top-36 bg-gray-50 z-20 border-b border-gray-200">
+      <!-- Buscador -->
+      <div class="px-4 pt-3 pb-1">
+        <input type="text" [(ngModel)]="busqueda"
+               placeholder="🔍 Buscar productos..."
+               class="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 bg-white shadow-sm">
+      </div>
+
+      <!-- Categorías -->
+      <div class="flex gap-2 px-4 py-2 overflow-x-auto">
         <button (click)="categoriaActiva = null"
+                class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors"
                 [class.bg-blue-600]="categoriaActiva === null" [class.text-white]="categoriaActiva === null"
-                [class.bg-white]="categoriaActiva !== null"   [class.text-gray-600]="categoriaActiva !== null"
-                class="flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 transition-colors whitespace-nowrap shadow-sm">
+                [class.bg-white]="categoriaActiva !== null" [class.text-gray-600]="categoriaActiva !== null">
           Todos
         </button>
         <button *ngFor="let cat of categorias"
                 (click)="categoriaActiva = cat.id"
+                class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors whitespace-nowrap"
                 [class.bg-blue-600]="categoriaActiva === cat.id" [class.text-white]="categoriaActiva === cat.id"
-                [class.bg-white]="categoriaActiva !== cat.id"   [class.text-gray-600]="categoriaActiva !== cat.id"
-                class="flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 transition-colors whitespace-nowrap shadow-sm">
+                [class.bg-white]="categoriaActiva !== cat.id" [class.text-gray-600]="categoriaActiva !== cat.id">
           {{ cat.nombre }}
         </button>
       </div>
 
+      <!-- Sin productos -->
       <div *ngIf="catalogoFiltrado.length === 0" class="text-center py-16 text-gray-400">
         <div class="text-5xl mb-3">😔</div>
         <p>Sin productos disponibles</p>
       </div>
 
-      <div class="grid grid-cols-2 gap-3 p-4">
+      <!-- Grid productos -->
+      <div class="grid grid-cols-2 gap-3 px-4 pb-4">
         <div *ngFor="let prod of catalogoFiltrado"
              class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col">
-          <div class="relative h-32 bg-gradient-to-br from-blue-50 to-blue-100">
-            <img *ngIf="prod.url_imagen" [src]="prod.url_imagen" [alt]="prod.nombre_producto"
+
+          <!-- Imagen -->
+          <div class="relative h-32 bg-blue-50">
+            <img *ngIf="prod.url_imagen"
+                 [src]="getImagenUrl(prod.url_imagen)"
+                 [alt]="prod.nombre_producto"
                  class="w-full h-full object-cover">
             <div *ngIf="!prod.url_imagen"
-                 class="w-full h-full flex items-center justify-center text-4xl font-bold text-blue-300">
+                 class="w-full h-full flex items-center justify-center text-4xl font-bold text-blue-200">
               {{ prod.nombre_producto?.charAt(0) }}
             </div>
-            <span class="absolute top-2 right-2 bg-white/90 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full shadow">
-              {{ prod.stock_actual }} disp.
+            <span class="absolute top-2 right-2 bg-white/90 text-xs font-bold px-2 py-0.5 rounded-full shadow"
+                  [class.text-green-600]="prod.stock_actual > 5"
+                  [class.text-orange-500]="prod.stock_actual > 0 && prod.stock_actual <= 5"
+                  [class.text-red-500]="prod.stock_actual === 0">
+              {{ prod.stock_actual === 0 ? 'Agotado' : prod.stock_actual + ' disp.' }}
             </span>
           </div>
+
+          <!-- Info -->
           <div class="p-3 flex flex-col flex-1">
             <p class="font-bold text-gray-800 text-sm leading-tight mb-1">{{ prod.nombre_producto }}</p>
-            <p *ngIf="prod.descripcion_producto" class="text-xs text-gray-500 mb-2 leading-tight">
+            <p *ngIf="prod.descripcion_producto" class="text-xs text-gray-400 mb-2 leading-tight line-clamp-2">
               {{ prod.descripcion_producto }}
             </p>
             <p class="text-blue-700 font-black text-base mt-auto">Bs. {{ prod.precio_unitario }}</p>
-            <button (click)="agregarAlCarrito(prod)" [disabled]="prod.stock_actual <= 0"
-                    class="mt-2 w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-bold rounded-xl transition-colors">
-              + Agregar
+            <button (click)="agregarAlCarrito(prod)"
+                    [disabled]="prod.stock_actual <= 0"
+                    class="mt-2 w-full py-2 font-bold rounded-xl transition-colors text-sm"
+                    [class.bg-blue-600]="prod.stock_actual > 0" [class.hover:bg-blue-700]="prod.stock_actual > 0" [class.text-white]="prod.stock_actual > 0"
+                    [class.bg-gray-200]="prod.stock_actual <= 0" [class.text-gray-400]="prod.stock_actual <= 0" [class.cursor-not-allowed]="prod.stock_actual <= 0">
+              {{ prod.stock_actual > 0 ? '+ Agregar' : 'Agotado' }}
             </button>
           </div>
         </div>
@@ -98,7 +128,7 @@
     </div>
 
     <!-- ════ CARRITO ════ -->
-    <div *ngIf="vistaActual === 'carrito'" class="pb-24 p-4">
+    <div *ngIf="vistaActual === 'carrito'" class="pb-28 p-4">
 
       <div *ngIf="carrito.length === 0" class="text-center py-16 text-gray-400">
         <div class="text-5xl mb-3">🛒</div>
@@ -111,55 +141,51 @@
       <div *ngIf="carrito.length > 0" class="space-y-3">
         <h2 class="text-xl font-bold text-gray-800 mb-4">Tu pedido</h2>
 
-        <div *ngFor="let item of carrito"
-             class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div class="flex gap-3 mb-3">
+        <div *ngFor="let item of carrito" class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div class="flex gap-3 mb-2">
             <div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-blue-50">
-              <img *ngIf="item.url_imagen" [src]="item.url_imagen" class="w-full h-full object-cover">
-              <div *ngIf="!item.url_imagen"
-                   class="w-full h-full flex items-center justify-center text-blue-300 font-bold text-xl">
+              <img *ngIf="item.url_imagen" [src]="getImagenUrl(item.url_imagen)" class="w-full h-full object-cover">
+              <div *ngIf="!item.url_imagen" class="w-full h-full flex items-center justify-center text-blue-200 font-black text-xl">
                 {{ item.nombre_producto?.charAt(0) }}
               </div>
             </div>
             <div class="flex-1">
               <p class="font-bold text-gray-800">{{ item.nombre_producto }}</p>
-              <p class="text-blue-700 font-black">Bs. {{ (item.precio_unitario * item.cantidad).toFixed(2) }}</p>
+              <p class="text-blue-700 font-black">Bs. {{ (Number(item.precio_unitario) * item.cantidad).toFixed(2) }}</p>
             </div>
-            <!-- FIX: botones con métodos del componente -->
             <div class="flex items-center gap-2 flex-shrink-0">
               <button (click)="decrementarItem(item)"
-                      class="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold flex items-center justify-center transition-colors">
+                      class="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold flex items-center justify-center">
                 −
               </button>
-              <span class="font-black text-gray-800 w-6 text-center">{{ item.cantidad }}</span>
+              <span class="font-black text-gray-800 w-5 text-center">{{ item.cantidad }}</span>
               <button (click)="incrementarItem(item)"
-                      class="w-7 h-7 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center transition-colors">
+                      class="w-7 h-7 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center">
                 +
               </button>
             </div>
           </div>
           <input type="text" [(ngModel)]="item.nota_cliente"
                  [name]="'nota_' + item.id_producto"
-                 placeholder="Observación (opcional): ej. sin azúcar..."
-                 class="w-full px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 outline-none focus:ring-2 focus:ring-amber-400 placeholder-amber-400">
+                 placeholder="Observación: sin azúcar, extra etc..."
+                 class="w-full px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 outline-none focus:ring-1 focus:ring-amber-400 placeholder-amber-300">
         </div>
 
         <!-- Observación general -->
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <label class="block text-sm font-semibold text-gray-700 mb-2">Observación general</label>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Observación general (opcional)</label>
           <textarea [(ngModel)]="observacionGeneral" rows="2"
-                    placeholder="Ej: somos 4 personas, traigan cubiertos extra..."
-                    class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                    placeholder="Ej: somos 3 personas..."
+                    class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-blue-500 resize-none"></textarea>
         </div>
 
         <!-- Total y enviar -->
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
           <div class="flex justify-between items-center mb-4">
-            <span class="font-bold text-gray-600">Total del pedido</span>
+            <span class="font-bold text-gray-600">Total</span>
             <span class="text-3xl font-black text-blue-700">Bs. {{ totalCarrito.toFixed(2) }}</span>
           </div>
-          <div *ngIf="errorEnvio"
-               class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm mb-3">
+          <div *ngIf="errorEnvio" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm mb-3">
             {{ errorEnvio }}
           </div>
           <button (click)="enviarPedido()" [disabled]="enviando"
@@ -172,12 +198,11 @@
     </div>
 
     <!-- ════ TRACKING ════ -->
-    <div *ngIf="vistaActual === 'tracking' && pedidoActual" class="pb-24 p-4">
-
-      <h2 class="text-xl font-bold text-gray-800 mb-5">Estado de tu pedido</h2>
+    <div *ngIf="vistaActual === 'tracking' && pedidoActual" class="pb-24 p-4 space-y-4">
+      <h2 class="text-xl font-bold text-gray-800">Estado de tu pedido</h2>
 
       <!-- Estado actual -->
-      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-center mb-5">
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-center">
         <ng-container *ngIf="getEstadoInfo(pedidoActual.estado) as info">
           <div class="text-6xl mb-3">{{ info.icon }}</div>
           <p class="text-xl font-black mb-1" [ngClass]="info.color">{{ info.label }}</p>
@@ -186,15 +211,15 @@
       </div>
 
       <!-- Timeline -->
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-5">
-        <h3 class="font-bold text-gray-700 mb-4">Progreso</h3>
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <h3 class="font-bold text-gray-700 mb-4 text-sm">Progreso del pedido</h3>
         <div class="space-y-3">
           <div *ngFor="let paso of [
             {key:'Pendiente_Cajero', label:'Esperando cajero',  icon:'⏳'},
             {key:'En_Cocina',        label:'En preparación',    icon:'🍳'},
             {key:'Listo',            label:'Listo para servir', icon:'✅'}
           ]" class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full flex items-center justify-center text-lg flex-shrink-0"
+            <div class="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0"
                  [class.bg-blue-600]="pedidoActual.estado === paso.key"
                  [class.bg-green-100]="pedidoActual.estado !== paso.key && isEstadoPasado(pedidoActual.estado, paso.key)"
                  [class.bg-gray-100]="!isEstadoPasado(pedidoActual.estado, paso.key) && pedidoActual.estado !== paso.key">
@@ -212,7 +237,7 @@
 
       <!-- Items del pedido -->
       <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <h3 class="font-bold text-gray-700 mb-3">Tu pedido</h3>
+        <h3 class="font-bold text-gray-700 mb-3 text-sm">Tu pedido</h3>
         <div *ngFor="let item of pedidoActual.items"
              class="flex justify-between py-2 border-b border-gray-100 last:border-0">
           <div>
@@ -222,7 +247,7 @@
           <div class="text-right ml-4">
             <span class="text-xs text-gray-500">×{{ item.cantidad }}</span>
             <span class="block text-sm font-bold text-blue-700">
-              Bs. {{ (item.precio_unitario * item.cantidad).toFixed(2) }}
+              Bs. {{ (Number(item.precio_unitario) * item.cantidad).toFixed(2) }}
             </span>
           </div>
         </div>
@@ -234,14 +259,14 @@
 
       <button *ngIf="pedidoActual.estado === 'Listo' || pedidoActual.estado === 'Cancelado'"
               (click)="pedidoActual = null; vistaActual = 'catalogo'"
-              class="mt-5 w-full py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-colors">
+              class="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-colors">
         Hacer otro pedido
       </button>
     </div>
 
   </ng-container>
 
-  <!-- Botón flotante carrito -->
+  <!-- Botón flotante del carrito -->
   <div *ngIf="vistaActual === 'catalogo' && cantidadTotal > 0"
        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-4">
     <button (click)="vistaActual = 'carrito'"

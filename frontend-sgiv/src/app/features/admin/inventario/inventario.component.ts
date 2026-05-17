@@ -1,55 +1,115 @@
 import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { ProductoService } from '../../../core/services/producto.service';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './inventario.component.html',
-  styleUrl: './inventario.component.css'
+  templateUrl: './inventario.component.html'
 })
 export class InventarioComponent implements OnInit {
   private productoService = inject(ProductoService);
-  private cdr = inject(ChangeDetectorRef);
+  private cdr             = inject(ChangeDetectorRef);
+  private http            = inject(HttpClient);
+  private apiUrl          = environment.apiUrl;
 
-  listaProductos: any[] = [];
-  listaProductosFiltrados: any[] = [];
-  listaCategorias: any[] = [];
-  cargando = true;
+  // ─── Usuario y sucursales ───
+  usuarioActual:         any   = null;
+  esAdmin                = false;
+  sucursales:            any[] = [];
+  sucursalSeleccionada:  any   = null;
 
-  // Filtros
-  categoriaFiltro: string = 'todas';
-  busqueda: string = '';
+  // ─── Productos e inventario ───
+  productos:             any[] = [];
+  productosFiltrados:    any[] = [];
+  categorias:            any[] = [];
+  cargando               = true;
 
-  // Modal CRUD
-  mostrarModal = false;
-  editandoId: number | null = null;
-  nuevoProducto: any = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '', url_imagen: '' };
-  imagenPreview: string = '';
+  // ─── Filtros ───
+  filtroCategoria:       number | null = null;
+  filtroBusqueda         = '';
 
-  // Modal Stock
-  mostrarModalStock = false;
-  productoSeleccionado: any = null;
-  cantidadIngreso = 0;
+  // ─── Modal Producto ───
+  mostrarModal           = false;
+  editandoId:            number | null = null;
+  errorModal             = '';
+  archivoImagen:         File | null = null;
+  previewImagen:         string | null = null;
+  formulario: any = {
+    nombre_producto: '', descripcion_producto: '',
+    precio_unitario: '', id_categoria: '',
+    stock_inicial: 0
+  };
 
-  // Modal Categorías
-  mostrarModalCategorias = false;
-  nuevaCategoria = { nombre_categoria: '', descripcion_categoria: '' };
-  cargandoCategoria = false;
-  mensajeCategoriaError = '';
+  // ─── Modal Stock ───
+  mostrarModalStock      = false;
+  productoStock:         any = null;
+  cantidadAgregar        = 0;
+  errorStock             = '';
 
-  ngOnInit() {
-    this.cargarInventario();
-    this.cargarCategorias();
+  // ─── Modal Categoría ───
+  mostrarModalCategoria  = false;
+  nombreCategoria        = '';
+  errorCategoria         = '';
+
+  private h(): HttpHeaders {
+    return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
   }
 
-  cargarInventario() {
+  ngOnInit() {
+    const raw = localStorage.getItem('usuario_sgiv');
+    this.usuarioActual = raw ? JSON.parse(raw) : null;
+    this.esAdmin       = this.usuarioActual?.id_rol === 1;
+
+    if (this.esAdmin) {
+      this.cargarSucursales();
+    } else {
+      // Cajero: solo su propia sucursal
+      this.sucursalSeleccionada = {
+        id_sucursal:    this.usuarioActual?.id_sucursal || 1,
+        nombre_sucursal: this.usuarioActual?.nombre_sucursal || 'Mi Sucursal'
+      };
+      this.cargarProductos();
+      this.cargarCategorias();
+    }
+  }
+
+  // ─── SUCURSALES ───
+  cargarSucursales() {
+    this.http.get<any[]>(`${this.apiUrl}/sucursales`, { headers: this.h() }).subscribe({
+      next: (suc) => {
+        this.sucursales = suc;
+        if (suc.length > 0 && !this.sucursalSeleccionada) {
+          this.seleccionarSucursal(suc[0]);
+        }
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  seleccionarSucursal(suc: any) {
+    this.sucursalSeleccionada = suc;
+    this.cargando             = true;
+    this.cargarProductos();
+    this.cargarCategorias();
+    this.cdr.detectChanges();
+  }
+
+  get idSucursal(): number {
+    return this.sucursalSeleccionada?.id_sucursal || 1;
+  }
+
+  // ─── PRODUCTOS ───
+  cargarProductos() {
     this.cargando = true;
-    this.productoService.obtenerInventario().subscribe({
+    this.productoService.obtenerInventario(this.idSucursal).subscribe({
       next: (datos) => {
-        this.listaProductos = datos;
+        this.productos          = datos;
+        this.productosFiltrados = datos;
         this.aplicarFiltros();
         this.cargando = false;
         this.cdr.detectChanges();
@@ -60,118 +120,170 @@ export class InventarioComponent implements OnInit {
 
   cargarCategorias() {
     this.productoService.obtenerCategorias().subscribe({
-      next: (datos) => { this.listaCategorias = datos; }
+      next: (c) => { this.categorias = c; this.cdr.detectChanges(); }
     });
   }
 
+  // ─── FILTROS ───
   aplicarFiltros() {
-    let lista = [...this.listaProductos];
-    if (this.categoriaFiltro !== 'todas') {
-      lista = lista.filter(p => p.id_categoria == this.categoriaFiltro);
-    }
-    if (this.busqueda.trim()) {
-      const term = this.busqueda.toLowerCase();
-      lista = lista.filter(p => p.nombre_producto.toLowerCase().includes(term));
-    }
-    this.listaProductosFiltrados = lista;
+    this.productosFiltrados = this.productos.filter(p => {
+      const porCat  = !this.filtroCategoria || p.id_categoria === this.filtroCategoria;
+      const porNomb = !this.filtroBusqueda  ||
+                      p.nombre_producto.toLowerCase().includes(this.filtroBusqueda.toLowerCase());
+      return porCat && porNomb;
+    });
+    this.cdr.detectChanges();
   }
 
-  // ─── Modal CRUD ───
-  abrirModal() {
-    this.editandoId = null;
-    this.imagenPreview = '';
-    this.nuevoProducto = { nombre_producto: '', id_categoria: '', precio_unitario: null, descripcion_producto: '', url_imagen: '' };
-    this.mostrarModal = true;
+  seleccionarCategoria(id: number | null) {
+    this.filtroCategoria = id;
+    this.aplicarFiltros();
   }
 
-  abrirModalEditar(p: any) {
-    this.editandoId = p.id_producto;
-    this.imagenPreview = p.url_imagen || '';
-    this.nuevoProducto = {
-      nombre_producto: p.nombre_producto,
-      id_categoria: p.id_categoria,
-      precio_unitario: p.precio_unitario,
-      descripcion_producto: p.descripcion_producto || '',
-      url_imagen: p.url_imagen || ''
+  // ─── MODAL PRODUCTO ───
+  abrirModalNuevo() {
+    this.editandoId     = null;
+    this.errorModal     = '';
+    this.archivoImagen  = null;
+    this.previewImagen  = null;
+    this.formulario     = {
+      nombre_producto: '', descripcion_producto: '',
+      precio_unitario: '', id_categoria: '',
+      stock_inicial: 0
     };
     this.mostrarModal = true;
   }
 
-  cerrarModal() { this.mostrarModal = false; this.editandoId = null; this.imagenPreview = ''; }
+  abrirModalEditar(prod: any) {
+    this.editandoId    = prod.id_producto;
+    this.errorModal    = '';
+    this.archivoImagen = null;
+    this.previewImagen = prod.url_imagen ? this.getImageUrl(prod.url_imagen) : null;
+    this.formulario    = {
+      nombre_producto:     prod.nombre_producto,
+      descripcion_producto: prod.descripcion_producto || '',
+      precio_unitario:     prod.precio_unitario,
+      id_categoria:        prod.id_categoria,
+      stock_inicial:       0
+    };
+    this.mostrarModal = true;
+  }
 
-  // Manejo de imagen (convierte a base64)
-  onImagenSeleccionada(event: any) {
-    const file = event.target.files[0];
+  cerrarModal() { this.mostrarModal = false; this.editandoId = null; this.errorModal = ''; }
+
+  onArchivoSeleccionado(event: any) {
+    const file: File = event.target.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert('La imagen no debe superar 2MB.'); return; }
+
+    if (file.size > 2 * 1024 * 1024) {
+      this.errorModal = 'La imagen no debe superar 2MB.'; return;
+    }
+
+    this.archivoImagen = file;
     const reader = new FileReader();
     reader.onload = (e: any) => {
-      this.nuevoProducto.url_imagen = e.target.result;
-      this.imagenPreview = e.target.result;
+      this.previewImagen = e.target.result;
       this.cdr.detectChanges();
     };
     reader.readAsDataURL(file);
   }
 
-  quitarImagen() { this.nuevoProducto.url_imagen = ''; this.imagenPreview = ''; }
-
   guardarProducto() {
-    this.cargando = true;
+    if (!this.formulario.nombre_producto || !this.formulario.precio_unitario || !this.formulario.id_categoria) {
+      this.errorModal = 'Completa todos los campos obligatorios.'; return;
+    }
+
+    this.cargando   = true;
+    this.errorModal = '';
+
+    const datos = {
+      nombre_producto:      this.formulario.nombre_producto,
+      descripcion_producto: this.formulario.descripcion_producto,
+      precio_unitario:      this.formulario.precio_unitario,
+      id_categoria:         this.formulario.id_categoria
+    };
+
     if (this.editandoId) {
-      this.productoService.actualizarProducto(this.editandoId, this.nuevoProducto).subscribe({
-        next: () => { this.cerrarModal(); this.cargarInventario(); },
-        error: () => { alert('Error al editar producto.'); this.cargando = false; }
+      this.productoService.actualizarProducto(this.editandoId, datos, this.archivoImagen || undefined).subscribe({
+        next: () => { this.cerrarModal(); this.cargarProductos(); },
+        error: () => { this.errorModal = 'Error al actualizar.'; this.cargando = false; }
       });
     } else {
-      this.productoService.crearProducto(this.nuevoProducto).subscribe({
-        next: () => { this.cerrarModal(); this.cargarInventario(); },
-        error: () => { alert('Error al guardar producto.'); this.cargando = false; }
+      this.productoService.crearProducto(datos, this.archivoImagen || undefined).subscribe({
+        next: (res: any) => {
+          // Si hay stock inicial, agregarlo
+          if (this.formulario.stock_inicial > 0 && res.producto?.id_producto) {
+            this.productoService.agregarStock(
+              res.producto.id_producto,
+              this.formulario.stock_inicial,
+              this.idSucursal
+            ).subscribe({ next: () => { this.cerrarModal(); this.cargarProductos(); } });
+          } else {
+            this.cerrarModal();
+            this.cargarProductos();
+          }
+        },
+        error: () => { this.errorModal = 'Error al crear.'; this.cargando = false; }
       });
     }
   }
 
-  // ─── Modal Stock ───
-  abrirModalStock(p: any) { this.productoSeleccionado = p; this.cantidadIngreso = 0; this.mostrarModalStock = true; }
-  cerrarModalStock() { this.mostrarModalStock = false; this.productoSeleccionado = null; }
-
-  confirmarIngresoStock() {
-    if (this.cantidadIngreso <= 0) { alert('Ingresa una cantidad válida.'); return; }
-    this.cargando = true;
-    this.productoService.ingresarStock(this.productoSeleccionado.id_producto, this.cantidadIngreso).subscribe({
-      next: () => { this.cerrarModalStock(); this.cargarInventario(); },
-      error: () => { alert('Error al ingresar stock.'); this.cargando = false; }
-    });
-  }
-
-  // ─── Modal Categorías ───
-  abrirModalCategorias() { this.mostrarModalCategorias = true; this.mensajeCategoriaError = ''; this.nuevaCategoria = { nombre_categoria: '', descripcion_categoria: '' }; }
-  cerrarModalCategorias() { this.mostrarModalCategorias = false; }
-
-  guardarCategoria() {
-    if (!this.nuevaCategoria.nombre_categoria.trim()) { this.mensajeCategoriaError = 'El nombre es obligatorio.'; return; }
-    this.cargandoCategoria = true;
-    this.productoService.crearCategoria(this.nuevaCategoria.nombre_categoria, this.nuevaCategoria.descripcion_categoria).subscribe({
-      next: () => {
-        this.nuevaCategoria = { nombre_categoria: '', descripcion_categoria: '' };
-        this.mensajeCategoriaError = '';
-        this.cargandoCategoria = false;
-        this.cargarCategorias();
-      },
-      error: () => { this.mensajeCategoriaError = 'Error al crear categoría.'; this.cargandoCategoria = false; }
-    });
-  }
-
-  borrarProducto(id: number, nombre: string) {
-    if (!confirm(`¿Eliminar el producto "${nombre}"?`)) return;
-    this.cargando = true;
+  eliminarProducto(id: number, nombre: string) {
+    if (!confirm(`¿Eliminar "${nombre}" del inventario?`)) return;
     this.productoService.eliminarProducto(id).subscribe({
-      next: () => this.cargarInventario(),
-      error: () => { alert('Error al eliminar.'); this.cargando = false; }
+      next: () => this.cargarProductos(),
+      error: () => alert('Error al eliminar.')
     });
   }
 
-  getNombreCategoria(id: any): string {
-    const cat = this.listaCategorias.find(c => c.id_categoria == id);
-    return cat ? cat.nombre_categoria : 'Sin categoría';
+  // ─── MODAL STOCK ───
+  abrirModalStock(prod: any) {
+    this.productoStock  = prod;
+    this.cantidadAgregar = 0;
+    this.errorStock      = '';
+    this.mostrarModalStock = true;
+  }
+
+  cerrarModalStock() { this.mostrarModalStock = false; this.productoStock = null; }
+
+  agregarStock() {
+    if (!this.cantidadAgregar || this.cantidadAgregar <= 0) {
+      this.errorStock = 'Ingresa una cantidad válida.'; return;
+    }
+    this.cargando = true;
+    this.productoService.agregarStock(
+      this.productoStock.id_producto,
+      this.cantidadAgregar,
+      this.idSucursal
+    ).subscribe({
+      next: () => { this.cerrarModalStock(); this.cargarProductos(); },
+      error: () => { this.errorStock = 'Error al agregar stock.'; this.cargando = false; }
+    });
+  }
+
+  // ─── MODAL CATEGORÍA ───
+  abrirModalCategoria() { this.nombreCategoria = ''; this.errorCategoria = ''; this.mostrarModalCategoria = true; }
+  cerrarModalCategoria() { this.mostrarModalCategoria = false; }
+
+  crearCategoria() {
+    if (!this.nombreCategoria.trim()) { this.errorCategoria = 'Escribe el nombre.'; return; }
+    this.productoService.crearCategoria({ nombre_categoria: this.nombreCategoria, descripcion_categoria: '' }).subscribe({
+      next: () => { this.cerrarModalCategoria(); this.cargarCategorias(); },
+      error: () => { this.errorCategoria = 'Error al crear.'; }
+    });
+  }
+
+  // ─── UTILIDADES ───
+  getImageUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('data:') || url.startsWith('http')) return url;
+    const host = environment.apiUrl.replace('/api', '');
+    return `${host}${url}`;
+  }
+
+  getStockColor(stock: number): string {
+    if (stock <= 0)  return 'bg-red-100 text-red-700';
+    if (stock <= 5)  return 'bg-amber-100 text-amber-700';
+    return 'bg-green-100 text-green-700';
   }
 }

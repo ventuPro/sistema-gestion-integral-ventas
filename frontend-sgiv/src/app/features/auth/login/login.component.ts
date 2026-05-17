@@ -36,7 +36,8 @@ export class LoginComponent {
           id_usuario:      res.usuario.id_usuario,
           nombre_completo: res.usuario.nombre_completo,
           id_rol:          res.usuario.id_rol,
-          id_sucursal:     res.usuario.id_sucursal
+          id_sucursal:     res.usuario.id_sucursal,
+          nombre_sucursal:  res.usuario.nombre_sucursal
         }));
 
         // Cargar permisos antes de redirigir

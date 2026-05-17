@@ -21,23 +21,37 @@ const registrarUsuario = async (req, res) => {
 const loginUsuario = async (req, res) => {
     try {
         const { correo_electronico, contrasena } = req.body;
-        const usuario = await userModel.obtenerUsuarioPorCorreo(correo_electronico);
-        if (!usuario)   return res.status(404).json({ error: 'Usuario no encontrado' });
+        const u = await userModel.obtenerUsuarioPorCorreo(correo_electronico);
+        if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+        if (!await bcrypt.compare(contrasena, u.contrasena_hash))
+            return res.status(401).json({ error: 'Contraseña incorrecta' });
 
-        const valido = await bcrypt.compare(contrasena, usuario.contrasena_hash);
-        if (!valido)    return res.status(401).json({ error: 'Contraseña incorrecta' });
+        // Obtener nombre de sucursal
+        const rSuc = await require('../config/db').query(
+            `SELECT nombre_sucursal FROM sucursal WHERE id_sucursal = $1`,
+            [u.id_sucursal]
+        );
+        const nombre_sucursal = rSuc.rows[0]?.nombre_sucursal || '';
 
         const token = jwt.sign(
-            { id_usuario: usuario.id_usuario, id_rol: usuario.id_rol, id_sucursal: usuario.id_sucursal },
+            { id_usuario: u.id_usuario, id_rol: u.id_rol, id_sucursal: u.id_sucursal },
             process.env.JWT_SECRET || 'ventupro2503_Security_key',
             { expiresIn: '8h' }
         );
+
         res.json({
-            mensaje: 'Inicio de sesión exitoso', token,
-            usuario: { id_usuario: usuario.id_usuario, nombre_completo: usuario.nombre_completo, id_rol: usuario.id_rol, id_sucursal: usuario.id_sucursal }
+            mensaje: 'Login exitoso',
+            token,
+            usuario: {
+                id_usuario:      u.id_usuario,
+                nombre_completo: u.nombre_completo,
+                id_rol:          u.id_rol,
+                id_sucursal:     u.id_sucursal,
+                nombre_sucursal              // ← incluir aquí
+            }
         });
-    } catch (e) {
-        console.error('Error en loginUsuario:', e);
+    } catch(e) {
+        console.error('Error loginUsuario:', e);
         res.status(500).json({ error: 'Error al iniciar sesión' });
     }
 };

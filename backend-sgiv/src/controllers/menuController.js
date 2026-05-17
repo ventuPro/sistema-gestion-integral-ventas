@@ -1,98 +1,78 @@
 const db = require('../config/db');
-const pedidoModel = require('../models/pedidoModel');
+const pm = require('../models/pedidoModel');
 
-// Info de la mesa (para la cabecera del menú)
 const obtenerInfoMesa = async (req, res) => {
+    // Headers para acceso público (el celular del cliente)
+    res.setHeader('Access-Control-Allow-Origin', '*');
     try {
-        const { id_mesa } = req.params;
-        const result = await db.query(
-            `SELECT m.*, s.nombre_sucursal
-             FROM mesa_local m
-             JOIN sucursal s ON m.id_sucursal = s.id_sucursal
-             WHERE m.id_mesa = $1;`,
-            [id_mesa]
-        );
-        if (!result.rows[0]) return res.status(404).json({ error: 'Mesa no encontrada' });
-        res.json(result.rows[0]);
-    } catch (error) {
-        res.status(500).json({ error: 'Error al obtener mesa' });
-    }
+        const r = await db.query(`
+            SELECT m.id_mesa, m.numero_mesa, m.estado_mesa, m.id_sucursal,
+                   s.nombre_sucursal
+            FROM mesa_local m
+            JOIN sucursal s ON m.id_sucursal=s.id_sucursal
+            WHERE m.id_mesa=$1
+        `, [req.params.id_mesa]);
+        if (!r.rows.length) return res.status(404).json({ error: 'Mesa no encontrada' });
+        res.json(r.rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
-// Catálogo público (solo productos visibles en menú con stock)
 const obtenerCatalogoPublico = async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
     try {
-        const id_sucursal = req.query.id_sucursal || 1;
-        const result = await db.query(
-            `SELECT p.id_producto, p.nombre_producto, p.descripcion_producto,
-                    p.precio_unitario::numeric, p.url_imagen, p.mostrar_en_menu,
-                    c.nombre_categoria, c.id_categoria,
-                    COALESCE(i.cantidad_actual, 0) AS stock_actual
-             FROM producto p
-             LEFT JOIN categoria_producto c ON p.id_categoria = c.id_categoria
-             LEFT JOIN inventario_sucursal i ON p.id_producto = i.id_producto
-                   AND i.id_sucursal = $1
-             WHERE p.estado_activo = TRUE AND p.mostrar_en_menu = TRUE
-               AND COALESCE(i.cantidad_actual, 0) > 0
-             ORDER BY c.nombre_categoria ASC, p.nombre_producto ASC;`,
-            [id_sucursal]
-        );
-        res.json(result.rows);
-    } catch (error) {
-        res.status(500).json({ error: 'Error al obtener catálogo' });
-    }
+        const id_sucursal = Number(req.query.id_sucursal) || 1;
+        const r = await db.query(`
+            SELECT p.id_producto, p.nombre_producto, p.descripcion_producto,
+                   p.precio_unitario, p.url_imagen,
+                   c.id_categoria, c.nombre_categoria,
+                   COALESCE(i.cantidad_actual, 0) AS stock_actual
+            FROM producto p
+            JOIN  categoria_producto    c ON p.id_categoria=c.id_categoria
+            LEFT JOIN inventario_sucursal i ON p.id_producto=i.id_producto AND i.id_sucursal=$1
+            WHERE p.estado_activo=TRUE AND COALESCE(i.cantidad_actual,0) > 0
+            ORDER BY c.nombre_categoria, p.nombre_producto
+        `, [id_sucursal]);
+        res.json(r.rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
-// Crear pedido completo desde el menú digital
 const crearPedidoDesdeMenu = async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
     try {
-        const { id_mesa, items, observacion_general } = req.body;
-        if (!id_mesa || !items || items.length === 0) {
-            return res.status(400).json({ error: 'Datos del pedido incompletos' });
-        }
+        const { id_mesa, numero_mesa, observacion_general, items } = req.body;
+        if (!items?.length) return res.status(400).json({ error: 'El pedido no tiene productos' });
 
-        // 1. Crear pedido
-        const pedido = await pedidoModel.crearPedido(id_mesa, observacion_general || '');
-
-        // 2. Agregar todos los ítems
+        const pedido = await pm.crearPedido({ id_mesa, observacion_general: observacion_general || null });
         for (const item of items) {
-            await pedidoModel.agregarDetallePedido(
+            await pm.agregarDetallePedido(
                 pedido.id_pedido, item.id_producto,
                 item.cantidad, item.precio_unitario, item.nota_cliente || ''
             );
         }
 
-        // 3. Notificar a cajeros
-        if (global.io) {
-            global.io.to('cajeros').emit('nuevo_pedido_pendiente', {
-                id_pedido:    pedido.id_pedido,
-                id_mesa,
-                numero_mesa:  req.body.numero_mesa || '?',
-                total_items:  items.length,
-                fecha_pedido: pedido.fecha_pedido
-            });
-        }
-
-        res.status(201).json({
-            mensaje: 'Pedido enviado. Un cajero lo revisará en breve.',
-            id_pedido: pedido.id_pedido
+        const rPedido = await db.query(`SELECT monto_total FROM pedido_mesa WHERE id_pedido=$1`, [pedido.id_pedido]);
+        const io = global.io;
+        io?.to('cajeros').emit('nuevo_pedido_pendiente', {
+            id_pedido:   pedido.id_pedido,
+            id_mesa,
+            numero_mesa,
+            monto_total: rPedido.rows[0]?.monto_total || 0,
+            items
         });
-    } catch (error) {
-        console.error('Error crearPedidoDesdeMenu:', error);
-        res.status(500).json({ error: 'Error al crear el pedido' });
+
+        res.status(201).json({ mensaje: 'Pedido enviado', id_pedido: pedido.id_pedido });
+    } catch(e) {
+        console.error('crearPedidoDesdeMenu:', e);
+        res.status(500).json({ error: e.message });
     }
 };
 
-// Estado del pedido (polling del cliente)
 const estadoPedido = async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
     try {
-        const { id_pedido } = req.params;
-        const pedido = await pedidoModel.obtenerEstadoPedidoPublico(id_pedido);
-        if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
-        res.json(pedido);
-    } catch (error) {
-        res.status(500).json({ error: 'Error al consultar pedido' });
-    }
+        const r = await pm.obtenerEstadoPedidoPublico(req.params.id_pedido);
+        res.json(r);
+    } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
 module.exports = { obtenerInfoMesa, obtenerCatalogoPublico, crearPedidoDesdeMenu, estadoPedido };
