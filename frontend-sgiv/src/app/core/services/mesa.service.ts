@@ -40,4 +40,8 @@ export class MesaService {
   rechazarPedido(id_pedido: number): Observable<any> {
     return this.http.patch(`${this.apiUrl}/pedidos/${id_pedido}/rechazar`, {}, { headers: this.h() });
   }
+
+  eliminarMesa(id_mesa: number): Observable<any> {
+  return this.http.delete(`${this.apiUrl}/mesas/${id_mesa}`, { headers: this.h() });
+}
 }

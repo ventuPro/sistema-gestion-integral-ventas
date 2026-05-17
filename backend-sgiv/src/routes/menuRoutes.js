@@ -1,11 +1,13 @@
 const express = require('express');
 const router  = express.Router();
-const menuController = require('../controllers/menuController');
+const ctrl    = require('../controllers/menuController');
 
-// Sin autenticación — acceso desde el celular del cliente
-router.get('/mesa/:id_mesa',          menuController.obtenerInfoMesa);
-router.get('/catalogo',               menuController.obtenerCatalogoPublico);
-router.post('/pedido',                menuController.crearPedidoDesdeMenu);
-router.get('/pedido/:id_pedido',      menuController.estadoPedido);
+// Preflight CORS para peticiones del celular
+
+
+router.get  ('/mesa/:id_mesa',     ctrl.obtenerInfoMesa);
+router.get  ('/catalogo',          ctrl.obtenerCatalogoPublico);
+router.post ('/pedido',            ctrl.crearPedidoDesdeMenu);
+router.get  ('/pedido/:id_pedido', ctrl.estadoPedido);
 
 module.exports = router;

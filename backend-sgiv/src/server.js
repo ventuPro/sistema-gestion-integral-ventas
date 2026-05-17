@@ -33,9 +33,10 @@ const io = new Server(server, {
 global.io = io;
 
 app.use(cors({
-  origin: '*',   // En producción real limitarías esto, en desarrollo local está bien
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  credentials: false
+    origin:      '*',
+    methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));

@@ -200,4 +200,25 @@ export class MesasComponent implements OnInit, OnDestroy {
       error: () => alert('Error al rechazar')
     });
   }
+
+  eliminarMesa(mesa: any, event: Event) {
+  event.stopPropagation(); // Evitar que abra el modal
+
+  if (mesa.id_cuenta) {
+    alert('No se puede eliminar: la mesa tiene una cuenta abierta.');
+    return;
+  }
+
+  if (!confirm(`¿Eliminar definitivamente la Mesa ${mesa.numero_mesa}?\nEsta acción no se puede deshacer.`)) return;
+
+  this.mesaService.eliminarMesa(mesa.id_mesa).subscribe({
+    next: () => {
+      this.mostrarToast(`🗑 Mesa ${mesa.numero_mesa} eliminada`);
+      this.cargarMesas();
+    },
+    error: (e: any) => {
+      alert(e?.error?.error || 'Error al eliminar la mesa.');
+    }
+  });
+}
 }

@@ -21,33 +21,51 @@ const obtenerMesasPorSucursal = async (id_sucursal) => {
 // ─── PEDIDOS ───
 
 // Cliente crea pedido (estado: 'Pendiente_Cajero')
-const crearPedido = async (id_mesa, observacion_general = '') => {
-    // Marcar mesa como Ocupada
-    await db.query(
-        `UPDATE mesa_local SET estado_mesa = 'Ocupada' WHERE id_mesa = $1`,
-        [id_mesa]
-    );
-    const result = await db.query(
-        `INSERT INTO pedido_mesa (id_mesa, estado_pedido, monto_total, observacion_general)
-         VALUES ($1, 'Pendiente_Cajero', 0.00, $2) RETURNING *;`,
-        [id_mesa, observacion_general]
-    );
-    return result.rows[0];
+const crearPedido = async ({ id_mesa, observacion_general }) => {
+    try {
+        // Cambiar estado de la mesa a Ocupada
+        await db.query(
+            `UPDATE mesa_local SET estado_mesa = 'Ocupada' WHERE id_mesa = $1`,
+            [id_mesa]
+        );
+
+        const r = await db.query(`
+            INSERT INTO pedido_mesa (id_mesa, estado_pedido, monto_total, observacion_general)
+            VALUES ($1, 'Pendiente_Cajero', 0, $2)
+            RETURNING *
+        `, [id_mesa, observacion_general || null]);
+
+        return r.rows[0];
+    } catch (e) {
+        console.error('Error en crearPedido:', e.message);
+        throw e;
+    }
 };
 
-// Agregar producto al pedido
-const agregarDetallePedido = async (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente = '') => {
-    const subtotal = cantidad_solicitada * precio_aplicado;
-    const result   = await db.query(
-        `INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente, estado_cocina)
-         VALUES ($1, $2, $3, $4, $5, $6, 'Pendiente') RETURNING *;`,
-        [id_pedido, id_producto, cantidad_solicitada, precio_aplicado, subtotal, nota_cliente]
-    );
-    await db.query(
-        `UPDATE pedido_mesa SET monto_total = monto_total + $1 WHERE id_pedido = $2`,
-        [subtotal, id_pedido]
-    );
-    return result.rows[0];
+const agregarDetallePedido = async (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente) => {
+    try {
+        const cantidad = Number(cantidad_solicitada) || 1;
+        const precio   = Number(precio_aplicado)     || 0;
+        const subtotal = cantidad * precio;
+
+        const r = await db.query(`
+            INSERT INTO detalle_pedido
+                (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente, estado_cocina)
+            VALUES ($1, $2, $3, $4, $5, $6, 'Pendiente')
+            RETURNING *
+        `, [id_pedido, id_producto, cantidad, precio, subtotal, nota_cliente || null]);
+
+        // Actualizar el monto total del pedido
+        await db.query(
+            `UPDATE pedido_mesa SET monto_total = monto_total + $1 WHERE id_pedido = $2`,
+            [subtotal, id_pedido]
+        );
+
+        return r.rows[0];
+    } catch (e) {
+        console.error('Error en agregarDetallePedido:', e.message);
+        throw e;
+    }
 };
 
 // Obtener pedido completo con detalles

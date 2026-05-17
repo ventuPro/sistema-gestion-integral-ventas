@@ -46,4 +46,19 @@ const actualizarEstado = async (req, res) => {
     }
 };
 
-module.exports = { agregarMesa, listarMesas, obtenerQR, actualizarEstado };
+const eliminarMesa = async (req, res) => {
+    try {
+        const id_mesa = Number(req.params.id_mesa);
+        await m.eliminarMesa(id_mesa);
+        res.json({ mensaje: 'Mesa eliminada correctamente' });
+    } catch (e) {
+        if (e.message === 'MESA_CON_CUENTA_ACTIVA')
+            return res.status(409).json({ error: 'No se puede eliminar: la mesa tiene una cuenta abierta.' });
+        if (e.message === 'MESA_CON_PEDIDO_ACTIVO')
+            return res.status(409).json({ error: 'No se puede eliminar: hay un pedido activo en esta mesa.' });
+        console.error('eliminarMesa:', e);
+        res.status(500).json({ error: 'Error al eliminar la mesa' });
+    }
+};
+
+module.exports = { agregarMesa, listarMesas, obtenerQR, actualizarEstado, eliminarMesa };

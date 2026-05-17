@@ -51,19 +51,52 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   private socket: Socket | null = null;
   private pollInterval: any;
 
-  ngOnInit() {
-    // Leer id_mesa de la URL
-    this.id_mesa = +this.route.snapshot.paramMap.get('id_mesa')!;
+ngOnInit() {
+  this.id_mesa = +this.route.snapshot.paramMap.get('id_mesa')!;
+  if (!this.id_mesa || isNaN(this.id_mesa)) {
+    this.cargando = false;
+    this.cdr.detectChanges();
+    return;
+  }
+  this.cargarDatos();
+  this.conectarSocket();
+}
 
-    if (!this.id_mesa || isNaN(this.id_mesa)) {
+cargarDatos() {
+  this.cargando = true;
+
+  // PASO 1: obtener info de la mesa (incluye id_sucursal)
+  this.http.get<any>(`${this.apiUrl}/menu/mesa/${this.id_mesa}`).subscribe({
+    next: (mesa) => {
+      this.infoMesa    = mesa;
+      this.id_sucursal = Number(mesa.id_sucursal) || 1;
+
+      // PASO 2: cargar catálogo de ESA sucursal
+      this.http.get<any[]>(`${this.apiUrl}/menu/catalogo?id_sucursal=${this.id_sucursal}`).subscribe({
+        next: (items) => {
+          this.catalogo = items;
+
+          const cats = new Map<number, string>();
+          items.forEach(i => cats.set(Number(i.id_categoria), i.nombre_categoria));
+          this.categorias = Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre }));
+
+          this.cargando = false;
+          this.cdr.detectChanges();
+        },
+        error: (e) => {
+          console.error('Error cargando catálogo:', e);
+          this.cargando = false;
+          this.cdr.detectChanges();
+        }
+      });
+    },
+    error: (e) => {
+      console.error('Error cargando mesa:', e);
       this.cargando = false;
       this.cdr.detectChanges();
-      return;
     }
-
-    this.cargarMesaYCatalogo();
-    this.conectarSocket();
-  }
+  });
+}
 
   ngOnDestroy() {
     this.socket?.disconnect();
