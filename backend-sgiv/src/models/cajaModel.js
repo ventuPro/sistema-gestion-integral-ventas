@@ -126,23 +126,28 @@ const obtenerVentasHoyPOS = async (id_sucursal, id_usuario_cajero) => {
 
 // ─── TURNOS ───
 const abrirTurno = async (id_sucursal, id_usuario_cajero, monto_inicial) => {
+    // 1. Verificar caja habilitada
     const check = await db.query(
         `SELECT caja_habilitada FROM usuario WHERE id_usuario = $1`,
         [id_usuario_cajero]
     );
-    if (!check.rows[0]?.caja_habilitada) throw new Error('CAJA_NO_HABILITADA');
+    if (!check.rows[0]?.caja_habilitada)
+        throw new Error('CAJA_NO_HABILITADA');
 
-    const turnoAbierto = await db.query(
-        `SELECT id_turno FROM turno_caja WHERE id_usuario_cajero=$1 AND estado_turno='Abierto'`,
-        [id_usuario_cajero]
-    );
-    if (turnoAbierto.rows.length > 0) throw new Error('YA_TIENE_TURNO_ABIERTO');
+    // 2. Solo bloquear si hay un turno ABIERTO (no cerrados anteriores)
+    const turnoAbierto = await db.query(`
+        SELECT id_turno FROM turno_caja
+        WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto'
+    `, [id_usuario_cajero]);
+    if (turnoAbierto.rows.length > 0)
+        throw new Error('YA_TIENE_TURNO_ABIERTO');
 
-    const result = await db.query(`
+    // 3. Crear nuevo turno (sin importar si hay turnos cerrados hoy)
+    const r = await db.query(`
         INSERT INTO turno_caja (id_sucursal, id_usuario_cajero, monto_inicial, estado_turno)
         VALUES ($1, $2, $3, 'Abierto') RETURNING *
     `, [id_sucursal, id_usuario_cajero, monto_inicial]);
-    return result.rows[0];
+    return r.rows[0];
 };
 
 const cerrarCaja = async (id_sucursal, id_usuario_cajero) => {
@@ -267,15 +272,15 @@ const obtenerCierresCaja = async () => {
 
 // Verificar si el cajero ya abrió turno hoy
 const verificarTurnoHoy = async (id_usuario_cajero) => {
-    const result = await db.query(`
+    const r = await db.query(`
         SELECT id_turno, estado_turno, fecha_hora_apertura, monto_inicial
         FROM turno_caja
         WHERE id_usuario_cajero = $1
-          AND DATE(fecha_hora_apertura) = CURRENT_DATE
+          AND estado_turno = 'Abierto'
         ORDER BY fecha_hora_apertura DESC
         LIMIT 1
     `, [id_usuario_cajero]);
-    return result.rows[0] || null;
+    return r.rows[0] || null;
 };
 
 module.exports = {

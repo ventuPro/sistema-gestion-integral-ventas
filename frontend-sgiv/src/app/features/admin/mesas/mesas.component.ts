@@ -1,10 +1,11 @@
 import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { CuentaService } from '../../../core/services/cuenta.service';
-import { SocketService } from '../../../core/services/socket.service';
+import { CuentaService }  from '../../../core/services/cuenta.service';
+import { CajaService }    from '../../../core/services/caja.service';
+import { MesaService }    from '../../../core/services/mesa.service';
+import { SocketService }  from '../../../core/services/socket.service';
 import { MesaModalComponent } from './mesa-modal/mesa-modal.component';
-import { MesaService } from '../../../core/services/mesa.service';
 
 @Component({
   selector: 'app-mesas',
@@ -15,132 +16,177 @@ import { MesaService } from '../../../core/services/mesa.service';
 })
 export class MesasComponent implements OnInit, OnDestroy {
   private cuentaService = inject(CuentaService);
+  private cajaService   = inject(CajaService);
   private mesaService   = inject(MesaService);
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
 
-  mesas:           any[] = [];
+  // ─── Control de acceso ───
+  verificandoCaja  = true;
+  cajaHabilitada   = false;
+  usuarioActual:   any = null;
+  esAdmin          = false;
+
+  // ─── Estado ───
+  mesas:            any[] = [];
   pedidosPendientes: any[] = [];
-  cargando         = true;
+  cargando          = true;
   notificacion: string | null = null;
 
-  // Modal nueva mesa
-  mostrarModalMesa = false;
-  nuevaMesaNum     = '';
-  errorMesa        = '';
+  // ─── Modal nueva mesa ───
+  mostrarModalMesa  = false;
+  nuevaMesaNum      = '';
+  errorMesa         = '';
 
-  // Modal de mesa seleccionada
+  // ─── Modal mesa seleccionada ───
   mesaSeleccionada: any = null;
 
+  // ─── Auto-refresh ───
+  private refreshInterval: any;
+  private readonly REFRESH_INTERVAL_MS = 30000; // 30 segundos
+
   ngOnInit() {
-    this.cargarMesas();
-    this.cargarPendientes();
-    this.iniciarSocket();
+    const raw = localStorage.getItem('usuario_sgiv');
+    this.usuarioActual = raw ? JSON.parse(raw) : null;
+    this.esAdmin       = this.usuarioActual?.id_rol === 1;
+
+    this.verificarAccesoCaja();
   }
 
   ngOnDestroy() {
     this.socketService.desconectar();
+    if (this.refreshInterval) clearInterval(this.refreshInterval);
   }
 
+  // ─── VERIFICAR ACCESO ───
+  verificarAccesoCaja() {
+    // Admin siempre tiene acceso
+    if (this.esAdmin) {
+      this.cajaHabilitada  = true;
+      this.verificandoCaja = false;
+      this.inicializar();
+      return;
+    }
+
+    this.cajaService.obtenerEstadoCaja(this.usuarioActual.id_usuario).subscribe({
+      next: (res) => {
+        this.cajaHabilitada  = res.caja_habilitada;
+        this.verificandoCaja = false;
+        if (this.cajaHabilitada) this.inicializar();
+        else this.cargando = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.cajaHabilitada  = false;
+        this.verificandoCaja = false;
+        this.cargando        = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  private inicializar() {
+    this.cargarMesas();
+    this.cargarPendientes();
+    this.iniciarSocket();
+    this.iniciarAutoRefresh();
+  }
+
+  // ─── AUTO-REFRESH ───
+  private iniciarAutoRefresh() {
+    if (this.refreshInterval) clearInterval(this.refreshInterval);
+    this.refreshInterval = setInterval(() => {
+      this.cargarMesas();
+      this.cargarPendientes();
+    }, this.REFRESH_INTERVAL_MS);
+  }
+
+  // ─── SOCKET ───
   iniciarSocket() {
     this.socketService.conectar('cajeros');
 
-    // Nuevo pedido QR pendiente
     this.socketService.escuchar<any>('nuevo_pedido_pendiente').subscribe(() => {
       this.mostrarToast('🔔 Nuevo pedido QR recibido');
       this.cargarPendientes();
       this.cargarMesas();
-      this.cdr.detectChanges();
     });
 
-    // Mesa actualizada (cuenta abierta, cerrada, producto agregado)
     this.socketService.escuchar<any>('mesa:actualizada').subscribe(() => {
       this.cargarMesas();
-      this.cdr.detectChanges();
     });
 
-    // Pedido QR integrado en comanda
     this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
-      this.mostrarToast(`🍽 Pedido QR integrado en Mesa ${data.numero_mesa}`);
+      this.mostrarToast(`🍽 Pedido QR integrado en Mesa ${data.numero_mesa || ''}`);
       this.cargarMesas();
-      this.cdr.detectChanges();
     });
 
-    // Cuenta cerrada
     this.socketService.escuchar<any>('cuenta:cerrada').subscribe(() => {
       this.cargarMesas();
-      this.cdr.detectChanges();
+    });
+
+    this.socketService.escuchar<any>('cuenta:abierta').subscribe(() => {
+      this.cargarMesas();
+    });
+
+    this.socketService.escuchar<any>('cuenta:producto_agregado').subscribe(() => {
+      this.cargarMesas();
     });
   }
 
   mostrarToast(msg: string) {
     this.notificacion = msg;
+    this.cdr.detectChanges();
     setTimeout(() => { this.notificacion = null; this.cdr.detectChanges(); }, 4000);
   }
 
+  // ─── CARGA DE DATOS ───
   cargarMesas() {
-    const usr = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
-    const id_sucursal = usr.id_sucursal || 1;
-
+    const id_sucursal = this.usuarioActual?.id_sucursal || 1;
     this.cuentaService.getMesasConCuenta(id_sucursal).subscribe({
       next: (m) => { this.mesas = m; this.cargando = false; this.cdr.detectChanges(); },
-      error: () => { this.cargando = false; }
+      error: ()  => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
 
   cargarPendientes() {
-    const usr = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
-    this.mesaService.listarPendientesCajero(usr.id_sucursal || 1).subscribe({
+    const id_sucursal = this.usuarioActual?.id_sucursal || 1;
+    this.mesaService.listarPendientesCajero(id_sucursal).subscribe({
       next: (p) => { this.pedidosPendientes = p; this.cdr.detectChanges(); }
     });
   }
 
-  // Abre el modal al hacer clic en una mesa
-  seleccionarMesa(mesa: any) {
-    this.mesaSeleccionada = mesa;
-  }
+  // ─── SELECCIONAR MESA ───
+  seleccionarMesa(mesa: any) { this.mesaSeleccionada = mesa; }
+  onModalCerrado()           { this.mesaSeleccionada = null; }
+  onMesaActualizada()        { this.cargarMesas(); this.cargarPendientes(); }
 
-  onModalCerrado() {
-    this.mesaSeleccionada = null;
-  }
-
-  onMesaActualizada() {
-    this.cargarMesas();
-    this.cargarPendientes();
-  }
-
-  // Colores y estilos del plano
-  getEstiloMesa(mesa: any) {
-    if (mesa.id_cuenta) {
-      // Mesa con comanda abierta
-      return 'border-orange-400 bg-orange-50 hover:bg-orange-100';
-    }
-    if (mesa.estado_mesa === 'Ocupada') {
-      return 'border-red-400 bg-red-50 hover:bg-red-100';
-    }
+  // ─── ESTILOS ───
+  getEstiloMesa(mesa: any): string {
+    if (mesa.id_cuenta)             return 'border-orange-400 bg-orange-50 hover:bg-orange-100';
+    if (mesa.estado_mesa === 'Ocupada') return 'border-red-400 bg-red-50 hover:bg-red-100';
     return 'border-green-300 bg-green-50 hover:bg-green-100';
   }
 
-  getIconoMesa(mesa: any) {
-    if (mesa.id_cuenta)           return '🟠';
+  getIconoMesa(mesa: any): string {
+    if (mesa.id_cuenta)             return '🟠';
     if (mesa.estado_mesa === 'Ocupada') return '🔴';
     return '🟢';
   }
 
-  // Nueva mesa
+  // ─── NUEVA MESA ───
   abrirModalMesa()  { this.nuevaMesaNum = ''; this.errorMesa = ''; this.mostrarModalMesa = true; }
   cerrarModalMesa() { this.mostrarModalMesa = false; }
 
   crearMesa() {
     if (!this.nuevaMesaNum || isNaN(+this.nuevaMesaNum)) { this.errorMesa = 'Número inválido'; return; }
-    const usr = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
-    this.mesaService.crearMesa({ id_sucursal: usr.id_sucursal || 1, numero_mesa: +this.nuevaMesaNum }).subscribe({
+    const id_sucursal = this.usuarioActual?.id_sucursal || 1;
+    this.mesaService.crearMesa({ id_sucursal, numero_mesa: +this.nuevaMesaNum }).subscribe({
       next: () => { this.cerrarModalMesa(); this.cargarMesas(); },
       error: () => { this.errorMesa = 'Error al crear la mesa'; }
     });
   }
 
-  // Pedidos pendientes
+  // ─── PEDIDOS PENDIENTES ───
   aprobarPedido(id_pedido: number) {
     this.mesaService.aprobarPedido(id_pedido).subscribe({
       next: () => { this.cargarPendientes(); this.cargarMesas(); },

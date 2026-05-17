@@ -2,109 +2,119 @@
 
   <!-- Toast -->
   <div *ngIf="notificacion"
-       class="fixed top-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium">
+       class="fixed top-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium animate-bounce">
     {{ notificacion }}
   </div>
 
-  <!-- Pedidos QR pendientes de aprobación -->
-  <div *ngIf="pedidosPendientes.length > 0"
-       class="bg-white rounded-xl border-2 border-amber-400 p-4">
-    <div class="flex items-center gap-3 mb-3">
-      <div class="w-3 h-3 rounded-full bg-amber-500 animate-ping"></div>
-      <h3 class="font-bold text-amber-800">
-        Pedidos QR pendientes ({{ pedidosPendientes.length }})
-      </h3>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-      <div *ngFor="let pedido of pedidosPendientes"
-           class="border-2 border-amber-300 bg-amber-50 rounded-xl p-3">
-        <div class="flex justify-between items-center mb-2">
-          <span class="font-black text-amber-800">Mesa {{ pedido.numero_mesa }}</span>
-          <span class="text-xs font-bold">Bs. {{ (+pedido.monto_total).toFixed(2) }}</span>
-        </div>
-        <div class="flex gap-2">
-          <button (click)="aprobarPedido(pedido.id_pedido)"
-                  class="flex-1 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700">
-            ✓ Aprobar
-          </button>
-          <button (click)="rechazarPedido(pedido.id_pedido)"
-                  class="flex-1 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600">
-            ✕ Rechazar
-          </button>
-        </div>
-      </div>
-    </div>
+  <!-- ═══ VERIFICANDO ═══ -->
+  <div *ngIf="verificandoCaja" class="flex justify-center py-20">
+    <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
   </div>
 
-  <!-- Plano de mesas -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-    <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
-      <div>
-        <h2 class="text-2xl font-bold text-gray-800">Plano de Mesas</h2>
-        <div class="flex gap-4 mt-1 text-xs text-gray-500">
-          <span>🟢 Libre</span>
-          <span>🟠 Con cuenta abierta</span>
-          <span>🔴 Ocupada (sin comanda)</span>
+  <!-- ═══ CAJA CERRADA ═══ -->
+  <div *ngIf="!verificandoCaja && !cajaHabilitada"
+       class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl shadow-sm border border-gray-100">
+    <div class="text-8xl mb-6">🔒</div>
+    <h2 class="text-3xl font-black text-gray-800 mb-3">Módulo Bloqueado</h2>
+    <p class="text-gray-500 mb-2">Necesitas tener la caja abierta para gestionar mesas.</p>
+    <p class="text-gray-400 text-sm">
+      Ve a <span class="font-bold text-blue-600">Punto de Venta</span> para abrir tu caja primero.
+    </p>
+  </div>
+
+  <!-- ═══ CONTENIDO NORMAL ═══ -->
+  <ng-container *ngIf="!verificandoCaja && cajaHabilitada">
+
+    <!-- Pedidos pendientes QR -->
+    <div *ngIf="pedidosPendientes.length > 0"
+         class="bg-white rounded-xl border-2 border-amber-400 p-4">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-3 h-3 rounded-full bg-amber-500 animate-ping"></div>
+        <h3 class="font-bold text-amber-800">Pedidos QR pendientes ({{ pedidosPendientes.length }})</h3>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div *ngFor="let pedido of pedidosPendientes"
+             class="border-2 border-amber-300 bg-amber-50 rounded-xl p-3">
+          <div class="flex justify-between items-center mb-2">
+            <span class="font-black text-amber-800">Mesa {{ pedido.numero_mesa }}</span>
+            <span class="text-sm font-bold text-green-700">Bs. {{ (+pedido.monto_total).toFixed(2) }}</span>
+          </div>
+          <div class="flex gap-2">
+            <button (click)="aprobarPedido(pedido.id_pedido)"
+                    class="flex-1 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700">
+              ✓ Aprobar
+            </button>
+            <button (click)="rechazarPedido(pedido.id_pedido)"
+                    class="flex-1 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600">
+              ✕ Rechazar
+            </button>
+          </div>
         </div>
       </div>
-      <div class="flex gap-2">
-        <button (click)="cargarMesas()"
-                class="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">
-          ⟳ Actualizar
-        </button>
-        <button (click)="abrirModalMesa()"
-                class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg text-sm hover:bg-blue-700">
-          + Nueva Mesa
-        </button>
+    </div>
+
+    <!-- Plano de mesas -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div class="flex flex-wrap justify-between items-center mb-5 gap-3">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800">Plano de Mesas</h2>
+          <div class="flex gap-4 mt-1 text-xs text-gray-500">
+            <span>🟢 Libre</span>
+            <span>🟠 Con comanda abierta</span>
+            <span>🔴 Ocupada</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-400">Auto-refresca cada 30s</span>
+          <button (click)="cargarMesas()"
+                  class="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">
+            ⟳ Actualizar
+          </button>
+          <button (click)="abrirModalMesa()"
+                  class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg text-sm hover:bg-blue-700">
+            + Nueva Mesa
+          </button>
+        </div>
       </div>
-    </div>
 
-    <div *ngIf="cargando" class="flex justify-center py-10">
-      <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
+      <div *ngIf="cargando" class="flex justify-center py-10">
+        <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
 
-    <!-- Grid de mesas -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-      <button *ngFor="let mesa of mesas"
-              (click)="seleccionarMesa(mesa)"
-              class="border-2 rounded-2xl p-4 transition-all hover:shadow-md text-left"
-              [ngClass]="getEstiloMesa(mesa)">
+      <div *ngIf="!cargando && mesas.length === 0" class="text-center py-10 text-gray-400">
+        No hay mesas creadas. Crea la primera.
+      </div>
 
-        <div class="text-center mb-3">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <button *ngFor="let mesa of mesas"
+                (click)="seleccionarMesa(mesa)"
+                class="border-2 rounded-2xl p-4 transition-all hover:shadow-md text-center"
+                [ngClass]="getEstiloMesa(mesa)">
           <div class="text-2xl mb-1">{{ getIconoMesa(mesa) }}</div>
           <p class="text-2xl font-black text-gray-800">{{ mesa.numero_mesa }}</p>
-          <p class="text-xs text-gray-500 font-medium">Mesa</p>
-        </div>
+          <p class="text-xs text-gray-500 mb-2">Mesa</p>
 
-        <!-- Info de la comanda -->
-        <div *ngIf="mesa.id_cuenta" class="space-y-1">
-          <p class="text-xs font-bold text-orange-700 text-center">
-            {{ mesa.num_items }} ítem(s)
-          </p>
-          <p class="text-sm font-black text-orange-800 text-center">
-            Bs. {{ (+mesa.total_acumulado || 0).toFixed(2) }}
-          </p>
-        </div>
+          <!-- Comanda activa -->
+          <div *ngIf="mesa.id_cuenta" class="space-y-0.5">
+            <p class="text-xs font-bold text-orange-700">{{ mesa.num_items }} ítem(s)</p>
+            <p class="text-sm font-black text-orange-800">Bs. {{ (+mesa.total_acumulado).toFixed(2) }}</p>
+          </div>
 
-        <p *ngIf="!mesa.id_cuenta" class="text-xs text-center text-gray-400 mt-2">
-          Click para abrir
-        </p>
-      </button>
+          <p *ngIf="!mesa.id_cuenta" class="text-xs text-gray-400">Toca para abrir</p>
+        </button>
+      </div>
     </div>
-  </div>
+
+  </ng-container>
 </div>
 
 <!-- Modal nueva mesa -->
 <div *ngIf="mostrarModalMesa"
      class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-    <div class="bg-blue-600 p-4 text-white">
-      <h3 class="font-bold text-lg">Nueva Mesa</h3>
-    </div>
+    <div class="bg-blue-600 p-4 text-white"><h3 class="font-bold text-lg">Nueva Mesa</h3></div>
     <div class="p-6">
-      <div *ngIf="errorMesa" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm mb-4">
-        {{ errorMesa }}
-      </div>
+      <div *ngIf="errorMesa" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm mb-4">{{ errorMesa }}</div>
       <label class="block text-sm font-medium text-gray-700 mb-2">Número de Mesa</label>
       <input type="number" [(ngModel)]="nuevaMesaNum"
              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-2xl text-center font-black outline-none focus:border-blue-500"
@@ -117,7 +127,7 @@
   </div>
 </div>
 
-<!-- Modal de mesa seleccionada -->
+<!-- Modal de mesa -->
 <app-mesa-modal
   *ngIf="mesaSeleccionada"
   [mesa]="mesaSeleccionada"
