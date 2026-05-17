@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ReporteService } from '../../../core/services/reporte.service';
 import { SucursalService } from '../../../core/services/sucursal.service';
+import { CajaService } from '../../../core/services/caja.service';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
@@ -17,6 +18,7 @@ Chart.register(...registerables);
 export class ResumenComponent implements OnInit, OnDestroy {
   private reporteService  = inject(ReporteService);
   private sucursalService = inject(SucursalService);
+  private cajaService     = inject(CajaService);
   private cdr             = inject(ChangeDetectorRef);
   private router          = inject(Router);
 
@@ -31,6 +33,8 @@ export class ResumenComponent implements OnInit, OnDestroy {
   nuevaSucursal    = { nombre_sucursal: '', direccion_fisica: '', telefono_contacto: '' };
   errorSucursal    = '';
   cargandoSucursal = false;
+  cajasAbiertas:     Record<number, boolean> = {};
+  cajerosTurnos:     Record<number, number>  = {};
 
   // Categorías para filtro de gráfico de productos
   listaCategorias:      any[]        = [];
@@ -100,6 +104,20 @@ export class ResumenComponent implements OnInit, OnDestroy {
       error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
+
+  cargarEstadoCajas() {
+  const sucursales = this.esAdmin ? this.sucursales : [{ id_sucursal: this.sucursalActual }];
+  sucursales.forEach((s: any) => {
+    if (!s?.id_sucursal) return;
+    this.cajaService.obtenerEstadoCajaSucursal(s.id_sucursal).subscribe({
+      next: (r: any) => {
+        this.cajasAbiertas[s.id_sucursal] = r?.hay_caja_abierta === true;
+        this.cajerosTurnos[s.id_sucursal] = r?.cajeros_con_turno || 0;
+        this.cdr.detectChanges();
+      }
+    });
+  });
+}
 
   cambiarSucursal(id_sucursal: number) {
     this.sucursalActual = id_sucursal;

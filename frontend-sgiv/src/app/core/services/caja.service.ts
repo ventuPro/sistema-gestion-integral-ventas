@@ -57,4 +57,12 @@ obtenerTurnoHoy(): Observable<any> {
 abrirTurno(datos: { id_sucursal: number; monto_inicial: number }): Observable<any> {
   return this.http.post(`${this.apiUrl}/caja/turnos/abrir`, datos, { headers: this.h() });
 }
+
+obtenerEstadoCajaSucursal(id_sucursal: number): Observable<any> {
+  return this.http.get(
+    `${this.apiUrl}/caja/estado-sucursal/${id_sucursal}`,
+    { headers: this.h() }
+  );
+}
+
 }

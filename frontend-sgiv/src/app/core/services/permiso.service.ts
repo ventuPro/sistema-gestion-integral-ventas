@@ -14,6 +14,13 @@ export const MODULOS = [
   { key: 'cocina',      label: 'Cocina (KDS)'      }
 ];
 
+// Permisos por defecto según rol (usados cuando la API falla)
+const DEFAULTS: Record<number, Record<string, boolean>> = {
+  1: { dashboard:true, inventario:true, punto_venta:true, mesas:true, arqueo:true, reportes:true, usuarios:true, cocina:true },
+  2: { dashboard:true, inventario:false, punto_venta:true, mesas:true, arqueo:true, reportes:false, usuarios:false, cocina:false },
+  3: { dashboard:false, inventario:false, punto_venta:false, mesas:false, arqueo:false, reportes:false, usuarios:false, cocina:true }
+};
+
 @Injectable({ providedIn: 'root' })
 export class PermisoService {
   private apiUrl = environment.apiUrl;
@@ -25,33 +32,57 @@ export class PermisoService {
     return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
   }
 
-  cargarMisPermisos(): Observable<any> {
+  private getRolActual(): number {
+    try {
+      const raw = localStorage.getItem('usuario_sgiv');
+      return raw ? Number(JSON.parse(raw).id_rol) : 0;
+    } catch { return 0; }
+  }
+
+  private getDefaults(): Record<string, boolean> {
+    return { ...(DEFAULTS[this.getRolActual()] || {}) };
+  }
+
+  cargarMisPermisos(): Observable<Record<string, boolean>> {
     return new Observable(observer => {
-      this.http.get<any>(`${this.apiUrl}/permisos/mis-permisos`, { headers: this.h() })
-        .subscribe({
-          next: (res) => {
-            const permisos = res.permisos || {};
-            this.permisosSubject.next(permisos);
-            localStorage.setItem('permisos_sgiv', JSON.stringify(permisos));
-            observer.next(permisos);
-            observer.complete();
-          },
-          error: (e) => {
-            // Si falla, usar permisos vacíos y continuar
-            this.permisosSubject.next({});
-            localStorage.setItem('permisos_sgiv', JSON.stringify({}));
-            observer.next({});
-            observer.complete();
-          }
-        });
+      this.http.get<any>(`${this.apiUrl}/permisos/mis-permisos`, { headers: this.h() }).subscribe({
+        next: (res) => {
+          const permisos: Record<string, boolean> = res?.permisos || this.getDefaults();
+          this.permisosSubject.next(permisos);
+          localStorage.setItem('permisos_sgiv', JSON.stringify(permisos));
+          observer.next(permisos);
+          observer.complete();
+        },
+        error: () => {
+          // Si la API falla: usar defaults del rol (NUNCA guardar objeto vacío)
+          const permisos = this.getDefaults();
+          this.permisosSubject.next(permisos);
+          localStorage.setItem('permisos_sgiv', JSON.stringify(permisos));
+          observer.next(permisos);
+          observer.complete();
+        }
+      });
     });
   }
 
   tienePermiso(modulo: string): boolean {
-    const raw = localStorage.getItem('permisos_sgiv');
-    if (!raw) return false;
     try {
+      const raw = localStorage.getItem('permisos_sgiv');
+
+      // Sin permisos en cache → usar defaults del rol
+      if (!raw) {
+        const def = this.getDefaults();
+        return def[modulo] === true;
+      }
+
       const permisos = JSON.parse(raw);
+
+      // Si el objeto está vacío → usar defaults
+      if (Object.keys(permisos).length === 0) {
+        const def = this.getDefaults();
+        return def[modulo] === true;
+      }
+
       return permisos[modulo] === true;
     } catch {
       return false;

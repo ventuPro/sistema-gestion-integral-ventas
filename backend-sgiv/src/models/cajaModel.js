@@ -2,31 +2,31 @@ const db = require('../config/db');
 
 // ─── CONTROL DE CAJA ───
 const obtenerEstadoCaja = async (id_usuario) => {
-    const result = await db.query(
+    const r = await db.query(
         `SELECT caja_habilitada FROM usuario WHERE id_usuario = $1`,
         [id_usuario]
     );
-    return result.rows[0];
+    return r.rows[0] || { caja_habilitada: false };
 };
 
 const habilitarCaja = async (id_usuario) => {
-    const result = await db.query(
-        `UPDATE usuario SET caja_habilitada = TRUE 
-         WHERE id_usuario = $1 
+    const r = await db.query(
+        `UPDATE usuario SET caja_habilitada = TRUE
+         WHERE id_usuario = $1
          RETURNING id_usuario, nombre_completo, caja_habilitada`,
         [id_usuario]
     );
-    return result.rows[0];
+    return r.rows[0];
 };
 
 const deshabilitarCaja = async (id_usuario) => {
-    const result = await db.query(
-        `UPDATE usuario SET caja_habilitada = FALSE 
-         WHERE id_usuario = $1 
+    const r = await db.query(
+        `UPDATE usuario SET caja_habilitada = FALSE
+         WHERE id_usuario = $1
          RETURNING id_usuario, nombre_completo, caja_habilitada`,
         [id_usuario]
     );
-    return result.rows[0];
+    return r.rows[0];
 };
 
 // ─── ARQUEO COMPLETO DEL DÍA ───
@@ -126,23 +126,14 @@ const obtenerVentasHoyPOS = async (id_sucursal, id_usuario_cajero) => {
 
 // ─── TURNOS ───
 const abrirTurno = async (id_sucursal, id_usuario_cajero, monto_inicial) => {
-    // 1. Verificar caja habilitada
-    const check = await db.query(
-        `SELECT caja_habilitada FROM usuario WHERE id_usuario = $1`,
+    // Solo bloquea si tiene turno ABIERTO (no importa si tiene cerrados)
+    const abierto = await db.query(
+        `SELECT id_turno FROM turno_caja
+         WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto'`,
         [id_usuario_cajero]
     );
-    if (!check.rows[0]?.caja_habilitada)
-        throw new Error('CAJA_NO_HABILITADA');
+    if (abierto.rows.length > 0) throw new Error('YA_TIENE_TURNO_ABIERTO');
 
-    // 2. Solo bloquear si hay un turno ABIERTO (no cerrados anteriores)
-    const turnoAbierto = await db.query(`
-        SELECT id_turno FROM turno_caja
-        WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto'
-    `, [id_usuario_cajero]);
-    if (turnoAbierto.rows.length > 0)
-        throw new Error('YA_TIENE_TURNO_ABIERTO');
-
-    // 3. Crear nuevo turno (sin importar si hay turnos cerrados hoy)
     const r = await db.query(`
         INSERT INTO turno_caja (id_sucursal, id_usuario_cajero, monto_inicial, estado_turno)
         VALUES ($1, $2, $3, 'Abierto') RETURNING *
@@ -154,26 +145,17 @@ const cerrarCaja = async (id_sucursal, id_usuario_cajero) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
-
-        // Cerrar turno abierto si existe
-        const resTurno = await client.query(`
+        await client.query(`
             UPDATE turno_caja
-            SET fecha_hora_cierre  = CURRENT_TIMESTAMP,
-                estado_turno       = 'Cerrado'
-            WHERE id_usuario_cajero = $1
-              AND id_sucursal       = $2
-              AND estado_turno      = 'Abierto'
-            RETURNING *
+            SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado'
+            WHERE id_usuario_cajero = $1 AND id_sucursal = $2 AND estado_turno = 'Abierto'
         `, [id_usuario_cajero, id_sucursal]);
-
-        // Deshabilitar caja
         await client.query(
             `UPDATE usuario SET caja_habilitada = FALSE WHERE id_usuario = $1`,
             [id_usuario_cajero]
         );
-
         await client.query('COMMIT');
-        return { turno_cerrado: resTurno.rows[0] || null, mensaje: 'Caja cerrada correctamente' };
+        return { mensaje: 'Caja cerrada correctamente' };
     } catch (e) {
         await client.query('ROLLBACK');
         throw e;
@@ -311,10 +293,63 @@ const verificarTurnoHoy = async (id_usuario_cajero) => {
     return r.rows[0] || null;
 };
 
+const obtenerEstadoRealCaja = async (id_usuario) => {
+    // Buscar turno abierto (sin filtro de fecha — la fecha puede cruzar medianoche)
+    const rTurno = await db.query(`
+        SELECT id_turno, fecha_hora_apertura, monto_inicial
+        FROM turno_caja
+        WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto'
+        ORDER BY fecha_hora_apertura DESC LIMIT 1
+    `, [id_usuario]);
+
+    const turnoAbierto = rTurno.rows[0] || null;
+
+    // Si hay turno abierto, la caja ESTÁ abierta aunque caja_habilitada sea false
+    if (turnoAbierto) {
+        // Sincronizar: asegurar que caja_habilitada sea true
+        await db.query(
+            `UPDATE usuario SET caja_habilitada = TRUE WHERE id_usuario = $1 AND caja_habilitada = FALSE`,
+            [id_usuario]
+        );
+        return { caja_habilitada: true, turno: turnoAbierto, estado: 'Abierta' };
+    }
+
+    // Sin turno abierto → revisar caja_habilitada
+    const rUser = await db.query(
+        `SELECT caja_habilitada FROM usuario WHERE id_usuario = $1`,
+        [id_usuario]
+    );
+    const caja_habilitada = rUser.rows[0]?.caja_habilitada ?? false;
+
+    return {
+        caja_habilitada,
+        turno:  null,
+        estado: caja_habilitada ? 'Habilitada (sin turno)' : 'Cerrada'
+    };
+};
+
+const obtenerEstadoCajaSucursal = async (id_sucursal) => {
+    const r = await db.query(`
+        SELECT
+            COUNT(DISTINCT t.id_usuario_cajero)::int AS cajeros_con_turno,
+            EXISTS(
+                SELECT 1 FROM turno_caja t2
+                JOIN usuario u2 ON t2.id_usuario_cajero = u2.id_usuario
+                WHERE u2.id_sucursal = $1 AND t2.estado_turno = 'Abierto'
+            ) AS hay_caja_abierta
+        FROM turno_caja t
+        JOIN usuario u ON t.id_usuario_cajero = u.id_usuario
+        WHERE u.id_sucursal = $1 AND t.estado_turno = 'Abierto'
+    `, [id_sucursal]);
+    return r.rows[0];
+};
+
 module.exports = {
     obtenerEstadoCaja, habilitarCaja, deshabilitarCaja,
     obtenerArqueoHoy, obtenerVentasHoyPOS,
     abrirTurno, cerrarCaja, registrarVenta,
     obtenerCierresCaja,
-    verificarTurnoHoy  
+    verificarTurnoHoy,
+    obtenerEstadoRealCaja,
+    obtenerEstadoCajaSucursal 
 };

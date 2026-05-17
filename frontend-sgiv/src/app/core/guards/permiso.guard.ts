@@ -1,22 +1,46 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { PermisoService } from '../services/permiso.service';
+
+const DEFAULTS_CAJERO: Record<string, boolean> = {
+  dashboard: true, inventario: false, punto_venta: true,
+  mesas: true, arqueo: true, reportes: false, usuarios: false, cocina: false
+};
 
 export function permisoGuard(modulo: string): CanActivateFn {
   return () => {
-    const permisoService = inject(PermisoService);
-    const router         = inject(Router);
+    const router = inject(Router);
 
-    // Administrador (rol 1) siempre pasa
-    const raw = localStorage.getItem('usuario_sgiv');
-    if (raw) {
-      const u = JSON.parse(raw);
-      if (u.id_rol === 1) return true;
+    // Sin sesión → login
+    const rawUser = localStorage.getItem('usuario_sgiv');
+    if (!rawUser) { router.navigate(['/login']); return false; }
+
+    const u = JSON.parse(rawUser);
+
+    // Admin siempre pasa
+    if (Number(u.id_rol) === 1) return true;
+
+    // Leer permisos del cache
+    const rawPermisos = localStorage.getItem('permisos_sgiv');
+
+    if (!rawPermisos || rawPermisos === '{}' || rawPermisos === 'null') {
+      // Sin cache → usar defaults del cajero
+      if (Number(u.id_rol) === 2) {
+        return DEFAULTS_CAJERO[modulo] === true
+          ? true
+          : (router.navigate(['/dashboard/sin-acceso']), false);
+      }
+      router.navigate(['/dashboard/sin-acceso']);
+      return false;
     }
 
-    if (permisoService.tienePermiso(modulo)) return true;
-
-    router.navigate(['/dashboard/sin-acceso']);
-    return false;
+    try {
+      const permisos = JSON.parse(rawPermisos);
+      if (permisos[modulo] === true) return true;
+      router.navigate(['/dashboard/sin-acceso']);
+      return false;
+    } catch {
+      router.navigate(['/dashboard/sin-acceso']);
+      return false;
+    }
   };
 }

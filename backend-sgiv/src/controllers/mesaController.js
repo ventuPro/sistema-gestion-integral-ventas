@@ -49,15 +49,17 @@ const actualizarEstado = async (req, res) => {
 const eliminarMesa = async (req, res) => {
     try {
         const id_mesa = Number(req.params.id_mesa);
+        if (!id_mesa) return res.status(400).json({ error: 'ID de mesa inválido' });
+
         await m.eliminarMesa(id_mesa);
+
+        // Notificar a cajeros que la mesa fue eliminada
+        global.io?.to('cajeros').emit('mesa:actualizada', { id_mesa });
+
         res.json({ mensaje: 'Mesa eliminada correctamente' });
     } catch (e) {
-        if (e.message === 'MESA_CON_CUENTA_ACTIVA')
-            return res.status(409).json({ error: 'No se puede eliminar: la mesa tiene una cuenta abierta.' });
-        if (e.message === 'MESA_CON_PEDIDO_ACTIVO')
-            return res.status(409).json({ error: 'No se puede eliminar: hay un pedido activo en esta mesa.' });
-        console.error('eliminarMesa:', e);
-        res.status(500).json({ error: 'Error al eliminar la mesa' });
+        console.error('eliminarMesa error:', e.message);
+        res.status(500).json({ error: `Error al eliminar: ${e.message}` });
     }
 };
 

@@ -1,34 +1,26 @@
 const cajaModel = require('../models/cajaModel');
 
-// ─── CONTROL DE CAJA (Admin) ───
+// ─── CONTROL DE CAJA (Admin) ──────────────────────────────────
 const getEstadoCaja = async (req, res) => {
     try {
-        const estado = await cajaModel.obtenerEstadoCaja(req.params.id_usuario);
-        res.json({ caja_habilitada: estado?.caja_habilitada ?? false });
+        const dato = await cajaModel.obtenerEstadoCaja(Number(req.params.id_usuario));
+        res.json({ caja_habilitada: dato?.caja_habilitada ?? false });
     } catch (e) {
-        res.status(500).json({ error: 'Error al obtener estado de caja' });
+        console.error('getEstadoCaja:', e.message);
+        res.status(500).json({ error: e.message });
     }
 };
 
 const habilitarCajaUsuario = async (req, res) => {
     try {
-        const rolAdmin = Number(req.usuario.id_rol);
-        if (rolAdmin !== 1)
+        if (Number(req.usuario.id_rol) !== 1)
             return res.status(403).json({ error: 'Solo el administrador puede habilitar la caja' });
-
-        const id_usuario = Number(req.params.id_usuario);
-        if (!id_usuario || isNaN(id_usuario))
-            return res.status(400).json({ error: 'ID de usuario inválido' });
-
-        const resultado = await cajaModel.habilitarCaja(id_usuario);
-        if (!resultado)
-            return res.status(404).json({ error: 'Usuario no encontrado' });
-
-        console.log(`✅ Caja habilitada para usuario ${id_usuario} por admin ${req.usuario.id_usuario}`);
-        return res.json({ mensaje: 'Caja habilitada correctamente', usuario: resultado });
+        const r = await cajaModel.habilitarCaja(Number(req.params.id_usuario));
+        if (!r) return res.status(404).json({ error: 'Usuario no encontrado' });
+        res.json({ mensaje: 'Caja habilitada', usuario: r });
     } catch (e) {
-        console.error('Error habilitarCajaUsuario:', e);
-        return res.status(500).json({ error: 'Error interno al habilitar caja' });
+        console.error('habilitarCaja:', e.message);
+        res.status(500).json({ error: e.message });
     }
 };
 
@@ -36,128 +28,120 @@ const deshabilitarCajaUsuario = async (req, res) => {
     try {
         if (Number(req.usuario.id_rol) !== 1)
             return res.status(403).json({ error: 'Solo el administrador puede cerrar la caja' });
-
-        const id_usuario = Number(req.params.id_usuario);
-        const resultado  = await cajaModel.deshabilitarCaja(id_usuario);
-        if (!resultado)
-            return res.status(404).json({ error: 'Usuario no encontrado' });
-
-        return res.json({ mensaje: 'Caja cerrada correctamente', usuario: resultado });
+        const r = await cajaModel.deshabilitarCaja(Number(req.params.id_usuario));
+        if (!r) return res.status(404).json({ error: 'Usuario no encontrado' });
+        res.json({ mensaje: 'Caja cerrada', usuario: r });
     } catch (e) {
-        console.error('Error deshabilitarCajaUsuario:', e);
-        return res.status(500).json({ error: 'Error interno al deshabilitar caja' });
+        console.error('deshabilitarCaja:', e.message);
+        res.status(500).json({ error: e.message });
     }
 };
 
-// ─── ARQUEO DEL DÍA ───
-const getArqueoHoy = async (req, res) => {
+// ─── TURNO ────────────────────────────────────────────────────
+const getTurnoHoy = async (req, res) => {
     try {
-        const id_sucursal       = req.params.id_sucursal;
-        const id_usuario_cajero = req.usuario.id_usuario;
-        const data = await cajaModel.obtenerArqueoHoy(id_sucursal, id_usuario_cajero);
-        res.json(data);
+        const turno = await cajaModel.verificarTurnoHoy(req.usuario.id_usuario);
+        res.json({ turno });
     } catch (e) {
-        console.error('Error en getArqueoHoy:', e);
-        res.status(500).json({ error: 'Error al obtener el arqueo' });
+        console.error('getTurnoHoy:', e.message);
+        res.status(500).json({ error: e.message });
     }
 };
 
-// ─── VENTAS HOY (para POS) ───
-const getVentasHoyPOS = async (req, res) => {
-    try {
-        const id_sucursal       = req.params.id_sucursal;
-        const id_usuario_cajero = req.usuario.id_usuario;
-        const ventas = await cajaModel.obtenerVentasHoyPOS(id_sucursal, id_usuario_cajero);
-        res.json(ventas);
-    } catch (e) {
-        console.error('Error en getVentasHoyPOS:', e);
-        res.status(500).json({ error: 'Error al obtener ventas del día' });
-    }
-};
-
-// ─── CIERRE DE CAJA ───
-const cerrarCaja = async (req, res) => {
-    try {
-        const id_usuario_cajero = req.usuario.id_usuario;
-        const { id_sucursal }   = req.body;
-        const resultado = await cajaModel.cerrarCaja(id_sucursal, id_usuario_cajero);
-        res.json(resultado);
-    } catch (e) {
-        console.error('Error en cerrarCaja:', e);
-        res.status(500).json({ error: 'Error al cerrar la caja' });
-    }
-};
-
-// ─── TURNO ───
 const abrirCaja = async (req, res) => {
     try {
         const { id_sucursal, monto_inicial } = req.body;
-        const id_usuario_cajero = req.usuario.id_usuario;
-        const turno = await cajaModel.abrirTurno(id_sucursal, id_usuario_cajero, monto_inicial);
+        const turno = await cajaModel.abrirTurno(
+            Number(id_sucursal),
+            req.usuario.id_usuario,
+            Number(monto_inicial) || 0
+        );
         res.status(201).json({ mensaje: 'Turno abierto', turno });
     } catch (e) {
-        if (e.message === 'CAJA_NO_HABILITADA')
-            return res.status(403).json({ error: 'Tu caja no está habilitada. Contacta al Administrador.' });
         if (e.message === 'YA_TIENE_TURNO_ABIERTO')
             return res.status(400).json({ error: 'Ya tienes un turno abierto.' });
-        res.status(500).json({ error: 'Error al abrir la caja' });
+        console.error('abrirCaja:', e.message);
+        res.status(500).json({ error: e.message });
     }
 };
 
-// ─── VENTA ───
-const cobrarVenta = async (req, res) => {
+const cerrarCaja = async (req, res) => {
     try {
-        const datosVenta = { ...req.body };
-        datosVenta.id_usuario_cajero = req.usuario.id_usuario;
-        const id_venta = await cajaModel.registrarVenta(datosVenta);
+        const { id_sucursal } = req.body;
+        const r = await cajaModel.cerrarCaja(Number(id_sucursal), req.usuario.id_usuario);
+        res.json(r);
+    } catch (e) {
+        console.error('cerrarCaja:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+};
 
-        // Notificar stock actualizado
-        global.io?.emit('stock:actualizado', {
-            id_sucursal: datosVenta.id_sucursal,
-            productos:   datosVenta.detalles.map((d) => ({
-                id_producto:      d.id_producto,
-                cantidad_vendida: d.cantidad
-            }))
-        });
+// ─── ARQUEO / VENTAS ──────────────────────────────────────────
+const getArqueoHoy = async (req, res) => {
+    try {
+        const data = await cajaModel.obtenerArqueoHoy(
+            Number(req.params.id_sucursal),
+            req.usuario.id_usuario
+        );
+        res.json(data);
+    } catch (e) {
+        console.error('getArqueoHoy:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+};
 
-        res.status(201).json({ mensaje: 'Venta registrada', id_venta });
-    } catch(e) {
-        // FIX: devolver el error real para diagnóstico
-        console.error('❌ cobrarVenta error:', e.message, e.detail || '');
-        res.status(500).json({
-            error:   'Error al registrar la venta.',
-            detalle: e.message   // ← visible en el frontend para depurar
-        });
+const getVentasHoyPOS = async (req, res) => {
+    try {
+        const ventas = await cajaModel.obtenerVentasHoyPOS(
+            Number(req.params.id_sucursal),
+            req.usuario.id_usuario
+        );
+        res.json(ventas);
+    } catch (e) {
+        console.error('getVentasHoyPOS:', e.message);
+        res.status(500).json({ error: e.message });
     }
 };
 
 const getCierresCaja = async (req, res) => {
     try {
-        if (req.usuario.id_rol !== 1)
-            return res.status(403).json({ error: 'Solo el administrador puede ver los cierres' });
+        if (Number(req.usuario.id_rol) !== 1)
+            return res.status(403).json({ error: 'Solo el administrador' });
         const cierres = await cajaModel.obtenerCierresCaja();
         res.json(cierres);
     } catch (e) {
-        console.error('Error en getCierresCaja:', e);
-        res.status(500).json({ error: 'Error al obtener cierres de caja' });
+        res.status(500).json({ error: e.message });
     }
 };
 
-const getTurnoHoy = async (req, res) => {
+const cobrarVenta = async (req, res) => {
     try {
-        const id_usuario_cajero = req.usuario.id_usuario;
-        const turno = await cajaModel.verificarTurnoHoy(id_usuario_cajero);
-        res.json({ turno });
+        const datos = { ...req.body, id_usuario_cajero: req.usuario.id_usuario };
+        const id_venta = await cajaModel.registrarVenta(datos);
+        global.io?.emit('stock:actualizado', {
+            id_sucursal: datos.id_sucursal,
+            productos: datos.detalles.map(d => ({ id_producto: d.id_producto, cantidad_vendida: d.cantidad }))
+        });
+        res.status(201).json({ mensaje: 'Venta registrada', id_venta });
     } catch (e) {
-        console.error('Error en getTurnoHoy:', e);
-        res.status(500).json({ error: 'Error al verificar turno' });
+        console.error('cobrarVenta:', e.message);
+        res.status(500).json({ error: 'Error al registrar la venta.', detalle: e.message });
+    }
+};
+
+// ─── ESTADO PARA PANEL PRINCIPAL ─────────────────────────────
+const getEstadoCajaSucursal = async (req, res) => {
+    try {
+        const r = await cajaModel.obtenerEstadoCajaSucursal(Number(req.params.id_sucursal));
+        res.json(r);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 };
 
 module.exports = {
     getEstadoCaja, habilitarCajaUsuario, deshabilitarCajaUsuario,
-    getArqueoHoy, getVentasHoyPOS,
-    cerrarCaja, abrirCaja, cobrarVenta,
-    getCierresCaja,
-    getTurnoHoy
+    getTurnoHoy, abrirCaja, cerrarCaja,
+    getArqueoHoy, getVentasHoyPOS, getCierresCaja, cobrarVenta,
+    getEstadoCajaSucursal
 };

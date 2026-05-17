@@ -1,6 +1,5 @@
 const db = require('../config/db');
 
-// Módulos del sistema por defecto según rol
 const PERMISOS_DEFAULT = {
     2: { // Cajero
         dashboard:   true,
@@ -24,75 +23,75 @@ const PERMISOS_DEFAULT = {
     }
 };
 
-const MODULOS = [
-    'dashboard','punto_venta','mesas','arqueo',
-    'inventario','reportes','usuarios','cocina'
-];
+const MODULOS = ['dashboard','punto_venta','mesas','arqueo','inventario','reportes','usuarios','cocina'];
 
-// Obtener permisos efectivos del usuario (combina tabla + defaults)
 const obtenerPermisosEfectivos = async (id_usuario, id_rol) => {
-    // Admin siempre tiene todo
-    if (id_rol === 1) {
-        const todos = {};
-        MODULOS.forEach(m => todos[m] = true);
-        return todos;
-    }
-
-    // Buscar permisos guardados en tabla
-    const result = await db.query(
-        `SELECT modulo, tiene_acceso FROM permiso_usuario WHERE id_usuario = $1`,
-        [id_usuario]
-    );
-
-    // Si tiene registros en tabla, usar esos
-    if (result.rows.length > 0) {
+    // Admin tiene todo
+    if (Number(id_rol) === 1) {
         const permisos = {};
-        MODULOS.forEach(m => permisos[m] = false);
-        result.rows.forEach(r => { permisos[r.modulo] = r.tiene_acceso; });
+        MODULOS.forEach(m => permisos[m] = true);
         return permisos;
     }
 
-    // Si no tiene registros, usar defaults del rol
-    return PERMISOS_DEFAULT[id_rol] || {};
+    try {
+        const r = await db.query(
+            `SELECT modulo, tiene_acceso FROM permiso_usuario WHERE id_usuario = $1`,
+            [id_usuario]
+        );
+
+        if (r.rows.length > 0) {
+            // Tiene permisos guardados — usar esos
+            const permisos = {};
+            MODULOS.forEach(m => permisos[m] = false);
+            r.rows.forEach(row => {
+                // FIX: asegurar que es boolean, no string
+                permisos[row.modulo] = row.tiene_acceso === true || row.tiene_acceso === 'true';
+            });
+            return permisos;
+        }
+
+        // Sin permisos guardados → usar defaults del rol
+        return { ...(PERMISOS_DEFAULT[Number(id_rol)] || {}) };
+    } catch (e) {
+        console.error('obtenerPermisosEfectivos error:', e.message);
+        // Si falla la DB, usar defaults para no bloquear el login
+        return { ...(PERMISOS_DEFAULT[Number(id_rol)] || {}) };
+    }
 };
 
-// Obtener permisos de un usuario específico (para el admin editarlos)
 const obtenerPermisosUsuario = async (id_usuario, id_rol) => {
-    const result = await db.query(
-        `SELECT modulo, tiene_acceso FROM permiso_usuario WHERE id_usuario = $1`,
-        [id_usuario]
-    );
+    const base = { ...(PERMISOS_DEFAULT[Number(id_rol)] || {}) };
+    MODULOS.forEach(m => { if (!(m in base)) base[m] = false; });
 
-    const base = PERMISOS_DEFAULT[id_rol] || {};
-    const permisos = { ...base };
-
-    if (result.rows.length > 0) {
-        MODULOS.forEach(m => permisos[m] = false);
-        result.rows.forEach(r => { permisos[r.modulo] = r.tiene_acceso; });
+    try {
+        const r = await db.query(
+            `SELECT modulo, tiene_acceso FROM permiso_usuario WHERE id_usuario = $1`,
+            [id_usuario]
+        );
+        if (r.rows.length > 0) {
+            MODULOS.forEach(m => base[m] = false);
+            r.rows.forEach(row => {
+                base[row.modulo] = row.tiene_acceso === true || row.tiene_acceso === 'true';
+            });
+        }
+    } catch (e) {
+        console.error('obtenerPermisosUsuario error:', e.message);
     }
 
-    return permisos;
+    return base;
 };
 
-// Guardar permisos de un usuario (upsert)
 const guardarPermisosUsuario = async (id_usuario, permisos) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
+        await client.query(`DELETE FROM permiso_usuario WHERE id_usuario = $1`, [id_usuario]);
 
-        // Eliminar permisos anteriores
-        await client.query(
-            `DELETE FROM permiso_usuario WHERE id_usuario = $1`,
-            [id_usuario]
-        );
-
-        // Insertar nuevos
         for (const [modulo, tiene_acceso] of Object.entries(permisos)) {
-            await client.query(
-                `INSERT INTO permiso_usuario (id_usuario, modulo, tiene_acceso)
-                 VALUES ($1, $2, $3)`,
-                [id_usuario, modulo, tiene_acceso]
-            );
+            await client.query(`
+                INSERT INTO permiso_usuario (id_usuario, modulo, tiene_acceso)
+                VALUES ($1, $2, $3)
+            `, [id_usuario, modulo, Boolean(tiene_acceso)]);
         }
 
         await client.query('COMMIT');
@@ -105,8 +104,4 @@ const guardarPermisosUsuario = async (id_usuario, permisos) => {
     }
 };
 
-module.exports = {
-    obtenerPermisosEfectivos,
-    obtenerPermisosUsuario,
-    guardarPermisosUsuario
-};
+module.exports = { obtenerPermisosEfectivos, obtenerPermisosUsuario, guardarPermisosUsuario };

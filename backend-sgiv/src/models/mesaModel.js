@@ -67,27 +67,41 @@ const actualizarEstadoMesa = async (id_mesa, estado_mesa) => {
 };
 
 const eliminarMesa = async (id_mesa) => {
-    // Verificar que no tenga cuenta activa
-    const cuentaActiva = await db.query(
-        `SELECT id_cuenta FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta'`,
-        [id_mesa]
-    );
-    if (cuentaActiva.rows.length > 0)
-        throw new Error('MESA_CON_CUENTA_ACTIVA');
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
 
-    // Verificar que no tenga pedidos pendientes
-    const pedidoPendiente = await db.query(
-        `SELECT id_pedido FROM pedido_mesa WHERE id_mesa = $1 AND estado_pedido IN ('Pendiente_Cajero','En_Cocina')`,
-        [id_mesa]
-    );
-    if (pedidoPendiente.rows.length > 0)
-        throw new Error('MESA_CON_PEDIDO_ACTIVO');
+        // Cerrar cualquier cuenta activa primero
+        await client.query(`
+            UPDATE cuenta_mesa
+            SET estado = 'Cancelada', fecha_cierre = NOW()
+            WHERE id_mesa = $1 AND estado = 'Abierta'
+        `, [id_mesa]);
 
-    const r = await db.query(
-        `DELETE FROM mesa_local WHERE id_mesa = $1 RETURNING *`,
-        [id_mesa]
-    );
-    return r.rows[0];
+        // Cancelar pedidos activos
+        await client.query(`
+            UPDATE pedido_mesa
+            SET estado_pedido = 'Cancelado'
+            WHERE id_mesa = $1
+              AND estado_pedido IN ('Pendiente_Cajero', 'En_Cocina', 'Listo')
+        `, [id_mesa]);
+
+        // Eliminar la mesa (las cuentas y pedidos ya se cancelaron)
+        const r = await client.query(
+            `DELETE FROM mesa_local WHERE id_mesa = $1 RETURNING *`,
+            [id_mesa]
+        );
+
+        if (!r.rows.length) throw new Error('Mesa no encontrada');
+
+        await client.query('COMMIT');
+        return r.rows[0];
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
 };
 
 module.exports = { crearMesa, obtenerMesasPorSucursal, generarQR, actualizarEstadoMesa, eliminarMesa };

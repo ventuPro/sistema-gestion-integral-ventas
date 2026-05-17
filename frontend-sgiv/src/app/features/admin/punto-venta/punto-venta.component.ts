@@ -71,65 +71,62 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {}
 
-  // ─── PASO 1: Verificar si caja está habilitada ───
-  verificarAccesoCaja() {
-    this.verificandoCaja = true;
+  // ─── PASO 1: verifica caja_habilitada ───
+verificarAccesoCaja() {
+  this.verificandoCaja = true;
 
-    if (this.usuarioActual?.id_rol === 1) {
-      this.cajaHabilitada  = true;
-      this.verificandoCaja = false;
-      this.cargarCatalogo();
-      this.cargarVentasHoy();
-      return;
-    }
-
-    this.cajaService.obtenerEstadoCaja(this.usuarioActual.id_usuario).subscribe({
-      next: (res) => {
-        this.cajaHabilitada  = res.caja_habilitada;
-        this.verificandoCaja = false;
-
-        if (this.cajaHabilitada) {
-          this.verificarTurnoActivo(); // ← pasa al PASO 2
-        } else {
-          this.cargando = false;
-        }
-        this.cdr.detectChanges();
-      },
-      error: () => {
-        this.cajaHabilitada  = false;
-        this.verificandoCaja = false;
-        this.cargando        = false;
-        this.cdr.detectChanges();
-      }
-    });
+  if (this.usuarioActual?.id_rol === 1) {
+    // Admin: acceso directo sin verificar caja
+    this.cajaHabilitada  = true;
+    this.verificandoCaja = false;
+    this.cargarCatalogo();
+    this.cargarVentasHoy();
+    return;
   }
 
-  // ─── PASO 2: Verificar si tiene turno abierto ───
-  verificarTurnoActivo() {
-    this.cajaService.obtenerTurnoHoy().subscribe({
-      next: (res) => {
-        this.turnoActivo = res.turno;
+  this.cajaService.obtenerEstadoCaja(this.usuarioActual.id_usuario).subscribe({
+    next: (res) => {
+      this.cajaHabilitada  = res.caja_habilitada === true;
+      this.verificandoCaja = false;
+      if (this.cajaHabilitada) {
+        this.verificarTurnoActivo(); // PASO 2
+      } else {
+        this.cargando = false;
+      }
+      this.cdr.detectChanges();
+    },
+    error: () => {
+      this.cajaHabilitada  = false;
+      this.verificandoCaja = false;
+      this.cargando        = false;
+      this.cdr.detectChanges();
+    }
+  });
+}
 
-        if (this.turnoActivo?.estado_turno === 'Abierto') {
-          // Tiene turno abierto → mostrar POS directamente
-          this.mostrarAbrirTurno = false;
-          this.cargarCatalogo();
-          this.cargarVentasHoy();
-        } else {
-          // Sin turno abierto → mostrar formulario de apertura
-          this.mostrarAbrirTurno = true;
-          this.cargando          = false;
-        }
-        this.cdr.detectChanges();
-      },
-      error: () => {
+// ─── PASO 2: verifica turno abierto ───
+verificarTurnoActivo() {
+  this.cajaService.obtenerTurnoHoy().subscribe({
+    next: (res) => {
+      this.turnoActivo = res.turno;
+
+      if (this.turnoActivo?.estado_turno === 'Abierto') {
+        this.mostrarAbrirTurno = false;
+        this.cargarCatalogo();
+        this.cargarVentasHoy();
+      } else {
         this.mostrarAbrirTurno = true;
         this.cargando          = false;
-        this.cdr.detectChanges();
       }
-    });
-  }
-
+      this.cdr.detectChanges();
+    },
+    error: () => {
+      this.mostrarAbrirTurno = true;
+      this.cargando          = false;
+      this.cdr.detectChanges();
+    }
+  });
+}
   // ─── ABRIR TURNO (cajero) ───
   confirmarAbrirTurno() {
     if (this.montoInicial < 0) { this.errorTurno = 'Monto inválido.'; return; }
