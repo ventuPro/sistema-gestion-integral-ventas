@@ -2,7 +2,7 @@ import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angula
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CuentaService }  from '../../../core/services/cuenta.service';
-import { CajaService }    from '../../../core/services/caja.service';
+import { CajaService, EstadoCajaCompleto }    from '../../../core/services/caja.service';
 import { MesaService }    from '../../../core/services/mesa.service';
 import { SocketService }  from '../../../core/services/socket.service';
 import { MesaModalComponent } from './mesa-modal/mesa-modal.component';
@@ -21,9 +21,11 @@ export class MesasComponent implements OnInit, OnDestroy {
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
 
-  // ─── Control de acceso ───
+  // ─── Control de acceso (basado en estado real del turno) ───
   verificandoCaja  = true;
-  cajaHabilitada   = false;
+  cajaHabilitada   = false;   // se mantiene por compatibilidad con el HTML
+  estadoCaja: EstadoCajaCompleto['estado'] = 'SIN_APERTURA';
+  turnoCajero: any = null;
   usuarioActual:   any = null;
   esAdmin          = false;
 
@@ -58,26 +60,37 @@ export class MesasComponent implements OnInit, OnDestroy {
     if (this.refreshInterval) clearInterval(this.refreshInterval);
   }
 
-  // ─── VERIFICAR ACCESO ───
+  // ─── VERIFICAR ACCESO (usa el estado real del turno) ───
   verificarAccesoCaja() {
     // Admin siempre tiene acceso
     if (this.esAdmin) {
       this.cajaHabilitada  = true;
+      this.estadoCaja      = 'ABIERTA';
       this.verificandoCaja = false;
       this.inicializar();
       return;
     }
 
-    this.cajaService.obtenerEstadoCaja(this.usuarioActual.id_usuario).subscribe({
+    this.cajaService.obtenerEstadoCompleto().subscribe({
       next: (res) => {
-        this.cajaHabilitada  = res.caja_habilitada;
+        this.estadoCaja     = res.estado;
+        this.cajaHabilitada = res.puede_vender;
+        this.turnoCajero    = res.turno;
         this.verificandoCaja = false;
-        if (this.cajaHabilitada) this.inicializar();
+
+        // Sincronizar localStorage
+        if (this.usuarioActual) {
+          this.usuarioActual.caja_habilitada = res.caja_habilitada;
+          localStorage.setItem('usuario_sgiv', JSON.stringify(this.usuarioActual));
+        }
+
+        if (res.puede_vender) this.inicializar();
         else this.cargando = false;
         this.cdr.detectChanges();
       },
       error: () => {
         this.cajaHabilitada  = false;
+        this.estadoCaja      = 'SIN_APERTURA';
         this.verificandoCaja = false;
         this.cargando        = false;
         this.cdr.detectChanges();

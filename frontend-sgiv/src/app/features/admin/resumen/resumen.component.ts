@@ -64,9 +64,13 @@ export class ResumenComponent implements OnInit, OnDestroy {
     this.cargarSucursales();
     this.cargarCategorias();
     this.cargarDatos();
+    this.cargarEstadoCajas();
 
-    // Refresco automático cada 60s
-    this.refreshInterval = setInterval(() => this.cargarDatos(), 60000);
+    // Refresco automático cada 30s (incluye estado de cajas)
+    this.refreshInterval = setInterval(() => {
+      this.cargarDatos();
+      this.cargarEstadoCajas();
+    }, 30000);
   }
 
   ngOnDestroy() {
@@ -76,7 +80,12 @@ export class ResumenComponent implements OnInit, OnDestroy {
 
   cargarSucursales() {
     this.sucursalService.listarSucursales().subscribe({
-      next: (s) => { this.sucursales = s; }
+      next: (s) => {
+        this.sucursales = s;
+        // Una vez cargadas las sucursales, consultar el estado de caja de cada una
+        this.cargarEstadoCajas();
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -106,24 +115,35 @@ export class ResumenComponent implements OnInit, OnDestroy {
   }
 
   cargarEstadoCajas() {
-  const sucursales = this.esAdmin ? this.sucursales : [{ id_sucursal: this.sucursalActual }];
-  sucursales.forEach((s: any) => {
-    if (!s?.id_sucursal) return;
-    this.cajaService.obtenerEstadoCajaSucursal(s.id_sucursal).subscribe({
-      next: (r: any) => {
-        this.cajasAbiertas[s.id_sucursal] = r?.hay_caja_abierta === true;
-        this.cajerosTurnos[s.id_sucursal] = r?.cajeros_con_turno || 0;
-        this.cdr.detectChanges();
-      }
+    // Garantizar que SIEMPRE pidamos al menos el estado de la sucursal actual,
+    // aunque la lista de sucursales aún no haya cargado.
+    const lista = this.esAdmin && this.sucursales.length > 0
+      ? this.sucursales
+      : [{ id_sucursal: this.sucursalActual }];
+
+    lista.forEach((s: any) => {
+      if (!s?.id_sucursal) return;
+      this.cajaService.obtenerEstadoCajaSucursal(s.id_sucursal).subscribe({
+        next: (r: any) => {
+          this.cajasAbiertas[s.id_sucursal] = r?.hay_caja_abierta === true;
+          this.cajerosTurnos[s.id_sucursal] = Number(r?.cajeros_con_turno) || 0;
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          this.cajasAbiertas[s.id_sucursal] = false;
+          this.cajerosTurnos[s.id_sucursal] = 0;
+          this.cdr.detectChanges();
+        }
+      });
     });
-  });
-}
+  }
 
   cambiarSucursal(id_sucursal: number) {
     this.sucursalActual = id_sucursal;
     this.cargando = true;
     this.destruirGraficos();
     this.cargarDatos();
+    this.cargarEstadoCajas();
   }
 
   filtrarCategoria(idCat: number | null) {

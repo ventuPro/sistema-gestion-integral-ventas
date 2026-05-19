@@ -59,20 +59,40 @@
 
     <!-- Estado del turno -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-      <h3 class="font-bold text-gray-700 mb-3">Estado del Turno</h3>
-      <div *ngIf="arqueo.turno_activo" class="flex items-center gap-3">
-        <div class="w-3 h-3 rounded-full bg-green-400 animate-pulse"></div>
-        <div>
-          <p class="text-sm font-semibold text-gray-800">Turno activo</p>
+      <h3 class="font-bold text-gray-700 mb-3">Estado de la Caja</h3>
+
+      <!-- ABIERTA -->
+      <div *ngIf="arqueo.turno_activo?.estado_turno === 'Abierto'" class="flex items-center gap-3">
+        <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+        <div class="flex-1">
+          <p class="text-sm font-black text-green-700">CAJA ABIERTA</p>
           <p class="text-xs text-gray-500">
-            Abierto el {{ arqueo.turno_activo.fecha_hora_apertura | date:'dd/MM/yyyy HH:mm' }} —
+            Turno #{{ arqueo.turno_activo.id_turno }} ·
+            Abierto el {{ arqueo.turno_activo.fecha_hora_apertura | date:'dd/MM/yyyy HH:mm' }} ·
             Monto inicial: Bs. {{ arqueo.turno_activo.monto_inicial }}
           </p>
         </div>
+        <span class="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">ABIERTO</span>
       </div>
+
+      <!-- CERRADA HOY -->
+      <div *ngIf="arqueo.turno_activo?.estado_turno === 'Cerrado'" class="flex items-center gap-3">
+        <div class="w-3 h-3 rounded-full bg-red-400"></div>
+        <div class="flex-1">
+          <p class="text-sm font-black text-red-600">CAJA CERRADA</p>
+          <p class="text-xs text-gray-500">
+            Turno #{{ arqueo.turno_activo.id_turno }} ·
+            Abierto: {{ arqueo.turno_activo.fecha_hora_apertura | date:'dd/MM HH:mm' }} ·
+            Cerrado: {{ arqueo.turno_activo.fecha_hora_cierre | date:'dd/MM HH:mm' }}
+          </p>
+        </div>
+        <span class="inline-block bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold">CERRADO</span>
+      </div>
+
+      <!-- SIN APERTURA -->
       <div *ngIf="!arqueo.turno_activo" class="flex items-center gap-3">
         <div class="w-3 h-3 rounded-full bg-gray-300"></div>
-        <p class="text-sm text-gray-500">Sin turno abierto hoy</p>
+        <p class="text-sm text-gray-500">Sin apertura de caja hoy</p>
       </div>
     </div>
 
@@ -134,49 +154,87 @@
       </div>
     </div>
 
-    <!-- Botón cerrar caja (solo cajeros) -->
-    <div *ngIf="!esAdmin" class="bg-white rounded-xl shadow-sm border border-red-200 p-6">
-      <div class="flex flex-wrap justify-between items-center gap-4">
-        <div>
-          <h3 class="font-bold text-gray-800 text-lg">Cerrar Caja</h3>
-          <p class="text-sm text-gray-500 mt-1">
-            Al cerrar, no podrás registrar más ventas hoy.<br>
-            El administrador deberá habilitarte nuevamente mañana.
-          </p>
+    <!-- ═══ SECCIÓN ARQUEO / CIERRE (solo cajeros) ═══ -->
+    <ng-container *ngIf="!esAdmin">
+
+      <!-- A) Caja ABIERTA → botón para hacer arqueo y cerrar -->
+      <div *ngIf="arqueo.turno_activo?.estado_turno === 'Abierto'"
+           class="bg-white rounded-xl shadow-sm border border-red-200 p-6">
+        <div class="flex flex-wrap justify-between items-center gap-4">
+          <div>
+            <h3 class="font-bold text-gray-800 text-lg">Hacer Arqueo y Cerrar Caja</h3>
+            <p class="text-sm text-gray-500 mt-1">
+              Al confirmar, se cerrará tu turno actual y no podrás vender más hasta que el
+              <span class="font-bold">administrador</span> reabra tu caja.<br>
+              Mañana podrás iniciar caja normalmente con un nuevo monto inicial.
+            </p>
+          </div>
+          <button (click)="confirmarCierre()"
+                  class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition-colors shadow-sm whitespace-nowrap">
+            🧾 Realizar Arqueo y Cerrar
+          </button>
         </div>
-        <button (click)="confirmarCierre()"
-                [disabled]="arqueo.resumen?.total_ventas === 0"
-                class="bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold px-6 py-3 rounded-xl transition-colors shadow-sm">
-          🔒 Cerrar Caja del Día
-        </button>
       </div>
-    </div>
+
+      <!-- B) Caja CERRADA hoy → aviso claro -->
+      <div *ngIf="arqueo.turno_activo?.estado_turno === 'Cerrado'"
+           class="bg-red-50 rounded-xl border border-red-200 p-5 text-center">
+        <div class="text-3xl mb-2">🔒</div>
+        <p class="text-sm text-red-700 font-bold mb-1">Caja CERRADA</p>
+        <p class="text-xs text-red-600">
+          Tu caja del día ya fue cerrada. Solicita al
+          <span class="font-bold">administrador</span> que la reabra si necesitas vender nuevamente.
+        </p>
+      </div>
+
+      <!-- C) Sin apertura aún → invitar a abrir caja -->
+      <div *ngIf="!arqueo.turno_activo"
+           class="bg-amber-50 rounded-xl border border-amber-200 p-5 text-center">
+        <div class="text-3xl mb-2">🏦</div>
+        <p class="text-sm text-amber-700 font-bold mb-1">Sin Caja Abierta Hoy</p>
+        <p class="text-xs text-amber-600">
+          Aún no has abierto tu caja del día. Ve a
+          <span class="font-bold">Punto de Venta</span> e ingresa tu monto inicial para empezar a vender.
+        </p>
+      </div>
+
+    </ng-container>
 
   </ng-container>
 </div>
 
 
-<!-- MODAL CONFIRMACIÓN CIERRE -->
+<!-- MODAL CONFIRMACIÓN ARQUEO + CIERRE -->
 <div *ngIf="mostrarConfirmCierre"
      class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
     <div class="bg-red-600 p-5 text-white text-center">
-      <div class="text-4xl mb-2">🔒</div>
-      <h3 class="font-black text-xl">Cerrar Caja</h3>
+      <div class="text-4xl mb-2">🧾</div>
+      <h3 class="font-black text-xl">Arqueo y Cierre de Caja</h3>
     </div>
     <div class="p-6 text-center">
-      <p class="text-gray-700 font-medium mb-2">¿Confirmas el cierre de caja?</p>
+      <p class="text-gray-700 font-medium mb-2">Resumen del día — ¿confirmas el cierre?</p>
       <div class="bg-gray-50 rounded-xl p-4 my-4 text-left space-y-1">
         <div class="flex justify-between text-sm">
           <span class="text-gray-500">Ventas del día:</span>
           <span class="font-bold">{{ arqueo.resumen?.total_ventas || 0 }}</span>
         </div>
         <div class="flex justify-between text-sm">
-          <span class="text-gray-500">Total ingresado:</span>
-          <span class="font-bold text-green-600">Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}</span>
+          <span class="text-gray-500">💵 Efectivo:</span>
+          <span class="font-bold text-blue-600">Bs. {{ (+arqueo.resumen?.total_efectivo || 0).toFixed(2) }}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-500">📱 QR:</span>
+          <span class="font-bold text-purple-600">Bs. {{ (+arqueo.resumen?.total_qr || 0).toFixed(2) }}</span>
+        </div>
+        <div class="flex justify-between text-sm pt-2 mt-2 border-t border-gray-200">
+          <span class="text-gray-700 font-bold">TOTAL:</span>
+          <span class="font-black text-green-600">Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}</span>
         </div>
       </div>
-      <p class="text-xs text-red-500 font-medium">Esta acción bloqueará el punto de venta.</p>
+      <p class="text-xs text-red-500 font-medium">
+        Tu caja se cerrará. Solo el administrador podrá reabrirla durante las próximas 24 horas.
+      </p>
     </div>
     <div class="px-6 pb-6 flex gap-3">
       <button (click)="cancelarCierre()"
@@ -185,7 +243,7 @@
       </button>
       <button (click)="ejecutarCierreCaja()" [disabled]="cerrando"
               class="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-black rounded-xl transition-colors">
-        {{ cerrando ? 'Cerrando...' : 'Confirmar Cierre' }}
+        {{ cerrando ? 'Cerrando...' : 'Confirmar Arqueo' }}
       </button>
     </div>
   </div>

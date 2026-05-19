@@ -11,14 +11,31 @@
     <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
   </div>
 
-  <!-- ═══ CAJA CERRADA ═══ -->
-  <div *ngIf="!verificandoCaja && !cajaHabilitada"
-       class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl shadow-sm border border-gray-100">
+  <!-- ═══ CAJA CERRADA (turno cerrado hoy) ═══ -->
+  <div *ngIf="!verificandoCaja && !cajaHabilitada && estadoCaja === 'CERRADA'"
+       class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl shadow-sm border border-red-200">
     <div class="text-8xl mb-6">🔒</div>
-    <h2 class="text-3xl font-black text-gray-800 mb-3">Módulo Bloqueado</h2>
-    <p class="text-gray-500 mb-2">Necesitas tener la caja abierta para gestionar mesas.</p>
+    <h2 class="text-3xl font-black text-red-600 mb-3">Caja CERRADA</h2>
+    <p class="text-gray-600 mb-2 max-w-md">
+      Tu caja ya fue cerrada hoy. Las mesas se bloquean hasta que el administrador la reabra.
+    </p>
+    <p class="text-gray-400 text-sm mt-3">
+      Solicita verbalmente al <span class="font-bold text-blue-600">Administrador</span> que reabra tu caja.
+    </p>
+    <button (click)="verificarAccesoCaja()"
+            class="mt-6 px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+      ⟳ Verificar de nuevo
+    </button>
+  </div>
+
+  <!-- ═══ SIN APERTURA HOY ═══ -->
+  <div *ngIf="!verificandoCaja && !cajaHabilitada && estadoCaja === 'SIN_APERTURA'"
+       class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl shadow-sm border border-gray-100">
+    <div class="text-8xl mb-6">🏦</div>
+    <h2 class="text-3xl font-black text-gray-800 mb-3">Sin Caja Abierta</h2>
+    <p class="text-gray-500 mb-2 max-w-md">Aún no has abierto tu caja del día.</p>
     <p class="text-gray-400 text-sm">
-      Ve a <span class="font-bold text-blue-600">Punto de Venta</span> para abrir tu caja primero.
+      Ve a <span class="font-bold text-blue-600">Punto de Venta</span> para abrir tu caja del día.
     </p>
   </div>
 

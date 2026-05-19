@@ -2,27 +2,41 @@
 <div *ngIf="verificandoCaja" class="flex justify-center items-center h-64">
   <div class="flex flex-col items-center gap-3">
     <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    <p class="text-gray-400 text-sm">Verificando acceso...</p>
+    <p class="text-gray-400 text-sm">Verificando estado de caja...</p>
   </div>
 </div>
 
-<!-- ═══ CAJA BLOQUEADA ═══ -->
-<div *ngIf="!verificandoCaja && !cajaHabilitada"
-     class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl shadow-sm border border-gray-100">
+<!-- ═══ CAJA CERRADA (turno cerrado hoy) — bloquea ventas ═══ -->
+<div *ngIf="!verificandoCaja && estadoCaja === 'CERRADA'"
+     class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl shadow-sm border border-red-200">
   <div class="text-8xl mb-6">🔒</div>
-  <h2 class="text-3xl font-black text-gray-800 mb-3">Caja Cerrada</h2>
-  <p class="text-gray-500 mb-2">Tu caja no está habilitada para operar.</p>
-  <p class="text-gray-400 text-sm">Contacta al <span class="font-bold text-blue-600">Administrador</span>.</p>
+  <h2 class="text-3xl font-black text-red-600 mb-3">Caja CERRADA</h2>
+  <p class="text-gray-600 mb-2 max-w-md">
+    Tu caja ya fue cerrada hoy. No puedes registrar más ventas hasta que el administrador la reabra.
+  </p>
+  <div *ngIf="turnoActivo" class="mt-4 bg-gray-50 rounded-xl p-4 text-left text-sm">
+    <p class="text-gray-500">
+      Turno #{{ turnoActivo.id_turno }} — Abierto: {{ turnoActivo.fecha_hora_apertura | date:'dd/MM HH:mm' }}<br>
+      Cerrado: {{ turnoActivo.fecha_hora_cierre | date:'dd/MM HH:mm' }}
+    </p>
+  </div>
+  <p class="text-gray-400 text-sm mt-4">
+    Solicita verbalmente al <span class="font-bold text-blue-600">Administrador</span> que reabra tu caja.
+  </p>
+  <button (click)="verificarAccesoCaja()"
+          class="mt-6 px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+    ⟳ Verificar de nuevo
+  </button>
 </div>
 
-<!-- ═══ ABRIR TURNO ═══ -->
-<div *ngIf="!verificandoCaja && cajaHabilitada && mostrarAbrirTurno"
+<!-- ═══ SIN APERTURA HOY — apertura automática (cajero ingresa monto inicial) ═══ -->
+<div *ngIf="!verificandoCaja && estadoCaja === 'SIN_APERTURA' && mostrarAbrirTurno"
      class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl shadow-sm border border-gray-100">
   <div class="text-7xl mb-5">🏦</div>
-  <h2 class="text-2xl font-black text-gray-800 mb-2">Abrir Caja</h2>
+  <h2 class="text-2xl font-black text-gray-800 mb-2">Abrir Caja del Día</h2>
   <p class="text-gray-500 mb-6 text-sm">
-    Ingresa el monto inicial en caja para comenzar.<br>
-    <span class="text-amber-600 font-medium">Solo puedes abrir el turno una vez.</span>
+    Es tu primera operación de hoy. Ingresa el monto inicial en caja para comenzar a vender.<br>
+    <span class="text-amber-600 font-medium">No necesitas autorización del administrador.</span>
   </p>
   <div class="w-full max-w-xs space-y-4">
     <div *ngIf="errorTurno" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
@@ -42,14 +56,21 @@
 </div>
 
 <!-- ═══ POS ACTIVO ═══ -->
-<ng-container *ngIf="!verificandoCaja && cajaHabilitada && !mostrarAbrirTurno">
+<ng-container *ngIf="!verificandoCaja && estadoCaja === 'ABIERTA'">
 
   <!-- Layout principal -->
   <div class="flex flex-col md:flex-row gap-4 mb-4">
 
     <!-- Catálogo -->
     <div class="w-full md:w-2/3 bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
-      <h2 class="text-xl font-bold text-gray-800 mb-4">Catálogo</h2>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-gray-800">Catálogo</h2>
+        <span class="inline-flex items-center gap-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">
+          <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          CAJA ABIERTA
+          <span *ngIf="turnoActivo" class="font-normal opacity-80">· Turno #{{ turnoActivo.id_turno }}</span>
+        </span>
+      </div>
 
       <div *ngIf="cargando" class="text-center py-10 text-gray-400 text-sm">Cargando productos...</div>
       <div *ngIf="!cargando && productosDisponibles.length === 0"

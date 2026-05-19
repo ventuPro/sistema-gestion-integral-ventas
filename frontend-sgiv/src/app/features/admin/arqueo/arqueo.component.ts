@@ -72,14 +72,14 @@ export class ArqueoComponent implements OnInit {
       next: () => {
         this.cerrando = false;
         this.mostrarConfirmCierre = false;
-        // Actualizar localStorage para reflejar caja cerrada
+        // Sincronizar localStorage para bloquear inmediatamente POS/Mesas
         if (this.usuarioActual) {
           this.usuarioActual.caja_habilitada = false;
           localStorage.setItem('usuario_sgiv', JSON.stringify(this.usuarioActual));
         }
+        // Recargar el arqueo para reflejar el nuevo estado (CERRADO)
+        this.cargarArqueo();
         this.cdr.detectChanges();
-        // Redirigir al dashboard después de cerrar
-        setTimeout(() => this.router.navigate(['/dashboard']), 1500);
       },
       error: () => {
         this.cerrando = false;

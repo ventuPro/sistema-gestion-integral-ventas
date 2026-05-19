@@ -102,7 +102,7 @@
                 Rol fijo
               </span>
 
-              <!-- Dentro del div de acciones, para cajeros activos -->
+              <!-- Control de caja del cajero (Reabrir / Cerrar) -->
               <button *ngIf="+usr.id_rol === 2 && usr.estado_activo"
                       (click)="toggleCaja(usr)"
                       class="font-medium text-xs transition-colors"
@@ -110,7 +110,7 @@
                       [class.hover:text-green-800]="!usr.caja_habilitada"
                       [class.text-orange-500]="usr.caja_habilitada"
                       [class.hover:text-orange-700]="usr.caja_habilitada">
-                {{ usr.caja_habilitada ? '🔒 Cerrar Caja' : '💰 Abrir Caja' }}
+                {{ usr.caja_habilitada ? '🔒 Cerrar Caja' : '🔓 Reabrir Caja' }}
               </button>
 
               <button *ngIf="usr.estado_activo"  (click)="desactivarUsuario(usr.id_usuario, usr.nombre_completo)" class="text-red-500 hover:text-red-700 font-medium text-xs">Desactivar</button>

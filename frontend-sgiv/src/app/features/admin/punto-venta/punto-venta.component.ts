@@ -2,9 +2,9 @@ import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angula
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProductoService } from '../../../core/services/producto.service';
-import { CajaService }     from '../../../core/services/caja.service';
+import { CajaService, EstadoCajaCompleto } from '../../../core/services/caja.service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { environment }     from '../../../../environments/environment';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-punto-venta',
@@ -19,25 +19,26 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
 
-  // ─── Estado de acceso ───
-  verificandoCaja   = true;
-  cajaHabilitada    = false;
-  usuarioActual:    any = null;
+  // ─── Estado de acceso (fuente: backend) ───
+  verificandoCaja = true;
+  estadoCaja: EstadoCajaCompleto['estado'] = 'SIN_APERTURA';
+  puedeVender = false;
+  usuarioActual: any = null;
 
   // ─── Turno ───
-  turnoActivo:      any    = null;
-  mostrarAbrirTurno = false;
-  montoInicial      = 0;
-  abriendoTurno     = false;
-  errorTurno        = '';
+  turnoActivo: any   = null;
+  mostrarAbrirTurno  = false;   // se muestra cuando SIN_APERTURA
+  montoInicial       = 0;
+  abriendoTurno      = false;
+  errorTurno         = '';
 
   // ─── Catálogo ───
   productosDisponibles: any[] = [];
-  cargando          = true;
+  cargando = true;
 
   // ─── Carrito ───
-  carrito:          any[] = [];
-  total             = 0;
+  carrito: any[] = [];
+  total = 0;
 
   // ─── Modal cobro ───
   mostrarModalCobro = false;
@@ -46,14 +47,17 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   get cambio(): number { return Math.max(0, this.montoPagado - this.total); }
 
   // ─── Ticket ───
-  mostrarTicket     = false;
-  datosTicket:      any = null;
-  fechaTicket       = new Date();
+  mostrarTicket = false;
+  datosTicket: any = null;
+  fechaTicket = new Date();
 
   // ─── Historial ventas ───
-  ventasHoy:        any[]   = [];
-  cargandoVentas    = false;
-  mostrarHistorial  = false;
+  ventasHoy: any[] = [];
+  cargandoVentas   = false;
+  mostrarHistorial = false;
+
+  // ─── Poll periódico del estado de caja (por si el admin cierra mientras vendemos) ───
+  private pollEstado: any;
 
   get totalVentasHoy(): number {
     return this.ventasHoy.reduce((s, v) => s + Number(v.monto_total_venta), 0);
@@ -69,65 +73,79 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.verificarAccesoCaja();
   }
 
-  ngOnDestroy() {}
-
-  // ─── PASO 1: verifica caja_habilitada ───
-verificarAccesoCaja() {
-  this.verificandoCaja = true;
-
-  if (this.usuarioActual?.id_rol === 1) {
-    // Admin: acceso directo sin verificar caja
-    this.cajaHabilitada  = true;
-    this.verificandoCaja = false;
-    this.cargarCatalogo();
-    this.cargarVentasHoy();
-    return;
+  ngOnDestroy() {
+    if (this.pollEstado) clearInterval(this.pollEstado);
   }
 
-  this.cajaService.obtenerEstadoCaja(this.usuarioActual.id_usuario).subscribe({
-    next: (res) => {
-      this.cajaHabilitada  = res.caja_habilitada === true;
+  // ─── VERIFICACIÓN PRINCIPAL ───
+  verificarAccesoCaja() {
+    this.verificandoCaja = true;
+
+    // Admin: acceso libre (no opera caja)
+    if (this.usuarioActual?.id_rol === 1) {
+      this.estadoCaja      = 'ABIERTA';
+      this.puedeVender     = true;
       this.verificandoCaja = false;
-      if (this.cajaHabilitada) {
-        this.verificarTurnoActivo(); // PASO 2
-      } else {
-        this.cargando = false;
-      }
-      this.cdr.detectChanges();
-    },
-    error: () => {
-      this.cajaHabilitada  = false;
-      this.verificandoCaja = false;
-      this.cargando        = false;
-      this.cdr.detectChanges();
+      this.cargarCatalogo();
+      this.cargarVentasHoy();
+      return;
     }
-  });
-}
 
-// ─── PASO 2: verifica turno abierto ───
-verificarTurnoActivo() {
-  this.cajaService.obtenerTurnoHoy().subscribe({
-    next: (res) => {
-      this.turnoActivo = res.turno;
-
-      if (this.turnoActivo?.estado_turno === 'Abierto') {
-        this.mostrarAbrirTurno = false;
-        this.cargarCatalogo();
-        this.cargarVentasHoy();
-      } else {
-        this.mostrarAbrirTurno = true;
-        this.cargando          = false;
+    this.cajaService.obtenerEstadoCompleto().subscribe({
+      next: (res) => this.aplicarEstado(res),
+      error: () => {
+        this.estadoCaja      = 'SIN_APERTURA';
+        this.puedeVender     = false;
+        this.verificandoCaja = false;
+        this.cargando        = false;
+        this.cdr.detectChanges();
       }
-      this.cdr.detectChanges();
-    },
-    error: () => {
+    });
+  }
+
+  private aplicarEstado(res: EstadoCajaCompleto) {
+    this.estadoCaja      = res.estado;
+    this.puedeVender     = res.puede_vender;
+    this.turnoActivo     = res.turno;
+    this.verificandoCaja = false;
+
+    // Sincronizar localStorage para que otros componentes vean el flag
+    if (this.usuarioActual) {
+      this.usuarioActual.caja_habilitada = res.caja_habilitada;
+      localStorage.setItem('usuario_sgiv', JSON.stringify(this.usuarioActual));
+    }
+
+    if (res.estado === 'ABIERTA') {
+      this.mostrarAbrirTurno = false;
+      this.cargarCatalogo();
+      this.cargarVentasHoy();
+      this.iniciarPollEstado();
+    } else if (res.estado === 'SIN_APERTURA') {
+      // Apertura automática del día — mostrar modal para monto inicial
       this.mostrarAbrirTurno = true;
       this.cargando          = false;
-      this.cdr.detectChanges();
+    } else {
+      // CERRADA — bloquear y mostrar mensaje al cajero
+      this.mostrarAbrirTurno = false;
+      this.cargando          = false;
     }
-  });
-}
-  // ─── ABRIR TURNO (cajero) ───
+    this.cdr.detectChanges();
+  }
+
+  private iniciarPollEstado() {
+    if (this.pollEstado) clearInterval(this.pollEstado);
+    // Cada 30s reverificar — si el admin cierra desde Usuarios, bloqueamos rápido
+    this.pollEstado = setInterval(() => {
+      if (this.usuarioActual?.id_rol === 1) return;
+      this.cajaService.obtenerEstadoCompleto().subscribe({
+        next: (res) => {
+          if (res.estado !== this.estadoCaja) this.aplicarEstado(res);
+        }
+      });
+    }, 30000);
+  }
+
+  // ─── APERTURA AUTOMÁTICA DIARIA ───
   confirmarAbrirTurno() {
     if (this.montoInicial < 0) { this.errorTurno = 'Monto inválido.'; return; }
     this.abriendoTurno = true;
@@ -139,10 +157,17 @@ verificarTurnoActivo() {
     }).subscribe({
       next: (res) => {
         this.turnoActivo       = res.turno;
+        this.estadoCaja        = 'ABIERTA';
+        this.puedeVender       = true;
         this.mostrarAbrirTurno = false;
         this.abriendoTurno     = false;
+        if (this.usuarioActual) {
+          this.usuarioActual.caja_habilitada = true;
+          localStorage.setItem('usuario_sgiv', JSON.stringify(this.usuarioActual));
+        }
         this.cargarCatalogo();
         this.cargarVentasHoy();
+        this.iniciarPollEstado();
         this.cdr.detectChanges();
       },
       error: (e: any) => {
@@ -154,25 +179,19 @@ verificarTurnoActivo() {
   }
 
   // ─── CATÁLOGO ───
-cargarCatalogo() {
-  this.cargando = true;
+  cargarCatalogo() {
+    this.cargando = true;
+    const id_sucursal = this.usuarioActual?.id_sucursal || 1;
 
-  // FIX: usar la sucursal del usuario logueado
-  const id_sucursal = this.usuarioActual?.id_sucursal || 1;
-
-  this.productoService.obtenerInventario(id_sucursal).subscribe({
-    next: (datos: any[]) => {
-      // Solo productos con stock disponible en ESA sucursal
-      this.productosDisponibles = datos.filter(p => Number(p.stock_actual) > 0);
-      this.cargando = false;
-      this.cdr.detectChanges();
-    },
-    error: () => {
-      this.cargando = false;
-      this.cdr.detectChanges();
-    }
-  });
-}
+    this.productoService.obtenerInventario(id_sucursal).subscribe({
+      next: (datos: any[]) => {
+        this.productosDisponibles = datos.filter(p => Number(p.stock_actual) > 0);
+        this.cargando = false;
+        this.cdr.detectChanges();
+      },
+      error: () => { this.cargando = false; this.cdr.detectChanges(); }
+    });
+  }
 
   // ─── CARRITO ───
   agregarAlCarrito(producto: any) {
@@ -190,7 +209,6 @@ cargarCatalogo() {
     } else {
       this.carrito.push({ ...producto, cantidad: 1, precio_unitario: precio, subtotal: precio });
     }
-    // Siempre restar 1 en 1
     producto.stock_actual = stockDisponible - 1;
     this.calcularTotal();
   }
@@ -213,6 +231,10 @@ cargarCatalogo() {
   // ─── COBRO ───
   abrirModalCobro() {
     if (!this.carrito.length) return;
+    if (!this.puedeVender) {
+      alert('La caja está cerrada. No puedes registrar ventas.');
+      return;
+    }
     this.metodoPago  = 'Efectivo';
     this.montoPagado = this.total;
     this.mostrarModalCobro = true;
@@ -225,56 +247,62 @@ cargarCatalogo() {
     this.registrarVenta();
   }
 
-registrarVenta() {
-  this.cargando = true;
+  registrarVenta() {
+    this.cargando = true;
 
-  const datosVenta = {
-    id_sucursal:       this.usuarioActual?.id_sucursal || 1,
-    id_usuario_cajero: this.usuarioActual?.id_usuario,
-    id_cliente:        null,
-    id_pedido_mesa:    null,
-    monto_total_venta: this.total,
-    metodo_pago:       this.metodoPago,
-    detalles: this.carrito.map(item => ({
-      id_producto: item.id_producto,
-      cantidad:    item.cantidad,
-      precio:      Number(item.precio_unitario),
-      subtotal:    Number(item.subtotal)
-    }))
-  };
+    const datosVenta = {
+      id_sucursal:       this.usuarioActual?.id_sucursal || 1,
+      id_cliente:        null,
+      id_pedido_mesa:    null,
+      monto_total_venta: this.total,
+      metodo_pago:       this.metodoPago,
+      detalles: this.carrito.map(item => ({
+        id_producto: item.id_producto,
+        cantidad:    item.cantidad,
+        precio:      Number(item.precio_unitario),
+        subtotal:    Number(item.subtotal)
+      }))
+    };
 
-  this.http.post<any>(
-    `${this.apiUrl}/caja/cobrar`,
-    datosVenta,
-    { headers: this.headers() }
-  ).subscribe({
-    next: (res) => {
-      this.datosTicket = {
-        id_venta: res.id_venta,
-        items:    [...this.carrito],
-        total:    this.total,
-        metodo:   this.metodoPago,
-        cambio:   this.cambio
-      };
-      this.fechaTicket   = new Date();
-      this.mostrarTicket = true;
-      this.carrito       = [];
-      this.total         = 0;
-      this.cargarCatalogo();
-      this.cargarVentasHoy();
-      this.cargando = false;
-      this.cdr.detectChanges();
-    },
-    error: (e: any) => {
-      // FIX: mostrar el error real del backend
-      const msg = e?.error?.detalle || e?.error?.error || 'Error desconocido al registrar la venta.';
-      console.error('Error venta:', msg);
-      alert(`Error al registrar: ${msg}`);
-      this.cargando = false;
-      this.cdr.detectChanges();
-    }
-  });
-}
+    this.http.post<any>(
+      `${this.apiUrl}/caja/cobrar`,
+      datosVenta,
+      { headers: this.headers() }
+    ).subscribe({
+      next: (res) => {
+        this.datosTicket = {
+          id_venta: res.id_venta,
+          items:    [...this.carrito],
+          total:    this.total,
+          metodo:   this.metodoPago,
+          cambio:   this.cambio
+        };
+        this.fechaTicket   = new Date();
+        this.mostrarTicket = true;
+        this.carrito       = [];
+        this.total         = 0;
+        this.cargarCatalogo();
+        this.cargarVentasHoy();
+        this.cargando = false;
+        this.cdr.detectChanges();
+      },
+      error: (e: any) => {
+        // CAJA_CERRADA → reverificar estado y bloquear
+        if (e?.error?.error === 'CAJA_CERRADA') {
+          alert('La caja fue cerrada. Pide al administrador que la reabra.');
+          this.verificarAccesoCaja();
+          this.cargando = false;
+          this.cdr.detectChanges();
+          return;
+        }
+        const msg = e?.error?.detalle || e?.error?.error || 'Error desconocido al registrar la venta.';
+        console.error('Error venta:', msg);
+        alert(`Error al registrar: ${msg}`);
+        this.cargando = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
 
   // ─── HISTORIAL VENTAS DEL DÍA ───
   cargarVentasHoy() {

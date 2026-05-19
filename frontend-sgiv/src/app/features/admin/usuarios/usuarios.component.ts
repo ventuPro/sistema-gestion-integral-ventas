@@ -211,40 +211,47 @@ private mostrarToast(msg: string) {
     return m[rol] || 'bg-gray-100 text-gray-700';
   }
 
-  // ─── Control de Caja desde Usuarios (Función agregada) ───
-toggleCaja(usr: any) {
-  const id     = Number(usr.id_usuario);
-  const nombre = usr.nombre_completo;
+  // ─── Control de Caja desde Usuarios (Admin) ───
+  // - Caja abierta → la cierra (cierra turno + flag).
+  // - Caja cerrada hoy → la reabre (reabre turno + flag).
+  // - Sin turno hoy → solo habilita el flag (el cajero aún deberá ingresar monto inicial).
+  toggleCaja(usr: any) {
+    const id     = Number(usr.id_usuario);
+    const nombre = usr.nombre_completo;
 
-  if (usr.caja_habilitada) {
-    if (!confirm(`¿Cerrar caja de "${nombre}"?`)) return;
+    if (usr.caja_habilitada) {
+      if (!confirm(`¿Cerrar caja de "${nombre}"?\n\nEl cajero no podrá registrar más ventas hasta que la reabras.`)) return;
 
-    this.cajaService.deshabilitarCaja(id).subscribe({
-      next: () => {
-        this.mostrarToast(`🔒 Caja de "${nombre}" cerrada.`);
-        this.cargarDatos(); // ← recarga completa del servidor
-      },
-      error: (e: any) => {
-        const msg = e?.error?.error || 'Error al cerrar la caja.';
-        alert(`Error: ${msg}`);
-        console.error('toggleCaja error:', e);
-      }
-    });
-  } else {
-    if (!confirm(`¿Abrir caja para "${nombre}"? Podrá ingresar al Punto de Venta.`)) return;
+      this.cajaService.deshabilitarCaja(id).subscribe({
+        next: () => {
+          this.mostrarToast(`🔒 Caja de "${nombre}" cerrada.`);
+          this.cargarDatos();
+        },
+        error: (e: any) => {
+          const msg = e?.error?.error || 'Error al cerrar la caja.';
+          alert(`Error: ${msg}`);
+          console.error('toggleCaja error:', e);
+        }
+      });
+    } else {
+      if (!confirm(`¿Reabrir / habilitar caja para "${nombre}"?\n\nSi tiene una caja cerrada hoy, se reabrirá el turno y podrá vender de inmediato.`)) return;
 
-    this.cajaService.habilitarCaja(id).subscribe({
-      next: () => {
-        this.mostrarToast(`💰 Caja de "${nombre}" habilitada.`);
-        this.cargarDatos(); // ← recarga completa del servidor
-      },
-      error: (e: any) => {
-        const msg = e?.error?.error || 'Error al habilitar la caja.';
-        alert(`Error: ${msg}`);
-        console.error('toggleCaja error:', e);
-      }
-    });
+      this.cajaService.habilitarCaja(id).subscribe({
+        next: (res: any) => {
+          const accion = res?.usuario?.accion;
+          if (accion === 'TURNO_REABIERTO')
+            this.mostrarToast(`🔓 Caja de "${nombre}" REABIERTA — ya puede vender.`);
+          else
+            this.mostrarToast(`💰 Caja de "${nombre}" habilitada.`);
+          this.cargarDatos();
+        },
+        error: (e: any) => {
+          const msg = e?.error?.error || 'Error al habilitar la caja.';
+          alert(`Error: ${msg}`);
+          console.error('toggleCaja error:', e);
+        }
+      });
+    }
   }
-}
 
 }
