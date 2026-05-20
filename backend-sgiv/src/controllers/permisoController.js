@@ -43,16 +43,21 @@ const putPermisosUsuario = async (req, res) => {
             return res.status(403).json({ error: 'Solo el administrador puede hacer esto' });
 
         const id_usuario = Number(req.params.id);
-        const { permisos } = req.body;
+        if (!Number.isFinite(id_usuario) || id_usuario <= 0)
+            return res.status(400).json({ error: 'id_usuario inválido' });
 
-        if (!permisos || typeof permisos !== 'object')
-            return res.status(400).json({ error: 'Permisos inválidos' });
+        const { permisos } = req.body || {};
+        if (!permisos || typeof permisos !== 'object' || Array.isArray(permisos))
+            return res.status(400).json({ error: 'Cuerpo inválido: se esperaba { permisos: { ... } }' });
 
         const resultado = await permisoModel.guardarPermisosUsuario(id_usuario, permisos);
         res.json({ mensaje: 'Permisos guardados correctamente', permisos: resultado });
     } catch (e) {
-        console.error('Error putPermisosUsuario:', e);
-        res.status(500).json({ error: 'Error al guardar permisos' });
+        console.error('[permisos] putPermisosUsuario error:', e);
+        res.status(500).json({
+            error:   'Error al guardar permisos',
+            detalle: e.message || String(e)
+        });
     }
 };
 

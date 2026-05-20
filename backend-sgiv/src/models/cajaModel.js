@@ -1,31 +1,7 @@
 const db = require('../config/db');
 
-/*  ════════════════════════════════════════════════════════════════════
-    REGLAS DE NEGOCIO DEL MÓDULO DE CAJA  (versión definitiva)
-    ─────────────────────────────────────────────────────────────────────
-    • La FUENTE DE VERDAD del estado de caja es turno_caja.estado_turno.
-        - 'Abierto'  → el cajero PUEDE vender.
-        - 'Cerrado'  → el cajero NO puede vender hasta que el admin
-                       reabra el turno (o hasta nuevo día con apertura
-                       automática).
-    • usuario.caja_habilitada se mantiene SIEMPRE sincronizado:
-        - TRUE  cuando hay un turno 'Abierto' para el cajero.
-        - FALSE cuando no hay turno abierto.
-      Se actualiza de forma automática en abrirTurno, cerrarCaja y
-      reabrirTurno; nunca debe tocarse manualmente sin pasar por aquí.
-    • Apertura automática diaria: si el cajero no tiene turno abierto
-      hoy, el front llama a abrirTurno con el monto inicial — NO se
-      necesita intervención del administrador.
-    • Reapertura: si la caja del día ya fue cerrada, sólo el admin puede
-      reabrir el último turno cerrado del día con reabrirTurno.
-    ════════════════════════════════════════════════════════════════════ */
-
-
-// ════════════════════════════════════════════════════════════════════
-//  ESTADO DE CAJA (consultas)
-// ════════════════════════════════════════════════════════════════════
-
-// Devuelve true/false simple (legacy — sigue usado por algunos componentes)
+// Estado de caja basado en turno_caja.estado_turno.
+// caja_habilitada se sincroniza automáticamente con el estado del turno.
 const obtenerEstadoCaja = async (id_usuario) => {
     const r = await db.query(
         `SELECT caja_habilitada FROM usuario WHERE id_usuario = $1`,
@@ -34,9 +10,7 @@ const obtenerEstadoCaja = async (id_usuario) => {
     return r.rows[0] || { caja_habilitada: false };
 };
 
-// Estado COMPLETO del cajero (lo que usa el front para decidir todo)
 const obtenerEstadoCompleto = async (id_usuario) => {
-    // 1. Buscar turno abierto (puede haber máximo uno)
     const rAbierto = await db.query(`
         SELECT id_turno, fecha_hora_apertura, monto_inicial, estado_turno
         FROM turno_caja

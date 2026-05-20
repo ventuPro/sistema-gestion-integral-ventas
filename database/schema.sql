@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS inventario_sucursal CASCADE;
 DROP TABLE IF EXISTS promocion CASCADE;
 DROP TABLE IF EXISTS producto CASCADE;
 DROP TABLE IF EXISTS categoria_producto CASCADE;
+DROP TABLE IF EXISTS permiso_usuario CASCADE;
 DROP TABLE IF EXISTS usuario CASCADE;
 DROP TABLE IF EXISTS rol_usuario CASCADE;
 DROP TABLE IF EXISTS sucursal CASCADE;
@@ -48,6 +49,18 @@ CREATE TABLE usuario (
     -- FALSE → no tiene turno abierto (sin apertura del día o cerrado).
     caja_habilitada BOOLEAN DEFAULT FALSE
 );
+
+-- Permisos granulares por usuario (sobreescriben los defaults del rol).
+-- El admin asigna/quita acceso a módulos específicos para cada cajero.
+CREATE TABLE permiso_usuario (
+    id_permiso SERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+    modulo     VARCHAR(50) NOT NULL,
+    tiene_acceso BOOLEAN NOT NULL DEFAULT FALSE,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (id_usuario, modulo)
+);
+CREATE INDEX idx_permiso_usuario_id ON permiso_usuario (id_usuario);
 
 -- ==========================================
 -- 2. CATÁLOGO DE PRODUCTOS Y PROMOCIONES

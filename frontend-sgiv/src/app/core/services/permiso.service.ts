@@ -25,6 +25,10 @@ const DEFAULTS: Record<number, Record<string, boolean>> = {
 export class PermisoService {
   private apiUrl = environment.apiUrl;
   private permisosSubject = new BehaviorSubject<Record<string, boolean>>({});
+  private pollHandle: any = null;
+
+  /** Observable que el dashboard puede consumir para re-renderizar el sidebar */
+  public permisos$ = this.permisosSubject.asObservable();
 
   constructor(private http: HttpClient) {}
 
@@ -102,7 +106,47 @@ export class PermisoService {
   }
 
   limpiarPermisos() {
+    this.detenerPoll();
     this.permisosSubject.next({});
     localStorage.removeItem('permisos_sgiv');
+  }
+
+  /**
+   * Inicia un polling silencioso que recarga los permisos del usuario logueado
+   * cada N segundos. Si cambian, emite por permisos$ y actualiza localStorage.
+   * Admin (id_rol = 1) no necesita poll: siempre tiene todo.
+   */
+  iniciarPollPermisos(intervaloMs: number = 30000) {
+    if (this.getRolActual() === 1) return;  // admin: skip
+    this.detenerPoll();
+    this.pollHandle = setInterval(() => this.recargarPermisos().subscribe(), intervaloMs);
+  }
+
+  detenerPoll() {
+    if (this.pollHandle) { clearInterval(this.pollHandle); this.pollHandle = null; }
+  }
+
+  /**
+   * Recarga los permisos del servidor. Si cambiaron respecto al cache, los
+   * actualiza y emite por permisos$. Devuelve un Observable que el cajero
+   * puede usar para refrescar manualmente con un botón.
+   */
+  recargarPermisos(): Observable<Record<string, boolean>> {
+    return new Observable(observer => {
+      this.http.get<any>(`${this.apiUrl}/permisos/mis-permisos`, { headers: this.h() }).subscribe({
+        next: (res) => {
+          const nuevos: Record<string, boolean> = res?.permisos || this.getDefaults();
+          const previo = localStorage.getItem('permisos_sgiv') || '{}';
+          const nuevoStr = JSON.stringify(nuevos);
+          if (nuevoStr !== previo) {
+            localStorage.setItem('permisos_sgiv', nuevoStr);
+            this.permisosSubject.next(nuevos);
+          }
+          observer.next(nuevos);
+          observer.complete();
+        },
+        error: (e) => observer.error(e)
+      });
+    });
   }
 }

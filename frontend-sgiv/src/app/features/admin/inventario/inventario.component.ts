@@ -4,11 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { ProductoService } from '../../../core/services/producto.service';
 import { environment } from '../../../../environments/environment';
+import { LucideAngularModule,
+         Pencil, Trash2, PackagePlus, Package,
+         AlertTriangle, CheckCircle2, XCircle } from 'lucide-angular';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: './inventario.component.html'
 })
 export class InventarioComponent implements OnInit {
@@ -16,6 +19,17 @@ export class InventarioComponent implements OnInit {
   private cdr             = inject(ChangeDetectorRef);
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
+
+  // ─── Iconos ───
+  readonly icons = {
+    edit:     Pencil,
+    delete:   Trash2,
+    addStock: PackagePlus,
+    package:  Package,
+    warning:  AlertTriangle,
+    ok:       CheckCircle2,
+    out:      XCircle
+  };
 
   // ─── Usuario y sucursales ───
   usuarioActual:         any   = null;

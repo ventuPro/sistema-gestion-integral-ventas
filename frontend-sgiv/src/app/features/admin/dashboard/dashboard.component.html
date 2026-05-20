@@ -107,6 +107,18 @@
         </div>
       </div>
 
+      <!-- Recargar permisos (solo cajeros / cocina) -->
+      <button *ngIf="esCajero || (!esAdmin && !esCajero)"
+              (click)="recargarPermisos()"
+              [disabled]="recargandoPermisos"
+              title="Recargar tus permisos sin cerrar sesión"
+              class="w-full flex items-center gap-3 px-3 py-2.5 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200 disabled:opacity-50 rounded-lg transition-all text-sm font-medium">
+        <lucide-icon [img]="icons.refresh"
+                     class="w-5 h-5 flex-shrink-0"
+                     [class.animate-spin]="recargandoPermisos"></lucide-icon>
+        {{ recargandoPermisos ? 'Actualizando…' : 'Recargar permisos' }}
+      </button>
+
       <!-- Cerrar sesión -->
       <button (click)="cerrarSesion()"
               class="w-full flex items-center gap-3 px-3 py-2.5 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-all text-sm font-medium">
@@ -115,6 +127,12 @@
       </button>
     </div>
   </aside>
+
+  <!-- Toast de permisos -->
+  <div *ngIf="toastPermisos"
+       class="fixed top-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium animate-bounce">
+    {{ toastPermisos }}
+  </div>
 
   <!-- ═══ CONTENIDO PRINCIPAL ═══ -->
   <div class="flex-1 flex flex-col overflow-hidden">

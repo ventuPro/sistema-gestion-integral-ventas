@@ -3,12 +3,15 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { UsuarioService } from '../../../core/services/usuario.service';
 import { PermisoService, MODULOS } from '../../../core/services/permiso.service';
-import { CajaService } from '../../../core/services/caja.service'; // <-- Import agregado
+import { CajaService } from '../../../core/services/caja.service';
+import { LucideAngularModule,
+         Pencil, KeyRound, ShieldCheck, Lock, Unlock,
+         UserCheck, UserX } from 'lucide-angular';
 
 @Component({
   selector: 'app-usuarios',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: './usuarios.component.html',
   styleUrl: './usuarios.component.css'
 })
@@ -16,7 +19,18 @@ export class UsuariosComponent implements OnInit {
   private usuarioService = inject(UsuarioService);
   private permisoService = inject(PermisoService);
   private cdr            = inject(ChangeDetectorRef);
-  private cajaService    = inject(CajaService); // <-- Inject agregado
+  private cajaService    = inject(CajaService);
+
+  // Iconos
+  readonly icons = {
+    edit:        Pencil,
+    password:    KeyRound,
+    permissions: ShieldCheck,
+    cajaOpen:    Unlock,
+    cajaClose:   Lock,
+    activate:    UserCheck,
+    deactivate:  UserX
+  };
 
   listaUsuarios:  any[] = [];
   listaRoles:     any[] = [];
@@ -43,6 +57,9 @@ export class UsuariosComponent implements OnInit {
   permisosEdicion: Record<string, boolean> = {};
   cargandoPermisos       = false;
   modulosSistema         = MODULOS;
+
+  // Toast éxito
+  mensajeExito: string | null = null;
 
   ngOnInit() { this.cargarDatos(); }
 
@@ -142,91 +159,91 @@ export class UsuariosComponent implements OnInit {
     });
   }
 
-  // ─── Modal permisos  ───
-abrirModalPermisos(usr: any) {
-  this.usuarioPermisos  = usr;
-  this.permisosEdicion  = {};
-  this.cargandoPermisos = true;
-  this.mostrarModalPermisos = true;
+  // ─── Modal permisos ───
+  abrirModalPermisos(usr: any) {
+    this.usuarioPermisos  = usr;
+    this.permisosEdicion  = {};
+    this.cargandoPermisos = true;
+    this.mostrarModalPermisos = true;
 
-  this.permisoService.obtenerPermisosUsuario(Number(usr.id_usuario)).subscribe({
-    next: (res: any) => {
-      // Inicializar todos los módulos en false primero
-      this.modulosSistema.forEach(m => {
-        this.permisosEdicion[m.key] = false;
-      });
-      // Aplicar los permisos recibidos
-      if (res?.permisos) {
-        Object.keys(res.permisos).forEach(k => {
-          this.permisosEdicion[k] = res.permisos[k];
-        });
+    this.permisoService.obtenerPermisosUsuario(Number(usr.id_usuario)).subscribe({
+      next: (res: any) => {
+        this.modulosSistema.forEach(m => { this.permisosEdicion[m.key] = false; });
+        if (res?.permisos) {
+          Object.keys(res.permisos).forEach(k => { this.permisosEdicion[k] = res.permisos[k]; });
+        }
+        this.cargandoPermisos = false;
+        this.cdr.detectChanges();
+      },
+      error: (e: any) => {
+        console.error('Error cargando permisos:', e);
+        this.cargandoPermisos = false;
+        alert('Error al cargar permisos del usuario.');
+        this.cerrarModalPermisos();
       }
-      this.cargandoPermisos = false;
-      this.cdr.detectChanges();
-    },
-    error: (e: any) => {
-      console.error('Error cargando permisos:', e);
-      this.cargandoPermisos = false;
-      alert('Error al cargar permisos del usuario.');
-      this.cerrarModalPermisos();
-    }
-  });
-}
+    });
+  }
 
   cerrarModalPermisos() { this.mostrarModalPermisos = false; this.usuarioPermisos = null; }
 
-guardarPermisos() {
-  if (!this.usuarioPermisos) return;
-  this.cargandoPermisos = true;
+  guardarPermisos() {
+    if (!this.usuarioPermisos) return;
+    const nombre = this.usuarioPermisos.nombre_completo;
+    const uid    = Number(this.usuarioPermisos.id_usuario);
+    this.cargandoPermisos = true;
 
-  this.permisoService.guardarPermisosUsuario(
-    Number(this.usuarioPermisos.id_usuario),
-    this.permisosEdicion
-  ).subscribe({
-    next: (res: any) => {
-      this.cargandoPermisos = false;
-      this.cerrarModalPermisos();
-      this.cdr.detectChanges();
-      // Confirmación visual
-      this.mostrarToast(`Permisos de "${this.usuarioPermisos.nombre_completo}" guardados.`);
-    },
-    error: (e: any) => {
-      console.error('Error guardando permisos:', e);
-      this.cargandoPermisos = false;
-      alert('Error al guardar permisos. Verifica la conexión.');
-    }
-  });
-}
+    // Normalizar SOLO los módulos válidos y forzar booleano
+    const MODULOS = ['dashboard','punto_venta','mesas','arqueo','inventario','reportes','usuarios','cocina'];
+    const permisosNorm: Record<string, boolean> = {};
+    MODULOS.forEach(m => { permisosNorm[m] = this.permisosEdicion[m] === true; });
 
-mensajeExito: string | null = null;
+    console.log('[permisos] Enviando uid=', uid, '→', permisosNorm);
 
-private mostrarToast(msg: string) {
-  this.mensajeExito = msg;
-  this.cdr.detectChanges();
-  setTimeout(() => { this.mensajeExito = null; this.cdr.detectChanges(); }, 3500);
-}
+    this.permisoService.guardarPermisosUsuario(uid, permisosNorm).subscribe({
+      next: (res: any) => {
+        this.cargandoPermisos = false;
+        const guardadosBackend = res?.permisos || {};
+        console.log('[permisos] ✅ Guardados en BD:', guardadosBackend);
+        this.cerrarModalPermisos();
+        this.cdr.detectChanges();
+        this.mostrarToast(
+          `✓ Permisos de "${nombre}" guardados. Se aplicarán cuando ${nombre} recargue o vuelva a iniciar sesión.`
+        );
+      },
+      error: (e: any) => {
+        console.error('[permisos] ❌ Error completo:', e);
+        this.cargandoPermisos = false;
+        const detalle = e?.error?.detalle || e?.error?.error || e?.message || 'Error desconocido';
+        const httpCode = e?.status ? ` (HTTP ${e.status})` : '';
+        alert(`Error al guardar permisos${httpCode}:\n\n${detalle}\n\nRevisa la consola del navegador y del backend para más detalles.`);
+      }
+    });
+  }
+
+  private mostrarToast(msg: string) {
+    this.mensajeExito = msg;
+    this.cdr.detectChanges();
+    setTimeout(() => { this.mensajeExito = null; this.cdr.detectChanges(); }, 3500);
+  }
 
   getBadge(rol: string): string {
-    const m: any = { 'Administrador': 'bg-purple-100 text-purple-700', 'Cajero': 'bg-blue-100 text-blue-700', 'Cocina': 'bg-orange-100 text-orange-700' };
+    const m: any = {
+      'Administrador': 'bg-purple-100 text-purple-700',
+      'Cajero':        'bg-blue-100 text-blue-700',
+      'Cocina':        'bg-orange-100 text-orange-700'
+    };
     return m[rol] || 'bg-gray-100 text-gray-700';
   }
 
   // ─── Control de Caja desde Usuarios (Admin) ───
-  // - Caja abierta → la cierra (cierra turno + flag).
-  // - Caja cerrada hoy → la reabre (reabre turno + flag).
-  // - Sin turno hoy → solo habilita el flag (el cajero aún deberá ingresar monto inicial).
   toggleCaja(usr: any) {
     const id     = Number(usr.id_usuario);
     const nombre = usr.nombre_completo;
 
     if (usr.caja_habilitada) {
       if (!confirm(`¿Cerrar caja de "${nombre}"?\n\nEl cajero no podrá registrar más ventas hasta que la reabras.`)) return;
-
       this.cajaService.deshabilitarCaja(id).subscribe({
-        next: () => {
-          this.mostrarToast(`🔒 Caja de "${nombre}" cerrada.`);
-          this.cargarDatos();
-        },
+        next: () => { this.mostrarToast(`🔒 Caja de "${nombre}" cerrada.`); this.cargarDatos(); },
         error: (e: any) => {
           const msg = e?.error?.error || 'Error al cerrar la caja.';
           alert(`Error: ${msg}`);
@@ -235,7 +252,6 @@ private mostrarToast(msg: string) {
       });
     } else {
       if (!confirm(`¿Reabrir / habilitar caja para "${nombre}"?\n\nSi tiene una caja cerrada hoy, se reabrirá el turno y podrá vender de inmediato.`)) return;
-
       this.cajaService.habilitarCaja(id).subscribe({
         next: (res: any) => {
           const accion = res?.usuario?.accion;
@@ -253,5 +269,4 @@ private mostrarToast(msg: string) {
       });
     }
   }
-
 }

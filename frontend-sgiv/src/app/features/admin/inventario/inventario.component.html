@@ -96,56 +96,85 @@
      class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
 
   <div *ngFor="let prod of productosFiltrados"
-       class="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all bg-white">
+       class="group border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all bg-white flex flex-col">
 
-    <!-- Imagen compacta -->
-    <div class="relative h-24 bg-gray-50">
+    <!-- Imagen + categoría -->
+    <div class="relative h-28 bg-gradient-to-br from-gray-50 to-gray-100">
       <img *ngIf="prod.url_imagen"
            [src]="getImageUrl(prod.url_imagen)"
            [alt]="prod.nombre_producto"
            class="w-full h-full object-cover">
       <div *ngIf="!prod.url_imagen"
-           class="w-full h-full flex items-center justify-center text-2xl font-black text-gray-300">
-        {{ prod.nombre_producto?.charAt(0) }}
+           class="w-full h-full flex items-center justify-center">
+        <lucide-icon [img]="icons.package" class="w-10 h-10 text-gray-300"></lucide-icon>
       </div>
 
-      <!-- Stock badge — MÁS NOTORIO -->
-      <div class="absolute top-0 left-0 right-0 flex justify-between p-1.5">
-        <span class="text-xs px-1.5 py-0.5 rounded-md font-medium text-gray-500 bg-white/90">
-          {{ prod.nombre_categoria }}
-        </span>
-        <span class="text-xs font-black px-2 py-0.5 rounded-md shadow-sm"
-              [class.bg-green-500]="(prod.stock_actual || 0) > 10"
-              [class.text-white]="(prod.stock_actual || 0) > 10"
-              [class.bg-amber-400]="(prod.stock_actual || 0) > 0 && (prod.stock_actual || 0) <= 10"
-              [class.text-white]="(prod.stock_actual || 0) > 0 && (prod.stock_actual || 0) <= 10"
-              [class.bg-red-500]="(prod.stock_actual || 0) <= 0"
-              [class.text-white]="(prod.stock_actual || 0) <= 0">
-          {{ (prod.stock_actual || 0) === 0 ? 'Sin stock' : (prod.stock_actual || 0) + ' uds.' }}
-        </span>
-      </div>
+      <!-- Tag categoría -->
+      <span class="absolute top-2 left-2 text-[11px] px-2 py-0.5 rounded-full font-semibold text-gray-700 bg-white/95 shadow-sm">
+        {{ prod.nombre_categoria }}
+      </span>
     </div>
 
-    <!-- Info compacta -->
-    <div class="p-3">
-      <h3 class="font-bold text-gray-800 text-sm leading-tight truncate mb-1">
+    <!-- Info -->
+    <div class="p-3 flex-1 flex flex-col">
+      <h3 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2 mb-1 min-h-[2.2em]">
         {{ prod.nombre_producto }}
       </h3>
-      <p class="text-blue-700 font-black text-base mb-2">Bs. {{ prod.precio_unitario }}</p>
+      <p class="text-blue-700 font-black text-base mb-3">Bs. {{ prod.precio_unitario }}</p>
 
-      <!-- Acciones -->
-      <div class="flex gap-1.5">
+      <!-- ═══ INDICADOR DE STOCK ═══ -->
+      <div class="mb-3">
+        <!-- Sin stock -->
+        <div *ngIf="(prod.stock_actual || 0) <= 0"
+             class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-100">
+          <lucide-icon [img]="icons.out" class="w-4 h-4 text-red-500 flex-shrink-0"></lucide-icon>
+          <div class="flex-1 min-w-0">
+            <p class="text-[11px] text-red-600 font-bold leading-tight">Sin stock</p>
+            <p class="text-[10px] text-red-400 leading-tight">0 unidades</p>
+          </div>
+        </div>
+        <!-- Stock bajo (1-10) -->
+        <div *ngIf="(prod.stock_actual || 0) > 0 && (prod.stock_actual || 0) <= 10"
+             class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-100">
+          <lucide-icon [img]="icons.warning" class="w-4 h-4 text-orange-500 flex-shrink-0"></lucide-icon>
+          <div class="flex-1 min-w-0">
+            <p class="text-[11px] text-orange-700 font-bold leading-tight">Stock bajo</p>
+            <p class="text-[10px] text-orange-500 leading-tight">{{ prod.stock_actual }} unidades</p>
+          </div>
+        </div>
+        <!-- Stock normal (>10) -->
+        <div *ngIf="(prod.stock_actual || 0) > 10"
+             class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100">
+          <lucide-icon [img]="icons.ok" class="w-4 h-4 text-emerald-600 flex-shrink-0"></lucide-icon>
+          <div class="flex-1 min-w-0">
+            <p class="text-[11px] text-emerald-700 font-bold leading-tight">En stock</p>
+            <p class="text-[10px] text-emerald-500 leading-tight">{{ prod.stock_actual }} unidades</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ ACCIONES con iconos profesionales + tooltips ═══ -->
+      <div class="flex gap-1.5 mt-auto">
+        <!-- Agregar stock (principal) -->
         <button (click)="abrirModalStock(prod)"
-                class="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors">
-          + Stock
+                title="Agregar más unidades al stock"
+                class="flex-1 inline-flex items-center justify-center gap-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-lg transition-all shadow-sm">
+          <lucide-icon [img]="icons.addStock" class="w-4 h-4"></lucide-icon>
+          <span>Stock</span>
         </button>
+
+        <!-- Editar producto -->
         <button (click)="abrirModalEditar(prod)"
-                class="py-1.5 px-2 border border-gray-200 text-gray-500 text-xs rounded-lg hover:bg-gray-50 transition-colors">
-          ✏
+                title="Editar este producto (nombre, precio, foto, categoría)"
+                class="inline-flex items-center justify-center w-9 h-9 border border-gray-200 bg-white text-gray-500 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 active:scale-95 rounded-lg transition-all">
+          <lucide-icon [img]="icons.edit" class="w-4 h-4"></lucide-icon>
         </button>
+
+        <!-- Eliminar producto -->
         <button (click)="eliminarProducto(prod.id_producto, prod.nombre_producto)"
-                class="py-1.5 px-2 border border-red-100 text-red-400 text-xs rounded-lg hover:bg-red-50 transition-colors">
-          🗑
+                title="Eliminar este producto del catálogo"
+                class="inline-flex items-center justify-center w-9 h-9 border border-gray-200 bg-white text-gray-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 active:scale-95 rounded-lg transition-all">
+          <lucide-icon [img]="icons.delete" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
     </div>
