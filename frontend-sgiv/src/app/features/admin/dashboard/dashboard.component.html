@@ -12,7 +12,6 @@
     <!-- Navegación -->
     <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
 
-      <!-- CAJERO -->
       <ng-container *ngIf="esCajero">
         <p class="text-gray-500 text-xs font-bold uppercase tracking-widest px-3 pb-2">Operaciones</p>
 
@@ -49,6 +48,20 @@
            class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
           <lucide-icon [img]="icons.inventario" class="w-5 h-5 flex-shrink-0"></lucide-icon>
           Inventario
+        </a>
+
+        <a *ngIf="tiene('reportes')"
+           routerLink="/dashboard/reportes" routerLinkActive="bg-blue-600 text-white"
+           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
+          <lucide-icon [img]="icons.reportes" class="w-5 h-5 flex-shrink-0"></lucide-icon>
+          Reportes
+        </a>
+
+        <a *ngIf="tiene('usuarios')"
+           routerLink="/dashboard/usuarios" routerLinkActive="bg-blue-600 text-white"
+           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
+          <lucide-icon [img]="icons.usuarios" class="w-5 h-5 flex-shrink-0"></lucide-icon>
+          Usuarios
         </a>
       </ng-container>
 

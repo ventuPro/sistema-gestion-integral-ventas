@@ -6,12 +6,16 @@ import { ReporteService } from '../../../core/services/reporte.service';
 import { SucursalService } from '../../../core/services/sucursal.service';
 import { CajaService } from '../../../core/services/caja.service';
 import { Chart, registerables } from 'chart.js';
+import { LucideAngularModule,
+         Store, Plus, X,
+         Wallet, QrCode, ShoppingCart,
+         Activity } from 'lucide-angular';
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-resumen',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: './resumen.component.html',
   styleUrl: './resumen.component.css'
 })
@@ -21,6 +25,21 @@ export class ResumenComponent implements OnInit, OnDestroy {
   private cajaService     = inject(CajaService);
   private cdr             = inject(ChangeDetectorRef);
   private router          = inject(Router);
+
+  readonly icons = {
+    store: Store,
+    plus:  Plus,
+    close: X,
+    cash:  Wallet,
+    qr:    QrCode,
+    cart:  ShoppingCart,
+    pulse: Activity
+  };
+
+  get nombreSucursalActual(): string {
+    const s = this.sucursales.find(x => x.id_sucursal === this.sucursalActual);
+    return s?.nombre_sucursal || 'Tu sucursal';
+  }
 
   cargando       = true;
   esAdmin        = false;
@@ -52,13 +71,8 @@ export class ResumenComponent implements OnInit, OnDestroy {
     const raw = localStorage.getItem('usuario_sgiv');
     if (raw) {
       const u = JSON.parse(raw);
-      this.esAdmin       = u.id_rol === 1;
+      this.esAdmin        = u.id_rol === 1;
       this.sucursalActual = u.id_sucursal || 1;
-    }
-
-    if (!this.esAdmin) {
-      this.router.navigate(['/dashboard/punto-venta']);
-      return;
     }
 
     this.cargarSucursales();
@@ -66,7 +80,6 @@ export class ResumenComponent implements OnInit, OnDestroy {
     this.cargarDatos();
     this.cargarEstadoCajas();
 
-    // Refresco automático cada 30s (incluye estado de cajas)
     this.refreshInterval = setInterval(() => {
       this.cargarDatos();
       this.cargarEstadoCajas();

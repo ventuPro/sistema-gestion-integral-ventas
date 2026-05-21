@@ -6,11 +6,13 @@ import { CajaService, EstadoCajaCompleto }    from '../../../core/services/caja.
 import { MesaService }    from '../../../core/services/mesa.service';
 import { SocketService }  from '../../../core/services/socket.service';
 import { MesaModalComponent } from './mesa-modal/mesa-modal.component';
+import { LucideAngularModule,
+         ShieldAlert, Landmark, RefreshCw } from 'lucide-angular';
 
 @Component({
   selector: 'app-mesas',
   standalone: true,
-  imports: [CommonModule, FormsModule, MesaModalComponent],
+  imports: [CommonModule, FormsModule, MesaModalComponent, LucideAngularModule],
   templateUrl: './mesas.component.html',
   styleUrl:    './mesas.component.css'
 })
@@ -20,6 +22,12 @@ export class MesasComponent implements OnInit, OnDestroy {
   private mesaService   = inject(MesaService);
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
+
+  readonly icons = {
+    shieldAlert: ShieldAlert,
+    landmark:    Landmark,
+    refresh:     RefreshCw
+  };
 
   // ─── Control de acceso (basado en estado real del turno) ───
   verificandoCaja  = true;

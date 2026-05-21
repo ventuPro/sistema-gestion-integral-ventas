@@ -4,21 +4,19 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 export const MODULOS = [
-  { key: 'dashboard',   label: 'Panel Principal'  },
-  { key: 'inventario',  label: 'Inventario'        },
-  { key: 'punto_venta', label: 'Punto de Venta'    },
-  { key: 'mesas',       label: 'Mesas'             },
-  { key: 'arqueo',      label: 'Arqueo de Caja'    },
-  { key: 'reportes',    label: 'Reportes'          },
-  { key: 'usuarios',    label: 'Usuarios'          },
-  { key: 'cocina',      label: 'Cocina (KDS)'      }
+  { key: 'dashboard',   label: 'Panel Principal' },
+  { key: 'punto_venta', label: 'Punto de Venta'  },
+  { key: 'mesas',       label: 'Mesas'           },
+  { key: 'arqueo',      label: 'Arqueo de Caja'  },
+  { key: 'inventario',  label: 'Inventario'      },
+  { key: 'reportes',    label: 'Reportes'        },
+  { key: 'usuarios',    label: 'Usuarios'        }
 ];
 
-// Permisos por defecto según rol (usados cuando la API falla)
 const DEFAULTS: Record<number, Record<string, boolean>> = {
-  1: { dashboard:true, inventario:true, punto_venta:true, mesas:true, arqueo:true, reportes:true, usuarios:true, cocina:true },
-  2: { dashboard:true, inventario:false, punto_venta:true, mesas:true, arqueo:true, reportes:false, usuarios:false, cocina:false },
-  3: { dashboard:false, inventario:false, punto_venta:false, mesas:false, arqueo:false, reportes:false, usuarios:false, cocina:true }
+  1: { dashboard:true,  inventario:true,  punto_venta:true,  mesas:true,  arqueo:true,  reportes:true,  usuarios:true  },
+  2: { dashboard:true,  inventario:false, punto_venta:true,  mesas:true,  arqueo:true,  reportes:false, usuarios:false },
+  3: { dashboard:false, inventario:false, punto_venta:false, mesas:false, arqueo:false, reportes:false, usuarios:false }
 };
 
 @Injectable({ providedIn: 'root' })

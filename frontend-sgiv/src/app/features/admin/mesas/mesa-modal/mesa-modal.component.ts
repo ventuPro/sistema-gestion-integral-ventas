@@ -282,5 +282,18 @@ cargarProductos() {
 
   imprimirTicket() { window.print(); }
 
-  cerrarModal() { this.cerrado.emit(); }
+  cerrarModal() {
+    // Si hay cuenta abierta sin productos, liberar la mesa automáticamente
+    const cuentaSinItems = this.cuentaActiva
+                        && (!this.cuentaActiva.items || this.cuentaActiva.items.length === 0)
+                        && this.vista !== 'ticket';
+    if (cuentaSinItems) {
+      this.cuentaService.cancelarSiVacia(this.cuentaActiva.id_cuenta).subscribe({
+        next: () => { this.mesaActualizada.emit(); this.cerrado.emit(); },
+        error: () => this.cerrado.emit()
+      });
+      return;
+    }
+    this.cerrado.emit();
+  }
 }

@@ -1,10 +1,14 @@
 <div class="space-y-6">
 
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-4 flex flex-wrap justify-between items-center gap-3">
-    <div class="flex items-center gap-3 flex-wrap">
-      <label class="text-sm font-semibold text-gray-600">Sucursal:</label>
-      
-      <div *ngIf="esAdmin && sucursales.length > 0" class="flex flex-wrap gap-2">
+
+    <div *ngIf="esAdmin" class="flex items-center gap-3 flex-wrap">
+      <label class="text-sm font-semibold text-gray-600 flex items-center gap-1.5">
+        <lucide-icon [img]="icons.store" class="w-4 h-4 text-blue-600"></lucide-icon>
+        Sucursal:
+      </label>
+
+      <div *ngIf="sucursales.length > 0" class="flex flex-wrap gap-2">
         <button *ngFor="let suc of sucursales"
                 (click)="cambiarSucursal(suc.id_sucursal)"
                 class="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
@@ -18,15 +22,30 @@
 
       <button (click)="abrirModalSucursal()"
               class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 ml-2">
-        <span class="text-lg leading-none">+</span> Nueva Sucursal
+        <lucide-icon [img]="icons.plus" class="w-4 h-4"></lucide-icon>
+        Nueva Sucursal
       </button>
     </div>
-    
+
+    <div *ngIf="!esAdmin"
+         class="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg px-4 py-2">
+      <div class="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
+        <lucide-icon [img]="icons.store" class="w-5 h-5"></lucide-icon>
+      </div>
+      <div class="leading-tight">
+        <p class="text-sm font-bold text-gray-800">{{ nombreSucursalActual }}</p>
+        <p class="text-xs text-gray-500">Panel de control de tu sucursal</p>
+      </div>
+    </div>
+
     <span *ngIf="cargando" class="text-sm text-gray-400 flex items-center gap-2">
       <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       Actualizando...
     </span>
-    <span *ngIf="!cargando" class="text-xs text-gray-400">Datos de hoy · Auto-refresco 60s</span>
+    <span *ngIf="!cargando" class="text-xs text-gray-400 flex items-center gap-1.5">
+      <lucide-icon [img]="icons.pulse" class="w-3.5 h-3.5"></lucide-icon>
+      Datos de hoy · Auto-refresco 60s
+    </span>
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-4 gap-4" *ngIf="!cargando && datosAdmin">
@@ -140,8 +159,13 @@
      class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
   <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
     <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-      <h3 class="text-lg font-bold text-gray-800">Nueva Sucursal</h3>
-      <button (click)="cerrarModalSucursal()" class="text-gray-400 hover:text-red-500 text-xl">✕</button>
+      <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <lucide-icon [img]="icons.store" class="w-5 h-5 text-blue-600"></lucide-icon>
+        Nueva Sucursal
+      </h3>
+      <button (click)="cerrarModalSucursal()" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors">
+        <lucide-icon [img]="icons.close" class="w-5 h-5"></lucide-icon>
+      </button>
     </div>
     <div class="p-6 space-y-4">
       <div *ngIf="errorSucursal" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">

@@ -170,16 +170,18 @@
             </p>
           </div>
           <button (click)="confirmarCierre()"
-                  class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition-colors shadow-sm whitespace-nowrap">
-            🧾 Realizar Arqueo y Cerrar
+                  class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition-colors shadow-sm whitespace-nowrap inline-flex items-center gap-2">
+            <lucide-icon [img]="icons.receipt" class="w-5 h-5"></lucide-icon>
+            Realizar Arqueo y Cerrar
           </button>
         </div>
       </div>
 
-      <!-- B) Caja CERRADA hoy → aviso claro -->
       <div *ngIf="arqueo.turno_activo?.estado_turno === 'Cerrado'"
            class="bg-red-50 rounded-xl border border-red-200 p-5 text-center">
-        <div class="text-3xl mb-2">🔒</div>
+        <div class="w-12 h-12 rounded-full bg-red-100 border border-red-200 flex items-center justify-center mx-auto mb-2">
+          <lucide-icon [img]="icons.shieldAlert" class="w-6 h-6 text-red-500"></lucide-icon>
+        </div>
         <p class="text-sm text-red-700 font-bold mb-1">Caja CERRADA</p>
         <p class="text-xs text-red-600">
           Tu caja del día ya fue cerrada. Solicita al
@@ -187,10 +189,11 @@
         </p>
       </div>
 
-      <!-- C) Sin apertura aún → invitar a abrir caja -->
       <div *ngIf="!arqueo.turno_activo"
            class="bg-amber-50 rounded-xl border border-amber-200 p-5 text-center">
-        <div class="text-3xl mb-2">🏦</div>
+        <div class="w-12 h-12 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center mx-auto mb-2">
+          <lucide-icon [img]="icons.landmark" class="w-6 h-6 text-amber-600"></lucide-icon>
+        </div>
         <p class="text-sm text-amber-700 font-bold mb-1">Sin Caja Abierta Hoy</p>
         <p class="text-xs text-amber-600">
           Aún no has abierto tu caja del día. Ve a

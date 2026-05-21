@@ -121,26 +121,28 @@ const obtenerDashboardCompleto = async (id_sucursal, id_categoria = null) => {
     };
 };
 
-// FIX: campo unificado como "ingresos" (no "ingresos_categoria")
 const obtenerReportePorPeriodo = async (id_sucursal, fecha_inicio, fecha_fin) => {
     const queryResumen = `
-        SELECT 
+        SELECT
             COUNT(id_venta)::int AS total_ventas,
             COALESCE(SUM(monto_total_venta), 0)::numeric AS ingresos_totales,
             COALESCE(AVG(monto_total_venta), 0)::numeric AS ticket_promedio
         FROM venta_caja
-        WHERE id_sucursal = $1 AND fecha_venta >= $2 AND fecha_venta <= $3;
+        WHERE id_sucursal = $1
+          AND fecha_venta >= $2::date
+          AND fecha_venta <  ($3::date + INTERVAL '1 day');
     `;
     const queryVentasDiarias = `
         SELECT DATE(fecha_venta)::text AS dia,
                COUNT(*)::int           AS ventas,
                SUM(monto_total_venta)::numeric AS ingresos
         FROM venta_caja
-        WHERE id_sucursal = $1 AND fecha_venta >= $2 AND fecha_venta <= $3
+        WHERE id_sucursal = $1
+          AND fecha_venta >= $2::date
+          AND fecha_venta <  ($3::date + INTERVAL '1 day')
         GROUP BY DATE(fecha_venta)
         ORDER BY dia ASC;
     `;
-    // FIX: alias "ingresos" y "unidades" estandarizados
     const queryCategorias = `
         SELECT c.nombre_categoria,
                SUM(dv.subtotal_venta)::numeric  AS ingresos,
@@ -149,7 +151,9 @@ const obtenerReportePorPeriodo = async (id_sucursal, fecha_inicio, fecha_fin) =>
         JOIN producto p ON dv.id_producto = p.id_producto
         JOIN categoria_producto c ON p.id_categoria = c.id_categoria
         JOIN venta_caja v ON dv.id_venta = v.id_venta
-        WHERE v.id_sucursal = $1 AND v.fecha_venta >= $2 AND v.fecha_venta <= $3
+        WHERE v.id_sucursal = $1
+          AND v.fecha_venta >= $2::date
+          AND v.fecha_venta <  ($3::date + INTERVAL '1 day')
         GROUP BY c.id_categoria, c.nombre_categoria
         ORDER BY ingresos DESC;
     `;
@@ -161,7 +165,9 @@ const obtenerReportePorPeriodo = async (id_sucursal, fecha_inicio, fecha_fin) =>
         JOIN producto p ON dv.id_producto = p.id_producto
         JOIN categoria_producto c ON p.id_categoria = c.id_categoria
         JOIN venta_caja v ON dv.id_venta = v.id_venta
-        WHERE v.id_sucursal = $1 AND v.fecha_venta >= $2 AND v.fecha_venta <= $3
+        WHERE v.id_sucursal = $1
+          AND v.fecha_venta >= $2::date
+          AND v.fecha_venta <  ($3::date + INTERVAL '1 day')
         GROUP BY p.id_producto, p.nombre_producto, c.nombre_categoria
         ORDER BY ingresos DESC
         LIMIT 10;

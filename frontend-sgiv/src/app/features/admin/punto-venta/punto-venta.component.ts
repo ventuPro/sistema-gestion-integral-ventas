@@ -5,11 +5,13 @@ import { ProductoService } from '../../../core/services/producto.service';
 import { CajaService, EstadoCajaCompleto } from '../../../core/services/caja.service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
+import { LucideAngularModule,
+         ShieldAlert, Landmark, RefreshCw, Check } from 'lucide-angular';
 
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: './punto-venta.component.html'
 })
 export class PuntoVentaComponent implements OnInit, OnDestroy {
@@ -18,6 +20,13 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   private cdr             = inject(ChangeDetectorRef);
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
+
+  readonly icons = {
+    shieldAlert: ShieldAlert,
+    landmark:    Landmark,
+    refresh:     RefreshCw,
+    check:       Check
+  };
 
   // ─── Estado de acceso (fuente: backend) ───
   verificandoCaja = true;

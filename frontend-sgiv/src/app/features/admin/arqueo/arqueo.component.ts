@@ -3,11 +3,13 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CajaService } from '../../../core/services/caja.service';
 import { Router } from '@angular/router';
+import { LucideAngularModule,
+         ShieldAlert, Landmark, FileText } from 'lucide-angular';
 
 @Component({
   selector: 'app-arqueo',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: './arqueo.component.html',
   styleUrl: './arqueo.component.css'
 })
@@ -15,6 +17,12 @@ export class ArqueoComponent implements OnInit {
   private cajaService = inject(CajaService);
   private cdr         = inject(ChangeDetectorRef);
   private router      = inject(Router);
+
+  readonly icons = {
+    shieldAlert: ShieldAlert,
+    landmark:    Landmark,
+    receipt:     FileText
+  };
 
   cargando      = true;
   cerrando      = false;

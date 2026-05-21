@@ -12,7 +12,8 @@
       <p class="text-sm text-gray-500 mt-1">Administra cajeros, cocina y administradores</p>
     </div>
     <button (click)="abrirModalNuevo()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 text-sm transition-colors">
-      <span class="text-lg leading-none">+</span> Nuevo Usuario
+      <lucide-icon [img]="icons.plus" class="w-4 h-4"></lucide-icon>
+      Nuevo Usuario
     </button>
   </div>
 
@@ -72,16 +73,17 @@
             <span *ngIf="!usr.estado_activo" class="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold">Inactivo</span>
           </td>
 
-          <!-- Estado de Caja (solo cajeros) -->
           <td class="px-4 py-3">
             <ng-container *ngIf="+usr.id_rol === 2 && usr.estado_activo">
               <span *ngIf="usr.caja_habilitada"
-                    class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">
-                💰 Caja Abierta
+                    class="inline-flex items-center gap-1.5 bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold">
+                <lucide-icon [img]="icons.wallet" class="w-3.5 h-3.5"></lucide-icon>
+                Caja Abierta
               </span>
               <span *ngIf="!usr.caja_habilitada"
-                    class="inline-flex items-center gap-1 bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold">
-                🔒 Caja Cerrada
+                    class="inline-flex items-center gap-1.5 bg-red-100 text-red-600 px-2.5 py-1 rounded-full text-xs font-bold">
+                <lucide-icon [img]="icons.walletOff" class="w-3.5 h-3.5"></lucide-icon>
+                Caja Cerrada
               </span>
             </ng-container>
             <span *ngIf="+usr.id_rol !== 2" class="text-gray-300 text-xs">—</span>
@@ -155,8 +157,13 @@
 <div *ngIf="mostrarModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
   <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
     <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-      <h3 class="text-lg font-bold text-gray-800">{{ editandoId ? 'Editar' : 'Crear' }} Usuario</h3>
-      <button (click)="cerrarModal()" class="text-gray-400 hover:text-red-500 text-xl">✕</button>
+      <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <lucide-icon [img]="icons.users" class="w-5 h-5 text-blue-600"></lucide-icon>
+        {{ editandoId ? 'Editar' : 'Crear' }} Usuario
+      </h3>
+      <button (click)="cerrarModal()" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors">
+        <lucide-icon [img]="icons.close" class="w-5 h-5"></lucide-icon>
+      </button>
     </div>
     <div class="p-6 space-y-4">
       <div *ngIf="mensajeError" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{{ mensajeError }}</div>
@@ -226,43 +233,41 @@
 </div>
 
 
-<!-- ════════ MODAL PERMISOS GRANULARES ════════ -->
 <div *ngIf="mostrarModalPermisos" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-    <div class="bg-indigo-600 p-4 text-white">
-      <h3 class="font-bold text-lg">Control de Permisos</h3>
-      <p class="text-xs opacity-90 mt-1">{{ usuarioPermisos?.nombre_completo }} — {{ usuarioPermisos?.nombre_rol }}</p>
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs overflow-hidden">
+    <div class="bg-indigo-600 px-4 py-3 text-white">
+      <h3 class="font-bold text-sm">Permisos de acceso</h3>
+      <p class="text-[11px] opacity-90 truncate">{{ usuarioPermisos?.nombre_completo }} · {{ usuarioPermisos?.nombre_rol }}</p>
     </div>
 
-    <div class="p-6">
-      <p class="text-xs text-gray-500 mb-2">Marca los módulos a los que este usuario tendrá acceso:</p>
-      <div class="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-4 text-xs text-blue-700">
-        ℹ️ Los cambios se aplicarán cuando el usuario <strong>vuelva a iniciar sesión</strong> o pulse "Recargar permisos".
+    <div class="px-4 py-3">
+      <div class="bg-blue-50 border border-blue-200 rounded-md px-2 py-1.5 mb-3 text-[11px] text-blue-700 leading-tight">
+        Se aplicará al volver a iniciar sesión o al pulsar "Recargar permisos".
       </div>
 
-      <div *ngIf="cargandoPermisos" class="text-center py-6">
-        <div class="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <div *ngIf="cargandoPermisos" class="text-center py-4">
+        <div class="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
       </div>
 
-      <div *ngIf="!cargandoPermisos" class="space-y-2">
+      <div *ngIf="!cargandoPermisos" class="space-y-1">
         <label *ngFor="let mod of modulosSistema"
-               class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-200 transition-colors"
+               class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 cursor-pointer border border-gray-200 transition-colors"
                [class.border-indigo-300]="permisosEdicion[mod.key]"
                [class.bg-indigo-50]="permisosEdicion[mod.key]">
           <input type="checkbox"
                  [(ngModel)]="permisosEdicion[mod.key]"
                  [name]="mod.key"
-                 class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer">
-          <span class="text-sm font-medium text-gray-700">{{ mod.label }}</span>
+                 class="w-3.5 h-3.5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer">
+          <span class="text-xs font-medium text-gray-700">{{ mod.label }}</span>
         </label>
       </div>
     </div>
 
-    <div class="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
-      <button (click)="cerrarModalPermisos()" class="px-4 py-2 bg-white border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100">Cancelar</button>
+    <div class="px-4 py-3 bg-gray-50 border-t flex justify-end gap-2">
+      <button (click)="cerrarModalPermisos()" class="px-3 py-1.5 bg-white border border-gray-300 text-gray-600 rounded-md text-xs font-medium hover:bg-gray-100">Cancelar</button>
       <button (click)="guardarPermisos()" [disabled]="cargandoPermisos"
-              class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium">
-        Guardar Permisos
+              class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-md text-xs font-medium">
+        Guardar
       </button>
     </div>
   </div>

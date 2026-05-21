@@ -6,7 +6,8 @@ import { PermisoService, MODULOS } from '../../../core/services/permiso.service'
 import { CajaService } from '../../../core/services/caja.service';
 import { LucideAngularModule,
          Pencil, KeyRound, ShieldCheck, Lock, Unlock,
-         UserCheck, UserX } from 'lucide-angular';
+         UserCheck, UserX, Wallet, CircleSlash2,
+         X, Plus, Users } from 'lucide-angular';
 
 @Component({
   selector: 'app-usuarios',
@@ -21,7 +22,6 @@ export class UsuariosComponent implements OnInit {
   private cdr            = inject(ChangeDetectorRef);
   private cajaService    = inject(CajaService);
 
-  // Iconos
   readonly icons = {
     edit:        Pencil,
     password:    KeyRound,
@@ -29,7 +29,12 @@ export class UsuariosComponent implements OnInit {
     cajaOpen:    Unlock,
     cajaClose:   Lock,
     activate:    UserCheck,
-    deactivate:  UserX
+    deactivate:  UserX,
+    wallet:      Wallet,
+    walletOff:   CircleSlash2,
+    close:       X,
+    plus:        Plus,
+    users:       Users
   };
 
   listaUsuarios:  any[] = [];
@@ -193,7 +198,7 @@ export class UsuariosComponent implements OnInit {
     this.cargandoPermisos = true;
 
     // Normalizar SOLO los módulos válidos y forzar booleano
-    const MODULOS = ['dashboard','punto_venta','mesas','arqueo','inventario','reportes','usuarios','cocina'];
+    const MODULOS = ['dashboard','punto_venta','mesas','arqueo','inventario','reportes','usuarios'];
     const permisosNorm: Record<string, boolean> = {};
     MODULOS.forEach(m => { permisosNorm[m] = this.permisosEdicion[m] === true; });
 
@@ -243,7 +248,7 @@ export class UsuariosComponent implements OnInit {
     if (usr.caja_habilitada) {
       if (!confirm(`¿Cerrar caja de "${nombre}"?\n\nEl cajero no podrá registrar más ventas hasta que la reabras.`)) return;
       this.cajaService.deshabilitarCaja(id).subscribe({
-        next: () => { this.mostrarToast(`🔒 Caja de "${nombre}" cerrada.`); this.cargarDatos(); },
+        next: () => { this.mostrarToast(`Caja de "${nombre}" cerrada.`); this.cargarDatos(); },
         error: (e: any) => {
           const msg = e?.error?.error || 'Error al cerrar la caja.';
           alert(`Error: ${msg}`);
@@ -256,9 +261,9 @@ export class UsuariosComponent implements OnInit {
         next: (res: any) => {
           const accion = res?.usuario?.accion;
           if (accion === 'TURNO_REABIERTO')
-            this.mostrarToast(`🔓 Caja de "${nombre}" REABIERTA — ya puede vender.`);
+            this.mostrarToast(`Caja de "${nombre}" REABIERTA — ya puede vender.`);
           else
-            this.mostrarToast(`💰 Caja de "${nombre}" habilitada.`);
+            this.mostrarToast(`Caja de "${nombre}" habilitada.`);
           this.cargarDatos();
         },
         error: (e: any) => {

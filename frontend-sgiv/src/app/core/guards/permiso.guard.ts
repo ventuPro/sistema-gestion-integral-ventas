@@ -3,7 +3,7 @@ import { CanActivateFn, Router } from '@angular/router';
 
 const DEFAULTS_CAJERO: Record<string, boolean> = {
   dashboard: true, inventario: false, punto_venta: true,
-  mesas: true, arqueo: true, reportes: false, usuarios: false, cocina: false
+  mesas: true, arqueo: true, reportes: false, usuarios: false
 };
 
 export function permisoGuard(modulo: string): CanActivateFn {

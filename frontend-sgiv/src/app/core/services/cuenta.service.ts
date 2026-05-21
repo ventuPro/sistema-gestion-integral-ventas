@@ -47,6 +47,10 @@ getProductos(id_sucursal: number = 1): Observable<any[]> {
     return this.http.post<any>(`${this.apiUrl}/cuentas/reset-mesa`, { id_mesa }, { headers: this.h() });
   }
 
+  cancelarSiVacia(id_cuenta: number): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/cuentas/${id_cuenta}/cancelar-si-vacia`, {}, { headers: this.h() });
+  }
+
   getQR(id_mesa: number): Observable<any> {
   // Construir la URL base del frontend correctamente
   const protocol = window.location.protocol;
