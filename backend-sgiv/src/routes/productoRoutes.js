@@ -5,8 +5,9 @@ const productoController = require('../controllers/productoController');
 const { verificarToken } = require('../middlewares/authMiddleware'); 
 
 // Rutas protegidas (solo entran los que tienen Token)
-router.post('/categorias', verificarToken, productoController.agregarCategoria); 
-router.get('/categorias', verificarToken, productoController.listarCategorias);  
+router.post('/categorias', verificarToken, productoController.agregarCategoria);
+router.get('/categorias', verificarToken, productoController.listarCategorias);
+router.delete('/categorias/:id', verificarToken, productoController.eliminarCategoria);
 
 router.post('/productos', verificarToken, productoController.agregarProducto);   
 router.get('/productos', verificarToken, productoController.listarProductos);    

@@ -22,10 +22,18 @@ export class ReporteService {
     return this.http.get(`${this.apiUrl}/reportes/dashboard-completo/${id_sucursal}`, { headers: this.h(), params });
   }
 
-  obtenerReportePeriodo(id_sucursal: number, fechaInicio: string, fechaFin: string): Observable<any> {
-    const params = new HttpParams()
+  obtenerReportePeriodo(id_sucursal: number, fechaInicio: string, fechaFin: string, categorias?: number[]): Observable<any> {
+    let params = new HttpParams()
       .set('fecha_inicio', fechaInicio)
       .set('fecha_fin', fechaFin);
+    if (categorias && categorias.length > 0) {
+      params = params.set('categorias', categorias.join(','));
+    }
     return this.http.get(`${this.apiUrl}/reportes/periodo/${id_sucursal}`, { headers: this.h(), params });
+  }
+
+  obtenerDesgloseDia(id_sucursal: number, fecha: string): Observable<any> {
+    const params = new HttpParams().set('fecha', fecha);
+    return this.http.get(`${this.apiUrl}/reportes/dia-detalle/${id_sucursal}`, { headers: this.h(), params });
   }
 }

@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CajaService } from '../../../core/services/caja.service';
 import { Router } from '@angular/router';
 import { LucideAngularModule,
-         ShieldAlert, Landmark, FileText } from 'lucide-angular';
+         ShieldAlert, Landmark, FileText, Inbox } from 'lucide-angular';
 
 @Component({
   selector: 'app-arqueo',
@@ -21,7 +21,8 @@ export class ArqueoComponent implements OnInit {
   readonly icons = {
     shieldAlert: ShieldAlert,
     landmark:    Landmark,
-    receipt:     FileText
+    receipt:     FileText,
+    empty:       Inbox
   };
 
   cargando      = true;
@@ -80,12 +81,10 @@ export class ArqueoComponent implements OnInit {
       next: () => {
         this.cerrando = false;
         this.mostrarConfirmCierre = false;
-        // Sincronizar localStorage para bloquear inmediatamente POS/Mesas
         if (this.usuarioActual) {
           this.usuarioActual.caja_habilitada = false;
           localStorage.setItem('usuario_sgiv', JSON.stringify(this.usuarioActual));
         }
-        // Recargar el arqueo para reflejar el nuevo estado (CERRADO)
         this.cargarArqueo();
         this.cdr.detectChanges();
       },

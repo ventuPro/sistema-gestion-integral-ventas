@@ -13,6 +13,39 @@ const listarCategorias  = async (req, res) => {
     catch(e) { res.status(500).json({ error: e.message }); }
 };
 
+const eliminarCategoria = async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({ error: 'ID de categoría inválido' });
+        }
+
+        const cat = await m.obtenerCategoriaPorId(id);
+        if (!cat) return res.status(404).json({ error: 'Categoría no encontrada' });
+
+        const productos = await m.productosActivosDeCategoria(id);
+        if (productos.length > 0) {
+            return res.status(409).json({
+                error: 'La categoría tiene productos activos',
+                productos
+            });
+        }
+
+        const confirmacion = (req.body && req.body.confirmacion) || '';
+        if (confirmacion.trim() !== cat.nombre_categoria) {
+            return res.status(400).json({
+                error: 'Debes escribir el nombre exacto de la categoría para confirmar'
+            });
+        }
+
+        await m.eliminarCategoria(id);
+        res.json({ mensaje: 'Categoría eliminada', categoria: cat });
+    } catch(e) {
+        console.error('eliminarCategoria:', e);
+        res.status(500).json({ error: e.message });
+    }
+};
+
 // Listar productos — SOLO los de esa sucursal (INNER JOIN)
 const listarProductos   = async (req, res) => {
     try {
@@ -94,6 +127,6 @@ const sumarStock = async (req, res) => {
 };
 
 module.exports = {
-    agregarCategoria, listarCategorias, listarProductos,
+    agregarCategoria, listarCategorias, eliminarCategoria, listarProductos,
     agregarProducto,  actualizarProducto, eliminarProducto, sumarStock
 };

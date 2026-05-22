@@ -1,27 +1,45 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ReporteService } from '../../../core/services/reporte.service';
+import { ProductoService } from '../../../core/services/producto.service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
+import { Subscription } from 'rxjs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { LucideAngularModule, Filter, ChevronDown, ChevronUp, Layers, X, Check, Sliders, FileDown, FileSpreadsheet, FileText } from 'lucide-angular';
 
 @Component({
   selector: 'app-reportes',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: './reportes.component.html',
   styleUrl: './reportes.component.css'
 })
-export class ReportesComponent implements OnInit {
-  private reporteService = inject(ReporteService);
-  private cdr            = inject(ChangeDetectorRef);
-  private http           = inject(HttpClient);
-  private apiUrl         = environment.apiUrl;
+export class ReportesComponent implements OnInit, OnDestroy {
+  private reporteService  = inject(ReporteService);
+  private productoService = inject(ProductoService);
+  private cdr             = inject(ChangeDetectorRef);
+  private http            = inject(HttpClient);
+  private apiUrl          = environment.apiUrl;
+
+  readonly icons = {
+    filter:  Filter,
+    sliders: Sliders,
+    down:    ChevronDown,
+    up:      ChevronUp,
+    layers:  Layers,
+    close:   X,
+    check:   Check,
+    excel:   FileSpreadsheet,
+    pdf:     FileText,
+    download: FileDown
+  };
 
   cargando       = false;
+  refrescando    = false;
   datosReporte: any = null;
   periodoActivo: 'hoy' | 'semana' | 'mes' | 'personalizado' = 'mes';
 
@@ -33,9 +51,108 @@ export class ReportesComponent implements OnInit {
   sucursales:      any[] = [];
   sucursalSeleccionada = 1;
 
+  // ─── Filtro categorías ───
+  categoriasDisponibles: any[] = [];
+  categoriasSeleccionadas = new Set<number>();
+  mostrarFiltroCategorias = false;
+
+  // ─── Drill-down por día ───
+  diasExpandidos   = new Set<string>();
+  desglosePorDia: Record<string, any> = {};
+  cargandoDia: Record<string, boolean> = {};
+
+  // ─── Control de requests concurrentes ───
+  private reporteSub: Subscription | null = null;
+  private debounceTimer: any = null;
+  private requestSeq = 0;
+
   ngOnInit() {
     this.cargarSucursales();
+    this.cargarCategorias();
     this.seleccionarPeriodo('mes');
+  }
+
+  ngOnDestroy() {
+    this.reporteSub?.unsubscribe();
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+  }
+
+  cargarCategorias() {
+    this.productoService.obtenerCategorias().subscribe({
+      next: (cats) => { this.categoriasDisponibles = cats || []; this.cdr.detectChanges(); },
+      error: () => { this.categoriasDisponibles = []; }
+    });
+  }
+
+  toggleCategoria(id: number) {
+    if (this.categoriasSeleccionadas.has(id)) this.categoriasSeleccionadas.delete(id);
+    else this.categoriasSeleccionadas.add(id);
+    this.programarRefresco();
+  }
+
+  esCategoriaActiva(id: number): boolean {
+    return this.categoriasSeleccionadas.has(id);
+  }
+
+  limpiarCategorias() {
+    if (this.categoriasSeleccionadas.size === 0) return;
+    this.categoriasSeleccionadas.clear();
+    this.programarRefresco();
+  }
+
+  private programarRefresco() {
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.refrescando = true;
+    this.cdr.detectChanges();
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null;
+      this.cargarReporte(true);
+    }, 180);
+  }
+
+  get hayFiltroCategorias(): boolean {
+    return this.categoriasSeleccionadas.size > 0;
+  }
+
+  get textoFiltroCategorias(): string {
+    const n = this.categoriasSeleccionadas.size;
+    const total = this.categoriasDisponibles.length;
+    if (n === 0) return `Filtrar por categoría (${total})`;
+    if (n === 1) {
+      const id = [...this.categoriasSeleccionadas][0];
+      const cat = this.categoriasDisponibles.find(c => c.id_categoria === id);
+      return cat ? cat.nombre_categoria : '1 categoría';
+    }
+    return `${n} de ${total} categorías`;
+  }
+
+  toggleDia(fecha: string) {
+    if (this.diasExpandidos.has(fecha)) {
+      this.diasExpandidos.delete(fecha);
+    } else {
+      this.diasExpandidos.add(fecha);
+      if (!this.desglosePorDia[fecha]) this.cargarDesgloseDia(fecha);
+    }
+  }
+
+  estaDiaExpandido(fecha: string): boolean {
+    return this.diasExpandidos.has(fecha);
+  }
+
+  private cargarDesgloseDia(fecha: string) {
+    this.cargandoDia[fecha] = true;
+    this.reporteService.obtenerDesgloseDia(this.sucursalSeleccionada, fecha).subscribe({
+      next: (d) => {
+        this.desglosePorDia[fecha] = d;
+        this.cargandoDia[fecha] = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.cargandoDia[fecha] = false;
+        this.desglosePorDia[fecha] = { desglose: [], total_dia: 0, ventas_dia: 0 };
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   private fmt(d: Date): string {
@@ -60,7 +177,9 @@ export class ReportesComponent implements OnInit {
 
   cambiarSucursal(id: number) {
     this.sucursalSeleccionada = id;
-    this.cargarReporte(); 
+    this.diasExpandidos.clear();
+    this.desglosePorDia = {};
+    this.cargarReporte();
   }
 
   seleccionarPeriodo(p: 'hoy' | 'semana' | 'mes' | 'personalizado') {
@@ -85,18 +204,43 @@ export class ReportesComponent implements OnInit {
     // 'personalizado': no carga automáticamente, espera al botón "Generar"
   }
 
-  cargarReporte() {
+  cargarReporte(silencioso: boolean = false) {
     if (!this.fechaInicio || !this.fechaFin) {
       alert('Selecciona las fechas de inicio y fin.'); return;
     }
     if (this.fechaInicio > this.fechaFin) {
       alert('La fecha de inicio no puede ser mayor a la fecha final.'); return;
     }
-    this.cargando = true;
-    this.reporteService.obtenerReportePeriodo(this.sucursalSeleccionada, this.fechaInicio, this.fechaFin).subscribe({
-      next:  (datos) => { this.datosReporte = datos; this.cargando = false; this.cdr.detectChanges(); },
-      error: ()      => { this.cargando = false; this.cdr.detectChanges(); }
-    });
+
+    this.reporteSub?.unsubscribe();
+    if (this.debounceTimer) { clearTimeout(this.debounceTimer); this.debounceTimer = null; }
+
+    const refresco = silencioso && !!this.datosReporte;
+    if (refresco) this.refrescando = true;
+    else          this.cargando    = true;
+
+    const cats = [...this.categoriasSeleccionadas];
+    const seq  = ++this.requestSeq;
+
+    this.reporteSub = this.reporteService
+      .obtenerReportePeriodo(this.sucursalSeleccionada, this.fechaInicio, this.fechaFin, cats)
+      .subscribe({
+        next: (datos) => {
+          if (seq !== this.requestSeq) return;
+          this.datosReporte = datos;
+          this.cargando     = false;
+          this.refrescando  = false;
+          this.diasExpandidos.clear();
+          this.desglosePorDia = {};
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          if (seq !== this.requestSeq) return;
+          this.cargando    = false;
+          this.refrescando = false;
+          this.cdr.detectChanges();
+        }
+      });
   }
 
   // ─── Exportar PDF ───
@@ -114,6 +258,14 @@ export class ReportesComponent implements OnInit {
     doc.text('Reporte de Ingresos', 105, 22, { align: 'center' });
     doc.setFontSize(9);
     doc.text(`Período: ${this.fechaInicio} al ${this.fechaFin}`, 105, 31, { align: 'center' });
+    if (this.hayFiltroCategorias) {
+      const nombres = this.categoriasDisponibles
+        .filter(c => this.categoriasSeleccionadas.has(c.id_categoria))
+        .map(c => c.nombre_categoria)
+        .join(', ');
+      doc.setFontSize(8);
+      doc.text(`Filtrado por categorías: ${nombres}`, 105, 36, { align: 'center' });
+    }
 
     doc.setTextColor(37, 99, 235); doc.setFontSize(12); doc.setFont('helvetica', 'bold');
     doc.text('RESUMEN EJECUTIVO', 14, 52);
@@ -182,9 +334,16 @@ export class ReportesComponent implements OnInit {
     const wb = XLSX.utils.book_new();
     const { resumen, ventas_diarias, por_categoria, top_productos } = this.datosReporte;
 
+    const filtroNombres = this.hayFiltroCategorias
+      ? this.categoriasDisponibles
+          .filter(c => this.categoriasSeleccionadas.has(c.id_categoria))
+          .map(c => c.nombre_categoria).join(', ')
+      : 'Todas';
+
     const ws1 = XLSX.utils.aoa_to_sheet([
       ["REPORTE DE INGRESOS — PASTELERÍA RICKY'S"],
       [`Período: ${this.fechaInicio} al ${this.fechaFin}`],
+      [`Categorías: ${filtroNombres}`],
       [''],
       ['RESUMEN'],
       ['Total Ventas',     resumen?.total_ventas || 0],

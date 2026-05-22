@@ -18,9 +18,15 @@
     </div>
     <h2 class="text-3xl font-black text-red-600 mb-3">Caja CERRADA</h2>
     <p class="text-gray-600 mb-2 max-w-md">
-      Tu caja ya fue cerrada hoy. Las mesas se bloquean hasta que el administrador la reabra.
+      Tu caja ya fue cerrada hoy. No puedes registrar más ventas hasta que el administrador la reabra.
     </p>
-    <p class="text-gray-400 text-sm mt-3">
+    <div *ngIf="turnoCajero" class="mt-4 bg-gray-50 rounded-xl p-4 text-left text-sm">
+      <p class="text-gray-500">
+        Turno #{{ turnoCajero.id_turno }} — Abierto: {{ turnoCajero.fecha_hora_apertura | date:'dd/MM HH:mm' }}<br>
+        Cerrado: {{ turnoCajero.fecha_hora_cierre | date:'dd/MM HH:mm' }}
+      </p>
+    </div>
+    <p class="text-gray-400 text-sm mt-4">
       Solicita al <span class="font-bold text-blue-600">Administrador</span> que reabra tu caja.
     </p>
     <button (click)="verificarAccesoCaja()"

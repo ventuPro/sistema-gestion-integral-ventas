@@ -6,7 +6,7 @@ import { ProductoService } from '../../../core/services/producto.service';
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
          Pencil, Trash2, PackagePlus, Package,
-         AlertTriangle, CheckCircle2, XCircle } from 'lucide-angular';
+         AlertTriangle, CheckCircle2, XCircle, Store } from 'lucide-angular';
 
 @Component({
   selector: 'app-inventario',
@@ -28,7 +28,8 @@ export class InventarioComponent implements OnInit {
     package:  Package,
     warning:  AlertTriangle,
     ok:       CheckCircle2,
-    out:      XCircle
+    out:      XCircle,
+    store:    Store
   };
 
   // ─── Usuario y sucursales ───
@@ -69,6 +70,15 @@ export class InventarioComponent implements OnInit {
   mostrarModalCategoria  = false;
   nombreCategoria        = '';
   errorCategoria         = '';
+
+  // ─── Borrado de categoría (doble confirmación) ───
+  mostrarModalBorrarCat   = false;
+  catABorrar:             any = null;
+  productosBloqueantes:   any[] = [];
+  pasoBorradoCat          = 1;
+  inputConfirmacionCat    = '';
+  errorBorrarCat          = '';
+  cargandoBorrarCat       = false;
 
   private h(): HttpHeaders {
     return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
@@ -283,6 +293,56 @@ guardarProducto() {
     this.productoService.crearCategoria({ nombre_categoria: this.nombreCategoria, descripcion_categoria: '' }).subscribe({
       next: () => { this.cerrarModalCategoria(); this.cargarCategorias(); },
       error: () => { this.errorCategoria = 'Error al crear.'; }
+    });
+  }
+
+  // ─── BORRAR CATEGORÍA ───
+  abrirModalBorrarCategoria(cat: any) {
+    this.catABorrar          = cat;
+    this.productosBloqueantes = this.productos.filter(
+      p => p.id_categoria === cat.id_categoria && p.estado_activo
+    );
+    this.pasoBorradoCat       = 1;
+    this.inputConfirmacionCat = '';
+    this.errorBorrarCat       = '';
+    this.cargandoBorrarCat    = false;
+    this.mostrarModalBorrarCat = true;
+  }
+
+  cerrarModalBorrarCategoria() {
+    this.mostrarModalBorrarCat = false;
+    this.catABorrar            = null;
+    this.productosBloqueantes  = [];
+    this.pasoBorradoCat        = 1;
+    this.inputConfirmacionCat  = '';
+    this.errorBorrarCat        = '';
+  }
+
+  avanzarBorradoCat() {
+    if (this.productosBloqueantes.length > 0) return;
+    this.pasoBorradoCat = 2;
+    this.errorBorrarCat = '';
+  }
+
+  confirmarBorradoCategoria() {
+    if (!this.catABorrar) return;
+    if (this.inputConfirmacionCat.trim() !== this.catABorrar.nombre_categoria) {
+      this.errorBorrarCat = 'El nombre no coincide.'; return;
+    }
+    this.cargandoBorrarCat = true;
+    this.errorBorrarCat    = '';
+    this.productoService.eliminarCategoria(this.catABorrar.id_categoria, this.inputConfirmacionCat).subscribe({
+      next: () => {
+        if (this.filtroCategoria === this.catABorrar.id_categoria) this.filtroCategoria = null;
+        this.cerrarModalBorrarCategoria();
+        this.cargarCategorias();
+        this.aplicarFiltros();
+      },
+      error: (e: any) => {
+        this.cargandoBorrarCat = false;
+        this.errorBorrarCat    = e?.error?.error || 'Error al eliminar la categoría.';
+        this.cdr.detectChanges();
+      }
     });
   }
 

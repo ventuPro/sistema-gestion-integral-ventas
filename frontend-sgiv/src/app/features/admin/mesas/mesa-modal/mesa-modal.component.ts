@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, inject, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CuentaService } from '../../../../core/services/cuenta.service';
@@ -20,33 +20,31 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
 
-  // Estado general
   esAdmin         = false;
   cargando        = false;
   cuentaActiva:   any = null;
   vista: 'info' | 'comanda' | 'pago' | 'qr' | 'ticket' = 'info';
 
-  // Catálogo
   productos:      any[] = [];
   categorias:     any[] = [];
   categoriaFiltro: number | null = null;
   busqueda        = '';
 
-  // Pago
   metodoPago      = 'Efectivo';
   montoPagado     = 0;
+  @ViewChild('inputMontoMesa') inputMontoMesaRef?: ElementRef<HTMLInputElement>;
   get cambio(): number {
     return Math.max(0, this.montoPagado - Number(this.cuentaActiva?.total_acumulado || 0));
   }
+  get totalCuenta(): number {
+    return Number(this.cuentaActiva?.total_acumulado || 0);
+  }
 
-  // Ticket (igual que POS)
   datosTicket: any = null;
   fechaTicket = new Date();
 
-  // QR
   qrData: any = null;
 
-  // Nota por producto
   notaProducto = '';
 
   private subs: Subscription[] = [];
@@ -63,7 +61,6 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     this.subs.forEach(s => s.unsubscribe());
   }
 
-  // ─── SOCKET: actualizar total cuando llega un pedido QR ───
   private escucharSocket() {
     const sub = this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
       if (data.id_mesa === this.mesa?.id_mesa && data.items) {
@@ -75,7 +72,6 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     this.subs.push(sub);
   }
 
-  // ─── Carga inicial (solo una vez o al abrir) ───
   cargarEstadoMesa() {
     this.cargando = true;
     this.cuentaService.getCuentaActiva(this.mesa.id_mesa).subscribe({
@@ -88,40 +84,40 @@ export class MesaModalComponent implements OnInit, OnDestroy {
       error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
-forzarReset() {
-  if (!confirm(`¿Resetear la Mesa ${this.mesa.numero_mesa}?\nEsto cancelará la cuenta actual y liberará la mesa.`)) return;
-  if (!this.esAdmin) { alert('Solo el administrador puede hacer esto.'); return; }
 
-  this.cargando = true;
-  this.cuentaService.resetMesa(this.mesa.id_mesa).subscribe({
-    next: () => {
-      this.cargando = false;
-      this.mesaActualizada.emit();
-      this.cerrarModal();
-    },
-    error: () => { this.cargando = false; alert('Error al resetear.'); }
-  });
-}
-cargarProductos() {
-  // FIX: usar la sucursal de la mesa, no la sucursal por defecto
-  const id_sucursal = Number(this.mesa?.id_sucursal) || 1;
+  forzarReset() {
+    if (!confirm(`¿Resetear la Mesa ${this.mesa.numero_mesa}?\nEsto cancelará la cuenta actual y liberará la mesa.`)) return;
+    if (!this.esAdmin) { alert('Solo el administrador puede hacer esto.'); return; }
 
-  this.cuentaService.getProductos(id_sucursal).subscribe({
-    next: (prods: any[]) => {
-      // Solo productos con stock > 0 en ESA sucursal
-      this.productos = prods.filter(p => Number(p.stock_actual) > 0);
+    this.cargando = true;
+    this.cuentaService.resetMesa(this.mesa.id_mesa).subscribe({
+      next: () => {
+        this.cargando = false;
+        this.mesaActualizada.emit();
+        this.cerrarModal();
+      },
+      error: () => { this.cargando = false; alert('Error al resetear.'); }
+    });
+  }
 
-      const cats = new Map<number, string>();
-      this.productos.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
-      this.categorias = Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre }));
+  cargarProductos() {
+    const id_sucursal = Number(this.mesa?.id_sucursal) || 1;
 
-      this.cdr.detectChanges();
-    },
-    error: () => {
-      console.error('Error al cargar catálogo de la mesa');
-    }
-  });
-}
+    this.cuentaService.getProductos(id_sucursal).subscribe({
+      next: (prods: any[]) => {
+        this.productos = prods.filter(p => Number(p.stock_actual) > 0);
+
+        const cats = new Map<number, string>();
+        this.productos.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
+        this.categorias = Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre }));
+
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        console.error('Error al cargar catálogo de la mesa');
+      }
+    });
+  }
 
   get productosFiltrados(): any[] {
     return this.productos.filter(p => {
@@ -131,7 +127,6 @@ cargarProductos() {
     });
   }
 
-  // ─── ABRIR MESA ───
   abrirMesa() {
     this.cargando = true;
     this.cuentaService.abrirCuenta(this.mesa.id_mesa).subscribe({
@@ -149,9 +144,14 @@ cargarProductos() {
     });
   }
 
-  // ─── AGREGAR PRODUCTO — SIN PARPADEO ───
   agregarProducto(producto: any) {
     if (!this.cuentaActiva) return;
+
+    const stockDisponible = Number(producto.stock_actual) || 0;
+    if (stockDisponible <= 0) {
+      alert(`Sin stock para: ${producto.nombre_producto}`);
+      return;
+    }
 
     const precio = Number(producto.precio_unitario);
 
@@ -162,7 +162,6 @@ cargarProductos() {
       nota:            this.notaProducto || undefined
     }).subscribe({
       next: (res: any) => {
-        // FIX: actualizar estado local sin recargar del servidor
         if (!this.cuentaActiva.items) this.cuentaActiva.items = [];
 
         const itemExistente = this.cuentaActiva.items.find(
@@ -186,7 +185,7 @@ cargarProductos() {
           });
         }
 
-        // Actualizar total desde respuesta del backend
+        producto.stock_actual = stockDisponible - 1;
         this.cuentaActiva.total_acumulado = res.total ?? this.calcularTotalLocal();
         this.notaProducto = '';
         this.cdr.detectChanges();
@@ -195,16 +194,24 @@ cargarProductos() {
     });
   }
 
-  // ─── QUITAR PRODUCTO — SIN PARPADEO ───
   quitarProducto(id_detalle: number) {
     if (!confirm('¿Quitar este producto?')) return;
 
+    const itemQuitado = this.cuentaActiva?.items?.find(
+      (i: any) => i.id_detalle_cuenta === id_detalle
+    );
+
     this.cuentaService.quitarProducto(id_detalle).subscribe({
       next: (res: any) => {
-        // FIX: quitar del estado local sin recargar
         this.cuentaActiva.items = this.cuentaActiva.items.filter(
           (i: any) => i.id_detalle_cuenta !== id_detalle
         );
+
+        if (itemQuitado) {
+          const prod = this.productos.find(p => p.id_producto === itemQuitado.id_producto);
+          if (prod) prod.stock_actual = Number(prod.stock_actual) + Number(itemQuitado.cantidad || 1);
+        }
+
         this.cuentaActiva.total_acumulado = res.total ?? this.calcularTotalLocal();
         this.cdr.detectChanges();
       },
@@ -218,10 +225,14 @@ cargarProductos() {
     ) || 0;
   }
 
-  // ─── PAGO ───
   irAPago() {
-    this.montoPagado = Number(this.cuentaActiva?.total_acumulado || 0);
-    this.vista = 'pago';
+    this.montoPagado = 0;
+    this.metodoPago  = 'Efectivo';
+    this.vista       = 'pago';
+    setTimeout(() => {
+      const el = this.inputMontoMesaRef?.nativeElement;
+      if (el) { el.focus(); el.select(); }
+    }, 60);
   }
 
   confirmarPago() {
@@ -240,7 +251,6 @@ cargarProductos() {
       id_sucursal
     ).subscribe({
       next: (res: any) => {
-        // FIX 3: guardar datos del ticket igual que en POS
         this.datosTicket = {
           id_venta:     res.id_venta,
           numero_mesa:  this.mesa.numero_mesa,
@@ -251,7 +261,7 @@ cargarProductos() {
         };
         this.fechaTicket = new Date();
         this.cargando    = false;
-        this.vista       = 'ticket';  // ← mostrar ticket antes de cerrar
+        this.vista       = 'ticket';
         this.mesaActualizada.emit();
         this.cdr.detectChanges();
       },
@@ -262,7 +272,6 @@ cargarProductos() {
     });
   }
 
-  // ─── QR ───
   verQR() {
     this.vista = 'qr';
     if (!this.qrData) {
@@ -283,7 +292,6 @@ cargarProductos() {
   imprimirTicket() { window.print(); }
 
   cerrarModal() {
-    // Si hay cuenta abierta sin productos, liberar la mesa automáticamente
     const cuentaSinItems = this.cuentaActiva
                         && (!this.cuentaActiva.items || this.cuentaActiva.items.length === 0)
                         && this.vista !== 'ticket';

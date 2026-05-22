@@ -40,7 +40,7 @@ const obtenerDashboardCompleto = async (req, res) => {
 const obtenerReportePeriodo = async (req, res) => {
     try {
         const { id_sucursal = 1 } = req.params;
-        const { fecha_inicio, fecha_fin } = req.query;
+        const { fecha_inicio, fecha_fin, categorias } = req.query;
 
         const ahora = new Date();
         // FIX: construir fechas correctas con timezone local
@@ -51,7 +51,14 @@ const obtenerReportePeriodo = async (req, res) => {
             ? new Date(fecha_fin + 'T23:59:59')
             : ahora;
 
-        const datos = await reporteModel.obtenerReportePorPeriodo(id_sucursal, inicio, fin);
+        const cats = (() => {
+            if (!categorias) return null;
+            const raw = Array.isArray(categorias) ? categorias : String(categorias).split(',');
+            const ids = raw.map(v => parseInt(String(v).trim(), 10)).filter(n => Number.isFinite(n) && n > 0);
+            return ids.length > 0 ? ids : null;
+        })();
+
+        const datos = await reporteModel.obtenerReportePorPeriodo(id_sucursal, inicio, fin, cats);
         res.json(datos);
     } catch (error) {
         console.error('Error en obtenerReportePeriodo:', error);
@@ -59,4 +66,19 @@ const obtenerReportePeriodo = async (req, res) => {
     }
 };
 
-module.exports = { obtenerDashboard, obtenerDashboardCompleto, obtenerReportePeriodo };
+const obtenerDesgloseDia = async (req, res) => {
+    try {
+        const { id_sucursal = 1 } = req.params;
+        const { fecha } = req.query;
+        if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+            return res.status(400).json({ error: 'Fecha requerida en formato YYYY-MM-DD' });
+        }
+        const datos = await reporteModel.obtenerDesgloseDia(id_sucursal, fecha);
+        res.json(datos);
+    } catch (error) {
+        console.error('Error en obtenerDesgloseDia:', error);
+        res.status(500).json({ error: 'Error al obtener el desglose del día' });
+    }
+};
+
+module.exports = { obtenerDashboard, obtenerDashboardCompleto, obtenerReportePeriodo, obtenerDesgloseDia };

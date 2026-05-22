@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProductoService } from '../../../core/services/producto.service';
@@ -6,7 +6,7 @@ import { CajaService, EstadoCajaCompleto } from '../../../core/services/caja.ser
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
-         ShieldAlert, Landmark, RefreshCw, Check } from 'lucide-angular';
+         ShieldAlert, Landmark, RefreshCw, Check, Inbox } from 'lucide-angular';
 
 @Component({
   selector: 'app-punto-venta',
@@ -25,7 +25,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     shieldAlert: ShieldAlert,
     landmark:    Landmark,
     refresh:     RefreshCw,
-    check:       Check
+    check:       Check,
+    empty:       Inbox
   };
 
   // ─── Estado de acceso (fuente: backend) ───
@@ -53,6 +54,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   mostrarModalCobro = false;
   metodoPago        = 'Efectivo';
   montoPagado       = 0;
+  @ViewChild('inputMonto') inputMontoRef?: ElementRef<HTMLInputElement>;
   get cambio(): number { return Math.max(0, this.montoPagado - this.total); }
 
   // ─── Ticket ───
@@ -245,8 +247,12 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       return;
     }
     this.metodoPago  = 'Efectivo';
-    this.montoPagado = this.total;
+    this.montoPagado = 0;
     this.mostrarModalCobro = true;
+    setTimeout(() => {
+      const el = this.inputMontoRef?.nativeElement;
+      if (el) { el.focus(); el.select(); }
+    }, 60);
   }
 
   cerrarModalCobro() { this.mostrarModalCobro = false; }

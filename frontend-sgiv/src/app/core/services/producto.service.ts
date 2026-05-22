@@ -28,6 +28,13 @@ export class ProductoService {
     return this.http.post(`${this.apiUrl}/catalogo/categorias`, datos, { headers: this.h() });
   }
 
+  eliminarCategoria(id: number, confirmacion: string): Observable<any> {
+    return this.http.request('delete', `${this.apiUrl}/catalogo/categorias/${id}`, {
+      headers: this.h(),
+      body: { confirmacion }
+    });
+  }
+
   // FIX: usa FormData para subir archivos (o JSON si no hay imagen)
   crearProducto(datos: any, archivo?: File): Observable<any> {
     if (archivo) {
