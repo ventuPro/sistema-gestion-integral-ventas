@@ -23,10 +23,13 @@ const eliminarCategoria = async (req, res) => {
         const cat = await m.obtenerCategoriaPorId(id);
         if (!cat) return res.status(404).json({ error: 'Categoría no encontrada' });
 
-        const productos = await m.productosActivosDeCategoria(id);
+        const productos = await m.productosDeCategoria(id);
         if (productos.length > 0) {
+            const activos = productos.filter(p => p.estado_activo);
             return res.status(409).json({
-                error: 'La categoría tiene productos activos',
+                error: activos.length > 0
+                    ? 'La categoría tiene productos activos'
+                    : 'La categoría tiene productos asociados (incluso eliminados). No se puede borrar.',
                 productos
             });
         }

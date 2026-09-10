@@ -6,7 +6,7 @@ import { CajaService, EstadoCajaCompleto } from '../../../core/services/caja.ser
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
-         ShieldAlert, Landmark, RefreshCw, Check, Inbox } from 'lucide-angular';
+         ShieldAlert, Landmark, RefreshCw, Check, Inbox, Search, X } from 'lucide-angular';
 
 @Component({
   selector: 'app-punto-venta',
@@ -26,7 +26,9 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     landmark:    Landmark,
     refresh:     RefreshCw,
     check:       Check,
-    empty:       Inbox
+    empty:       Inbox,
+    search:      Search,
+    close:       X
   };
 
   // ─── Estado de acceso (fuente: backend) ───
@@ -44,7 +46,17 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── Catálogo ───
   productosDisponibles: any[] = [];
+  busqueda = '';
   cargando = true;
+
+  get productosFiltrados(): any[] {
+    const q = this.busqueda.trim().toLowerCase();
+    if (!q) return this.productosDisponibles;
+    return this.productosDisponibles.filter(p =>
+      (p.nombre_producto || '').toLowerCase().includes(q) ||
+      (p.nombre_categoria || '').toLowerCase().includes(q)
+    );
+  }
 
   // ─── Carrito ───
   carrito: any[] = [];
@@ -335,7 +347,13 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     if (this.mostrarHistorial) this.cargarVentasHoy();
   }
 
-  // ─── TICKET ───
-  imprimirVenta() { window.print(); }
-  cerrarTicket()  { this.mostrarTicket = false; this.datosTicket = null; }
+
+  cerrarTicket() {
+    this.mostrarTicket = false;
+    this.datosTicket   = null;
+  }
+
+  imprimirVenta() {
+    window.print();
+  }
 }

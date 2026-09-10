@@ -300,7 +300,7 @@ guardarProducto() {
   abrirModalBorrarCategoria(cat: any) {
     this.catABorrar          = cat;
     this.productosBloqueantes = this.productos.filter(
-      p => p.id_categoria === cat.id_categoria && p.estado_activo
+      p => p.id_categoria === cat.id_categoria
     );
     this.pasoBorradoCat       = 1;
     this.inputConfirmacionCat = '';

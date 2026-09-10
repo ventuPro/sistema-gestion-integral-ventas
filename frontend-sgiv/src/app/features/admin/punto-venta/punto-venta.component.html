@@ -76,12 +76,31 @@
         </span>
       </div>
 
+      <div class="relative mb-4">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+          <lucide-icon [img]="icons.search" class="w-4 h-4"></lucide-icon>
+        </span>
+        <input type="text" [(ngModel)]="busqueda"
+               placeholder="Buscar producto por nombre o categoría..."
+               class="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all">
+        <button *ngIf="busqueda"
+                (click)="busqueda = ''"
+                title="Limpiar"
+                class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+          <lucide-icon [img]="icons.close" class="w-3.5 h-3.5"></lucide-icon>
+        </button>
+      </div>
+
       <div *ngIf="cargando" class="text-center py-10 text-gray-400 text-sm">Cargando productos...</div>
       <div *ngIf="!cargando && productosDisponibles.length === 0"
            class="text-center py-10 text-gray-400 text-sm">Sin productos con stock.</div>
+      <div *ngIf="!cargando && productosDisponibles.length > 0 && productosFiltrados.length === 0"
+           class="text-center py-10 text-gray-400 text-sm">
+        Sin resultados para "<strong>{{ busqueda }}</strong>".
+      </div>
 
       <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto max-h-[500px] pr-1">
-        <button *ngFor="let prod of productosDisponibles"
+        <button *ngFor="let prod of productosFiltrados"
                 (click)="agregarAlCarrito(prod)"
                 [disabled]="prod.stock_actual <= 0"
                 class="flex flex-col items-center p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all active:scale-95">

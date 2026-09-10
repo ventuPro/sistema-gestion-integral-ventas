@@ -93,13 +93,6 @@
 
   <ng-container *ngIf="!cargando && datosReporte">
 
-    <!-- Indicador sutil de refresco en caliente (no oculta nada) -->
-    <div *ngIf="refrescando"
-         class="flex items-center gap-2 text-blue-600 text-xs font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 w-fit">
-      <div class="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      Actualizando datos…
-    </div>
-
     <!-- KPIs -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">

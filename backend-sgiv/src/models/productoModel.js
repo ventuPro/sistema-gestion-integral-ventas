@@ -9,12 +9,12 @@ const obtenerCategorias = async () =>
 const obtenerCategoriaPorId = async (id) =>
     (await db.query(`SELECT * FROM categoria_producto WHERE id_categoria = $1`, [id])).rows[0];
 
-const productosActivosDeCategoria = async (id) =>
+const productosDeCategoria = async (id) =>
     (await db.query(
-        `SELECT id_producto, nombre_producto
+        `SELECT id_producto, nombre_producto, estado_activo
            FROM producto
-          WHERE id_categoria = $1 AND estado_activo = TRUE
-          ORDER BY nombre_producto ASC`, [id])).rows;
+          WHERE id_categoria = $1
+          ORDER BY estado_activo DESC, nombre_producto ASC`, [id])).rows;
 
 const eliminarCategoria = async (id) =>
     (await db.query(`DELETE FROM categoria_producto WHERE id_categoria = $1 RETURNING *`, [id])).rows[0];
@@ -96,7 +96,7 @@ module.exports = {
     crearCategoria,
     obtenerCategorias,
     obtenerCategoriaPorId,
-    productosActivosDeCategoria,
+    productosDeCategoria,
     eliminarCategoria,
     crearProducto,
     obtenerProductos,

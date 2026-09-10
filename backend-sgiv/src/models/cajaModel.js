@@ -298,7 +298,8 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
         FROM venta_caja
         WHERE id_sucursal       = $1
           AND id_usuario_cajero = $2
-          AND DATE(fecha_venta AT TIME ZONE 'America/La_Paz') = CURRENT_DATE
+          AND (fecha_venta AT TIME ZONE 'America/La_Paz')::date
+            = (NOW()        AT TIME ZONE 'America/La_Paz')::date
     `, [id_sucursal, id_usuario_cajero]);
 
     const ventas = await db.query(`
@@ -312,7 +313,8 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
         LEFT JOIN detalle_venta dv ON v.id_venta = dv.id_venta
         WHERE v.id_sucursal       = $1
           AND v.id_usuario_cajero = $2
-          AND DATE(v.fecha_venta AT TIME ZONE 'America/La_Paz') = CURRENT_DATE
+          AND (v.fecha_venta AT TIME ZONE 'America/La_Paz')::date
+            = (NOW()          AT TIME ZONE 'America/La_Paz')::date
         GROUP BY v.id_venta, v.monto_total_venta, v.metodo_pago, v.fecha_venta
         ORDER BY v.fecha_venta DESC
     `, [id_sucursal, id_usuario_cajero]);
@@ -359,7 +361,8 @@ const obtenerVentasHoyPOS = async (id_sucursal, id_usuario_cajero) => {
         FROM venta_caja v
         WHERE v.id_sucursal       = $1
           AND v.id_usuario_cajero = $2
-          AND DATE(v.fecha_venta AT TIME ZONE 'America/La_Paz') = CURRENT_DATE
+          AND (v.fecha_venta AT TIME ZONE 'America/La_Paz')::date
+            = (NOW()          AT TIME ZONE 'America/La_Paz')::date
         ORDER BY v.fecha_venta DESC
         LIMIT 30
     `, [id_sucursal, id_usuario_cajero]);
@@ -511,7 +514,16 @@ const obtenerCierresCaja = async () => {
         FROM turno_caja t
         JOIN usuario  u ON t.id_usuario_cajero = u.id_usuario
         JOIN sucursal s ON t.id_sucursal       = s.id_sucursal
-        LEFT JOIN venta_caja v ON v.id_turno = t.id_turno
+        LEFT JOIN venta_caja v ON (
+            v.id_turno = t.id_turno
+            OR (
+                v.id_turno IS NULL
+                AND v.id_sucursal       = t.id_sucursal
+                AND v.id_usuario_cajero = t.id_usuario_cajero
+                AND v.fecha_venta >= t.fecha_hora_apertura
+                AND v.fecha_venta <  COALESCE(t.fecha_hora_cierre, NOW())
+            )
+        )
         WHERE t.estado_turno = 'Cerrado'
         GROUP BY t.id_turno, t.fecha_hora_apertura, t.fecha_hora_cierre,
                  t.monto_inicial, u.nombre_completo, s.nombre_sucursal

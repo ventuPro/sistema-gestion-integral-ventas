@@ -149,12 +149,15 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, id_sucurs
         if (!rCuenta.rows.length) throw new Error('CUENTA_NO_ACTIVA');
         const cuenta = rCuenta.rows[0];
 
-        // Obtener turno activo del cajero
         const rTurno = await client.query(
             `SELECT id_turno FROM turno_caja WHERE id_usuario_cajero=$1 AND estado_turno='Abierto' ORDER BY fecha_hora_apertura DESC LIMIT 1`,
             [id_usuario_cajero]
         );
-        const id_turno = rTurno.rows[0]?.id_turno || null;
+        if (rTurno.rows.length === 0) {
+            await client.query('ROLLBACK');
+            throw new Error('CAJA_CERRADA');
+        }
+        const id_turno = rTurno.rows[0].id_turno;
 
         // Crear registro de venta
         const rVenta = await client.query(`

@@ -1,0 +1,3 @@
+:host ::ng-deep .bg-blue-500 { transition: width 220ms ease-out; }
+:host ::ng-deep [class*="text-4xl"] { transition: color 180ms ease; }
+:host ::ng-deep table tbody tr { transition: background-color 150ms ease; }

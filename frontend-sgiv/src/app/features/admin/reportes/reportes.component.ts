@@ -102,12 +102,10 @@ export class ReportesComponent implements OnInit, OnDestroy {
 
   private programarRefresco() {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
-    this.refrescando = true;
-    this.cdr.detectChanges();
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = null;
       this.cargarReporte(true);
-    }, 180);
+    }, 120);
   }
 
   get hayFiltroCategorias(): boolean {
