@@ -60,7 +60,13 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── Carrito ───
   carrito: any[] = [];
-  total = 0;
+
+  get total(): number {
+    return this.carrito.reduce(
+      (s, i) => s + (Number(i.precio_unitario) * Number(i.cantidad) || 0),
+      0
+    );
+  }
 
   // ─── Modal cobro ───
   mostrarModalCobro = false;
@@ -208,7 +214,13 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
     this.productoService.obtenerInventario(id_sucursal).subscribe({
       next: (datos: any[]) => {
-        this.productosDisponibles = datos.filter(p => Number(p.stock_actual) > 0);
+        this.productosDisponibles = (datos || [])
+          .map(p => ({
+            ...p,
+            stock_actual:    Number(p.stock_actual)    || 0,
+            precio_unitario: Number(p.precio_unitario) || 0
+          }))
+          .filter(p => p.stock_actual > 0);
         this.cargando = false;
         this.cdr.detectChanges();
       },
@@ -225,29 +237,40 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       alert(`Sin stock para: ${producto.nombre_producto}`); return;
     }
 
-    const item = this.carrito.find(i => i.id_producto === producto.id_producto);
-    if (item) {
-      item.cantidad++;
-      item.subtotal = item.cantidad * precio;
+    const existe = this.carrito.find(i => i.id_producto === producto.id_producto);
+    if (existe) {
+      this.carrito = this.carrito.map(i =>
+        i.id_producto === producto.id_producto
+          ? { ...i, cantidad: Number(i.cantidad) + 1, precio_unitario: precio, subtotal: (Number(i.cantidad) + 1) * precio }
+          : i
+      );
     } else {
-      this.carrito.push({ ...producto, cantidad: 1, precio_unitario: precio, subtotal: precio });
+      this.carrito = [
+        ...this.carrito,
+        { ...producto, cantidad: 1, precio_unitario: precio, subtotal: precio }
+      ];
     }
-    producto.stock_actual = stockDisponible - 1;
-    this.calcularTotal();
+
+    this.productosDisponibles = this.productosDisponibles.map(p =>
+      p.id_producto === producto.id_producto
+        ? { ...p, stock_actual: stockDisponible - 1 }
+        : p
+    );
+
+    this.cdr.detectChanges();
   }
 
   quitarDelCarrito(index: number) {
-    const item    = this.carrito[index];
-    const prodIdx = this.productosDisponibles.findIndex(p => p.id_producto === item.id_producto);
-    if (prodIdx !== -1)
-      this.productosDisponibles[prodIdx].stock_actual =
-        Number(this.productosDisponibles[prodIdx].stock_actual) + item.cantidad;
-    this.carrito.splice(index, 1);
-    this.calcularTotal();
-  }
+    const item = this.carrito[index];
+    if (!item) return;
 
-  calcularTotal() {
-    this.total = this.carrito.reduce((s, i) => s + Number(i.subtotal), 0);
+    this.productosDisponibles = this.productosDisponibles.map(p =>
+      p.id_producto === item.id_producto
+        ? { ...p, stock_actual: Number(p.stock_actual) + Number(item.cantidad) }
+        : p
+    );
+
+    this.carrito = this.carrito.filter((_, i) => i !== index);
     this.cdr.detectChanges();
   }
 
@@ -307,7 +330,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
         this.fechaTicket   = new Date();
         this.mostrarTicket = true;
         this.carrito       = [];
-        this.total         = 0;
         this.cargarCatalogo();
         this.cargarVentasHoy();
         this.cargando = false;
@@ -337,8 +359,21 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     const id_sucursal   = this.usuarioActual?.id_sucursal || 1;
 
     this.cajaService.obtenerVentasHoy(id_sucursal).subscribe({
-      next:  (v: any[]) => { this.ventasHoy = v; this.cargandoVentas = false; this.cdr.detectChanges(); },
-      error: ()         => { this.cargandoVentas = false; this.cdr.detectChanges(); }
+      next: (v: any[]) => {
+        this.ventasHoy = (v || []).map(x => ({
+          ...x,
+          monto_total_venta: Number(x.monto_total_venta) || 0,
+          items: (x.items || []).map((it: any) => ({
+            ...it,
+            cantidad_vendida: Number(it.cantidad_vendida) || 0,
+            precio_unitario:  Number(it.precio_unitario)  || 0,
+            subtotal_venta:   Number(it.subtotal_venta)   || 0
+          }))
+        }));
+        this.cargandoVentas = false;
+        this.cdr.detectChanges();
+      },
+      error: () => { this.cargandoVentas = false; this.cdr.detectChanges(); }
     });
   }
 
