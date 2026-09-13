@@ -89,30 +89,35 @@ export class InventarioComponent implements OnInit {
     this.usuarioActual = raw ? JSON.parse(raw) : null;
     this.esAdmin       = this.usuarioActual?.id_rol === 1;
 
-    if (this.esAdmin) {
-      this.cargarSucursales();
-    } else {
-      // Cajero: solo su propia sucursal
-      this.sucursalSeleccionada = {
-        id_sucursal:    this.usuarioActual?.id_sucursal || 1,
-        nombre_sucursal: this.usuarioActual?.nombre_sucursal || 'Mi Sucursal'
-      };
-      this.cargarProductos();
-      this.cargarCategorias();
-    }
+    // Todo usuario con acceso al módulo tiene control total.
+    // Se carga el selector de sucursales para cualquier rol.
+    this.cargarSucursales();
   }
 
   // ─── SUCURSALES ───
   cargarSucursales() {
     this.http.get<any[]>(`${this.apiUrl}/sucursales`, { headers: this.h() }).subscribe({
       next: (suc) => {
-        this.sucursales = suc;
-        if (suc.length > 0 && !this.sucursalSeleccionada) {
-          this.seleccionarSucursal(suc[0]);
+        this.sucursales = suc || [];
+        if (this.sucursales.length > 0 && !this.sucursalSeleccionada) {
+          this.seleccionarSucursal(this.sucursales[0]);
+        } else if (this.sucursales.length === 0) {
+          this.usarSucursalPropia();
         }
         this.cdr.detectChanges();
-      }
+      },
+      error: () => this.usarSucursalPropia()
     });
+  }
+
+  private usarSucursalPropia() {
+    this.sucursalSeleccionada = {
+      id_sucursal:     this.usuarioActual?.id_sucursal || 1,
+      nombre_sucursal: this.usuarioActual?.nombre_sucursal || 'Mi Sucursal'
+    };
+    this.cargarProductos();
+    this.cargarCategorias();
+    this.cdr.detectChanges();
   }
 
   seleccionarSucursal(suc: any) {
@@ -355,8 +360,8 @@ guardarProducto() {
   }
 
   getStockColor(stock: number): string {
-    if (stock <= 0)  return 'bg-red-100 text-red-700';
-    if (stock <= 5)  return 'bg-amber-100 text-amber-700';
-    return 'bg-green-100 text-green-700';
+    if (stock <= 0) return 'bg-red-100 text-red-700';
+    if (stock <= 3) return 'bg-orange-100 text-orange-700';
+    return 'bg-emerald-100 text-emerald-700';
   }
 }

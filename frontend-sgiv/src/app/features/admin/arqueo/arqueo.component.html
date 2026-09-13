@@ -28,13 +28,13 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
 
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Total Ventas</p>
+        <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">Total Ventas</p>
         <p class="text-3xl font-black text-gray-800">{{ arqueo.resumen?.total_ventas || 0 }}</p>
         <p class="text-xs text-gray-400 mt-1">transacciones hoy</p>
       </div>
 
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Ingresos Totales</p>
+        <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">Ingresos Totales</p>
         <p class="text-3xl font-black text-green-600">
           Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
         </p>
@@ -42,14 +42,14 @@
       </div>
 
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">💵 Efectivo</p>
+        <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">💵 Efectivo</p>
         <p class="text-3xl font-black text-blue-600">
           Bs. {{ (+arqueo.resumen?.total_efectivo || 0).toFixed(2) }}
         </p>
       </div>
 
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">📱 QR</p>
+        <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">📱 QR</p>
         <p class="text-3xl font-black text-purple-600">
           Bs. {{ (+arqueo.resumen?.total_qr || 0).toFixed(2) }}
         </p>
@@ -112,8 +112,8 @@
       </div>
 
       <div class="overflow-x-auto" *ngIf="arqueo.ventas?.length > 0">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+        <table class="w-full text-base">
+          <thead class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
             <tr>
               <th class="px-4 py-3 text-left">#Venta</th>
               <th class="px-4 py-3 text-left">Hora</th>
@@ -125,13 +125,13 @@
           <tbody>
             <tr *ngFor="let venta of arqueo.ventas"
                 class="border-b border-gray-100 hover:bg-gray-50">
-              <td class="px-4 py-3 font-bold text-gray-700">#{{ venta.id_venta }}</td>
-              <td class="px-4 py-3 text-gray-500">
+              <td class="px-4 py-3 font-bold text-gray-800 text-base">#{{ venta.id_venta }}</td>
+              <td class="px-4 py-3 text-gray-600 text-base">
                 {{ venta.fecha_venta | date:'HH:mm' }}
               </td>
-              <td class="px-4 py-3 text-gray-500">{{ venta.num_items }} ítem(s)</td>
+              <td class="px-4 py-3 text-gray-600 text-base">{{ venta.num_items }} ítem(s)</td>
               <td class="px-4 py-3">
-                <span class="px-2 py-1 rounded-full text-xs font-bold"
+                <span class="px-3 py-1 rounded-full text-sm font-bold"
                       [class.bg-green-100]="venta.metodo_pago === 'Efectivo'"
                       [class.text-green-700]="venta.metodo_pago === 'Efectivo'"
                       [class.bg-purple-100]="venta.metodo_pago === 'QR'"
@@ -139,15 +139,15 @@
                   {{ venta.metodo_pago }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-right font-black text-gray-800">
+              <td class="px-4 py-3 text-right font-black text-gray-800 text-lg">
                 Bs. {{ (+venta.monto_total_venta).toFixed(2) }}
               </td>
             </tr>
           </tbody>
           <tfoot class="bg-gray-50">
             <tr>
-              <td colspan="4" class="px-4 py-3 font-black text-gray-700 text-right">TOTAL DEL DÍA:</td>
-              <td class="px-4 py-3 text-right font-black text-green-600 text-lg">
+              <td colspan="4" class="px-4 py-4 font-black text-gray-800 text-right text-lg">TOTAL DEL DÍA:</td>
+              <td class="px-4 py-4 text-right font-black text-green-600 text-3xl">
                 Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
               </td>
             </tr>

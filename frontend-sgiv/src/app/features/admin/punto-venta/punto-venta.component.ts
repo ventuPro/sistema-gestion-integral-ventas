@@ -51,16 +51,20 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── Catálogo ───
   productosDisponibles: any[] = [];
+  categorias: { id: number; nombre: string }[] = [];
+  categoriaFiltro: number | null = null;
   busqueda = '';
   cargando = true;
 
   get productosFiltrados(): any[] {
     const q = this.busqueda.trim().toLowerCase();
-    if (!q) return this.productosDisponibles;
-    return this.productosDisponibles.filter(p =>
-      (p.nombre_producto || '').toLowerCase().includes(q) ||
-      (p.nombre_categoria || '').toLowerCase().includes(q)
-    );
+    return this.productosDisponibles.filter(p => {
+      const porCat  = !this.categoriaFiltro || Number(p.id_categoria) === this.categoriaFiltro;
+      const porNomb = !q ||
+        (p.nombre_producto || '').toLowerCase().includes(q) ||
+        (p.nombre_categoria || '').toLowerCase().includes(q);
+      return porCat && porNomb;
+    });
   }
 
   // ─── Carrito ───
@@ -247,6 +251,13 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
             precio_unitario: Number(p.precio_unitario) || 0
           }))
           .filter(p => p.stock_actual > 0);
+
+        const mapCats = new Map<number, string>();
+        this.productosDisponibles.forEach(p => mapCats.set(Number(p.id_categoria), p.nombre_categoria));
+        this.categorias = Array.from(mapCats.entries())
+          .map(([id, nombre]) => ({ id, nombre }))
+          .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
         this.cargando = false;
         this.cdr.detectChanges();
       },

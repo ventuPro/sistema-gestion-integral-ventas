@@ -96,17 +96,17 @@
     <!-- KPIs -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Ventas</p>
+        <p class="text-sm font-bold text-gray-600 uppercase tracking-wider">Total Ventas</p>
         <p class="text-4xl font-black text-gray-800 mt-2">{{ resumen.total_ventas || 0 }}</p>
         <p class="text-xs text-gray-400 mt-1">ventas en el período</p>
       </div>
       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ingresos Totales</p>
+        <p class="text-sm font-bold text-gray-600 uppercase tracking-wider">Ingresos Totales</p>
         <p class="text-4xl font-black text-green-600 mt-2">Bs. {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</p>
         <p class="text-xs text-gray-400 mt-1">bolivianos</p>
       </div>
       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Ticket Promedio</p>
+        <p class="text-sm font-bold text-gray-600 uppercase tracking-wider">Ticket Promedio</p>
         <p class="text-4xl font-black text-blue-600 mt-2">Bs. {{ (+resumen.ticket_promedio || 0).toFixed(2) }}</p>
         <p class="text-xs text-gray-400 mt-1">por venta</p>
       </div>
@@ -185,7 +185,7 @@
           <h3 class="font-bold text-gray-800">Top Productos</h3>
         </div>
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="w-full text-base">
             <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
                 <th class="px-4 py-2 text-left">#</th>
@@ -231,7 +231,7 @@
         <span class="text-xs text-gray-400">{{ fechaInicio }} — {{ fechaFin }}</span>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="w-full text-base">
           <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
               <th class="w-10 px-3 py-3"></th>
@@ -280,7 +280,7 @@
                     </div>
 
                     <div *ngIf="det.desglose?.length" class="overflow-hidden rounded-lg border border-blue-100 bg-white">
-                      <table class="w-full text-sm">
+                      <table class="w-full text-base">
                         <thead class="bg-blue-50/60 text-blue-700 text-xs uppercase">
                           <tr>
                             <th class="px-4 py-2 text-left">Categoría</th>
@@ -311,12 +311,12 @@
               </tr>
             </ng-container>
           </tbody>
-          <tfoot class="bg-gray-50 font-bold text-gray-800">
+          <tfoot class="bg-gray-50 font-black text-gray-800">
             <tr>
-              <td class="px-3 py-3"></td>
-              <td class="px-6 py-3">TOTAL</td>
-              <td class="px-6 py-3 text-center">{{ resumen.total_ventas || 0 }}</td>
-              <td class="px-6 py-3 text-right text-green-600">Bs. {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</td>
+              <td class="px-3 py-4"></td>
+              <td class="px-6 py-4 text-lg">TOTAL</td>
+              <td class="px-6 py-4 text-center text-lg">{{ resumen.total_ventas || 0 }}</td>
+              <td class="px-6 py-4 text-right text-green-600 text-2xl">Bs. {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</td>
             </tr>
           </tfoot>
         </table>

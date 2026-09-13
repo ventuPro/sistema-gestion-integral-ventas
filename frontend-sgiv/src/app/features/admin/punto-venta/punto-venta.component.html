@@ -66,7 +66,7 @@
   <div class="flex flex-col md:flex-row gap-4 h-full">
 
     <!-- Catálogo -->
-    <div class="w-full md:w-2/3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative">
+    <div class="w-full md:w-3/5 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative">
 
       <!-- Cabecera fija -->
       <div class="p-5 pb-3 border-b border-gray-100 flex-shrink-0">
@@ -116,6 +116,21 @@
             <lucide-icon [img]="icons.close" class="w-3.5 h-3.5"></lucide-icon>
           </button>
         </div>
+
+        <div class="flex gap-1.5 overflow-x-auto pb-1 mt-3">
+          <button (click)="categoriaFiltro = null"
+                  class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+                  [class.bg-green-600]="!categoriaFiltro" [class.text-white]="!categoriaFiltro"
+                  [class.bg-gray-100]="!!categoriaFiltro" [class.text-gray-600]="!!categoriaFiltro">
+            Todos
+          </button>
+          <button *ngFor="let cat of categorias" (click)="categoriaFiltro = cat.id"
+                  class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+                  [class.bg-green-600]="categoriaFiltro === cat.id" [class.text-white]="categoriaFiltro === cat.id"
+                  [class.bg-gray-100]="categoriaFiltro !== cat.id" [class.text-gray-600]="categoriaFiltro !== cat.id">
+            {{ cat.nombre }}
+          </button>
+        </div>
       </div>
 
       <!-- Zona scrolleable de productos -->
@@ -128,7 +143,7 @@
           Sin resultados para "<strong>{{ busqueda }}</strong>".
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <button *ngFor="let prod of productosFiltrados"
                   (click)="agregarAlCarrito(prod)"
                   [disabled]="prod.stock_actual <= 0"
@@ -139,11 +154,11 @@
                 {{ prod.nombre_producto?.charAt(0) }}
               </span>
             </div>
-            <p class="font-bold text-gray-800 text-xs text-center leading-tight mb-1">{{ prod.nombre_producto }}</p>
-            <p class="text-blue-600 font-black text-sm">Bs. {{ prod.precio_unitario }}</p>
-            <span class="text-xs mt-1"
-                  [class.text-green-600]="prod.stock_actual > 5"
-                  [class.text-red-500]="prod.stock_actual <= 5">
+            <p class="font-bold text-gray-800 text-lg text-center leading-tight mb-1">{{ prod.nombre_producto }}</p>
+            <p class="text-blue-600 font-black text-xl">Bs. {{ prod.precio_unitario }}</p>
+            <span class="text-sm font-semibold mt-1"
+                  [class.text-green-600]="prod.stock_actual > 3"
+                  [class.text-red-500]="prod.stock_actual <= 3">
               Stock: {{ prod.stock_actual }}
             </span>
           </button>
@@ -238,36 +253,42 @@
     </div>
 
     <!-- Carrito -->
-    <div class="w-full md:w-1/3 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col overflow-hidden">
+    <div class="w-full md:w-2/5 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col overflow-hidden">
       <div class="bg-gray-800 text-white px-4 py-3 text-center flex-shrink-0">
-        <h2 class="font-bold">Detalle de Venta</h2>
-        <p *ngIf="turnoActivo" class="text-xs text-gray-400 mt-0.5">
+        <h2 class="font-bold text-lg">Detalle de Venta</h2>
+        <p *ngIf="turnoActivo" class="text-sm text-gray-400 mt-0.5">
           Turno #{{ turnoActivo.id_turno }} abierto
         </p>
       </div>
 
       <div class="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50">
-        <div *ngIf="carrito.length === 0" class="text-center text-gray-400 text-sm py-10 italic">
+        <div *ngIf="carrito.length === 0" class="text-center text-gray-400 text-base py-10 italic">
           Toca los productos para agregarlos.
         </div>
         <div *ngFor="let item of carrito; let i = index"
              class="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center shadow-sm">
           <div class="flex-1 min-w-0">
-            <p class="font-bold text-gray-800 text-sm truncate">{{ item.nombre_producto }}</p>
-            <p class="text-gray-500 text-xs">Bs. {{ item.precio_unitario }} × {{ item.cantidad }}</p>
+            <p class="font-bold text-gray-800 text-base truncate">{{ item.nombre_producto }}</p>
+            <p class="text-gray-500 text-sm font-medium">Bs. {{ item.precio_unitario }} × {{ item.cantidad }}</p>
           </div>
           <div class="flex items-center gap-2 ml-2">
-            <span class="font-black text-gray-800 text-sm">Bs. {{ item.subtotal }}</span>
+            <span class="font-black text-gray-800 text-lg">Bs. {{ item.subtotal }}</span>
             <button (click)="quitarDelCarrito(i)"
-                    class="text-red-400 hover:text-red-600 p-1 rounded transition-colors">✕</button>
+                    title="Quitar producto"
+                    class="p-1 rounded transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                   class="w-5 h-5 text-gray-400 hover:text-red-500 cursor-pointer transition-colors">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
 
       <div class="p-4 bg-white border-t flex-shrink-0">
         <div class="flex justify-between items-center mb-3">
-          <span class="font-bold text-gray-600">TOTAL:</span>
-          <span class="text-3xl font-black text-green-600">Bs. {{ total }}</span>
+          <span class="font-bold text-gray-700 text-lg">TOTAL:</span>
+          <span class="text-3xl font-black text-green-600">Bs. {{ total.toFixed(2) }}</span>
         </div>
         <button [disabled]="carrito.length === 0"
                 (click)="abrirModalCobro()"

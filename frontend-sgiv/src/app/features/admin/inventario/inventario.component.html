@@ -2,7 +2,7 @@
 
   <!-- ═══ SELECTOR DE SUCURSAL (solo admin) ═══ -->
 <!-- Selector sucursal admin — igual que reportes -->
-<div *ngIf="esAdmin && sucursales.length > 0" class="flex flex-wrap gap-2 mb-6">
+<div *ngIf="sucursales.length > 0" class="flex flex-wrap gap-2 mb-6">
   <button *ngFor="let suc of sucursales"
           (click)="seleccionarSucursal(suc)"
           class="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
@@ -14,13 +14,14 @@
   </button>
 </div>
 
-  <div *ngIf="!esAdmin" class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl px-5 py-3 flex items-center gap-3">
+  <div *ngIf="sucursales.length === 0 && sucursalSeleccionada"
+       class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl px-5 py-3 flex items-center gap-3">
     <div class="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
       <lucide-icon [img]="icons.store" class="w-5 h-5"></lucide-icon>
     </div>
     <div>
       <p class="text-sm font-bold text-blue-700">{{ sucursalSeleccionada?.nombre_sucursal }}</p>
-      <p class="text-xs text-blue-500">Inventario de tu sucursal</p>
+      <p class="text-xs text-blue-500">Inventario</p>
     </div>
   </div>
 
@@ -75,8 +76,7 @@
                   [class.text-gray-600]="filtroCategoria !== cat.id_categoria">
             {{ cat.nombre_categoria }}
           </button>
-          <button *ngIf="esAdmin"
-                  (click)="abrirModalBorrarCategoria(cat)"
+          <button (click)="abrirModalBorrarCategoria(cat)"
                   title="Eliminar categoría"
                   class="px-2 flex items-center justify-center border-l text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                   [class.border-blue-500]="filtroCategoria === cat.id_categoria"
@@ -113,57 +113,57 @@
   <div *ngFor="let prod of productosFiltrados"
        class="group border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all bg-white flex flex-col">
 
-    <!-- Imagen + categoría -->
-    <div class="relative h-28 bg-gradient-to-br from-gray-50 to-gray-100">
+    <!-- Imagen + categoría (cuadrado perfecto) -->
+    <div class="relative w-full aspect-square bg-gradient-to-br from-gray-50 to-gray-100">
       <img *ngIf="prod.url_imagen"
            [src]="getImageUrl(prod.url_imagen)"
            [alt]="prod.nombre_producto"
            class="w-full h-full object-cover">
       <div *ngIf="!prod.url_imagen"
            class="w-full h-full flex items-center justify-center">
-        <lucide-icon [img]="icons.package" class="w-10 h-10 text-gray-300"></lucide-icon>
+        <lucide-icon [img]="icons.package" class="w-14 h-14 text-gray-300"></lucide-icon>
       </div>
 
       <!-- Tag categoría -->
-      <span class="absolute top-2 left-2 text-[11px] px-2 py-0.5 rounded-full font-semibold text-gray-700 bg-white/95 shadow-sm">
+      <span class="absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-semibold text-gray-700 bg-white/95 shadow-sm">
         {{ prod.nombre_categoria }}
       </span>
     </div>
 
     <!-- Info -->
-    <div class="p-3 flex-1 flex flex-col">
-      <h3 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2 mb-1 min-h-[2.2em]">
+    <div class="p-4 flex-1 flex flex-col">
+      <h3 class="font-bold text-gray-800 text-lg leading-tight line-clamp-2 mb-1 min-h-[2.4em]">
         {{ prod.nombre_producto }}
       </h3>
-      <p class="text-blue-700 font-black text-base mb-3">Bs. {{ prod.precio_unitario }}</p>
+      <p class="text-blue-700 font-black text-xl mb-3">Bs. {{ prod.precio_unitario }}</p>
 
-      <!-- ═══ INDICADOR DE STOCK ═══ -->
+      <!-- ═══ INDICADOR DE STOCK (alerta si <= 3) ═══ -->
       <div class="mb-3">
         <!-- Sin stock -->
         <div *ngIf="(prod.stock_actual || 0) <= 0"
-             class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-100">
-          <lucide-icon [img]="icons.out" class="w-4 h-4 text-red-500 flex-shrink-0"></lucide-icon>
+             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100">
+          <lucide-icon [img]="icons.out" class="w-5 h-5 text-red-500 flex-shrink-0"></lucide-icon>
           <div class="flex-1 min-w-0">
-            <p class="text-[11px] text-red-600 font-bold leading-tight">Sin stock</p>
-            <p class="text-[10px] text-red-400 leading-tight">0 unidades</p>
+            <p class="text-sm text-red-600 font-bold leading-tight">Sin stock</p>
+            <p class="text-2xl font-black text-red-500 leading-tight">0</p>
           </div>
         </div>
-        <!-- Stock bajo (1-10) -->
-        <div *ngIf="(prod.stock_actual || 0) > 0 && (prod.stock_actual || 0) <= 10"
-             class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-orange-50 border border-orange-100">
-          <lucide-icon [img]="icons.warning" class="w-4 h-4 text-orange-500 flex-shrink-0"></lucide-icon>
+        <!-- Stock bajo (1-3) -->
+        <div *ngIf="(prod.stock_actual || 0) > 0 && (prod.stock_actual || 0) <= 3"
+             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50 border border-orange-100">
+          <lucide-icon [img]="icons.warning" class="w-5 h-5 text-orange-500 flex-shrink-0"></lucide-icon>
           <div class="flex-1 min-w-0">
-            <p class="text-[11px] text-orange-700 font-bold leading-tight">Stock bajo</p>
-            <p class="text-[10px] text-orange-500 leading-tight">{{ prod.stock_actual }} unidades</p>
+            <p class="text-sm text-orange-700 font-bold leading-tight">Stock bajo</p>
+            <p class="text-2xl font-black text-orange-600 leading-tight">{{ prod.stock_actual }} <span class="text-xs font-semibold">uds</span></p>
           </div>
         </div>
-        <!-- Stock normal (>10) -->
-        <div *ngIf="(prod.stock_actual || 0) > 10"
-             class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100">
-          <lucide-icon [img]="icons.ok" class="w-4 h-4 text-emerald-600 flex-shrink-0"></lucide-icon>
+        <!-- Stock normal (> 3) -->
+        <div *ngIf="(prod.stock_actual || 0) > 3"
+             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-100">
+          <lucide-icon [img]="icons.ok" class="w-5 h-5 text-emerald-600 flex-shrink-0"></lucide-icon>
           <div class="flex-1 min-w-0">
-            <p class="text-[11px] text-emerald-700 font-bold leading-tight">En stock</p>
-            <p class="text-[10px] text-emerald-500 leading-tight">{{ prod.stock_actual }} unidades</p>
+            <p class="text-sm text-emerald-700 font-bold leading-tight">En stock</p>
+            <p class="text-2xl font-black text-emerald-600 leading-tight">{{ prod.stock_actual }} <span class="text-xs font-semibold">uds</span></p>
           </div>
         </div>
       </div>
