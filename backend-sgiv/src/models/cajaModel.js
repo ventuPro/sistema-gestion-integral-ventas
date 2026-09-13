@@ -441,6 +441,7 @@ const registrarVenta = async ({
         const id_venta = rVenta.rows[0].id_venta;
 
         // 3. Procesar cada ítem del carrito
+        const cambiosStock = [];
         for (const item of detalles) {
             const cantidad = Number(item.cantidad) || 1;
             const precio   = Number(item.precio)   || 0;
@@ -461,6 +462,11 @@ const registrarVenta = async ({
             `, [cantidad, Number(id_sucursal), id_prod]);
 
             if (rInv.rows.length > 0) {
+                cambiosStock.push({
+                    id_producto: id_prod,
+                    id_sucursal: Number(id_sucursal),
+                    nuevo_stock: Number(rInv.rows[0].cantidad_actual)
+                });
                 await client.query(`
                     INSERT INTO historial_inventario
                         (id_inventario, id_usuario, tipo_movimiento, cantidad_movida, motivo_movimiento)
@@ -482,7 +488,7 @@ const registrarVenta = async ({
         }
 
         await client.query('COMMIT');
-        return id_venta;
+        return { id_venta, cambiosStock };
 
     } catch (e) {
         await client.query('ROLLBACK');

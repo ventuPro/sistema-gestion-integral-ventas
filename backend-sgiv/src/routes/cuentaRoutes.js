@@ -50,23 +50,49 @@ router.post('/:id_cuenta/cancelar-si-vacia', verificarToken, async (req, res) =>
 });
 
 router.post('/reset-mesa', verificarToken, async (req, res) => {
+    const db = require('../config/db');
+    const cuentaModel = require('../models/cuentaModel');
+    const client = await db.connect();
     try {
+        await client.query('BEGIN');
         const { id_mesa } = req.body;
-        const db = require('../config/db');
 
-        await db.query(`
-            UPDATE cuenta_mesa SET estado='Cancelada', fecha_cierre=NOW()
+        const rC = await client.query(`
+            SELECT id_cuenta FROM cuenta_mesa
             WHERE id_mesa=$1 AND estado='Abierta'
         `, [id_mesa]);
 
-        await db.query(
+        let cambiosStock = [];
+        for (const row of rC.rows) {
+            cambiosStock = cambiosStock.concat(
+                await cuentaModel.devolverStockCuenta(client, row.id_cuenta)
+            );
+            await client.query(`
+                UPDATE cuenta_mesa SET estado='Cancelada', fecha_cierre=NOW()
+                WHERE id_cuenta=$1
+            `, [row.id_cuenta]);
+        }
+
+        await client.query(
             `UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`, [id_mesa]
         );
+        await client.query('COMMIT');
 
         global.io?.to('cajeros').emit('mesa:actualizada', { id_mesa });
+        for (const c of cambiosStock) {
+            global.io?.emit('actualizacion_stock_global', {
+                id_producto:               c.id_producto,
+                id_sucursal:               c.id_sucursal,
+                nueva_cantidad_disponible: c.nuevo_stock
+            });
+        }
+
         res.json({ mensaje: 'Mesa reseteada correctamente' });
     } catch(e) {
+        await client.query('ROLLBACK');
         res.status(500).json({ error: e.message });
+    } finally {
+        client.release();
     }
 });
 

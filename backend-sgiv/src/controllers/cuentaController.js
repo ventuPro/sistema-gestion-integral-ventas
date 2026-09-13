@@ -42,14 +42,11 @@ const agregarProducto = async (req, res) => {
         const id_cuenta = Number(req.params.id_cuenta);
         const { id_producto, cantidad, precio_unitario, nota } = req.body;
 
-        const detalle = await cuentaModel.agregarProductoCuenta(
+        const resultado = await cuentaModel.agregarProductoCuenta(
             id_cuenta, id_producto, cantidad, precio_unitario, nota, 'cajero'
         );
 
-        // Obtener cuenta actualizada para emitir por socket
-        const cuentaActualizada = await cuentaModel.obtenerCuentaActiva(
-            await cuentaModel.getCuentaMesaId(id_cuenta)
-        );
+        const cuentaActualizada = await cuentaModel.obtenerCuentaActiva(resultado.id_mesa);
 
         io()?.to('cajeros').emit('cuenta:producto_agregado', {
             id_cuenta,
@@ -58,9 +55,22 @@ const agregarProducto = async (req, res) => {
             num_items:        cuentaActualizada?.items?.length
         });
 
-        res.status(201).json({ detalle, total: cuentaActualizada?.total_acumulado });
+        // Broadcast global: POS y Mesas deben repintar stock al instante
+        io()?.emit('actualizacion_stock_global', {
+            id_producto:               resultado.id_producto,
+            id_sucursal:               resultado.id_sucursal,
+            nueva_cantidad_disponible: resultado.nuevo_stock
+        });
+
+        res.status(201).json({ detalle: resultado.detalle, total: cuentaActualizada?.total_acumulado });
     } catch(e) {
-        console.error('agregarProducto:', e);
+        console.error('agregarProducto:', e.message);
+        if (e.message === 'STOCK_INSUFICIENTE')
+            return res.status(409).json({ error: 'Stock insuficiente para este producto' });
+        if (e.message === 'PRODUCTO_SIN_INVENTARIO')
+            return res.status(404).json({ error: 'El producto no está en el inventario de la sucursal' });
+        if (e.message === 'CUENTA_NO_ACTIVA')
+            return res.status(404).json({ error: 'La cuenta no está abierta' });
         res.status(500).json({ error: 'Error al agregar producto' });
     }
 };
@@ -68,16 +78,22 @@ const agregarProducto = async (req, res) => {
 // DELETE /api/cuentas/detalle/:id_detalle
 const quitarProducto = async (req, res) => {
     try {
-        const { id_cuenta } = await cuentaModel.quitarProductoCuenta(req.params.id_detalle);
-        const cuentaActualizada = await cuentaModel.obtenerCuentaActiva(
-            await cuentaModel.getCuentaMesaId(id_cuenta)
-        );
+        const resultado = await cuentaModel.quitarProductoCuenta(req.params.id_detalle);
+        const cuentaActualizada = await cuentaModel.obtenerCuentaActiva(resultado.id_mesa);
 
         io()?.to('cajeros').emit('cuenta:producto_agregado', {
-            id_cuenta,
+            id_cuenta:       resultado.id_cuenta,
             id_mesa:         cuentaActualizada?.id_mesa,
             total_acumulado: cuentaActualizada?.total_acumulado
         });
+
+        if (resultado.nuevo_stock != null) {
+            io()?.emit('actualizacion_stock_global', {
+                id_producto:               resultado.id_producto,
+                id_sucursal:               resultado.id_sucursal,
+                nueva_cantidad_disponible: resultado.nuevo_stock
+            });
+        }
 
         res.json({ mensaje: 'Producto eliminado', total: cuentaActualizada?.total_acumulado });
     } catch(e) {

@@ -156,11 +156,16 @@ const getCierresCaja = async (req, res) => {
 const cobrarVenta = async (req, res) => {
     try {
         const datos = { ...req.body, id_usuario_cajero: req.usuario.id_usuario };
-        const id_venta = await cajaModel.registrarVenta(datos);
-        global.io?.emit('stock:actualizado', {
-            id_sucursal: datos.id_sucursal,
-            productos: datos.detalles.map(d => ({ id_producto: d.id_producto, cantidad_vendida: d.cantidad }))
-        });
+        const { id_venta, cambiosStock } = await cajaModel.registrarVenta(datos);
+
+        for (const c of cambiosStock) {
+            global.io?.emit('actualizacion_stock_global', {
+                id_producto:               c.id_producto,
+                id_sucursal:               c.id_sucursal,
+                nueva_cantidad_disponible: c.nuevo_stock
+            });
+        }
+
         res.status(201).json({ mensaje: 'Venta registrada', id_venta });
     } catch (e) {
         console.error('cobrarVenta:', e.message);

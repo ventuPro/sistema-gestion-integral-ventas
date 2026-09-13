@@ -3,8 +3,10 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProductoService } from '../../../core/services/producto.service';
 import { CajaService, EstadoCajaCompleto } from '../../../core/services/caja.service';
+import { SocketService } from '../../../core/services/socket.service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
+import { Subscription } from 'rxjs';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Inbox, Search, X } from 'lucide-angular';
 
@@ -17,9 +19,12 @@ import { LucideAngularModule,
 export class PuntoVentaComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
   private cajaService     = inject(CajaService);
+  private socketService   = inject(SocketService);
   private cdr             = inject(ChangeDetectorRef);
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
+
+  private stockSub?: Subscription;
 
   readonly icons = {
     shieldAlert: ShieldAlert,
@@ -100,10 +105,31 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     const raw = localStorage.getItem('usuario_sgiv');
     this.usuarioActual = raw ? JSON.parse(raw) : null;
     this.verificarAccesoCaja();
+    this.suscribirStockGlobal();
   }
 
   ngOnDestroy() {
     if (this.pollEstado) clearInterval(this.pollEstado);
+    this.stockSub?.unsubscribe();
+  }
+
+  private suscribirStockGlobal() {
+    this.socketService.conectar('cajeros');
+    this.stockSub = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(payload => {
+      if (!payload) return;
+      const idSuc = Number(this.usuarioActual?.id_sucursal) || 1;
+      if (Number(payload.id_sucursal) !== idSuc) return;
+
+      const idProd = Number(payload.id_producto);
+      const nuevo  = Number(payload.nueva_cantidad_disponible) || 0;
+
+      this.productosDisponibles = this.productosDisponibles.map(p =>
+        Number(p.id_producto) === idProd
+          ? { ...p, stock_actual: nuevo }
+          : p
+      );
+      this.cdr.detectChanges();
+    });
   }
 
   // ─── VERIFICACIÓN PRINCIPAL ───

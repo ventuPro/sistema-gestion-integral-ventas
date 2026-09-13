@@ -70,6 +70,23 @@ export class MesaModalComponent implements OnInit, OnDestroy {
       }
     });
     this.subs.push(sub);
+
+    const subStock = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(payload => {
+      if (!payload) return;
+      const idSuc = Number(this.mesa?.id_sucursal) || 1;
+      if (Number(payload.id_sucursal) !== idSuc) return;
+
+      const idProd = Number(payload.id_producto);
+      const nuevo  = Number(payload.nueva_cantidad_disponible) || 0;
+
+      this.productos = this.productos.map(p =>
+        Number(p.id_producto) === idProd
+          ? { ...p, stock_actual: nuevo }
+          : p
+      );
+      this.cdr.detectChanges();
+    });
+    this.subs.push(subStock);
   }
 
   cargarEstadoMesa() {
