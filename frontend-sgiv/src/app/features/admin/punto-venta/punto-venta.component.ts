@@ -319,6 +319,9 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   cerrarModalCobro() { this.mostrarModalCobro = false; }
 
   confirmarVenta() {
+    if (this.metodoPago === 'Efectivo' && (!this.montoPagado || this.montoPagado < this.total)) {
+      this.montoPagado = this.total;
+    }
     this.mostrarModalCobro = false;
     this.registrarVenta();
   }

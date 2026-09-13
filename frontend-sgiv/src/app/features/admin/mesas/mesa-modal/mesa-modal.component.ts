@@ -94,9 +94,13 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     this.cuentaService.getCuentaActiva(this.mesa.id_mesa).subscribe({
       next: (res) => {
         this.cuentaActiva = res.cuenta;
-        this.vista        = this.cuentaActiva ? 'comanda' : 'info';
-        this.cargando     = false;
-        this.cdr.detectChanges();
+        if (this.cuentaActiva) {
+          this.vista    = 'comanda';
+          this.cargando = false;
+          this.cdr.detectChanges();
+        } else {
+          this.abrirMesa();
+        }
       },
       error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
@@ -212,8 +216,6 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   quitarProducto(id_detalle: number) {
-    if (!confirm('¿Quitar este producto?')) return;
-
     const itemQuitado = this.cuentaActiva?.items?.find(
       (i: any) => i.id_detalle_cuenta === id_detalle
     );
@@ -253,9 +255,9 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   confirmarPago() {
-    if (this.metodoPago === 'Efectivo' &&
-        this.montoPagado < Number(this.cuentaActiva?.total_acumulado || 0)) {
-      alert('El monto es insuficiente'); return;
+    const totalReq = Number(this.cuentaActiva?.total_acumulado || 0);
+    if (this.metodoPago === 'Efectivo' && (!this.montoPagado || this.montoPagado < totalReq)) {
+      this.montoPagado = totalReq;
     }
 
     const usr         = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');

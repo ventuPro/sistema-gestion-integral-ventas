@@ -133,9 +133,9 @@
                   (click)="agregarAlCarrito(prod)"
                   [disabled]="prod.stock_actual <= 0"
                   class="flex flex-col items-center p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all active:scale-95">
-            <div class="w-full h-20 rounded-lg overflow-hidden mb-2 bg-blue-100 flex items-center justify-center">
+            <div class="w-full aspect-square rounded-lg overflow-hidden mb-2 bg-blue-100 flex items-center justify-center">
               <img *ngIf="prod.url_imagen" [src]="prod.url_imagen" class="w-full h-full object-cover">
-              <span *ngIf="!prod.url_imagen" class="text-2xl font-black text-blue-300">
+              <span *ngIf="!prod.url_imagen" class="text-3xl font-black text-blue-300">
                 {{ prod.nombre_producto?.charAt(0) }}
               </span>
             </div>
@@ -284,12 +284,18 @@
 <!-- ═══ MODAL COBRO ═══ -->
 <div *ngIf="mostrarModalCobro"
      class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-    <div class="bg-green-600 p-4 text-white text-center">
-      <h3 class="font-black text-xl">Cobrar Venta</h3>
-      <p class="text-green-200 text-sm">Total: Bs. {{ total }}</p>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto overflow-hidden">
+    <div class="bg-green-600 px-6 py-4 text-white text-center">
+      <h3 class="font-black text-2xl">Cobrar Venta</h3>
     </div>
-    <div class="p-6 space-y-4">
+
+    <div class="p-6 space-y-5">
+
+      <div class="flex justify-between items-center bg-green-50 border-2 border-green-200 rounded-xl p-5">
+        <span class="font-bold text-green-700 text-base">TOTAL A COBRAR</span>
+        <span class="font-black text-green-600 text-5xl">Bs. {{ total.toFixed(2) }}</span>
+      </div>
+
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">Método de pago</label>
         <div class="grid grid-cols-2 gap-3">
@@ -305,19 +311,17 @@
       </div>
 
       <div *ngIf="metodoPago === 'Efectivo'">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Monto recibido (Bs.)</label>
-        <input #inputMonto type="number" inputmode="decimal" [(ngModel)]="montoPagado" [min]="total"
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Monto recibido (Bs.) <span class="text-gray-400 text-xs font-normal">— opcional</span>
+        </label>
+        <input #inputMonto type="number" inputmode="decimal" [(ngModel)]="montoPagado"
                (focus)="inputMonto.select()"
-               (keyup.enter)="montoPagado >= total && confirmarVenta()"
-               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-2xl text-center font-black outline-none focus:border-green-500">
-        <div *ngIf="montoPagado >= total"
+               (keyup.enter)="confirmarVenta()"
+               class="w-full px-4 py-4 border-2 border-gray-200 rounded-xl text-3xl text-center font-black outline-none focus:border-green-500">
+        <div *ngIf="montoPagado >= total && montoPagado > 0"
              class="mt-3 bg-green-50 border border-green-200 rounded-xl p-3 text-center">
           <p class="text-sm text-green-600">Cambio</p>
           <p class="text-3xl font-black text-green-700">Bs. {{ cambio.toFixed(2) }}</p>
-        </div>
-        <div *ngIf="montoPagado < total && montoPagado > 0"
-             class="mt-3 bg-red-50 border border-red-200 rounded-xl p-3 text-center text-red-600 text-sm font-medium">
-          Monto insuficiente
         </div>
       </div>
 
@@ -329,10 +333,9 @@
 
     <div class="px-6 pb-6 flex gap-3">
       <button (click)="cerrarModalCobro()"
-              class="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl">Cancelar</button>
+              class="flex-1 py-4 bg-gray-100 text-gray-700 font-bold rounded-xl">Cancelar</button>
       <button (click)="confirmarVenta()"
-              [disabled]="metodoPago === 'Efectivo' && montoPagado < total"
-              class="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-black rounded-xl transition-colors">
+              class="flex-1 py-4 bg-green-600 hover:bg-green-700 text-white font-black text-lg rounded-xl transition-colors">
         ✓ Confirmar
       </button>
     </div>
