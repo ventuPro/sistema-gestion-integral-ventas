@@ -629,7 +629,7 @@ module.exports = {
     obtenerEstadoCompleto,
     habilitarCaja, deshabilitarCaja,
     obtenerArqueoHoy, obtenerVentasHoyPOS,
-    abrirTurno, cerrarCaja, reabrirTurno, registrarVenta,
+    abrirTurno, cerrarCaja, reabrirTurno, registrarVenta, calcularItemsVenta,
     obtenerCierresCaja,
     verificarTurnoHoy,
     obtenerEstadoCajaSucursal

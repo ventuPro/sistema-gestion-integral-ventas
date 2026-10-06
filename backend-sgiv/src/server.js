@@ -88,7 +88,13 @@ app.get('/', (req, res) => {
     res.json({ mensaje: '🚀 API del Sistema SGIV v2 funcionando' });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 Servidor + WebSocket corriendo en puerto ${PORT}`);
-});
+// Solo escucha cuando se ejecuta directamente (npm run dev / start);
+// las pruebas automatizadas importan app y server sin abrir el puerto 3000.
+if (require.main === module) {
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+        console.log(`🚀 Servidor + WebSocket corriendo en puerto ${PORT}`);
+    });
+}
+
+module.exports = { app, server, io };

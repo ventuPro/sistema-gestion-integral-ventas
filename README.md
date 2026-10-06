@@ -125,6 +125,20 @@ ng serve --host 0.0.0.0 --port 4200
 | Aplicación | `http://localhost:4200` |
 | API | `http://localhost:3000/api` |
 
+#### Pruebas automatizadas
+```bash
+cd backend-sgiv
+
+# Unitarias + integración (requiere PostgreSQL con los datos de .env)
+npm test
+
+# Solo unitarias (no usan la base de datos)
+npm run test:unitarias
+```
+Las pruebas de integración crean una base de datos temporal a partir de
+`database/schema.sql` y `seed.sql`, levantan la API contra ella y la eliminan al
+terminar; la base de datos real no se modifica.
+
 ---
 
 ## Credenciales por defecto

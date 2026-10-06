@@ -10,11 +10,17 @@ const pool = new Pool({
     // Todas las fechas (TIMESTAMP sin zona) se guardan y comparan en hora de Bolivia,
     // aunque el servidor PostgreSQL (p.ej. Docker) esté en UTC.
     options: '-c timezone=America/La_Paz',
+    // Las conexiones inactivas no mantienen vivo el proceso (scripts y pruebas)
+    allowExitOnIdle: true,
 });
 
 // Probar la conexión inicial
+// (se libera el cliente de prueba para no dejar una conexión ocupada)
 pool.connect()
-    .then(() => console.log('✅ Conexión exitosa a la base de datos PostgreSQL (sgiv_db)'))
+    .then(client => {
+        client.release();
+        console.log(`✅ Conexión exitosa a la base de datos PostgreSQL (${process.env.DB_NAME})`);
+    })
     .catch(err => console.error('❌ Error al conectar a la base de datos', err.stack));
 
 module.exports = pool;
