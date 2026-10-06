@@ -74,7 +74,7 @@
                     [disabled]="prod.stock_actual <= 0"
                     class="flex flex-col items-start p-2 bg-gray-50 hover:bg-green-50 border border-gray-200 hover:border-green-300 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-left transition-colors active:scale-95">
               <div class="w-full aspect-square rounded-lg overflow-hidden mb-2 bg-green-50 flex items-center justify-center">
-                <img *ngIf="prod.url_imagen" [src]="prod.url_imagen" class="w-full h-full object-cover">
+                <img *ngIf="prod.url_imagen" [src]="prod.url_imagen | imagenUrl" class="w-full h-full object-cover">
                 <span *ngIf="!prod.url_imagen" class="text-3xl font-black text-green-300">
                   {{ prod.nombre_producto?.charAt(0) }}
                 </span>
@@ -107,7 +107,7 @@
           <div *ngFor="let item of cuentaActiva?.items"
                class="flex items-center gap-2 bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
             <div class="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-green-50 flex items-center justify-center">
-              <img *ngIf="item.url_imagen" [src]="item.url_imagen" class="w-full h-full object-cover">
+              <img *ngIf="item.url_imagen" [src]="item.url_imagen | imagenUrl" class="w-full h-full object-cover">
               <span *ngIf="!item.url_imagen" class="text-green-300 font-black text-lg">
                 {{ item.nombre_producto?.charAt(0) }}
               </span>

@@ -174,6 +174,8 @@ const cobrarVenta = async (req, res) => {
                 error: 'CAJA_CERRADA',
                 detalle: 'Tu caja está cerrada. Pide al administrador que la reabra.'
             });
+        if (e.code === 'STOCK_INSUFICIENTE')
+            return res.status(409).json({ error: 'STOCK_INSUFICIENTE', detalle: e.message });
         res.status(500).json({ error: 'Error al registrar la venta.', detalle: e.message });
     }
 };

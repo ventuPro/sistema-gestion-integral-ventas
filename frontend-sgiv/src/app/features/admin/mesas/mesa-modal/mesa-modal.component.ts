@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { CuentaService } from '../../../../core/services/cuenta.service';
 import { SocketService } from '../../../../core/services/socket.service';
 import { Subscription } from 'rxjs';
+import { ImagenUrlPipe } from '../../../../core/pipes/imagen-url.pipe';
 
 @Component({
   selector: 'app-mesa-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ImagenUrlPipe],
   templateUrl: './mesa-modal.component.html'
 })
 export class MesaModalComponent implements OnInit, OnDestroy {

@@ -55,9 +55,20 @@ const obtenerCuentaActiva = async (id_mesa) => {
 
 // ─── AGREGAR PRODUCTO A LA COMANDA (con reserva inmediata de stock) ───
 const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_unitario, nota, origen) => {
+    cantidad = Math.floor(Number(cantidad));
+    if (!(cantidad > 0)) throw new Error('CANTIDAD_INVALIDA');
+
     const client = await db.connect();
     try {
         await client.query('BEGIN');
+
+        // Precio oficial del catálogo (no se confía en el enviado por el cliente)
+        const rPrecio = await client.query(
+            `SELECT precio_unitario FROM producto WHERE id_producto = $1 AND estado_activo = TRUE`,
+            [id_producto]
+        );
+        if (rPrecio.rows.length === 0) throw new Error('PRODUCTO_SIN_INVENTARIO');
+        precio_unitario = Number(rPrecio.rows[0].precio_unitario);
 
         // 1. Obtener id_sucursal desde la mesa vinculada a la cuenta
         const rSuc = await client.query(`
@@ -251,10 +262,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, id_sucurs
             `SELECT id_turno FROM turno_caja WHERE id_usuario_cajero=$1 AND estado_turno='Abierto' ORDER BY fecha_hora_apertura DESC LIMIT 1`,
             [id_usuario_cajero]
         );
-        if (rTurno.rows.length === 0) {
-            await client.query('ROLLBACK');
-            throw new Error('CAJA_CERRADA');
-        }
+        if (rTurno.rows.length === 0) throw new Error('CAJA_CERRADA');
         const id_turno = rTurno.rows[0].id_turno;
 
         // Crear registro de venta

@@ -1,6 +1,8 @@
 -- Archivo: database/schema.sql corregido
 
 -- Limpieza previa para evitar errores de "ya existe" (Opcional pero recomendado en desarrollo)
+DROP TABLE IF EXISTS detalle_cuenta CASCADE;
+DROP TABLE IF EXISTS cuenta_mesa CASCADE;
 DROP TABLE IF EXISTS detalle_venta CASCADE;
 DROP TABLE IF EXISTS venta_caja CASCADE;
 DROP TABLE IF EXISTS cliente CASCADE;
@@ -138,20 +140,49 @@ CREATE TABLE mesa_local (
 
 CREATE TABLE pedido_mesa (
     id_pedido SERIAL PRIMARY KEY,
-    id_mesa INT REFERENCES mesa_local(id_mesa),
+    id_mesa INT REFERENCES mesa_local(id_mesa) ON DELETE CASCADE,
     estado_pedido VARCHAR(30) DEFAULT 'Pendiente',
     monto_total DECIMAL(10, 2) DEFAULT 0.00,
-    fecha_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    fecha_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    observacion_general TEXT,
+    fecha_aprobacion TIMESTAMP,
+    fecha_entrega TIMESTAMP
 );
 
 CREATE TABLE detalle_pedido (
     id_detalle_pedido SERIAL PRIMARY KEY,
-    id_pedido INT REFERENCES pedido_mesa(id_pedido),
+    id_pedido INT REFERENCES pedido_mesa(id_pedido) ON DELETE CASCADE,
     id_producto INT REFERENCES producto(id_producto),
     cantidad_solicitada INT NOT NULL,
     precio_aplicado DECIMAL(10, 2) NOT NULL,
     subtotal_detalle DECIMAL(10, 2) NOT NULL,
-    nota_cliente TEXT
+    nota_cliente TEXT,
+    estado_cocina VARCHAR(20) DEFAULT 'Pendiente',
+    nota_cocina TEXT
+);
+
+-- Comanda / cuenta abierta de una mesa (atención directa del cajero + pedidos QR)
+CREATE TABLE cuenta_mesa (
+    id_cuenta SERIAL PRIMARY KEY,
+    id_mesa INT REFERENCES mesa_local(id_mesa) ON DELETE CASCADE,
+    id_usuario_apertura INT REFERENCES usuario(id_usuario),
+    estado VARCHAR(20) DEFAULT 'Abierta',
+    total_acumulado DECIMAL(10, 2) DEFAULT 0.00,
+    metodo_pago VARCHAR(50),
+    fecha_apertura TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_cierre TIMESTAMP
+);
+
+CREATE TABLE detalle_cuenta (
+    id_detalle_cuenta SERIAL PRIMARY KEY,
+    id_cuenta INT REFERENCES cuenta_mesa(id_cuenta) ON DELETE CASCADE,
+    id_producto INT REFERENCES producto(id_producto),
+    cantidad INT NOT NULL DEFAULT 1,
+    precio_unitario DECIMAL(10, 2) NOT NULL,
+    subtotal DECIMAL(10, 2) NOT NULL,
+    nota TEXT,
+    origen VARCHAR(20) DEFAULT 'cajero',
+    fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================================
@@ -186,7 +217,7 @@ CREATE TABLE venta_caja (
     id_sucursal INT REFERENCES sucursal(id_sucursal),
     id_usuario_cajero INT REFERENCES usuario(id_usuario),
     id_cliente INT REFERENCES cliente(id_cliente),
-    id_pedido_mesa INT REFERENCES pedido_mesa(id_pedido) NULL,
+    id_pedido_mesa INT REFERENCES pedido_mesa(id_pedido) ON DELETE SET NULL,
     id_turno INT REFERENCES turno_caja(id_turno),
     monto_total_venta DECIMAL(10, 2) NOT NULL,
     metodo_pago VARCHAR(50) NOT NULL,
@@ -201,3 +232,11 @@ CREATE TABLE detalle_venta (
     precio_unitario DECIMAL(10, 2) NOT NULL,
     subtotal_venta DECIMAL(10, 2) NOT NULL
 );
+
+-- ==========================================
+-- 7. ÍNDICES
+-- ==========================================
+
+CREATE INDEX idx_turno_cajero_estado      ON turno_caja (id_usuario_cajero, estado_turno);
+CREATE INDEX idx_venta_caja_cajero_fecha  ON venta_caja (id_usuario_cajero, fecha_venta);
+CREATE INDEX idx_cuenta_mesa_estado       ON cuenta_mesa (id_mesa, estado);

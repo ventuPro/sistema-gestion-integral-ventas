@@ -5,7 +5,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { ProductoService } from '../../../core/services/producto.service';
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
-         Pencil, Trash2, PackagePlus, Package,
+         Pencil, Trash2, PackagePlus, Package, RotateCw,
          AlertTriangle, CheckCircle2, XCircle, Store } from 'lucide-angular';
 
 @Component({
@@ -29,7 +29,8 @@ export class InventarioComponent implements OnInit {
     warning:  AlertTriangle,
     ok:       CheckCircle2,
     out:      XCircle,
-    store:    Store
+    store:    Store,
+    refresh:  RotateCw
   };
 
   // ─── Usuario y sucursales ───
@@ -47,6 +48,7 @@ export class InventarioComponent implements OnInit {
   // ─── Filtros ───
   filtroCategoria:       number | null = null;
   filtroBusqueda         = '';
+  filtroEstado: 'todos' | 'activos' | 'inactivos' = 'activos';
 
   // ─── Modal Producto ───
   mostrarModal           = false;
@@ -135,7 +137,7 @@ export class InventarioComponent implements OnInit {
   // ─── PRODUCTOS ───
   cargarProductos() {
     this.cargando = true;
-    this.productoService.obtenerInventario(this.idSucursal).subscribe({
+    this.productoService.obtenerInventario(this.idSucursal, true).subscribe({
       next: (datos) => {
         this.productos          = datos;
         this.productosFiltrados = datos;
@@ -156,10 +158,13 @@ export class InventarioComponent implements OnInit {
   // ─── FILTROS ───
   aplicarFiltros() {
     this.productosFiltrados = this.productos.filter(p => {
-      const porCat  = !this.filtroCategoria || p.id_categoria === this.filtroCategoria;
-      const porNomb = !this.filtroBusqueda  ||
-                      p.nombre_producto.toLowerCase().includes(this.filtroBusqueda.toLowerCase());
-      return porCat && porNomb;
+      const porCat    = !this.filtroCategoria || p.id_categoria === this.filtroCategoria;
+      const porNomb   = !this.filtroBusqueda ||
+                        p.nombre_producto.toLowerCase().includes(this.filtroBusqueda.toLowerCase());
+      const porEstado = this.filtroEstado === 'todos'
+                        || (this.filtroEstado === 'activos'  &&  p.estado_activo)
+                        || (this.filtroEstado === 'inactivos' && !p.estado_activo);
+      return porCat && porNomb && porEstado;
     });
     this.cdr.detectChanges();
   }
@@ -256,12 +261,19 @@ guardarProducto() {
     });
   }
 }
-  eliminarProducto(id: number, nombre: string) {
-    if (!confirm(`¿Eliminar "${nombre}" del inventario?`)) return;
-    this.productoService.eliminarProducto(id).subscribe({
-      next: () => this.cargarProductos(),
-      error: () => alert('Error al eliminar.')
-    });
+
+  toggleEstadoProducto(prod: any) {
+    if (prod.estado_activo) {
+      this.productoService.desactivarProducto(prod.id_producto).subscribe({
+        next: () => this.cargarProductos(),
+        error: () => alert('Error al desactivar el producto.')
+      });
+    } else {
+      this.productoService.reactivarProducto(prod.id_producto).subscribe({
+        next: () => this.cargarProductos(),
+        error: () => alert('Error al reactivar el producto.')
+      });
+    }
   }
 
   // ─── MODAL STOCK ───

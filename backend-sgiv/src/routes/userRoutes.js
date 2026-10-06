@@ -1,15 +1,18 @@
 const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/userController');
-const { verificarToken } = require('../middlewares/authMiddleware');
+const { verificarToken, verificarPermiso } = require('../middlewares/authMiddleware');
 
-router.post  ('/registro',          ctrl.registrarUsuario);
+// Gestión de usuarios: requiere sesión + permiso del módulo 'usuarios'
+const gestion = [verificarToken, verificarPermiso('usuarios')];
+
+router.post  ('/registro',          gestion, ctrl.registrarUsuario);
 router.post  ('/login',             ctrl.loginUsuario);
-router.get   ('/',                  verificarToken, ctrl.listarUsuarios);
-router.get   ('/form-data',         verificarToken, ctrl.obtenerDatosFormulario);
-router.put   ('/:id',               verificarToken, ctrl.actualizarUsuario);
-router.patch ('/:id/desactivar',    verificarToken, ctrl.desactivarUsuario);
-router.patch ('/:id/reactivar',     verificarToken, ctrl.reactivarUsuario);
-router.patch ('/:id/contrasena',    verificarToken, ctrl.cambiarContrasena);
+router.get   ('/',                  gestion, ctrl.listarUsuarios);
+router.get   ('/form-data',         gestion, ctrl.obtenerDatosFormulario);
+router.put   ('/:id',               gestion, ctrl.actualizarUsuario);
+router.patch ('/:id/desactivar',    gestion, ctrl.desactivarUsuario);
+router.patch ('/:id/reactivar',     gestion, ctrl.reactivarUsuario);
+router.patch ('/:id/contrasena',    gestion, ctrl.cambiarContrasena);
 
 module.exports = router;

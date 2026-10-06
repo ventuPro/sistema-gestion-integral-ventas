@@ -75,7 +75,7 @@
               <!-- Imagen pequeña si existe -->
               <div class="flex items-center gap-2">
                 <div *ngIf="item.imagen" class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
-                  <img [src]="item.imagen" [alt]="item.nombre" class="w-full h-full object-cover">
+                  <img [src]="item.imagen | imagenUrl" [alt]="item.nombre" class="w-full h-full object-cover">
                 </div>
                 <div>
                   <p class="font-bold text-gray-800 text-sm leading-tight">{{ item.nombre }}</p>

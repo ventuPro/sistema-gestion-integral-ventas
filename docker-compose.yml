@@ -11,6 +11,8 @@ services:
       POSTGRES_DB:       sgiv_db
       POSTGRES_USER:     sgiv_user
       POSTGRES_PASSWORD: sgiv_password
+      TZ:                America/La_Paz
+      PGTZ:              America/La_Paz
     ports:
       - "5432:5432"
     volumes:
@@ -42,6 +44,8 @@ services:
       PORT:        3000
     ports:
       - "3000:3000"
+    volumes:
+      - uploads_data:/app/uploads      # imágenes de productos
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,6 +70,8 @@ services:
 volumes:
   postgres_data:
     name: sgiv_postgres_data
+  uploads_data:
+    name: sgiv_uploads_data
 
 # ─── Red interna ───
 networks:

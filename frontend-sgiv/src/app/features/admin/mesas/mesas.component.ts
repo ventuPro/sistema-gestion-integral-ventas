@@ -211,7 +211,7 @@ export class MesasComponent implements OnInit, OnDestroy {
   aprobarPedido(id_pedido: number) {
     this.mesaService.aprobarPedido(id_pedido).subscribe({
       next: () => { this.cargarPendientes(); this.cargarMesas(); },
-      error: () => alert('Error al aprobar')
+      error: (e: any) => alert(e?.error?.error || 'Error al aprobar')
     });
   }
 

@@ -49,11 +49,12 @@ const eliminarCategoria = async (req, res) => {
     }
 };
 
-// Listar productos — SOLO los de esa sucursal (INNER JOIN)
+// Listar productos — SOLO los de esa sucursal. Opcionalmente incluye inactivos (para Inventario).
 const listarProductos   = async (req, res) => {
     try {
-        const id_sucursal = Number(req.query.id_sucursal) || 1;
-        res.json(await m.obtenerProductos(id_sucursal));
+        const id_sucursal        = Number(req.query.id_sucursal) || 1;
+        const incluirInactivos   = String(req.query.incluir_inactivos || '') === 'true';
+        res.json(await m.obtenerProductos(id_sucursal, incluirInactivos));
     } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -114,8 +115,16 @@ const actualizarProducto = async (req, res) => {
 
 const eliminarProducto  = async (req, res) => {
     try {
-        await m.eliminarProducto(req.params.id);
-        res.json({ mensaje: 'Producto eliminado' });
+        await m.desactivarProducto(req.params.id);
+        res.json({ mensaje: 'Producto desactivado' });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+};
+
+const reactivarProducto = async (req, res) => {
+    try {
+        const prod = await m.reactivarProducto(req.params.id);
+        if (!prod) return res.status(404).json({ error: 'Producto no encontrado' });
+        res.json({ mensaje: 'Producto reactivado', producto: prod });
     } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -131,5 +140,5 @@ const sumarStock = async (req, res) => {
 
 module.exports = {
     agregarCategoria, listarCategorias, eliminarCategoria, listarProductos,
-    agregarProducto,  actualizarProducto, eliminarProducto, sumarStock
+    agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto, sumarStock
 };

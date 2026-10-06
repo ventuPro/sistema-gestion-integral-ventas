@@ -1,10 +1,25 @@
 const bcrypt      = require('bcryptjs');
 const jwt         = require('jsonwebtoken');
 const userModel   = require('../models/userModel');
+const db          = require('../config/db');
+
+// Un usuario con permiso 'usuarios' que no es administrador no puede crear,
+// ascender ni modificar administradores.
+const esAdmin = (req) => Number(req.usuario?.id_rol) === 1;
+const tocaAdmin = async (id_usuario_objetivo, id_rol_nuevo) => {
+    if (Number(id_rol_nuevo) === 1) return true;
+    if (!id_usuario_objetivo) return false;
+    const r = await db.query(`SELECT id_rol FROM usuario WHERE id_usuario = $1`, [id_usuario_objetivo]);
+    return Number(r.rows[0]?.id_rol) === 1;
+};
 
 const registrarUsuario = async (req, res) => {
     try {
-        const { id_sucursal, id_rol, nombre_completo, correo_electronico, contrasena } = req.body;
+        const { id_sucursal, id_rol, nombre_completo, correo_electronico, contrasena } = req.body || {};
+        if (!nombre_completo || !correo_electronico || !contrasena || !id_rol)
+            return res.status(400).json({ error: 'Faltan datos obligatorios' });
+        if (!esAdmin(req) && await tocaAdmin(null, id_rol))
+            return res.status(403).json({ error: 'Solo un administrador puede crear administradores' });
         const existente = await userModel.obtenerUsuarioPorCorreo(correo_electronico);
         if (existente) return res.status(400).json({ error: 'El correo ya está registrado' });
 
@@ -68,6 +83,8 @@ const listarUsuarios = async (req, res) => {
 
 const actualizarUsuario = async (req, res) => {
     try {
+        if (!esAdmin(req) && await tocaAdmin(req.params.id, req.body?.id_rol))
+            return res.status(403).json({ error: 'Solo un administrador puede modificar administradores' });
         const usuario = await userModel.actualizarUsuario(req.params.id, req.body);
         res.json({ mensaje: 'Usuario actualizado', usuario });
     } catch (e) {
@@ -77,6 +94,10 @@ const actualizarUsuario = async (req, res) => {
 
 const desactivarUsuario = async (req, res) => {
     try {
+        if (!esAdmin(req) && await tocaAdmin(req.params.id))
+            return res.status(403).json({ error: 'Solo un administrador puede desactivar administradores' });
+        if (Number(req.params.id) === Number(req.usuario.id_usuario))
+            return res.status(400).json({ error: 'No puedes desactivar tu propia cuenta' });
         await userModel.desactivarUsuario(req.params.id);
         res.json({ mensaje: 'Usuario desactivado' });
     } catch (e) {
@@ -95,7 +116,11 @@ const reactivarUsuario = async (req, res) => {
 
 const cambiarContrasena = async (req, res) => {
     try {
-        const { nueva_contrasena } = req.body;
+        const { nueva_contrasena } = req.body || {};
+        if (!nueva_contrasena || String(nueva_contrasena).length < 6)
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        if (!esAdmin(req) && await tocaAdmin(req.params.id))
+            return res.status(403).json({ error: 'Solo un administrador puede cambiar esa contraseña' });
         const salt           = await bcrypt.genSalt(10);
         const contrasena_hash = await bcrypt.hash(nueva_contrasena, salt);
         await userModel.cambiarContrasena(req.params.id, contrasena_hash);

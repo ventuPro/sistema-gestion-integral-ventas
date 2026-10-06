@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { KdsService } from '../../../core/services/kds.service';
 import { SocketService } from '../../../core/services/socket.service';
 import { Router } from '@angular/router';
+import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 
 @Component({
   selector: 'app-kds',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ImagenUrlPipe],
   templateUrl: './kds.component.html',
   styleUrl: './kds.component.css'
 })

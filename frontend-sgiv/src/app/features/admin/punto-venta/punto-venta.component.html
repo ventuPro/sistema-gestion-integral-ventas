@@ -149,7 +149,7 @@
                   [disabled]="prod.stock_actual <= 0"
                   class="flex flex-col items-center p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all active:scale-95">
             <div class="w-full aspect-square rounded-lg overflow-hidden mb-2 bg-blue-100 flex items-center justify-center">
-              <img *ngIf="prod.url_imagen" [src]="prod.url_imagen" class="w-full h-full object-cover">
+              <img *ngIf="prod.url_imagen" [src]="prod.url_imagen | imagenUrl" class="w-full h-full object-cover">
               <span *ngIf="!prod.url_imagen" class="text-3xl font-black text-blue-300">
                 {{ prod.nombre_producto?.charAt(0) }}
               </span>

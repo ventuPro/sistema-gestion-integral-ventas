@@ -7,13 +7,14 @@ import { SocketService } from '../../../core/services/socket.service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { Subscription } from 'rxjs';
+import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Inbox, Search, X } from 'lucide-angular';
 
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe],
   templateUrl: './punto-venta.component.html'
 })
 export class PuntoVentaComponent implements OnInit, OnDestroy {

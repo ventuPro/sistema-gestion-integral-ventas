@@ -27,8 +27,8 @@ const crearProducto = async ({ id_categoria, nombre_producto, descripcion_produc
     return r.rows[0];
 };
 
-// ─── FIX DEFINITIVO: INNER JOIN → solo muestra productos de ESA sucursal ───
-const obtenerProductos = async (id_sucursal = 1) => {
+const obtenerProductos = async (id_sucursal = 1, incluirInactivos = false) => {
+    const filtroEstado = incluirInactivos ? '' : 'WHERE p.estado_activo = TRUE';
     const r = await db.query(`
         SELECT
             p.id_producto,
@@ -45,14 +45,19 @@ const obtenerProductos = async (id_sucursal = 1) => {
         JOIN categoria_producto   c ON p.id_categoria = c.id_categoria
         JOIN inventario_sucursal  i ON i.id_producto  = p.id_producto
                                    AND i.id_sucursal  = $1
-        WHERE p.estado_activo = TRUE
+        ${filtroEstado}
         ORDER BY c.nombre_categoria ASC, p.nombre_producto ASC
     `, [id_sucursal]);
     return r.rows;
 };
 
-const eliminarProducto = async (id) =>
+const desactivarProducto = async (id) =>
     (await db.query(`UPDATE producto SET estado_activo=FALSE WHERE id_producto=$1 RETURNING *`,[id])).rows[0];
+
+const reactivarProducto = async (id) =>
+    (await db.query(`UPDATE producto SET estado_activo=TRUE WHERE id_producto=$1 RETURNING *`,[id])).rows[0];
+
+const eliminarProducto = desactivarProducto;
 
 const actualizarProducto = async (id, { id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen }) => {
     const vals  = [id_categoria, nombre_producto, descripcion_producto, precio_unitario, id];
@@ -101,6 +106,8 @@ module.exports = {
     crearProducto,
     obtenerProductos,
     eliminarProducto,
+    desactivarProducto,
+    reactivarProducto,
     actualizarProducto,
     agregarStock,
     asignarProductoASucursal

@@ -1,4 +1,6 @@
 const pedidoModel = require('../models/pedidoModel');
+const cuentaModel = require('../models/cuentaModel');
+const io          = () => global.io;
 
 // ─── MESAS (CRUD) ───
 const agregarMesa = async (req, res) => {
@@ -29,7 +31,7 @@ const abrirPedido = async (req, res) => {
     try {
         const { id_mesa, observacion_general } = req.body;
         if (!id_mesa) return res.status(400).json({ error: 'id_mesa requerido' });
-        const pedido = await pedidoModel.crearPedido(id_mesa, observacion_general || '');
+        const pedido = await pedidoModel.crearPedido({ id_mesa, observacion_general });
 
         // Notificar a cajeros en tiempo real
         if (global.io) {
@@ -87,22 +89,33 @@ const listarPendientesCajero = async (req, res) => {
 const aprobarPedido = async (req, res) => {
     try {
         const id_pedido = Number(req.params.id_pedido);
-        const pedido    = await pm.aprobarPedido(id_pedido);
 
-        // Buscar si la mesa tiene cuenta abierta e integrar el pedido QR
-        const cuenta = await require('../models/cuentaModel').obtenerCuentaActiva(pedido.id_mesa);
-        if (cuenta) {
-            await require('../models/cuentaModel').integrarPedidoQR(cuenta.id_cuenta, id_pedido);
-
-            const cuentaActualizada = await require('../models/cuentaModel').obtenerCuentaActiva(pedido.id_mesa);
-            io()?.to('cajeros').emit('cuenta:qr_integrado', {
-                id_mesa:         pedido.id_mesa,
-                numero_mesa:     pedido.numero_mesa,
-                id_cuenta:       cuenta.id_cuenta,
-                total_acumulado: cuentaActualizada?.total_acumulado,
-                items:           cuentaActualizada?.items
+        const faltantes = await pedidoModel.verificarStockPedido(id_pedido);
+        if (faltantes.length > 0) {
+            return res.status(409).json({
+                error: 'Stock insuficiente: ' + faltantes
+                    .map(f => `${f.nombre_producto} (pide ${f.solicitado}, hay ${f.disponible})`).join(', ')
             });
         }
+
+        const pedido = await pedidoModel.aprobarPedido(id_pedido);
+        if (!pedido) return res.status(409).json({ error: 'El pedido no existe o ya fue procesado' });
+
+        // Integrar el pedido QR a la comanda de la mesa (se abre una si no existe),
+        // así sus productos descuentan stock y se cobran al cerrar la cuenta.
+        let cuenta = await cuentaModel.obtenerCuentaActiva(pedido.id_mesa);
+        if (!cuenta) {
+            await cuentaModel.abrirCuenta(pedido.id_mesa, req.usuario.id_usuario);
+            cuenta = await cuentaModel.obtenerCuentaActiva(pedido.id_mesa);
+        }
+        const cuentaActualizada = await cuentaModel.integrarPedidoQR(cuenta.id_cuenta, id_pedido);
+        io()?.to('cajeros').emit('cuenta:qr_integrado', {
+            id_mesa:         pedido.id_mesa,
+            numero_mesa:     cuenta.numero_mesa,
+            id_cuenta:       cuenta.id_cuenta,
+            total_acumulado: cuentaActualizada?.total_acumulado,
+            items:           cuentaActualizada?.items
+        });
 
         io()?.to('cocina').emit('nuevo_pedido_cocina', pedido);
         io()?.to(`mesa_${pedido.id_mesa}`).emit('pedido_aprobado', { id_pedido });
@@ -122,7 +135,8 @@ const rechazarPedido = async (req, res) => {
         const resultado = await pedidoModel.rechazarPedido(id_pedido);
 
         if (global.io) {
-            global.io.to(`pedido_${id_pedido}`).emit('pedido_rechazado', { id_pedido });
+            // El menú digital escucha en la sala de su mesa (mesa_<id>)
+        if (resultado) global.io.to(`mesa_${resultado.id_mesa}`).emit('pedido_rechazado', { id_pedido });
         }
 
         res.json({ mensaje: 'Pedido rechazado', resultado });

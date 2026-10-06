@@ -13,7 +13,7 @@ VALUES ('Casa Matriz', 'La Paz, Bolivia', '70000000')
 ON CONFLICT DO NOTHING;
 
 -- Usuario administrador por defecto
--- Contraseña: Admin123 (el hash es generado con bcrypt salt=10)
+-- Contraseña: password (hash bcrypt, salt=10)
 INSERT INTO usuario (id_sucursal, id_rol, nombre_completo, correo_electronico, contrasena_hash, estado_activo)
 VALUES (
   1, 1,

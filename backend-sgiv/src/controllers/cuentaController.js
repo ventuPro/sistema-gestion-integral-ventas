@@ -71,6 +71,8 @@ const agregarProducto = async (req, res) => {
             return res.status(404).json({ error: 'El producto no está en el inventario de la sucursal' });
         if (e.message === 'CUENTA_NO_ACTIVA')
             return res.status(404).json({ error: 'La cuenta no está abierta' });
+        if (e.message === 'CANTIDAD_INVALIDA')
+            return res.status(400).json({ error: 'La cantidad debe ser un entero mayor a 0' });
         res.status(500).json({ error: 'Error al agregar producto' });
     }
 };
@@ -120,6 +122,8 @@ const cerrarCuenta = async (req, res) => {
     } catch(e) {
         if (e.message === 'CUENTA_NO_ACTIVA')
             return res.status(404).json({ error: 'No hay cuenta activa en esta mesa' });
+        if (e.message === 'CAJA_CERRADA')
+            return res.status(403).json({ error: 'Tu caja está cerrada. Abre un turno para cobrar.' });
         console.error('cerrarCuenta:', e);
         res.status(500).json({ error: 'Error al cerrar la cuenta' });
     }

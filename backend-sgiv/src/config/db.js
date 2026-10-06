@@ -7,6 +7,9 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     port: process.env.DB_PORT,
+    // Todas las fechas (TIMESTAMP sin zona) se guardan y comparan en hora de Bolivia,
+    // aunque el servidor PostgreSQL (p.ej. Docker) esté en UTC.
+    options: '-c timezone=America/La_Paz',
 });
 
 // Probar la conexión inicial

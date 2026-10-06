@@ -86,7 +86,18 @@ const eliminarMesa = async (id_mesa) => {
               AND estado_pedido IN ('Pendiente_Cajero', 'En_Cocina', 'Listo')
         `, [id_mesa]);
 
-        // Eliminar la mesa (las cuentas y pedidos ya se cancelaron)
+        // detalle_pedido y venta_caja referencian pedido_mesa sin ON DELETE CASCADE:
+        // sin esto, borrar una mesa que alguna vez recibió pedidos QR falla por FK.
+        await client.query(`
+            UPDATE venta_caja SET id_pedido_mesa = NULL
+            WHERE id_pedido_mesa IN (SELECT id_pedido FROM pedido_mesa WHERE id_mesa = $1)
+        `, [id_mesa]);
+        await client.query(`
+            DELETE FROM detalle_pedido
+            WHERE id_pedido IN (SELECT id_pedido FROM pedido_mesa WHERE id_mesa = $1)
+        `, [id_mesa]);
+
+        // Eliminar la mesa (pedido_mesa y cuenta_mesa caen por ON DELETE CASCADE)
         const r = await client.query(
             `DELETE FROM mesa_local WHERE id_mesa = $1 RETURNING *`,
             [id_mesa]

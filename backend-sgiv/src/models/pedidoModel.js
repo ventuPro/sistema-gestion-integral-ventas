@@ -44,8 +44,17 @@ const crearPedido = async ({ id_mesa, observacion_general }) => {
 
 const agregarDetallePedido = async (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente) => {
     try {
-        const cantidad = Number(cantidad_solicitada) || 1;
-        const precio   = Number(precio_aplicado)     || 0;
+        const cantidad = Math.floor(Number(cantidad_solicitada));
+        if (!(cantidad > 0)) throw new Error('Cantidad inválida');
+
+        // El precio se toma del catálogo: el menú digital es público y no se
+        // puede confiar en el precio enviado por el cliente.
+        const rProd = await db.query(
+            `SELECT precio_unitario FROM producto WHERE id_producto = $1 AND estado_activo = TRUE`,
+            [id_producto]
+        );
+        if (!rProd.rows.length) throw new Error(`Producto ${id_producto} no disponible`);
+        const precio   = Number(rProd.rows[0].precio_unitario);
         const subtotal = cantidad * precio;
 
         const r = await db.query(`
@@ -125,7 +134,7 @@ const aprobarPedido = async (id_pedido) => {
     const result = await db.query(
         `UPDATE pedido_mesa
          SET estado_pedido = 'En_Cocina', fecha_aprobacion = CURRENT_TIMESTAMP
-         WHERE id_pedido = $1 RETURNING *;`,
+         WHERE id_pedido = $1 AND estado_pedido = 'Pendiente_Cajero' RETURNING *;`,
         [id_pedido]
     );
     // Actualizar todos los detalles a 'Pendiente' (ya lo están, pero confirmamos)
@@ -135,6 +144,23 @@ const aprobarPedido = async (id_pedido) => {
         [id_pedido]
     );
     return result.rows[0];
+};
+
+// Productos del pedido cuyo stock en la sucursal de la mesa no alcanza
+const verificarStockPedido = async (id_pedido) => {
+    const r = await db.query(`
+        SELECT p.nombre_producto, SUM(dp.cantidad_solicitada)::int AS solicitado,
+               COALESCE(i.cantidad_actual, 0)::int AS disponible
+        FROM detalle_pedido dp
+        JOIN pedido_mesa pm ON pm.id_pedido = dp.id_pedido
+        JOIN mesa_local  m  ON m.id_mesa    = pm.id_mesa
+        JOIN producto    p  ON p.id_producto = dp.id_producto
+        LEFT JOIN inventario_sucursal i ON i.id_producto = dp.id_producto AND i.id_sucursal = m.id_sucursal
+        WHERE dp.id_pedido = $1
+        GROUP BY p.nombre_producto, i.cantidad_actual
+        HAVING SUM(dp.cantidad_solicitada) > COALESCE(i.cantidad_actual, 0)
+    `, [id_pedido]);
+    return r.rows;
 };
 
 // CAJERO: Rechazar pedido
@@ -153,6 +179,10 @@ const rechazarPedido = async (id_pedido) => {
                AND NOT EXISTS (
                    SELECT 1 FROM pedido_mesa
                    WHERE id_mesa = $1 AND estado_pedido NOT IN ('Pagado','Cancelado')
+               )
+               AND NOT EXISTS (
+                   SELECT 1 FROM cuenta_mesa
+                   WHERE id_mesa = $1 AND estado = 'Abierta'
                );`,
             [result.rows[0].id_mesa]
         );
@@ -274,7 +304,7 @@ const cerrarCuentaMesa = async (id_pedido) => {
 module.exports = {
     crearMesa, obtenerMesasPorSucursal,
     crearPedido, agregarDetallePedido, obtenerPedidoCompleto,
-    obtenerPedidosPendientesCajero, aprobarPedido, rechazarPedido,
+    obtenerPedidosPendientesCajero, aprobarPedido, rechazarPedido, verificarStockPedido,
     obtenerPedidosKDS, actualizarEstadoCocinaItem,
     obtenerEstadoPedidoPublico, cerrarCuentaMesa
 };

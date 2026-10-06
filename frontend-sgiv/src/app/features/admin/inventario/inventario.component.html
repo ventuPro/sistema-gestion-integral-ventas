@@ -49,6 +49,28 @@
       </div>
     </div>
 
+    <!-- Filtro por estado -->
+    <div class="flex flex-wrap gap-2 mb-3">
+      <button (click)="filtroEstado = 'activos'; aplicarFiltros()"
+              [class.bg-blue-600]="filtroEstado === 'activos'"
+              [class.text-white]="filtroEstado === 'activos'"
+              [class.bg-gray-100]="filtroEstado !== 'activos'"
+              [class.text-gray-600]="filtroEstado !== 'activos'"
+              class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Activos</button>
+      <button (click)="filtroEstado = 'inactivos'; aplicarFiltros()"
+              [class.bg-blue-600]="filtroEstado === 'inactivos'"
+              [class.text-white]="filtroEstado === 'inactivos'"
+              [class.bg-gray-100]="filtroEstado !== 'inactivos'"
+              [class.text-gray-600]="filtroEstado !== 'inactivos'"
+              class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Inactivos</button>
+      <button (click)="filtroEstado = 'todos'; aplicarFiltros()"
+              [class.bg-blue-600]="filtroEstado === 'todos'"
+              [class.text-white]="filtroEstado === 'todos'"
+              [class.bg-gray-100]="filtroEstado !== 'todos'"
+              [class.text-gray-600]="filtroEstado !== 'todos'"
+              class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Todos</button>
+    </div>
+
     <!-- Filtros -->
     <div class="flex flex-wrap gap-2 mb-4">
       <!-- Buscador -->
@@ -111,7 +133,8 @@
      class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
 
   <div *ngFor="let prod of productosFiltrados"
-       class="group border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all bg-white flex flex-col">
+       class="group border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all bg-white flex flex-col"
+       [class.opacity-60]="!prod.estado_activo">
 
     <!-- Imagen + categoría (cuadrado perfecto) -->
     <div class="relative w-full aspect-square bg-gradient-to-br from-gray-50 to-gray-100">
@@ -127,6 +150,12 @@
       <!-- Tag categoría -->
       <span class="absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-semibold text-gray-700 bg-white/95 shadow-sm">
         {{ prod.nombre_categoria }}
+      </span>
+
+      <!-- Badge estado (solo si inactivo) -->
+      <span *ngIf="!prod.estado_activo"
+            class="absolute top-2 right-2 text-xs px-2.5 py-0.5 rounded-full font-bold text-red-700 bg-red-100 shadow-sm">
+        Inactivo
       </span>
     </div>
 
@@ -185,11 +214,18 @@
           <lucide-icon [img]="icons.edit" class="w-4 h-4"></lucide-icon>
         </button>
 
-        <!-- Eliminar producto -->
-        <button (click)="eliminarProducto(prod.id_producto, prod.nombre_producto)"
-                title="Eliminar este producto del catálogo"
+        <!-- Toggle activar/desactivar -->
+        <button *ngIf="prod.estado_activo"
+                (click)="toggleEstadoProducto(prod)"
+                title="Desactivar producto (deja de aparecer en ventas)"
                 class="inline-flex items-center justify-center w-9 h-9 border border-gray-200 bg-white text-gray-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 active:scale-95 rounded-lg transition-all">
           <lucide-icon [img]="icons.delete" class="w-4 h-4"></lucide-icon>
+        </button>
+        <button *ngIf="!prod.estado_activo"
+                (click)="toggleEstadoProducto(prod)"
+                title="Reactivar producto"
+                class="inline-flex items-center justify-center w-9 h-9 border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:scale-95 rounded-lg transition-all">
+          <lucide-icon [img]="icons.refresh" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
     </div>

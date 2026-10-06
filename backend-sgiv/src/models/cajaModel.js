@@ -124,10 +124,9 @@ const cerrarCaja = async (id_sucursal, id_usuario_cajero) => {
             UPDATE turno_caja
             SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado'
             WHERE id_usuario_cajero = $1
-              AND id_sucursal       = $2
               AND estado_turno      = 'Abierto'
             RETURNING id_turno
-        `, [id_usuario_cajero, id_sucursal]);
+        `, [id_usuario_cajero]);
 
         // Sincronizar flag → FALSE
         await client.query(
@@ -250,22 +249,22 @@ const deshabilitarCaja = async (id_usuario) => {
         await client.query('BEGIN');
 
         const rUser = await client.query(
-            `SELECT id_sucursal FROM usuario WHERE id_usuario = $1`,
+            `SELECT id_usuario FROM usuario WHERE id_usuario = $1`,
             [id_usuario]
         );
         if (rUser.rows.length === 0) {
             await client.query('ROLLBACK');
             return null;
         }
-        const id_sucursal = rUser.rows[0].id_sucursal;
 
+        // Cierra el turno abierto aunque se haya abierto en otra sucursal
+        // (antes se filtraba por la sucursal del usuario y no se cerraba).
         await client.query(`
             UPDATE turno_caja
             SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado'
             WHERE id_usuario_cajero = $1
-              AND id_sucursal       = $2
               AND estado_turno      = 'Abierto'
-        `, [id_usuario, id_sucursal]);
+        `, [id_usuario]);
 
         const r = await client.query(
             `UPDATE usuario SET caja_habilitada = FALSE WHERE id_usuario = $1
@@ -416,10 +415,7 @@ const registrarVenta = async ({
             ORDER BY fecha_hora_apertura DESC LIMIT 1
         `, [id_usuario_cajero]);
 
-        if (rTurno.rows.length === 0) {
-            await client.query('ROLLBACK');
-            throw new Error('CAJA_CERRADA');
-        }
+        if (rTurno.rows.length === 0) throw new Error('CAJA_CERRADA');
         const id_turno = rTurno.rows[0].id_turno;
 
         // 2. Registrar la venta principal
@@ -454,12 +450,29 @@ const registrarVenta = async ({
                 VALUES ($1, $2, $3, $4, $5)
             `, [id_venta, id_prod, cantidad, precio, subtotal]);
 
+            // Descuento atómico: solo si hay stock suficiente (evita sobreventa
+            // cuando dos cajas venden el mismo producto a la vez).
             const rInv = await client.query(`
                 UPDATE inventario_sucursal
-                SET cantidad_actual = GREATEST(0, cantidad_actual - $1)
-                WHERE id_sucursal = $2 AND id_producto = $3
+                SET cantidad_actual = cantidad_actual - $1
+                WHERE id_sucursal = $2 AND id_producto = $3 AND cantidad_actual >= $1
                 RETURNING id_inventario, cantidad_actual
             `, [cantidad, Number(id_sucursal), id_prod]);
+
+            if (rInv.rows.length === 0) {
+                const rInfo = await client.query(`
+                    SELECT p.nombre_producto, i.cantidad_actual
+                    FROM producto p
+                    LEFT JOIN inventario_sucursal i ON i.id_producto = p.id_producto AND i.id_sucursal = $2
+                    WHERE p.id_producto = $1
+                `, [id_prod, Number(id_sucursal)]);
+                const info = rInfo.rows[0];
+                const err  = new Error(
+                    `Stock insuficiente de "${info?.nombre_producto || id_prod}" (disponible: ${info?.cantidad_actual ?? 0})`
+                );
+                err.code = 'STOCK_INSUFICIENTE';
+                throw err;
+            }
 
             if (rInv.rows.length > 0) {
                 cambiosStock.push({

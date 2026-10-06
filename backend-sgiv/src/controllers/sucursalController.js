@@ -11,7 +11,9 @@ const listarSucursales = async (req, res) => {
 
 const crearSucursal = async (req, res) => {
     try {
-        const { nombre_sucursal, direccion_fisica, telefono_contacto } = req.body;
+        if (Number(req.usuario.id_rol) !== 1)
+            return res.status(403).json({ error: 'Solo el administrador puede crear sucursales' });
+        const { nombre_sucursal, direccion_fisica, telefono_contacto } = req.body || {};
         if (!nombre_sucursal) return res.status(400).json({ error: 'El nombre es obligatorio' });
         const nueva = await sucursalModel.crearSucursal(nombre_sucursal, direccion_fisica, telefono_contacto);
         res.status(201).json({ mensaje: 'Sucursal creada', sucursal: nueva });
