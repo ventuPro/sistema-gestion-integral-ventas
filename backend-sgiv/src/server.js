@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 require('dotenv').config();
 
 require('./config/db');
+const { origenPermitido } = require('./config/seguridad');
 
 const userRoutes      = require('./routes/userRoutes');
 const productoRoutes  = require('./routes/productoRoutes');
@@ -22,22 +23,31 @@ const kdsRoutes       = require('./routes/kdsRoutes');
 const app    = express();
 const server = http.createServer(app);
 
-// Socket.IO con CORS
+// Socket.IO con CORS restringido a los orígenes permitidos
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: true,
     methods: ['GET', 'POST']
+  },
+  allowRequest: (req, callback) => {
+    callback(null, origenPermitido(req.headers.origin, req.headers.host));
   }
 });
 
 // Exportar io para usarlo en controllers
 global.io = io;
 
-app.use(cors({
-    origin:      '*',
-    methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false
+// ─── CORS ───
+// El menú digital (QR) es público y acepta cualquier origen; el resto de la API
+// solo responde a los orígenes permitidos (ver config/seguridad.js).
+app.use(cors((req, callback) => {
+    const publico = req.path.startsWith('/api/menu');
+    callback(null, {
+        origin:         publico || origenPermitido(req.headers.origin, req.headers.host),
+        methods:        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials:    false
+    });
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));

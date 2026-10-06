@@ -2,6 +2,7 @@ const bcrypt      = require('bcryptjs');
 const jwt         = require('jsonwebtoken');
 const userModel   = require('../models/userModel');
 const db          = require('../config/db');
+const { JWT_SECRET, JWT_OPCIONES } = require('../config/seguridad');
 
 // Un usuario con permiso 'usuarios' que no es administrador no puede crear,
 // ascender ni modificar administradores.
@@ -50,8 +51,8 @@ const loginUsuario = async (req, res) => {
 
         const token = jwt.sign(
             { id_usuario: u.id_usuario, id_rol: u.id_rol, id_sucursal: u.id_sucursal },
-            process.env.JWT_SECRET || 'ventupro2503_Security_key',
-            { expiresIn: '8h' }
+            JWT_SECRET,
+            JWT_OPCIONES
         );
 
         res.json({

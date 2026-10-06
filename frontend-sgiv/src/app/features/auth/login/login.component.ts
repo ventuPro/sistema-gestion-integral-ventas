@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { PermisoService } from '../../../core/services/permiso.service';
 
@@ -21,6 +21,14 @@ export class LoginComponent {
   private authService    = inject(AuthService);
   private permisoService = inject(PermisoService);
   private router         = inject(Router);
+  private route          = inject(ActivatedRoute);
+
+  constructor() {
+    // Redirigido por el interceptor: token vencido o usuario desactivado
+    if (this.route.snapshot.queryParamMap.get('sesion') === 'expirada') {
+      this.mensajeError = 'Tu sesión terminó o tu usuario fue desactivado. Inicia sesión nuevamente.';
+    }
+  }
 
   iniciarSesion() {
     if (!this.correo || !this.contrasena) {
