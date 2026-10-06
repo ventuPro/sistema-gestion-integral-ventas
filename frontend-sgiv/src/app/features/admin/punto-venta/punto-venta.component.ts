@@ -385,6 +385,21 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
           this.cdr.detectChanges();
           return;
         }
+        // PRECIO_DESACTUALIZADO → un precio cambió en la BD: actualizar el carrito y volver a cobrar
+        if (e?.error?.error === 'PRECIO_DESACTUALIZADO') {
+          const precios = new Map<number, number>(
+            (e.error.precios || []).map((p: any) => [Number(p.id_producto), Number(p.precio_unitario)])
+          );
+          this.carrito = this.carrito.map(i => {
+            const precio = precios.get(Number(i.id_producto)) ?? Number(i.precio_unitario);
+            return { ...i, precio_unitario: precio, subtotal: precio * Number(i.cantidad) };
+          });
+          alert(`Los precios cambiaron. Nuevo total: Bs. ${Number(e.error.total).toFixed(2)}. Revise el carrito y vuelva a cobrar.`);
+          this.cargarCatalogo();
+          this.cargando = false;
+          this.cdr.detectChanges();
+          return;
+        }
         const msg = e?.error?.detalle || e?.error?.error || 'Error desconocido al registrar la venta.';
         console.error('Error venta:', msg);
         alert(`Error al registrar: ${msg}`);

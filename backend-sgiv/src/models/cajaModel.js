@@ -400,6 +400,37 @@ const obtenerVentasHoyPOS = async (id_sucursal, id_usuario_cajero) => {
 //  REGISTRO DE VENTA  (con validación estricta de turno)
 // ════════════════════════════════════════════════════════════════════
 
+// Valida el carrito y le pone el precio vigente de la BD a cada ítem.
+// Lanza VENTA_INVALIDA si el carrito está vacío, una cantidad no es un entero
+// positivo o un producto no existe / está inactivo.
+const calcularItemsVenta = async (client, detalles) => {
+    const invalida = (msg) => { const e = new Error(msg); e.code = 'VENTA_INVALIDA'; return e; };
+    if (!Array.isArray(detalles) || detalles.length === 0) throw invalida('El carrito está vacío.');
+
+    const ids = [...new Set(detalles.map(d => Number(d.id_producto)))];
+    const r = await client.query(
+        `SELECT id_producto, nombre_producto, precio_unitario
+         FROM producto WHERE id_producto = ANY($1::int[]) AND estado_activo = TRUE`,
+        [ids]
+    );
+    const precios = new Map(r.rows.map(p => [Number(p.id_producto), p]));
+
+    return detalles.map(d => {
+        const id_producto = Number(d.id_producto);
+        const cantidad    = Number(d.cantidad);
+        if (!Number.isInteger(cantidad) || cantidad <= 0)
+            throw invalida(`Cantidad inválida para el producto ${id_producto}.`);
+        const prod = precios.get(id_producto);
+        if (!prod) throw invalida(`El producto ${id_producto} no existe o está inactivo.`);
+        const precioCentavos = Math.round(Number(prod.precio_unitario) * 100);
+        return {
+            id_producto, cantidad,
+            precio:           precioCentavos / 100,
+            subtotalCentavos: precioCentavos * cantidad
+        };
+    });
+};
+
 const registrarVenta = async ({
     id_sucursal, id_usuario_cajero, id_cliente,
     id_pedido_mesa, monto_total_venta, metodo_pago, detalles
@@ -418,7 +449,21 @@ const registrarVenta = async ({
         if (rTurno.rows.length === 0) throw new Error('CAJA_CERRADA');
         const id_turno = rTurno.rows[0].id_turno;
 
-        // 2. Registrar la venta principal
+        // 2. Precios y total se calculan con la BD; del cliente solo se toman
+        //    producto y cantidad. Si el total que vio el cajero no coincide
+        //    (precio cambiado mientras tenía el carrito), se rechaza la venta.
+        const items = await calcularItemsVenta(client, detalles);
+        const totalCentavos = items.reduce((s, i) => s + i.subtotalCentavos, 0);
+        const totalCliente  = Math.round(Number(monto_total_venta) * 100);
+        if (monto_total_venta !== undefined && totalCliente !== totalCentavos) {
+            const err = new Error('Los precios cambiaron. Revise el carrito y vuelva a cobrar.');
+            err.code    = 'PRECIO_DESACTUALIZADO';
+            err.precios = items.map(i => ({ id_producto: i.id_producto, precio_unitario: i.precio }));
+            err.total   = totalCentavos / 100;
+            throw err;
+        }
+
+        // 3. Registrar la venta principal
         const rVenta = await client.query(`
             INSERT INTO venta_caja
                 (id_sucursal, id_usuario_cajero, id_cliente, id_pedido_mesa,
@@ -431,18 +476,17 @@ const registrarVenta = async ({
             id_cliente    || null,
             id_pedido_mesa|| null,
             id_turno,
-            Number(monto_total_venta),
+            totalCentavos / 100,
             metodo_pago
         ]);
         const id_venta = rVenta.rows[0].id_venta;
 
-        // 3. Procesar cada ítem del carrito
+        // 4. Procesar cada ítem del carrito
         const cambiosStock = [];
-        for (const item of detalles) {
-            const cantidad = Number(item.cantidad) || 1;
-            const precio   = Number(item.precio)   || 0;
-            const subtotal = Number(item.subtotal) || (cantidad * precio);
-            const id_prod  = Number(item.id_producto);
+        for (const item of items) {
+            const { cantidad, precio } = item;
+            const subtotal = item.subtotalCentavos / 100;
+            const id_prod  = item.id_producto;
 
             await client.query(`
                 INSERT INTO detalle_venta
@@ -488,7 +532,7 @@ const registrarVenta = async ({
             }
         }
 
-        // 4. Si viene de pedido QR → liberar mesa
+        // 5. Si viene de pedido QR → liberar mesa
         if (id_pedido_mesa) {
             await client.query(
                 `UPDATE pedido_mesa SET estado_pedido = 'Pagado' WHERE id_pedido = $1`,

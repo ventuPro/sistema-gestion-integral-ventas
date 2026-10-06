@@ -70,7 +70,9 @@ export class LoginComponent {
         this.cargando = false;
         this.mensajeError = e.status === 401 || e.status === 404
           ? 'Correo o contraseña incorrectos.'
-          : 'Error al conectar con el servidor.';
+          : e.status === 429
+            ? 'Demasiados intentos fallidos. Intenta de nuevo en 15 minutos.'
+            : 'Error al conectar con el servidor.';
       }
     });
   }

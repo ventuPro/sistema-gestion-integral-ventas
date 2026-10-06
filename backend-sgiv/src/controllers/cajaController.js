@@ -176,6 +176,10 @@ const cobrarVenta = async (req, res) => {
             });
         if (e.code === 'STOCK_INSUFICIENTE')
             return res.status(409).json({ error: 'STOCK_INSUFICIENTE', detalle: e.message });
+        if (e.code === 'PRECIO_DESACTUALIZADO')
+            return res.status(409).json({ error: 'PRECIO_DESACTUALIZADO', detalle: e.message, precios: e.precios, total: e.total });
+        if (e.code === 'VENTA_INVALIDA')
+            return res.status(400).json({ error: 'VENTA_INVALIDA', detalle: e.message });
         res.status(500).json({ error: 'Error al registrar la venta.', detalle: e.message });
     }
 };

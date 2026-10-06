@@ -34,13 +34,54 @@ const registrarUsuario = async (req, res) => {
     }
 };
 
+// ─── Login ───
+// Mismo mensaje y mismo tiempo de respuesta si el correo no existe o la
+// contraseña es incorrecta, para no revelar qué correos están registrados.
+// Además se limita la cantidad de intentos fallidos por IP + correo.
+const HASH_FICTICIO       = bcrypt.hashSync('sgiv-hash-ficticio', 10);
+const MAX_INTENTOS        = 5;
+const VENTANA_BLOQUEO_MS  = 15 * 60 * 1000;
+const intentosFallidos    = new Map();   // clave → { cantidad, desde }
+
+// Limpieza periódica para que el registro de intentos no crezca indefinidamente
+setInterval(() => {
+    const ahora = Date.now();
+    for (const [clave, r] of intentosFallidos)
+        if (ahora - r.desde > VENTANA_BLOQUEO_MS) intentosFallidos.delete(clave);
+}, VENTANA_BLOQUEO_MS).unref();
+
+const claveIntento = (req, correo) => `${req.ip}|${String(correo || '').toLowerCase()}`;
+
+const estaBloqueado = (clave) => {
+    const r = intentosFallidos.get(clave);
+    if (!r) return false;
+    if (Date.now() - r.desde > VENTANA_BLOQUEO_MS) { intentosFallidos.delete(clave); return false; }
+    return r.cantidad >= MAX_INTENTOS;
+};
+
+const registrarFallo = (clave) => {
+    const r = intentosFallidos.get(clave);
+    if (!r || Date.now() - r.desde > VENTANA_BLOQUEO_MS) intentosFallidos.set(clave, { cantidad: 1, desde: Date.now() });
+    else r.cantidad++;
+};
+
 const loginUsuario = async (req, res) => {
     try {
-        const { correo_electronico, contrasena } = req.body;
+        const { correo_electronico, contrasena } = req.body || {};
+        if (!correo_electronico || !contrasena)
+            return res.status(400).json({ error: 'Ingrese correo y contraseña' });
+
+        const clave = claveIntento(req, correo_electronico);
+        if (estaBloqueado(clave))
+            return res.status(429).json({ error: 'Demasiados intentos fallidos. Intente de nuevo en 15 minutos.' });
+
         const u = await userModel.obtenerUsuarioPorCorreo(correo_electronico);
-        if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
-        if (!await bcrypt.compare(contrasena, u.contrasena_hash))
-            return res.status(401).json({ error: 'Contraseña incorrecta' });
+        const valida = await bcrypt.compare(String(contrasena), u ? u.contrasena_hash : HASH_FICTICIO);
+        if (!u || !valida) {
+            registrarFallo(clave);
+            return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
+        }
+        intentosFallidos.delete(clave);
 
         // Obtener nombre de sucursal
         const rSuc = await require('../config/db').query(
