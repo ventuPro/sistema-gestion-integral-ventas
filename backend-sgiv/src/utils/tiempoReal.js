@@ -1,6 +1,4 @@
-// ─── Notificaciones en tiempo real (Socket.IO) ───
-// Salas: 'cajeros' (personal autenticado) y 'mesa_<id_mesa>' (menú digital
-// del cliente). El stock se difunde a todos: lo usan POS, Mesas y el menú QR.
+// ─── Tiempo real: salas 'cajeros' y 'mesa_<id_mesa>' ───
 
 const io = () => global.io;
 
@@ -15,7 +13,6 @@ const emitirStock = (cambios = []) => {
     }
 };
 
-// Producto creado, editado, desactivado o reactivado: el menú recarga su catálogo
 const emitirCatalogo = () => io()?.emit('catalogo:actualizado', {});
 
 const emitirCajeros = (evento, datos) => io()?.to('cajeros').emit(evento, datos);

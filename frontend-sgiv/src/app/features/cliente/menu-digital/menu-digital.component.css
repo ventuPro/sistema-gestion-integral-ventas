@@ -1,2 +1,6 @@
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Sin zoom por doble toque: en el celular los toques rápidos al "+" se perdían */
+:host, button { touch-action: manipulation; }
+button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }

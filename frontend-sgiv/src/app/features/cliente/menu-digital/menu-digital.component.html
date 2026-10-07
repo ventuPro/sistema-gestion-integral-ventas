@@ -133,10 +133,10 @@
             </button>
             <div *ngIf="enCarrito(prod.id_producto) > 0" class="mt-2 flex items-center justify-between bg-blue-50 rounded-xl p-1">
               <button (click)="quitarUno(prod.id_producto)"
-                      class="w-8 h-8 rounded-lg bg-white text-blue-700 font-black shadow-sm">−</button>
+                      class="w-10 h-10 rounded-lg bg-white text-blue-700 text-lg font-black shadow-sm">−</button>
               <span class="font-black text-blue-800">{{ enCarrito(prod.id_producto) }}</span>
               <button (click)="agregar(prod)" [disabled]="disponible(prod) <= 0"
-                      class="w-8 h-8 rounded-lg bg-blue-600 text-white font-black shadow-sm disabled:bg-gray-300">+</button>
+                      class="w-10 h-10 rounded-lg bg-blue-600 text-white text-lg font-black shadow-sm disabled:bg-gray-300">+</button>
             </div>
           </div>
         </div>
@@ -156,7 +156,7 @@
         <h2 class="text-xl font-bold text-gray-800">Tu pedido</h2>
 
         <div *ngFor="let item of carrito" class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div class="flex gap-3 mb-2">
+          <div class="flex gap-3">
             <div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-blue-50">
               <img *ngIf="item.url_imagen" [src]="item.url_imagen | imagenUrl" class="w-full h-full object-cover">
               <div *ngIf="!item.url_imagen" class="w-full h-full flex items-center justify-center text-blue-200 font-black text-xl">
@@ -170,15 +170,12 @@
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
               <button (click)="quitarUno(item.id_producto)"
-                      class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 font-bold">−</button>
+                      class="w-10 h-10 rounded-full bg-gray-200 text-gray-700 text-lg font-bold">−</button>
               <span class="font-black text-gray-800 w-5 text-center">{{ item.cantidad }}</span>
               <button (click)="agregarUno(item)" [disabled]="!puedeSumar(item)"
-                      class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold disabled:bg-gray-300">+</button>
+                      class="w-10 h-10 rounded-full bg-blue-600 text-white text-lg font-bold disabled:bg-gray-300">+</button>
             </div>
           </div>
-          <input type="text" [(ngModel)]="item.nota_cliente" maxlength="200"
-                 placeholder="Observación: sin azúcar, para llevar..."
-                 class="w-full px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 outline-none focus:ring-1 focus:ring-amber-400 placeholder-amber-300">
         </div>
 
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">

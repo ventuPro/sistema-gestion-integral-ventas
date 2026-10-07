@@ -1,17 +1,19 @@
 const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/cuentaController');
-const { verificarToken } = require('../middlewares/authMiddleware');
+const { verificarToken, verificarPermiso } = require('../middlewares/authMiddleware');
 const pedidoModel = require('../models/pedidoModel');
 const { emitirStock, emitirMesa } = require('../utils/tiempoReal');
 
-router.get  ('/mesas/:id_sucursal',       verificarToken, ctrl.getMesasConCuenta);
-router.get  ('/mesa/:id_mesa',            verificarToken, ctrl.getCuentaActiva);
-router.post ('/abrir',                    verificarToken, ctrl.abrirCuenta);
-router.post ('/:id_cuenta/producto',      verificarToken, ctrl.agregarProducto);
-router.delete('/detalle/:id_detalle',     verificarToken, ctrl.quitarProducto);
-router.post ('/:id_cuenta/cerrar',        verificarToken, ctrl.cerrarCuenta);
-router.post('/:id_cuenta/cancelar-si-vacia', verificarToken, async (req, res) => {
+const mesas = [verificarToken, verificarPermiso('mesas')];
+
+router.get  ('/mesas/:id_sucursal',       mesas, ctrl.getMesasConCuenta);
+router.get  ('/mesa/:id_mesa',            mesas, ctrl.getCuentaActiva);
+router.post ('/abrir',                    mesas, ctrl.abrirCuenta);
+router.post ('/:id_cuenta/producto',      mesas, ctrl.agregarProducto);
+router.delete('/detalle/:id_detalle',     mesas, ctrl.quitarProducto);
+router.post ('/:id_cuenta/cerrar',        mesas, ctrl.cerrarCuenta);
+router.post('/:id_cuenta/cancelar-si-vacia', mesas, async (req, res) => {
     try {
         const id_cuenta = Number(req.params.id_cuenta);
         const db = require('../config/db');
@@ -64,7 +66,9 @@ router.post('/:id_cuenta/cancelar-si-vacia', verificarToken, async (req, res) =>
     }
 });
 
-router.post('/reset-mesa', verificarToken, async (req, res) => {
+router.post('/reset-mesa', mesas, async (req, res) => {
+    if (Number(req.usuario.id_rol) !== 1)
+        return res.status(403).json({ error: 'Solo el administrador puede resetear una mesa' });
     const db = require('../config/db');
     const cuentaModel = require('../models/cuentaModel');
     const client = await db.connect();

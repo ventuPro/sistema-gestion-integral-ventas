@@ -3,10 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
-// ─── Conexión en tiempo real del personal (una sola por sesión) ───
-// Las pantallas solo escuchan eventos; no desconectan el socket (lo comparten
-// el panel principal, POS, Mesas y la bandeja de pedidos). Se desconecta al
-// cerrar sesión. La sala 'cajeros' exige el token de la sesión.
+// ─── Socket compartido del personal; solo se desconecta al cerrar sesión ───
 @Injectable({ providedIn: 'root' })
 export class SocketService {
   private socket: Socket | null = null;
@@ -16,7 +13,6 @@ export class SocketService {
   private asegurarSocket(): Socket {
     if (!this.socket) {
       this.socket = io(this.URL, { transports: ['websocket'] });
-      // Al (re)conectar se vuelve a entrar a las salas
       this.socket.on('connect', () => this.salas.forEach(s => this.unirse(s)));
     }
     return this.socket;

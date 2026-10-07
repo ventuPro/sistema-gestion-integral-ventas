@@ -432,6 +432,53 @@ describe('Menú QR: códigos', () => {
     });
 });
 
+// ─── Pedidos abandonados ───
+describe('Menú QR: pedidos sin atender', () => {
+    test('vencido el plazo se cancelan solos y devuelven el stock', async () => {
+        const pedidoModel = require('../../src/models/pedidoModel');
+        const mesa = await crearMesa(50);
+        const prod = await crearProducto('Expira QR', 4, 10);
+        const viejo  = await pedir(mesa.codigo_qr, [{ id_producto: prod, cantidad: 3 }]);
+        const nuevo  = await pedir(mesa.codigo_qr, [{ id_producto: prod, cantidad: 2 }]);
+        await bd.sql(`UPDATE pedido_mesa SET fecha_pedido = LOCALTIMESTAMP - interval '20 minutes' WHERE id_pedido = $1`,
+                     [viejo.body.id_pedido]);
+        assert.equal(await stock(prod), 5);
+
+        const bandeja = await api('GET', '/pedidos/bandeja', { token: tCajero });
+        assert.ok(bandeja.body.find(p => p.id_pedido === nuevo.body.id_pedido).fecha_expiracion);
+
+        const r = await pedidoModel.expirarPendientes(15);
+        assert.deepEqual(r.pedidos.map(p => p.id_pedido), [viejo.body.id_pedido]);
+        assert.equal((await estadoPedido(viejo.body.id_pedido)).estado_pedido, 'Cancelado');
+        assert.equal((await estadoPedido(nuevo.body.id_pedido)).estado_pedido, 'Pendiente_Cajero');
+        assert.equal(await stock(prod), 8);
+    });
+});
+
+// ─── Permisos de mesas, cuentas y cobro ───
+describe('Permisos por módulo', () => {
+    test('sin permiso de mesas no se usan cuentas ni mesas; sin punto_venta no se cobra', async () => {
+        const id = await crearUsuario('sin.permisos@prueba.com', 2);
+        await bd.sql(`INSERT INTO permiso_usuario (id_usuario, modulo, tiene_acceso)
+                      VALUES ($1, 'mesas', FALSE), ($1, 'punto_venta', FALSE)`, [id]);
+        const t = await login('sin.permisos@prueba.com');
+
+        assert.equal((await api('GET',  '/cuentas/mesas/1',   { token: t })).status, 403);
+        assert.equal((await api('POST', '/cuentas/abrir',     { token: t, body: { id_mesa: 1 } })).status, 403);
+        assert.equal((await api('GET',  '/mesas/sucursal/1',  { token: t })).status, 403);
+        assert.equal((await api('POST', '/mesas',             { token: t, body: { id_sucursal: 1, numero_mesa: 77 } })).status, 403);
+        assert.equal((await api('POST', '/caja/cobrar',       { token: t, body: { id_sucursal: 1, metodo_pago: 'Efectivo', detalles: [] } })).status, 403);
+
+        assert.equal((await api('GET', '/cuentas/mesas/1', { token: tCajero })).status, 200);
+    });
+
+    test('resetear una mesa es solo del administrador', async () => {
+        const mesa = await crearMesa(60);
+        assert.equal((await api('POST', '/cuentas/reset-mesa', { token: tCajero, body: { id_mesa: mesa.id_mesa } })).status, 403);
+        assert.equal((await api('POST', '/cuentas/reset-mesa', { token: tAdmin,  body: { id_mesa: mesa.id_mesa } })).status, 200);
+    });
+});
+
 // ─── Módulo de cocina eliminado ───
 describe('Sin módulo de cocina', () => {
     test('no existe el rol Cocina ni las rutas /kds', async () => {

@@ -15,18 +15,11 @@ interface ItemCarrito {
   precio_unitario: number;
   url_imagen:      string | null;
   cantidad:        number;
-  nota_cliente:    string;
 }
 
 interface PedidoGuardado { id: number; t: number; }
 
-// ════════════════════════════════════════════════════════════════════
-//  MENÚ DIGITAL (cliente en su mesa, sin login) — /menu/<codigo QR>
-//  · El stock que ve el cliente es el real y se actualiza en vivo.
-//  · El pedido llega al cajero, que lo confirma; luego se suma a la cuenta
-//    de la mesa. El cliente puede pedir más y paga todo al final en caja.
-//  · Los pedidos hechos desde este celular se recuerdan aunque recargue.
-// ════════════════════════════════════════════════════════════════════
+// ─── Menú digital del cliente: /menu/<codigo QR> ───
 @Component({
   selector:    'app-menu-digital',
   standalone:  true,
@@ -84,7 +77,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.cargarTodo();
     this.conectarSocket();
 
-    // Respaldo por si se pierde algún evento en tiempo real
+    // Respaldo del socket
     this.timers.push(setInterval(() => this.refrescarEstado(), 20_000));
     this.timers.push(setInterval(() => { this.cargarInfo(); this.cargarCatalogo(); }, 60_000));
   }
@@ -125,7 +118,6 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
         this.catalogo.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
         this.categorias = [...cats.entries()].map(([id, nombre]) => ({ id, nombre }));
 
-        // El carrito sigue al catálogo: precio actualizado y productos retirados fuera
         const retirados: string[] = [];
         this.carrito = this.carrito.filter(item => {
           const p = this.catalogo.find(c => c.id_producto === item.id_producto);
@@ -181,12 +173,11 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     return this.carrito.find(i => i.id_producto === id_producto)?.cantidad || 0;
   }
 
-  /** Lo que el cliente todavía puede agregar (stock real menos su carrito) */
+  /** Stock real menos lo que ya está en el carrito */
   disponible(prod: any): number {
     return Math.max(0, Number(prod.stock_actual) - this.enCarrito(prod.id_producto));
   }
 
-  /** Si el stock bajó (otra mesa o la caja vendió), el carrito se ajusta */
   private ajustarCarritoAlStock() {
     const ajustes: string[] = [];
     for (const item of [...this.carrito]) {
@@ -223,8 +214,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
       nombre_producto: prod.nombre_producto,
       precio_unitario: Number(prod.precio_unitario),
       url_imagen:      prod.url_imagen,
-      cantidad:        1,
-      nota_cliente:    ''
+      cantidad:        1
     });
   }
 
@@ -269,11 +259,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
     const body = {
       observacion_general: this.observacionGeneral.trim() || null,
-      items: this.carrito.map(i => ({
-        id_producto:  i.id_producto,
-        cantidad:     i.cantidad,
-        nota_cliente: i.nota_cliente.trim() || null
-      }))
+      items: this.carrito.map(i => ({ id_producto: i.id_producto, cantidad: i.cantidad }))
     };
 
     this.http.post<any>(`${this.api}/${this.codigo}/pedidos`, body).subscribe({
@@ -323,7 +309,6 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.escribirGuardados([...this.leerGuardados(), { id, t: Date.now() }]);
   }
 
-  /** cuentaCerrada: el cajero cobró o cerró la mesa → se muestra el agradecimiento */
   refrescarEstado(cuentaCerrada = false) {
     const ids = this.idsGuardados();
     this.http.get<any>(`${this.api}/${this.codigo}/estado`, { params: { ids: ids.join(',') } }).subscribe({
@@ -331,9 +316,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
         const pedidos = (res.pedidos || []) as any[];
         this.cuenta   = res.cuenta;
 
-        // Se olvidan los pedidos ya pagados (la visita terminó) y los consultados
-        // que ya no existen. Solo se tocan los ids de esta consulta: un pedido
-        // enviado mientras la consulta viajaba no se pierde.
+        // Solo se olvidan ids de esta consulta (no perder un pedido recién enviado)
         const pagados = pedidos.filter(p => p.estado_pedido === 'Pagado');
         if (pagados.length && cuentaCerrada) this.gracias = true;
         const vigentes = new Set(pedidos.filter(p => p.estado_pedido !== 'Pagado').map(p => p.id_pedido));

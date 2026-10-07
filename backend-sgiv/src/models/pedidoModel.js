@@ -1,16 +1,6 @@
 const db = require('../config/db');
 
-// ════════════════════════════════════════════════════════════════════
-//  PEDIDOS DEL CLIENTE (menú QR en mesa; preparado para delivery)
-//
-//  Pendiente_Cajero → Confirmado → Entregado → Pagado   (o Cancelado)
-//
-//  · El stock se reserva al crear el pedido: lo que el cliente ve en el
-//    menú es lo que realmente hay, y dos pedidos no pueden tomar la misma
-//    unidad. Si el pedido se rechaza/cancela, el stock vuelve.
-//  · Al confirmarse, sus productos pasan a la cuenta de la mesa (sin volver
-//    a descontar stock) y se cobran al cerrar la cuenta.
-// ════════════════════════════════════════════════════════════════════
+// ─── Pedidos del cliente: Pendiente_Cajero → Confirmado → Entregado → Pagado / Cancelado ───
 
 const MAX_ITEMS_PEDIDO      = 30;   // productos distintos por pedido
 const MAX_CANTIDAD_ITEM     = 50;   // unidades de un producto por pedido
@@ -40,9 +30,7 @@ const texto = (valor, max) => {
     return t || null;
 };
 
-// ─── Validación del carrito enviado por el cliente ───
-// Solo se toman producto, cantidad y nota; el precio sale de la BD.
-// Productos repetidos se juntan en una sola línea.
+// ─── Validación del carrito (el precio sale de la BD) ───
 const normalizarItems = (items) => {
     if (!Array.isArray(items) || items.length === 0)
         throw errorCodigo('PEDIDO_INVALIDO', 'El pedido está vacío');
@@ -71,13 +59,11 @@ const normalizarItems = (items) => {
     if (lista.some(i => i.cantidad > MAX_CANTIDAD_ITEM))
         throw errorCodigo('PEDIDO_INVALIDO', `Máximo ${MAX_CANTIDAD_ITEM} unidades por producto`);
 
-    // Orden fijo por producto: evita bloqueos cruzados entre pedidos simultáneos
+    // Orden fijo: evita deadlocks
     return lista.sort((a, b) => a.id_producto - b.id_producto);
 };
 
-// ─── Stock ───
-// Descuento atómico: solo si alcanza (dos pedidos simultáneos no pueden
-// llevarse la misma unidad). items: [{ id_producto, cantidad }]
+// ─── Stock (descuento atómico) ───
 const reservarStock = async (client, id_sucursal, items) => {
     const cambios = [];
     for (const it of items) {
@@ -131,7 +117,7 @@ const exigirId = (id) => {
     if (!Number.isInteger(id) || id <= 0) throw errorCodigo('PEDIDO_NO_ENCONTRADO', 'Pedido no encontrado');
 };
 
-// Bloquea el pedido; id_sucursal = null → sin filtro de sucursal (admin)
+// id_sucursal null = sin filtro (admin)
 const bloquearPedido = async (client, id_pedido, id_sucursal) => {
     exigirId(id_pedido);
     const r = await client.query(`
@@ -153,7 +139,7 @@ const itemsDelPedido = async (client, id_pedido) =>
         `SELECT id_producto, cantidad_solicitada AS cantidad FROM detalle_pedido WHERE id_pedido = $1`,
         [id_pedido])).rows;
 
-// ─── Mesa por código QR (público) ───
+// ─── Mesa por código QR ───
 const obtenerMesaPorCodigo = async (codigo) => {
     const r = await db.query(`
         SELECT m.id_mesa, m.numero_mesa, m.id_sucursal, s.nombre_sucursal,
@@ -166,8 +152,7 @@ const obtenerMesaPorCodigo = async (codigo) => {
     return r.rows[0] || null;
 };
 
-// ─── Catálogo del menú (público) ───
-// Incluye los agotados (stock 0) para que aparezcan en cuanto se repongan.
+// ─── Catálogo del menú (incluye agotados) ───
 const obtenerCatalogoMenu = async (id_sucursal) => {
     const r = await db.query(`
         SELECT p.id_producto, p.nombre_producto, p.descripcion_producto,
@@ -188,7 +173,6 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general }) => {
     const lista = normalizarItems(items);
 
     return enTransaccion(async (client) => {
-        // Bloquear la mesa serializa los pedidos de una misma mesa
         await client.query(`SELECT id_mesa FROM mesa_local WHERE id_mesa = $1 FOR UPDATE`, [mesa.id_mesa]);
 
         const rTurno = await client.query(
@@ -236,11 +220,12 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general }) => {
     });
 };
 
-// ─── CAJERO: bandeja de pedidos (por confirmar y por entregar) ───
-const obtenerBandeja = async (id_sucursal) => {
+// ─── CAJERO: bandeja ───
+const obtenerBandeja = async (id_sucursal, minutos_expiracion) => {
     const r = await db.query(`
         SELECT pm.id_pedido, pm.tipo_pedido, pm.id_mesa, pm.id_sucursal, pm.estado_pedido,
                pm.monto_total, pm.fecha_pedido, pm.fecha_aprobacion, pm.observacion_general,
+               pm.fecha_pedido + make_interval(mins => $2) AS fecha_expiracion,
                pm.nombre_cliente, pm.telefono_cliente, pm.direccion_entrega,
                m.numero_mesa,
                json_agg(json_build_object(
@@ -262,12 +247,11 @@ const obtenerBandeja = async (id_sucursal) => {
           AND pm.estado_pedido IN ('Pendiente_Cajero', 'Confirmado')
         GROUP BY pm.id_pedido, m.numero_mesa
         ORDER BY pm.fecha_pedido ASC
-    `, [id_sucursal]);
+    `, [id_sucursal, minutos_expiracion]);
     return r.rows;
 };
 
-// ─── CAJERO: ajustar la cantidad de un producto antes de confirmar ───
-// cantidad 0 = quitar el producto. El stock se reserva/devuelve según la diferencia.
+// ─── CAJERO: ajustar cantidad (0 = quitar) ───
 const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal }) => {
     const nueva = Number(cantidad);
     if (!Number.isInteger(nueva) || nueva < 0 || nueva > MAX_CANTIDAD_ITEM)
@@ -312,7 +296,7 @@ const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal }) 
     });
 };
 
-// ─── CAJERO: confirmar → los productos pasan a la cuenta de la mesa ───
+// ─── CAJERO: confirmar (pasa a la cuenta de la mesa) ───
 const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
     enTransaccion(async (client) => {
         const pedido = await bloquearPedido(client, id_pedido, id_sucursal);
@@ -320,7 +304,6 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
         if (pedido.tipo_pedido !== 'Mesa' || !pedido.id_mesa)
             throw errorCodigo('PEDIDO_INVALIDO', 'Solo los pedidos de mesa se integran a una cuenta');
 
-        // Cuenta abierta de la mesa (se abre una si no existe)
         let rCuenta = await client.query(
             `SELECT id_cuenta FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta' FOR UPDATE`,
             [pedido.id_mesa]);
@@ -334,7 +317,7 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
         }
         const id_cuenta = rCuenta.rows[0].id_cuenta;
 
-        // El stock ya se reservó al crear el pedido: aquí NO se vuelve a descontar
+        // Stock ya reservado: no se descuenta de nuevo
         await client.query(`
             INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, subtotal, nota, origen)
             SELECT $1, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente, 'qr'
@@ -359,7 +342,7 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
         return { pedido: rPed.rows[0], id_cuenta, cuenta_nueva };
     });
 
-// Cancela un pedido pendiente ya bloqueado y devuelve su stock
+// Pedido ya bloqueado
 const cancelarPendiente = async (client, pedido, id_usuario = null) => {
     const cambios = await devolverStock(client, pedido.id_sucursal, await itemsDelPedido(client, pedido.id_pedido));
     const r = await client.query(`
@@ -377,7 +360,7 @@ const rechazarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
         return cancelarPendiente(client, pedido, id_usuario);
     });
 
-// ─── CLIENTE: cancelar su pedido mientras nadie lo confirmó ───
+// ─── CLIENTE: cancelar ───
 const cancelarPorCliente = async ({ id_pedido, id_mesa }) =>
     enTransaccion(async (client) => {
         const pedido = await bloquearPedido(client, id_pedido, null);
@@ -386,7 +369,7 @@ const cancelarPorCliente = async ({ id_pedido, id_mesa }) =>
         return cancelarPendiente(client, pedido);
     });
 
-// ─── CAJERO: marcar como entregado en la mesa ───
+// ─── CAJERO: entregado ───
 const marcarEntregado = async ({ id_pedido, id_sucursal }) => {
     exigirId(id_pedido);
     const r = await db.query(`
@@ -405,7 +388,6 @@ const marcarEntregado = async ({ id_pedido, id_sucursal }) => {
 
 // ─── Integración con cuentas y mesas ───
 
-// Al cerrar (Pagado) o cancelar (Cancelado) la cuenta, sus pedidos terminan igual
 const finalizarPedidosDeCuenta = async (client, id_cuenta, estadoFinal) =>
     (await client.query(`
         UPDATE pedido_mesa SET estado_pedido = $2
@@ -413,7 +395,6 @@ const finalizarPedidosDeCuenta = async (client, id_cuenta, estadoFinal) =>
         RETURNING id_pedido
     `, [id_cuenta, estadoFinal])).rows.map(r => r.id_pedido);
 
-// Cancela los pedidos sin confirmar de una mesa (reset o eliminación de la mesa)
 const cancelarPendientesMesa = async (client, id_mesa) => {
     const rPend = await client.query(
         `SELECT * FROM pedido_mesa WHERE id_mesa = $1 AND estado_pedido = 'Pendiente_Cajero' ORDER BY id_pedido FOR UPDATE`,
@@ -458,10 +439,30 @@ const obtenerEstadoMesa = async (id_mesa, ids) => {
     return { pedidos: rPed.rows, cuenta: rCuenta.rows[0] || null };
 };
 
+// ─── Pendientes sin atender: se cancelan solos ───
+const expirarPendientes = async (minutos) =>
+    enTransaccion(async (client) => {
+        const r = await client.query(`
+            SELECT * FROM pedido_mesa
+            WHERE estado_pedido = 'Pendiente_Cajero'
+              AND fecha_pedido < LOCALTIMESTAMP - make_interval(mins => $1)
+            ORDER BY id_pedido
+            FOR UPDATE SKIP LOCKED
+        `, [minutos]);
+        let cambios = [];
+        const pedidos = [];
+        for (const p of r.rows) {
+            const x = await cancelarPendiente(client, p);
+            cambios = cambios.concat(x.cambios);
+            pedidos.push(x.pedido);
+        }
+        return { pedidos, cambios };
+    });
+
 module.exports = {
     MAX_PENDIENTES_MESA,
     obtenerMesaPorCodigo, obtenerCatalogoMenu,
     crearPedidoMesa, cancelarPorCliente, obtenerEstadoMesa,
     obtenerBandeja, ajustarDetalle, confirmarPedido, rechazarPedido, marcarEntregado,
-    finalizarPedidosDeCuenta, cancelarPendientesMesa
+    finalizarPedidosDeCuenta, cancelarPendientesMesa, expirarPendientes
 };

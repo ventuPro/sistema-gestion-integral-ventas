@@ -2,7 +2,7 @@ const pedidoModel = require('../models/pedidoModel');
 const cuentaModel = require('../models/cuentaModel');
 const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
 
-// ─── Respuesta de error común ───
+// ─── Errores ───
 const ERRORES = {
     PEDIDO_INVALIDO:      400,
     ULTIMO_PRODUCTO:      400,
@@ -17,7 +17,9 @@ const responderError = (res, e, contexto) => {
     res.status(500).json({ error: 'Error al procesar el pedido' });
 };
 
-// El administrador ve todas las sucursales; el cajero solo la suya
+const MINUTOS_EXPIRACION = Number(process.env.MENU_MINUTOS_EXPIRACION) || 15;
+
+// Admin: todas las sucursales
 const sucursalFiltro = (req) => Number(req.usuario.id_rol) === 1 ? null : Number(req.usuario.id_sucursal);
 
 const avisarCambio = (pedido, extra = {}) => {
@@ -28,17 +30,17 @@ const avisarCambio = (pedido, extra = {}) => {
     emitirMesa(pedido.id_mesa, 'pedido:estado', { id_pedido: pedido.id_pedido, estado: pedido.estado_pedido });
 };
 
-// GET /api/pedidos/bandeja?id_sucursal= — por confirmar y por entregar
+// GET /api/pedidos/bandeja
 const obtenerBandeja = async (req, res) => {
     try {
         const id_sucursal = sucursalFiltro(req) ?? (Number(req.query.id_sucursal) || Number(req.usuario.id_sucursal) || 1);
-        res.json(await pedidoModel.obtenerBandeja(id_sucursal));
+        res.json(await pedidoModel.obtenerBandeja(id_sucursal, MINUTOS_EXPIRACION));
     } catch (e) {
         responderError(res, e, 'obtenerBandeja');
     }
 };
 
-// PATCH /api/pedidos/:id_pedido/detalle/:id_detalle  { cantidad }
+// PATCH /api/pedidos/:id_pedido/detalle/:id_detalle
 const ajustarDetalle = async (req, res) => {
     try {
         const r = await pedidoModel.ajustarDetalle({
@@ -83,7 +85,7 @@ const confirmarPedido = async (req, res) => {
     }
 };
 
-// POST /api/pedidos/:id_pedido/rechazar — sin motivo, devuelve el stock
+// POST /api/pedidos/:id_pedido/rechazar
 const rechazarPedido = async (req, res) => {
     try {
         const r = await pedidoModel.rechazarPedido({
@@ -113,4 +115,15 @@ const marcarEntregado = async (req, res) => {
     }
 };
 
-module.exports = { obtenerBandeja, ajustarDetalle, confirmarPedido, rechazarPedido, marcarEntregado, avisarCambio };
+// Revisa cada minuto los pedidos que nadie atendió
+const iniciarExpiracion = () => setInterval(async () => {
+    try {
+        const r = await pedidoModel.expirarPendientes(MINUTOS_EXPIRACION);
+        emitirStock(r.cambios);
+        r.pedidos.forEach(p => avisarCambio(p));
+    } catch (e) {
+        console.error('expirarPendientes:', e.message);
+    }
+}, 60_000).unref();
+
+module.exports = { obtenerBandeja, ajustarDetalle, confirmarPedido, rechazarPedido, marcarEntregado, avisarCambio, iniciarExpiracion };

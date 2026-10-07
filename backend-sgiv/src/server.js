@@ -111,6 +111,7 @@ if (require.main === module) {
     server.listen(PORT, () => {
         console.log(`🚀 Servidor + WebSocket corriendo en puerto ${PORT}`);
     });
+    require('./controllers/pedidoController').iniciarExpiracion();
 }
 
 module.exports = { app, server, io };

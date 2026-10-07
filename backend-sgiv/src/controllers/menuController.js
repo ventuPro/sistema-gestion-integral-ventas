@@ -1,13 +1,9 @@
 const pedidoModel = require('../models/pedidoModel');
 const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
 
-// ════════════════════════════════════════════════════════════════════
-//  MENÚ DIGITAL (público, sin login)
-//  La mesa se identifica por su código QR aleatorio (/menu/<codigo>),
-//  no por su id interno, para que no se pueda pedir a nombre de otra mesa.
-// ════════════════════════════════════════════════════════════════════
+// ─── Menú digital público: la mesa se identifica por su código QR ───
 
-// ─── Límite de pedidos por IP (evita pedidos falsos en ráfaga) ───
+// ─── Límite de pedidos por IP ───
 const MAX_PEDIDOS_IP   = Number(process.env.MENU_MAX_PEDIDOS_IP) || 10;
 const VENTANA_IP_MS    = 10 * 60 * 1000;
 const pedidosPorIp     = new Map();   // ip → { cantidad, desde }
@@ -46,7 +42,7 @@ const responderError = (res, e, contexto) => {
     res.status(500).json({ error: 'No se pudo procesar tu solicitud. Intenta de nuevo.' });
 };
 
-// Middleware: resuelve la mesa a partir del código QR
+// Middleware
 const cargarMesa = async (req, res, next) => {
     try {
         const mesa = await pedidoModel.obtenerMesaPorCodigo(req.params.codigo);
@@ -58,7 +54,7 @@ const cargarMesa = async (req, res, next) => {
     }
 };
 
-// GET /api/menu/m/:codigo — datos de la mesa
+// GET /api/menu/m/:codigo
 const obtenerMesa = (req, res) => {
     const { numero_mesa, nombre_sucursal, id_sucursal, recibe_pedidos } = req.mesa;
     res.json({ numero_mesa, nombre_sucursal, id_sucursal, recibe_pedidos });
@@ -73,7 +69,7 @@ const obtenerCatalogo = async (req, res) => {
     }
 };
 
-// POST /api/menu/m/:codigo/pedidos  { items: [{ id_producto, cantidad, nota_cliente }], observacion_general }
+// POST /api/menu/m/:codigo/pedidos
 const crearPedido = async (req, res) => {
     try {
         if (superaLimiteIp(req.ip))
@@ -104,7 +100,7 @@ const crearPedido = async (req, res) => {
     }
 };
 
-// POST /api/menu/m/:codigo/pedidos/:id_pedido/cancelar — solo si aún no fue confirmado
+// POST /api/menu/m/:codigo/pedidos/:id_pedido/cancelar
 const cancelarPedido = async (req, res) => {
     try {
         const { pedido, cambios } = await pedidoModel.cancelarPorCliente({
@@ -123,7 +119,7 @@ const cancelarPedido = async (req, res) => {
     }
 };
 
-// GET /api/menu/m/:codigo/estado?ids=1,2,3 — pedidos de este celular + consumo de la mesa
+// GET /api/menu/m/:codigo/estado?ids=1,2,3
 const obtenerEstado = async (req, res) => {
     try {
         const ids = String(req.query.ids || '')

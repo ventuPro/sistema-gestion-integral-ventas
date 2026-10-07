@@ -70,18 +70,18 @@
 
         <div *ngFor="let p of pendientes"
              class="bg-white rounded-xl border-2 shadow-sm overflow-hidden"
-             [class.border-red-300]="esperaLarga(p.fecha_pedido)"
-             [class.border-amber-300]="!esperaLarga(p.fecha_pedido)">
+             [class.border-red-300]="porVencer(p)"
+             [class.border-amber-300]="!porVencer(p)">
 
           <div class="px-4 py-3 flex items-center justify-between"
-               [class.bg-red-50]="esperaLarga(p.fecha_pedido)" [class.bg-amber-50]="!esperaLarga(p.fecha_pedido)">
+               [class.bg-red-50]="porVencer(p)" [class.bg-amber-50]="!porVencer(p)">
             <div class="flex items-center gap-2">
               <lucide-icon *ngIf="p.tipo_pedido === 'Delivery'" [img]="icons.delivery" class="w-4 h-4 text-gray-600"></lucide-icon>
               <span class="font-black text-gray-800 text-lg">{{ etiqueta(p) }}</span>
             </div>
             <span class="text-xs font-semibold"
-                  [class.text-red-600]="esperaLarga(p.fecha_pedido)" [class.text-gray-500]="!esperaLarga(p.fecha_pedido)">
-              {{ minutos(p.fecha_pedido) }}
+                  [class.text-red-600]="porVencer(p)" [class.text-gray-500]="!porVencer(p)">
+              {{ minutos(p.fecha_pedido) }} · vence en {{ minutosRestantes(p) }} min
             </span>
           </div>
 

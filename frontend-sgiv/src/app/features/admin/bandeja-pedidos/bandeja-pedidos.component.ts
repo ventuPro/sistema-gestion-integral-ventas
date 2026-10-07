@@ -7,13 +7,7 @@ import { SocketService } from '../../../core/services/socket.service';
 
 type Pestana = 'pendientes' | 'entregar';
 
-// ════════════════════════════════════════════════════════════════════
-//  Bandeja de pedidos del menú QR (visible en cualquier pantalla del cajero)
-//  · Aviso con sonido al llegar un pedido y recordatorio mientras haya
-//    pedidos sin confirmar.
-//  · Por confirmar: ver productos, ajustar cantidades, confirmar o rechazar.
-//  · Por entregar: marcar como entregado en la mesa.
-// ════════════════════════════════════════════════════════════════════
+// ─── Bandeja de pedidos QR (visible en todo el panel del cajero) ───
 @Component({
   selector:    'app-bandeja-pedidos',
   standalone:  true,
@@ -36,9 +30,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   pestana: Pestana = 'pendientes';
   pendientes: any[] = [];
   porEntregar: any[] = [];
-  /** id_pedido en proceso (evita doble clic) */
   ocupado: Record<number, boolean> = {};
-  /** error a mostrar en la tarjeta del pedido */
   errores: Record<number, string> = {};
   aviso: string | null = null;
   sonidoActivo = true;
@@ -71,7 +63,6 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
       if (this.esDeMiSucursal(d)) this.cargarPronto();
     }));
 
-    // Respaldo por si se pierde un evento, recordatorio sonoro y reloj de "hace X min"
     this.timers.push(setInterval(() => this.cargar(), this.RESPALDO_MS));
     this.timers.push(setInterval(() => {
       if (this.pendientes.length > 0) this.sonar();
@@ -107,7 +98,6 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Agrupa varios eventos seguidos en una sola recarga */
   private cargarPronto() {
     if (this.recarga) clearTimeout(this.recarga);
     this.recarga = setTimeout(() => { this.recarga = null; this.cargar(); }, 250);
@@ -168,7 +158,6 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
       error: (e: any) => {
         delete this.ocupado[id];
         this.errores[id] = e?.error?.error || 'No se pudo completar la acción. Intenta de nuevo.';
-        // Otro cajero ya lo atendió: se actualiza la lista
         if (e?.status === 409 || e?.status === 404) this.cargar();
         this.cdr.detectChanges();
       }
@@ -181,8 +170,12 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     return min === 0 ? 'recién' : `hace ${min} min`;
   }
 
-  esperaLarga(fecha: string): boolean {
-    return this.ahora - new Date(fecha).getTime() > 5 * 60000;
+  minutosRestantes(pedido: any): number {
+    return Math.max(0, Math.ceil((new Date(pedido.fecha_expiracion).getTime() - this.ahora) / 60000));
+  }
+
+  porVencer(pedido: any): boolean {
+    return this.minutosRestantes(pedido) <= 5;
   }
 
   etiqueta(pedido: any): string {
@@ -197,9 +190,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     setTimeout(() => { if (this.aviso === msg) { this.aviso = null; this.cdr.detectChanges(); } }, 4000);
   }
 
-  // ─── Sonido (Web Audio: no requiere archivos) ───
-  // El navegador solo permite sonar después de una interacción del usuario;
-  // cualquier clic en la bandeja (o en la página) lo habilita.
+  // ─── Sonido (requiere un clic previo en la página) ───
   private desbloquearAudio = () => this.prepararAudio();
 
   private prepararAudio() {
