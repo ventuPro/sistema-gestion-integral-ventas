@@ -1,6 +1,7 @@
 const cuentaModel  = require('../models/cuentaModel');
 const productoModel = require('../models/productoModel');
 const mesaModel    = require('../models/mesaModel');
+const { emitirMesa } = require('../utils/tiempoReal');
 const io           = () => global.io;
 
 // POST /api/cuentas/abrir
@@ -54,6 +55,7 @@ const agregarProducto = async (req, res) => {
             total_acumulado:  cuentaActualizada?.total_acumulado,
             num_items:        cuentaActualizada?.items?.length
         });
+        emitirMesa(resultado.id_mesa, 'cuenta:actualizada', {});
 
         // Broadcast global: POS y Mesas deben repintar stock al instante
         io()?.emit('actualizacion_stock_global', {
@@ -88,6 +90,7 @@ const quitarProducto = async (req, res) => {
             id_mesa:         cuentaActualizada?.id_mesa,
             total_acumulado: cuentaActualizada?.total_acumulado
         });
+        emitirMesa(resultado.id_mesa, 'cuenta:actualizada', {});
 
         if (resultado.nuevo_stock != null) {
             io()?.emit('actualizacion_stock_global', {
@@ -117,6 +120,9 @@ const cerrarCuenta = async (req, res) => {
 
         io()?.to('cajeros').emit('cuenta:cerrada', { id_mesa: resultado.id_mesa });
         io()?.to('cajeros').emit('mesa:actualizada', { id_mesa: resultado.id_mesa });
+        if (resultado.pedidos_pagados.length)
+            io()?.to('cajeros').emit('pedido:actualizado', { id_mesa: resultado.id_mesa, estado: 'Pagado' });
+        emitirMesa(resultado.id_mesa, 'cuenta:cerrada', {});
 
         res.json({ mensaje: 'Cuenta cerrada y mesa liberada', ...resultado });
     } catch(e) {

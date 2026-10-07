@@ -7,18 +7,21 @@ import { LucideAngularModule,
          Landmark, LogOut, ChevronRight, Building2, RefreshCw } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
+import { SocketService }  from '../../../core/services/socket.service';
+import { BandejaPedidosComponent } from '../bandeja-pedidos/bandeja-pedidos.component';
 import { Subscription }   from 'rxjs';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterOutlet, RouterModule, CommonModule, LucideAngularModule],
+  imports: [RouterOutlet, RouterModule, CommonModule, LucideAngularModule, BandejaPedidosComponent],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   private router         = inject(Router);
   private permisoService = inject(PermisoService);
   private authService    = inject(AuthService);
+  private socketService  = inject(SocketService);
   private cdr            = inject(ChangeDetectorRef);
 
   usuario:        any  = null;
@@ -122,6 +125,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   cerrarSesion() {
     this.authService.cerrarSesion();
     this.permisoService.limpiarPermisos();
+    this.socketService.desconectar();
     this.router.navigate(['/login']);
   }
 }

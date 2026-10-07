@@ -1,152 +1,116 @@
 const pedidoModel = require('../models/pedidoModel');
 const cuentaModel = require('../models/cuentaModel');
-const io          = () => global.io;
+const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
 
-// ─── MESAS (CRUD) ───
-const agregarMesa = async (req, res) => {
+// ─── Respuesta de error común ───
+const ERRORES = {
+    PEDIDO_INVALIDO:      400,
+    ULTIMO_PRODUCTO:      400,
+    PEDIDO_NO_ENCONTRADO: 404,
+    PEDIDO_YA_PROCESADO:  409,
+    STOCK_INSUFICIENTE:   409
+};
+const responderError = (res, e, contexto) => {
+    const status = ERRORES[e.code];
+    if (status) return res.status(status).json({ error: e.message, codigo: e.code, estado_actual: e.estado_actual });
+    console.error(`${contexto}:`, e);
+    res.status(500).json({ error: 'Error al procesar el pedido' });
+};
+
+// El administrador ve todas las sucursales; el cajero solo la suya
+const sucursalFiltro = (req) => Number(req.usuario.id_rol) === 1 ? null : Number(req.usuario.id_sucursal);
+
+const avisarCambio = (pedido, extra = {}) => {
+    emitirCajeros('pedido:actualizado', {
+        id_pedido: pedido.id_pedido, id_sucursal: pedido.id_sucursal,
+        id_mesa: pedido.id_mesa, estado: pedido.estado_pedido, ...extra
+    });
+    emitirMesa(pedido.id_mesa, 'pedido:estado', { id_pedido: pedido.id_pedido, estado: pedido.estado_pedido });
+};
+
+// GET /api/pedidos/bandeja?id_sucursal= — por confirmar y por entregar
+const obtenerBandeja = async (req, res) => {
     try {
-        const { id_sucursal = 1, numero_mesa } = req.body;
-        const codigo_qr = `QR-SUC${id_sucursal}-MESA${numero_mesa}-${Date.now()}`;
-        const mesa = await pedidoModel.crearMesa(id_sucursal, numero_mesa, codigo_qr);
-        res.status(201).json({ mensaje: 'Mesa registrada', mesa });
-    } catch (error) {
-        res.status(500).json({ error: 'Error al registrar la mesa' });
+        const id_sucursal = sucursalFiltro(req) ?? (Number(req.query.id_sucursal) || Number(req.usuario.id_sucursal) || 1);
+        res.json(await pedidoModel.obtenerBandeja(id_sucursal));
+    } catch (e) {
+        responderError(res, e, 'obtenerBandeja');
     }
 };
 
-const listarMesas = async (req, res) => {
+// PATCH /api/pedidos/:id_pedido/detalle/:id_detalle  { cantidad }
+const ajustarDetalle = async (req, res) => {
     try {
-        const { id_sucursal } = req.params;
-        const mesas = await pedidoModel.obtenerMesasPorSucursal(id_sucursal);
-        res.json(mesas);
-    } catch (error) {
-        res.status(500).json({ error: 'Error al obtener las mesas' });
-    }
-};
-
-// ─── PEDIDOS (CLIENTE → CAJERO → COCINA) ───
-
-// Cliente abre pedido desde QR
-const abrirPedido = async (req, res) => {
-    try {
-        const { id_mesa, observacion_general } = req.body;
-        if (!id_mesa) return res.status(400).json({ error: 'id_mesa requerido' });
-        const pedido = await pedidoModel.crearPedido({ id_mesa, observacion_general });
-
-        // Notificar a cajeros en tiempo real
-        if (global.io) {
-            global.io.to('cajeros').emit('nuevo_pedido_pendiente', {
-                id_pedido:     pedido.id_pedido,
-                id_mesa,
-                fecha_pedido:  pedido.fecha_pedido
-            });
-        }
-
-        res.status(201).json({ mensaje: 'Pedido creado. Agrega productos.', pedido });
-    } catch (error) {
-        console.error('Error abrirPedido:', error);
-        res.status(500).json({ error: 'Error al iniciar el pedido' });
-    }
-};
-
-// Cliente agrega producto al pedido
-const agregarProductoPedido = async (req, res) => {
-    try {
-        const { id_pedido, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente } = req.body;
-        const detalle = await pedidoModel.agregarDetallePedido(
-            id_pedido, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente
-        );
-        res.status(201).json({ mensaje: 'Producto agregado', detalle });
-    } catch (error) {
-        res.status(500).json({ error: 'Error al agregar producto' });
-    }
-};
-
-// Cliente: ver estado de su pedido
-const verEstadoPedido = async (req, res) => {
-    try {
-        const { id_pedido } = req.params;
-        const pedido = await pedidoModel.obtenerEstadoPedidoPublico(id_pedido);
-        if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
-        res.json(pedido);
-    } catch (error) {
-        res.status(500).json({ error: 'Error al obtener el pedido' });
-    }
-};
-
-// CAJERO: Ver pedidos pendientes de aprobación
-const listarPendientesCajero = async (req, res) => {
-    try {
-        const id_sucursal = req.params.id_sucursal || req.usuario.id_sucursal || 1;
-        const pedidos = await pedidoModel.obtenerPedidosPendientesCajero(id_sucursal);
-        res.json(pedidos);
-    } catch (error) {
-        res.status(500).json({ error: 'Error al obtener pedidos pendientes' });
-    }
-};
-
-// CAJERO: Aprobar pedido → va a cocina
-const aprobarPedido = async (req, res) => {
-    try {
-        const id_pedido = Number(req.params.id_pedido);
-
-        const faltantes = await pedidoModel.verificarStockPedido(id_pedido);
-        if (faltantes.length > 0) {
-            return res.status(409).json({
-                error: 'Stock insuficiente: ' + faltantes
-                    .map(f => `${f.nombre_producto} (pide ${f.solicitado}, hay ${f.disponible})`).join(', ')
-            });
-        }
-
-        const pedido = await pedidoModel.aprobarPedido(id_pedido);
-        if (!pedido) return res.status(409).json({ error: 'El pedido no existe o ya fue procesado' });
-
-        // Integrar el pedido QR a la comanda de la mesa (se abre una si no existe),
-        // así sus productos descuentan stock y se cobran al cerrar la cuenta.
-        let cuenta = await cuentaModel.obtenerCuentaActiva(pedido.id_mesa);
-        if (!cuenta) {
-            await cuentaModel.abrirCuenta(pedido.id_mesa, req.usuario.id_usuario);
-            cuenta = await cuentaModel.obtenerCuentaActiva(pedido.id_mesa);
-        }
-        const cuentaActualizada = await cuentaModel.integrarPedidoQR(cuenta.id_cuenta, id_pedido);
-        io()?.to('cajeros').emit('cuenta:qr_integrado', {
-            id_mesa:         pedido.id_mesa,
-            numero_mesa:     cuenta.numero_mesa,
-            id_cuenta:       cuenta.id_cuenta,
-            total_acumulado: cuentaActualizada?.total_acumulado,
-            items:           cuentaActualizada?.items
+        const r = await pedidoModel.ajustarDetalle({
+            id_pedido:   Number(req.params.id_pedido),
+            id_detalle:  Number(req.params.id_detalle),
+            cantidad:    req.body?.cantidad,
+            id_sucursal: sucursalFiltro(req)
         });
-
-        io()?.to('cocina').emit('nuevo_pedido_cocina', pedido);
-        io()?.to(`mesa_${pedido.id_mesa}`).emit('pedido_aprobado', { id_pedido });
-        io()?.to('cajeros').emit('mesa:actualizada', { id_mesa: pedido.id_mesa });
-
-        res.json({ mensaje: 'Aprobado', pedido });
-    } catch(e) {
-        console.error('aprobarPedido:', e);
-        res.status(500).json({ error: e.message });
+        emitirStock(r.cambios);
+        avisarCambio(r.pedido, { monto_total: r.monto_total });
+        res.json({ mensaje: 'Pedido actualizado', monto_total: r.monto_total });
+    } catch (e) {
+        responderError(res, e, 'ajustarDetalle');
     }
 };
 
-// CAJERO: Rechazar pedido
+// POST /api/pedidos/:id_pedido/confirmar
+const confirmarPedido = async (req, res) => {
+    try {
+        const r = await pedidoModel.confirmarPedido({
+            id_pedido:   Number(req.params.id_pedido),
+            id_usuario:  req.usuario.id_usuario,
+            id_sucursal: sucursalFiltro(req)
+        });
+        const cuenta = await cuentaModel.obtenerCuentaActiva(r.pedido.id_mesa);
+
+        avisarCambio(r.pedido);
+        if (r.cuenta_nueva) emitirCajeros('cuenta:abierta', { id_mesa: r.pedido.id_mesa, id_cuenta: r.id_cuenta });
+        emitirCajeros('cuenta:qr_integrado', {
+            id_mesa:         r.pedido.id_mesa,
+            numero_mesa:     cuenta?.numero_mesa,
+            id_cuenta:       r.id_cuenta,
+            total_acumulado: cuenta?.total_acumulado,
+            items:           cuenta?.items
+        });
+        emitirCajeros('mesa:actualizada', { id_mesa: r.pedido.id_mesa });
+        emitirMesa(r.pedido.id_mesa, 'cuenta:actualizada', {});
+
+        res.json({ mensaje: 'Pedido confirmado', pedido: r.pedido, id_cuenta: r.id_cuenta });
+    } catch (e) {
+        responderError(res, e, 'confirmarPedido');
+    }
+};
+
+// POST /api/pedidos/:id_pedido/rechazar — sin motivo, devuelve el stock
 const rechazarPedido = async (req, res) => {
     try {
-        const { id_pedido } = req.params;
-        const resultado = await pedidoModel.rechazarPedido(id_pedido);
-
-        if (global.io) {
-            // El menú digital escucha en la sala de su mesa (mesa_<id>)
-        if (resultado) global.io.to(`mesa_${resultado.id_mesa}`).emit('pedido_rechazado', { id_pedido });
-        }
-
-        res.json({ mensaje: 'Pedido rechazado', resultado });
-    } catch (error) {
-        res.status(500).json({ error: 'Error al rechazar pedido' });
+        const r = await pedidoModel.rechazarPedido({
+            id_pedido:   Number(req.params.id_pedido),
+            id_usuario:  req.usuario.id_usuario,
+            id_sucursal: sucursalFiltro(req)
+        });
+        emitirStock(r.cambios);
+        avisarCambio(r.pedido);
+        res.json({ mensaje: 'Pedido rechazado' });
+    } catch (e) {
+        responderError(res, e, 'rechazarPedido');
     }
 };
 
-module.exports = {
-    agregarMesa, listarMesas,
-    abrirPedido, agregarProductoPedido, verEstadoPedido,
-    listarPendientesCajero, aprobarPedido, rechazarPedido
+// POST /api/pedidos/:id_pedido/entregado
+const marcarEntregado = async (req, res) => {
+    try {
+        const pedido = await pedidoModel.marcarEntregado({
+            id_pedido:   Number(req.params.id_pedido),
+            id_sucursal: sucursalFiltro(req)
+        });
+        avisarCambio(pedido);
+        res.json({ mensaje: 'Pedido entregado' });
+    } catch (e) {
+        responderError(res, e, 'marcarEntregado');
+    }
 };
+
+module.exports = { obtenerBandeja, ajustarDetalle, confirmarPedido, rechazarPedido, marcarEntregado, avisarCambio };

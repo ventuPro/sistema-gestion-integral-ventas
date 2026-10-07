@@ -2,8 +2,6 @@ const db = require('../config/db');
 
 const PERMISOS_DEFAULT = {
     2: { dashboard: true,  punto_venta: true,  mesas: true,  arqueo: true,
-         inventario: false, reportes: false, usuarios: false },
-    3: { dashboard: false, punto_venta: false, mesas: false, arqueo: false,
          inventario: false, reportes: false, usuarios: false }
 };
 

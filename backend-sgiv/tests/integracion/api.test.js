@@ -10,6 +10,9 @@ const { crearBdPrueba } = require('../bdPrueba');
 let bd, servidor, io, pool, URL_BASE;
 const CLAVE = 'Prueba123';
 
+// Todas las pruebas piden desde 127.0.0.1: se amplía el límite de pedidos por IP del menú
+process.env.MENU_MAX_PEDIDOS_IP = '1000';
+
 const api = async (metodo, ruta, { token, body, headers = {} } = {}) => {
     const r = await fetch(`${URL_BASE}/api${ruta}`, {
         method: metodo,
@@ -163,7 +166,7 @@ describe('CORS', () => {
     });
 
     test('el menú digital (QR) sigue siendo público', async () => {
-        assert.ok(await origenRespondido('/menu/1', 'https://evil.com'));
+        assert.ok(await origenRespondido('/menu/m/codigo-inexistente', 'https://evil.com'));
     });
 });
 

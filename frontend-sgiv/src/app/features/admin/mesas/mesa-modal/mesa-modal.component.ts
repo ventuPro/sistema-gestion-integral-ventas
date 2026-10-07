@@ -64,7 +64,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   private escucharSocket() {
     const sub = this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
-      if (data.id_mesa === this.mesa?.id_mesa && data.items) {
+      if (this.cuentaActiva && data.id_mesa === this.mesa?.id_mesa && data.items) {
         this.cuentaActiva.items          = data.items;
         this.cuentaActiva.total_acumulado = data.total_acumulado;
         this.cdr.detectChanges();

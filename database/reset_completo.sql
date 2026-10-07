@@ -4,7 +4,7 @@
 --  Deja el sistema vacío con:
 --    - 1 usuario admin: Brayan Richard (brayan@rickys.com / Admin123)
 --    - 2 sucursales: "Sucursal 1" y "Sucursal 2"
---    - Roles base (Administrador, Cajero, Cocina)
+--    - Roles base (Administrador, Cajero)
 --    - 0 productos, 0 categorías, 0 ventas, 0 turnos, 0 mesas
 --
 --  Aplicar:
@@ -78,8 +78,7 @@ ALTER SEQUENCE IF EXISTS detalle_venta_id_detalle_venta_seq   RESTART WITH 1;
 -- ── 6. ROLES BASE (idempotente) ─────────────────────────────────────
 INSERT INTO rol_usuario (id_rol, nombre_rol, nivel_permiso) VALUES
     (1, 'Administrador', 1),
-    (2, 'Cajero',        2),
-    (3, 'Cocina',        3)
+    (2, 'Cajero',        2)
 ON CONFLICT (id_rol) DO UPDATE
    SET nombre_rol    = EXCLUDED.nombre_rol,
        nivel_permiso = EXCLUDED.nivel_permiso;

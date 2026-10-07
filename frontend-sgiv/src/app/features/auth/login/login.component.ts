@@ -52,12 +52,7 @@ export class LoginComponent {
         this.permisoService.cargarMisPermisos().subscribe({
           next: () => {
             this.cargando = false;
-            // Redirigir según rol
-            if (res.usuario.id_rol === 3) {
-              this.router.navigate(['/cocina']);
-            } else {
-              this.router.navigate(['/dashboard']);
-            }
+            this.router.navigate(['/dashboard']);
           },
           error: () => {
             // Si falla la carga de permisos, igual redirigir

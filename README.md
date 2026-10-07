@@ -18,9 +18,9 @@ menú digital QR y control de caja para pequeñas y medianas empresas.
 |---|---|
 | **Autenticación** | Login con JWT, control de sesiones por rol |
 | **Punto de Venta** | Registro de ventas con ticket imprimible |
-| **Mesas y QR** | Plano de mesas, pedidos desde celular via QR |
-| **Menú Digital** | App móvil para clientes (sin instalación) |
-| **Cocina (KDS)** | Pantalla de órdenes en tiempo real para cocina |
+| **Mesas y QR** | Plano de mesas, cuentas por mesa e impresión de códigos QR |
+| **Menú Digital** | El cliente pide desde su mesa con el celular (sin instalación) |
+| **Pedidos QR** | Bandeja del cajero: confirma, ajusta o rechaza los pedidos del menú |
 | **Inventario** | CRUD de productos, control de stock |
 | **Arqueo de Caja** | Resumen diario, apertura y cierre de caja |
 | **Usuarios** | CRUD con permisos granulares por módulo |
@@ -93,6 +93,9 @@ CREATE DATABASE sgiv_db;
 \q
 ```
 
+Si la base de datos ya existía, aplicar las migraciones pendientes `database/migration_*.sql`
+(por ejemplo `psql -U postgres -d sgiv_db -f database/migration_menu_qr.sql`).
+
 #### Backend
 ```bash
 cd backend-sgiv
@@ -160,6 +163,7 @@ terminar; la base de datos real no se modifica.
 | `DB_PASSWORD` | Contraseña | `sgiv_password` |
 | `JWT_SECRET` | Clave secreta para JWT | `clave_segura` |
 | `PORT` | Puerto del servidor Node | `3000` |
+| `MENU_MAX_PEDIDOS_IP` | Pedidos del menú QR permitidos por IP cada 10 min (opcional) | `10` |
 
 ---
 
@@ -190,7 +194,6 @@ sistema/
 │   ├── app/
 │   │   ├── features/   # Módulos por feature
 │   │   │   ├── admin/  # Dashboard, POS, Inventario...
-│   │   │   ├── cocina/ # KDS pantalla cocina
 │   │   │   └── cliente/# Menú digital (QR)
 │   │   ├── core/
 │   │   │   ├── services/   # Servicios HTTP
@@ -212,27 +215,30 @@ sistema/
 | `/dashboard/reportes` | Admin | Reportes y gráficos |
 | `/dashboard/usuarios` | Admin | Gestión de usuarios |
 | `/dashboard/cierres-caja` | Admin | Historial cierres |
-| `/cocina` | Cocina | KDS pantalla cocina |
-| `/menu/:id_mesa` | Público | Menú digital QR |
+| `/menu/:codigo` | Público | Menú digital QR (código aleatorio de la mesa) |
 
 ## Flujo del sistema
 
 Cliente (celular)
-│ Escanea QR de mesa
+│ Escanea el QR de su mesa
 ▼
-Menú Digital (/menu/:id)
-│ Envía pedido
+Menú Digital (/menu/:codigo) — ve el stock real, en vivo
+│ Envía pedido → el stock se reserva al instante
 ▼
-Cajero (/dashboard/mesas)
-│ Aprueba o rechaza
+Cajero (bandeja "Pedidos QR", visible en cualquier pantalla, con aviso sonoro)
+│ Confirma (puede ajustar cantidades) o rechaza (el stock vuelve)
 ▼
-Cocina (/cocina)
-│ Prepara ítems → marca como Listo
+El pedido se suma a la cuenta de la mesa — el cliente lo ve "Confirmado"
+│ El cliente puede pedir más (no reducir lo confirmado)
 ▼
-Cliente recibe notificación: "Tu pedido está listo"
+Cajero marca "Entregado" al llevarlo a la mesa
 │
 ▼
-Cajero registra pago → Genera ticket
+Al final, el cajero cobra la cuenta de la mesa → venta + ticket; pedidos "Pagado"
+
+Estados del pedido: `Pendiente_Cajero → Confirmado → Entregado → Pagado` (o `Cancelado`).
+La tabla `pedido_mesa` ya está preparada para pedidos a delivery (`tipo_pedido`,
+`id_sucursal` y datos de contacto del cliente).
 
 ## API REST (resumen)
 
@@ -243,16 +249,22 @@ Cajero registra pago → Genera ticket
 | POST | `/api/caja/cobrar` | Registrar venta |
 | GET | `/api/caja/arqueo/:id` | Arqueo del día |
 | GET | `/api/reportes/dashboard/:id` | Dashboard |
-| GET | `/api/menu/catalogo` | Menú público QR |
-| POST | `/api/menu/pedido` | Crear pedido desde QR |
+| GET | `/api/menu/m/:codigo/catalogo` | Menú público QR |
+| POST | `/api/menu/m/:codigo/pedidos` | Crear pedido desde QR (público) |
+| GET | `/api/menu/m/:codigo/estado` | Estado de los pedidos y consumo de la mesa (público) |
+| GET | `/api/pedidos/bandeja` | Pedidos por confirmar y por entregar (cajero) |
+| POST | `/api/pedidos/:id/confirmar` · `rechazar` · `entregado` | Atender un pedido (cajero) |
 
 
 ## Notas
 
-- El sistema usa **Socket.IO** para notificaciones en tiempo real entre cajero, cocina y cliente.
+- El sistema usa **Socket.IO** para notificaciones en tiempo real entre el cajero y el cliente (stock, pedidos y cuenta de la mesa).
 - Las contraseñas se almacenan con **bcrypt** (10 salt rounds).
 - Todas las rutas protegidas requieren **Bearer Token** JWT en el header.
-- El menú digital (`/menu/:id_mesa`) es **público** — no requiere autenticación.
+- El menú digital (`/menu/:codigo`) es **público** — no requiere autenticación. Cada mesa tiene un código aleatorio
+  (no su número interno), y el cajero puede generar uno nuevo para invalidar un QR impreso.
+- Los QR se imprimen desde **Mesas → Códigos QR**. La dirección debe ser la IP del equipo en la red del local
+  (por ejemplo `http://192.168.1.10:4200`), no `localhost`, para que abra en el celular del cliente.
 - Los permisos son **granulares por módulo** — el administrador los asigna por usuario.
 - La URL del backend es **dinámica** — usa `window.location.hostname` para funcionar en cualquier red sin reconfiguración.
 

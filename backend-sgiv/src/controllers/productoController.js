@@ -1,5 +1,6 @@
 const m = require('../models/productoModel');
 const { guardarBase64ComoArchivo } = require('../middlewares/uploadMiddleware');
+const { emitirStock, emitirCatalogo } = require('../utils/tiempoReal');
 
 const agregarCategoria  = async (req, res) => {
     try {
@@ -87,6 +88,7 @@ const agregarProducto   = async (req, res) => {
         const stock_ini   = Number(stock_inicial) || 0;
         await m.asignarProductoASucursal(prod.id_producto, id_suc, stock_ini);
 
+        emitirCatalogo();
         res.status(201).json({ producto: prod });
     } catch(e) {
         console.error('agregarProducto:', e);
@@ -109,6 +111,7 @@ const actualizarProducto = async (req, res) => {
         const prod = await m.actualizarProducto(req.params.id, {
             id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen
         });
+        emitirCatalogo();
         res.json({ producto: prod });
     } catch(e) { res.status(500).json({ error: e.message }); }
 };
@@ -116,6 +119,7 @@ const actualizarProducto = async (req, res) => {
 const eliminarProducto  = async (req, res) => {
     try {
         await m.desactivarProducto(req.params.id);
+        emitirCatalogo();
         res.json({ mensaje: 'Producto desactivado' });
     } catch(e) { res.status(500).json({ error: e.message }); }
 };
@@ -124,6 +128,7 @@ const reactivarProducto = async (req, res) => {
     try {
         const prod = await m.reactivarProducto(req.params.id);
         if (!prod) return res.status(404).json({ error: 'Producto no encontrado' });
+        emitirCatalogo();
         res.json({ mensaje: 'Producto reactivado', producto: prod });
     } catch(e) { res.status(500).json({ error: e.message }); }
 };
@@ -134,6 +139,7 @@ const sumarStock = async (req, res) => {
         const id_sucursal = Number(req.body.id_sucursal) || 1;
         const cantidad    = Number(req.body.cantidad)    || 0;
         const r = await m.agregarStock(req.params.id, cantidad, id_sucursal);
+        emitirStock([{ id_producto: r.id_producto, id_sucursal: r.id_sucursal, nuevo_stock: r.cantidad_actual }]);
         res.json({ mensaje: `Stock actualizado: ${r.cantidad_actual}`, inventario: r });
     } catch(e) { res.status(500).json({ error: e.message }); }
 };

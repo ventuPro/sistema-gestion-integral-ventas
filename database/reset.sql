@@ -2,7 +2,7 @@
 --  RESET DEL SISTEMA — Pastelería Ricky's
 --  ─────────────────────────────────────────────────────────────────────
 --  Limpia todos los datos operativos (ventas, turnos, mesas, pedidos,
---  cuentas, notificaciones, historial, clientes, cajeros y cocina).
+--  cuentas, notificaciones, historial, clientes y cajeros).
 --  PRESERVA: sucursales, roles, productos, categorías, promociones,
 --            inventario_sucursal (entradas; las cantidades se resetean)
 --            y los USUARIOS con id_rol = 1 (administradores).

@@ -1,310 +1,467 @@
 const db = require('../config/db');
 
-// ─── MESAS ───
-const crearMesa = async (id_sucursal, numero_mesa, codigo_qr) => {
-    const result = await db.query(
-        `INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
-         VALUES ($1, $2, $3) RETURNING *;`,
-        [id_sucursal, numero_mesa, codigo_qr]
-    );
-    return result.rows[0];
-};
+// ════════════════════════════════════════════════════════════════════
+//  PEDIDOS DEL CLIENTE (menú QR en mesa; preparado para delivery)
+//
+//  Pendiente_Cajero → Confirmado → Entregado → Pagado   (o Cancelado)
+//
+//  · El stock se reserva al crear el pedido: lo que el cliente ve en el
+//    menú es lo que realmente hay, y dos pedidos no pueden tomar la misma
+//    unidad. Si el pedido se rechaza/cancela, el stock vuelve.
+//  · Al confirmarse, sus productos pasan a la cuenta de la mesa (sin volver
+//    a descontar stock) y se cobran al cerrar la cuenta.
+// ════════════════════════════════════════════════════════════════════
 
-const obtenerMesasPorSucursal = async (id_sucursal) => {
-    const result = await db.query(
-        `SELECT * FROM mesa_local WHERE id_sucursal = $1 ORDER BY numero_mesa ASC;`,
-        [id_sucursal]
-    );
-    return result.rows;
-};
+const MAX_ITEMS_PEDIDO      = 30;   // productos distintos por pedido
+const MAX_CANTIDAD_ITEM     = 50;   // unidades de un producto por pedido
+const MAX_PENDIENTES_MESA   = 3;    // pedidos sin confirmar a la vez por mesa
+const MAX_LARGO_NOTA        = 200;
 
-// ─── PEDIDOS ───
+const errorCodigo = (code, message, extra = {}) =>
+    Object.assign(new Error(message), { code }, extra);
 
-// Cliente crea pedido (estado: 'Pendiente_Cajero')
-const crearPedido = async ({ id_mesa, observacion_general }) => {
+const enTransaccion = async (fn) => {
+    const client = await db.connect();
     try {
-        // Cambiar estado de la mesa a Ocupada
-        await db.query(
-            `UPDATE mesa_local SET estado_mesa = 'Ocupada' WHERE id_mesa = $1`,
-            [id_mesa]
-        );
-
-        const r = await db.query(`
-            INSERT INTO pedido_mesa (id_mesa, estado_pedido, monto_total, observacion_general)
-            VALUES ($1, 'Pendiente_Cajero', 0, $2)
-            RETURNING *
-        `, [id_mesa, observacion_general || null]);
-
-        return r.rows[0];
+        await client.query('BEGIN');
+        const r = await fn(client);
+        await client.query('COMMIT');
+        return r;
     } catch (e) {
-        console.error('Error en crearPedido:', e.message);
+        await client.query('ROLLBACK');
         throw e;
+    } finally {
+        client.release();
     }
 };
 
-const agregarDetallePedido = async (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente) => {
-    try {
-        const cantidad = Math.floor(Number(cantidad_solicitada));
-        if (!(cantidad > 0)) throw new Error('Cantidad inválida');
-
-        // El precio se toma del catálogo: el menú digital es público y no se
-        // puede confiar en el precio enviado por el cliente.
-        const rProd = await db.query(
-            `SELECT precio_unitario FROM producto WHERE id_producto = $1 AND estado_activo = TRUE`,
-            [id_producto]
-        );
-        if (!rProd.rows.length) throw new Error(`Producto ${id_producto} no disponible`);
-        const precio   = Number(rProd.rows[0].precio_unitario);
-        const subtotal = cantidad * precio;
-
-        const r = await db.query(`
-            INSERT INTO detalle_pedido
-                (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente, estado_cocina)
-            VALUES ($1, $2, $3, $4, $5, $6, 'Pendiente')
-            RETURNING *
-        `, [id_pedido, id_producto, cantidad, precio, subtotal, nota_cliente || null]);
-
-        // Actualizar el monto total del pedido
-        await db.query(
-            `UPDATE pedido_mesa SET monto_total = monto_total + $1 WHERE id_pedido = $2`,
-            [subtotal, id_pedido]
-        );
-
-        return r.rows[0];
-    } catch (e) {
-        console.error('Error en agregarDetallePedido:', e.message);
-        throw e;
-    }
+const texto = (valor, max) => {
+    const t = String(valor ?? '').trim().slice(0, max);
+    return t || null;
 };
 
-// Obtener pedido completo con detalles
-const obtenerPedidoCompleto = async (id_pedido) => {
-    const pedido = await db.query(
-        `SELECT pm.*, m.numero_mesa, m.id_sucursal
-         FROM pedido_mesa pm
-         JOIN mesa_local m ON pm.id_mesa = m.id_mesa
-         WHERE pm.id_pedido = $1;`,
-        [id_pedido]
-    );
-    if (!pedido.rows[0]) return null;
+// ─── Validación del carrito enviado por el cliente ───
+// Solo se toman producto, cantidad y nota; el precio sale de la BD.
+// Productos repetidos se juntan en una sola línea.
+const normalizarItems = (items) => {
+    if (!Array.isArray(items) || items.length === 0)
+        throw errorCodigo('PEDIDO_INVALIDO', 'El pedido está vacío');
 
-    const detalles = await db.query(
-        `SELECT dp.*, p.nombre_producto, p.url_imagen, c.nombre_categoria
-         FROM detalle_pedido dp
-         JOIN producto p ON dp.id_producto = p.id_producto
-         JOIN categoria_producto c ON p.id_categoria = c.id_categoria
-         WHERE dp.id_pedido = $1
-         ORDER BY dp.id_detalle_pedido ASC;`,
-        [id_pedido]
-    );
+    const porProducto = new Map();
+    for (const it of items) {
+        const id_producto = Number(it?.id_producto);
+        const cantidad    = Number(it?.cantidad);
+        if (!Number.isInteger(id_producto) || id_producto <= 0 ||
+            !Number.isInteger(cantidad)    || cantidad <= 0)
+            throw errorCodigo('PEDIDO_INVALIDO', 'Producto o cantidad inválidos');
 
-    return { ...pedido.rows[0], detalles: detalles.rows };
-};
-
-// Obtener todos los pedidos pendientes de cajero de una sucursal
-const obtenerPedidosPendientesCajero = async (id_sucursal) => {
-    const result = await db.query(
-        `SELECT pm.*, m.numero_mesa,
-                json_agg(
-                    json_build_object(
-                        'id_detalle', dp.id_detalle_pedido,
-                        'nombre_producto', p.nombre_producto,
-                        'cantidad', dp.cantidad_solicitada,
-                        'precio', dp.precio_aplicado,
-                        'subtotal', dp.subtotal_detalle,
-                        'nota_cliente', dp.nota_cliente,
-                        'estado_cocina', dp.estado_cocina
-                    ) ORDER BY dp.id_detalle_pedido
-                ) AS items
-         FROM pedido_mesa pm
-         JOIN mesa_local m ON pm.id_mesa = m.id_mesa
-         JOIN detalle_pedido dp ON dp.id_pedido = pm.id_pedido
-         JOIN producto p ON dp.id_producto = p.id_producto
-         WHERE m.id_sucursal = $1
-           AND pm.estado_pedido = 'Pendiente_Cajero'
-         GROUP BY pm.id_pedido, m.numero_mesa
-         ORDER BY pm.fecha_pedido ASC;`,
-        [id_sucursal]
-    );
-    return result.rows;
-};
-
-// CAJERO: Aprobar pedido → va a cocina
-const aprobarPedido = async (id_pedido) => {
-    const result = await db.query(
-        `UPDATE pedido_mesa
-         SET estado_pedido = 'En_Cocina', fecha_aprobacion = CURRENT_TIMESTAMP
-         WHERE id_pedido = $1 AND estado_pedido = 'Pendiente_Cajero' RETURNING *;`,
-        [id_pedido]
-    );
-    // Actualizar todos los detalles a 'Pendiente' (ya lo están, pero confirmamos)
-    await db.query(
-        `UPDATE detalle_pedido SET estado_cocina = 'Pendiente'
-         WHERE id_pedido = $1 AND estado_cocina = 'Pendiente';`,
-        [id_pedido]
-    );
-    return result.rows[0];
-};
-
-// Productos del pedido cuyo stock en la sucursal de la mesa no alcanza
-const verificarStockPedido = async (id_pedido) => {
-    const r = await db.query(`
-        SELECT p.nombre_producto, SUM(dp.cantidad_solicitada)::int AS solicitado,
-               COALESCE(i.cantidad_actual, 0)::int AS disponible
-        FROM detalle_pedido dp
-        JOIN pedido_mesa pm ON pm.id_pedido = dp.id_pedido
-        JOIN mesa_local  m  ON m.id_mesa    = pm.id_mesa
-        JOIN producto    p  ON p.id_producto = dp.id_producto
-        LEFT JOIN inventario_sucursal i ON i.id_producto = dp.id_producto AND i.id_sucursal = m.id_sucursal
-        WHERE dp.id_pedido = $1
-        GROUP BY p.nombre_producto, i.cantidad_actual
-        HAVING SUM(dp.cantidad_solicitada) > COALESCE(i.cantidad_actual, 0)
-    `, [id_pedido]);
-    return r.rows;
-};
-
-// CAJERO: Rechazar pedido
-const rechazarPedido = async (id_pedido) => {
-    const result = await db.query(
-        `UPDATE pedido_mesa SET estado_pedido = 'Cancelado'
-         WHERE id_pedido = $1 RETURNING *, 
-         (SELECT id_mesa FROM pedido_mesa WHERE id_pedido = $1) AS id_mesa_ref;`,
-        [id_pedido]
-    );
-    // Liberar mesa si no hay otros pedidos activos
-    if (result.rows[0]) {
-        await db.query(
-            `UPDATE mesa_local SET estado_mesa = 'Libre'
-             WHERE id_mesa = $1
-               AND NOT EXISTS (
-                   SELECT 1 FROM pedido_mesa
-                   WHERE id_mesa = $1 AND estado_pedido NOT IN ('Pagado','Cancelado')
-               )
-               AND NOT EXISTS (
-                   SELECT 1 FROM cuenta_mesa
-                   WHERE id_mesa = $1 AND estado = 'Abierta'
-               );`,
-            [result.rows[0].id_mesa]
-        );
-    }
-    return result.rows[0];
-};
-
-// COCINA: Obtener pedidos activos en cocina
-const obtenerPedidosKDS = async (id_sucursal) => {
-    const result = await db.query(
-        `SELECT pm.id_pedido, pm.estado_pedido, pm.fecha_aprobacion, pm.observacion_general,
-                m.numero_mesa,
-                json_agg(
-                    json_build_object(
-                        'id_detalle',    dp.id_detalle_pedido,
-                        'nombre',        p.nombre_producto,
-                        'categoria',     c.nombre_categoria,
-                        'imagen',        p.url_imagen,
-                        'cantidad',      dp.cantidad_solicitada,
-                        'nota_cliente',  dp.nota_cliente,
-                        'estado_cocina', dp.estado_cocina
-                    ) ORDER BY dp.id_detalle_pedido
-                ) AS items
-         FROM pedido_mesa pm
-         JOIN mesa_local m ON pm.id_mesa = m.id_mesa
-         JOIN detalle_pedido dp ON dp.id_pedido = pm.id_pedido
-         JOIN producto p ON dp.id_producto = p.id_producto
-         JOIN categoria_producto c ON p.id_categoria = c.id_categoria
-         WHERE m.id_sucursal = $1
-           AND pm.estado_pedido IN ('En_Cocina', 'Listo')
-         GROUP BY pm.id_pedido, m.numero_mesa
-         ORDER BY pm.fecha_aprobacion ASC;`,
-        [id_sucursal]
-    );
-    return result.rows;
-};
-
-// COCINA: Actualizar estado de un ítem
-const actualizarEstadoCocinaItem = async (id_detalle, nuevo_estado) => {
-    const estadosValidos = ['Pendiente', 'En_Preparacion', 'Listo'];
-    if (!estadosValidos.includes(nuevo_estado)) throw new Error('Estado inválido');
-
-    const result = await db.query(
-        `UPDATE detalle_pedido SET estado_cocina = $2
-         WHERE id_detalle_pedido = $1 RETURNING *, id_pedido;`,
-        [id_detalle, nuevo_estado]
-    );
-    if (!result.rows[0]) return null;
-
-    const id_pedido = result.rows[0].id_pedido;
-
-    // Verificar si todos los ítems están listos → actualizar pedido
-    const checkTodos = await db.query(
-        `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN estado_cocina = 'Listo' THEN 1 ELSE 0 END) AS listos
-         FROM detalle_pedido WHERE id_pedido = $1;`,
-        [id_pedido]
-    );
-    const { total, listos } = checkTodos.rows[0];
-
-    if (parseInt(total) === parseInt(listos)) {
-        await db.query(
-            `UPDATE pedido_mesa SET estado_pedido = 'Listo', fecha_entrega = CURRENT_TIMESTAMP
-             WHERE id_pedido = $1;`,
-            [id_pedido]
-        );
-        return { ...result.rows[0], pedido_listo: true, id_pedido };
+        const nota   = texto(it.nota_cliente, MAX_LARGO_NOTA);
+        const previo = porProducto.get(id_producto);
+        if (previo) {
+            previo.cantidad += cantidad;
+            if (nota) previo.nota = texto([previo.nota, nota].filter(Boolean).join('; '), MAX_LARGO_NOTA);
+        } else {
+            porProducto.set(id_producto, { id_producto, cantidad, nota });
+        }
     }
 
-    return { ...result.rows[0], pedido_listo: false, id_pedido };
+    const lista = [...porProducto.values()];
+    if (lista.length > MAX_ITEMS_PEDIDO)
+        throw errorCodigo('PEDIDO_INVALIDO', `Máximo ${MAX_ITEMS_PEDIDO} productos distintos por pedido`);
+    if (lista.some(i => i.cantidad > MAX_CANTIDAD_ITEM))
+        throw errorCodigo('PEDIDO_INVALIDO', `Máximo ${MAX_CANTIDAD_ITEM} unidades por producto`);
+
+    // Orden fijo por producto: evita bloqueos cruzados entre pedidos simultáneos
+    return lista.sort((a, b) => a.id_producto - b.id_producto);
 };
 
-// CLIENTE: Ver estado de su pedido (sin auth)
-const obtenerEstadoPedidoPublico = async (id_pedido) => {
-    const result = await db.query(
-        `SELECT pm.id_pedido, pm.estado_pedido, pm.monto_total::numeric,
-                pm.fecha_pedido, pm.observacion_general,
-                m.numero_mesa,
-                json_agg(
-                    json_build_object(
-                        'nombre',       p.nombre_producto,
-                        'cantidad',     dp.cantidad_solicitada,
-                        'nota',         dp.nota_cliente,
-                        'estado',       dp.estado_cocina
-                    ) ORDER BY dp.id_detalle_pedido
-                ) AS items
-         FROM pedido_mesa pm
-         JOIN mesa_local m ON pm.id_mesa = m.id_mesa
-         JOIN detalle_pedido dp ON dp.id_pedido = pm.id_pedido
-         JOIN producto p ON dp.id_producto = p.id_producto
-         WHERE pm.id_pedido = $1
-         GROUP BY pm.id_pedido, m.numero_mesa;`,
-        [id_pedido]
-    );
-    return result.rows[0] || null;
+// ─── Stock ───
+// Descuento atómico: solo si alcanza (dos pedidos simultáneos no pueden
+// llevarse la misma unidad). items: [{ id_producto, cantidad }]
+const reservarStock = async (client, id_sucursal, items) => {
+    const cambios = [];
+    for (const it of items) {
+        const r = await client.query(`
+            UPDATE inventario_sucursal
+            SET cantidad_actual = cantidad_actual - $1
+            WHERE id_sucursal = $2 AND id_producto = $3 AND cantidad_actual >= $1
+            RETURNING cantidad_actual
+        `, [it.cantidad, id_sucursal, it.id_producto]);
+
+        if (r.rows.length === 0) {
+            const rInfo = await client.query(`
+                SELECT p.nombre_producto, COALESCE(i.cantidad_actual, 0)::int AS disponible
+                FROM producto p
+                LEFT JOIN inventario_sucursal i ON i.id_producto = p.id_producto AND i.id_sucursal = $2
+                WHERE p.id_producto = $1
+            `, [it.id_producto, id_sucursal]);
+            const info = rInfo.rows[0] || {};
+            throw errorCodigo('STOCK_INSUFICIENTE',
+                `Ya no hay suficiente "${info.nombre_producto || it.id_producto}" (disponible: ${info.disponible ?? 0})`,
+                { id_producto: it.id_producto, disponible: info.disponible ?? 0 });
+        }
+        cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock: Number(r.rows[0].cantidad_actual) });
+    }
+    return cambios;
 };
 
-// PAGO: Cobrar pedido de mesa y liberarla
-const cerrarCuentaMesa = async (id_pedido) => {
-    await db.query(
-        `UPDATE pedido_mesa SET estado_pedido = 'Pagado' WHERE id_pedido = $1;`,
-        [id_pedido]
-    );
-    // Liberar mesa
-    const r = await db.query(
-        `UPDATE mesa_local SET estado_mesa = 'Libre'
-         WHERE id_mesa = (SELECT id_mesa FROM pedido_mesa WHERE id_pedido = $1)
-         AND NOT EXISTS (
-             SELECT 1 FROM pedido_mesa
-             WHERE id_mesa = (SELECT id_mesa FROM pedido_mesa WHERE id_pedido = $1)
-               AND estado_pedido NOT IN ('Pagado','Cancelado')
-               AND id_pedido != $1
-         ) RETURNING id_mesa;`,
-        [id_pedido]
-    );
+const devolverStock = async (client, id_sucursal, items) => {
+    const cambios = [];
+    for (const it of items) {
+        const r = await client.query(`
+            UPDATE inventario_sucursal
+            SET cantidad_actual = cantidad_actual + $1
+            WHERE id_sucursal = $2 AND id_producto = $3
+            RETURNING cantidad_actual
+        `, [it.cantidad, id_sucursal, it.id_producto]);
+        if (r.rows.length)
+            cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock: Number(r.rows[0].cantidad_actual) });
+    }
+    return cambios;
+};
+
+const recalcularMontoPedido = (client, id_pedido) => client.query(`
+    UPDATE pedido_mesa
+    SET monto_total = (SELECT COALESCE(SUM(subtotal_detalle), 0) FROM detalle_pedido WHERE id_pedido = $1)
+    WHERE id_pedido = $1
+    RETURNING monto_total
+`, [id_pedido]);
+
+const exigirId = (id) => {
+    if (!Number.isInteger(id) || id <= 0) throw errorCodigo('PEDIDO_NO_ENCONTRADO', 'Pedido no encontrado');
+};
+
+// Bloquea el pedido; id_sucursal = null → sin filtro de sucursal (admin)
+const bloquearPedido = async (client, id_pedido, id_sucursal) => {
+    exigirId(id_pedido);
+    const r = await client.query(`
+        SELECT * FROM pedido_mesa
+        WHERE id_pedido = $1 AND ($2::int IS NULL OR id_sucursal = $2)
+        FOR UPDATE
+    `, [id_pedido, id_sucursal ?? null]);
+    if (!r.rows.length) throw errorCodigo('PEDIDO_NO_ENCONTRADO', 'Pedido no encontrado');
     return r.rows[0];
 };
 
+const exigirEstado = (pedido, estado) => {
+    if (pedido.estado_pedido !== estado)
+        throw errorCodigo('PEDIDO_YA_PROCESADO', 'El pedido ya fue atendido', { estado_actual: pedido.estado_pedido });
+};
+
+const itemsDelPedido = async (client, id_pedido) =>
+    (await client.query(
+        `SELECT id_producto, cantidad_solicitada AS cantidad FROM detalle_pedido WHERE id_pedido = $1`,
+        [id_pedido])).rows;
+
+// ─── Mesa por código QR (público) ───
+const obtenerMesaPorCodigo = async (codigo) => {
+    const r = await db.query(`
+        SELECT m.id_mesa, m.numero_mesa, m.id_sucursal, s.nombre_sucursal,
+               EXISTS (SELECT 1 FROM turno_caja t
+                       WHERE t.id_sucursal = m.id_sucursal AND t.estado_turno = 'Abierto') AS recibe_pedidos
+        FROM mesa_local m
+        JOIN sucursal   s ON s.id_sucursal = m.id_sucursal
+        WHERE m.codigo_qr = $1
+    `, [String(codigo || '')]);
+    return r.rows[0] || null;
+};
+
+// ─── Catálogo del menú (público) ───
+// Incluye los agotados (stock 0) para que aparezcan en cuanto se repongan.
+const obtenerCatalogoMenu = async (id_sucursal) => {
+    const r = await db.query(`
+        SELECT p.id_producto, p.nombre_producto, p.descripcion_producto,
+               p.precio_unitario, p.url_imagen,
+               c.id_categoria, c.nombre_categoria,
+               GREATEST(i.cantidad_actual, 0)::int AS stock_actual
+        FROM producto p
+        JOIN categoria_producto  c ON c.id_categoria = p.id_categoria
+        JOIN inventario_sucursal i ON i.id_producto  = p.id_producto AND i.id_sucursal = $1
+        WHERE p.estado_activo = TRUE AND p.mostrar_en_menu IS NOT FALSE
+        ORDER BY c.nombre_categoria, p.nombre_producto
+    `, [id_sucursal]);
+    return r.rows;
+};
+
+// ─── CLIENTE: crear pedido desde la mesa ───
+const crearPedidoMesa = async ({ mesa, items, observacion_general }) => {
+    const lista = normalizarItems(items);
+
+    return enTransaccion(async (client) => {
+        // Bloquear la mesa serializa los pedidos de una misma mesa
+        await client.query(`SELECT id_mesa FROM mesa_local WHERE id_mesa = $1 FOR UPDATE`, [mesa.id_mesa]);
+
+        const rTurno = await client.query(
+            `SELECT 1 FROM turno_caja WHERE id_sucursal = $1 AND estado_turno = 'Abierto' LIMIT 1`,
+            [mesa.id_sucursal]);
+        if (!rTurno.rows.length)
+            throw errorCodigo('NO_RECIBE_PEDIDOS', 'En este momento no estamos recibiendo pedidos desde el menú. Consulta en caja.');
+
+        const rPend = await client.query(
+            `SELECT COUNT(*)::int AS n FROM pedido_mesa WHERE id_mesa = $1 AND estado_pedido = 'Pendiente_Cajero'`,
+            [mesa.id_mesa]);
+        if (rPend.rows[0].n >= MAX_PENDIENTES_MESA)
+            throw errorCodigo('DEMASIADOS_PENDIENTES', 'Tu mesa ya tiene pedidos esperando confirmación. Espera a que el cajero los confirme.');
+
+        const rProd = await client.query(`
+            SELECT id_producto, precio_unitario FROM producto
+            WHERE id_producto = ANY($1::int[]) AND estado_activo = TRUE AND mostrar_en_menu IS NOT FALSE
+        `, [lista.map(i => i.id_producto)]);
+        const precios = new Map(rProd.rows.map(p => [p.id_producto, Math.round(Number(p.precio_unitario) * 100)]));
+        const noDisponible = lista.find(i => !precios.has(i.id_producto));
+        if (noDisponible)
+            throw errorCodigo('PRODUCTO_NO_DISPONIBLE', 'Un producto de tu pedido ya no está disponible. Revisa tu carrito.',
+                              { id_producto: noDisponible.id_producto });
+
+        const cambios = await reservarStock(client, mesa.id_sucursal, lista);
+
+        const totalCentavos = lista.reduce((s, i) => s + precios.get(i.id_producto) * i.cantidad, 0);
+        const rPed = await client.query(`
+            INSERT INTO pedido_mesa (tipo_pedido, id_sucursal, id_mesa, estado_pedido, monto_total, observacion_general)
+            VALUES ('Mesa', $1, $2, 'Pendiente_Cajero', $3, $4)
+            RETURNING *
+        `, [mesa.id_sucursal, mesa.id_mesa, totalCentavos / 100, texto(observacion_general, MAX_LARGO_NOTA)]);
+        const pedido = rPed.rows[0];
+
+        for (const it of lista) {
+            const precio = precios.get(it.id_producto);
+            await client.query(`
+                INSERT INTO detalle_pedido
+                    (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            `, [pedido.id_pedido, it.id_producto, it.cantidad, precio / 100, (precio * it.cantidad) / 100, it.nota]);
+        }
+
+        return { pedido, cambios };
+    });
+};
+
+// ─── CAJERO: bandeja de pedidos (por confirmar y por entregar) ───
+const obtenerBandeja = async (id_sucursal) => {
+    const r = await db.query(`
+        SELECT pm.id_pedido, pm.tipo_pedido, pm.id_mesa, pm.id_sucursal, pm.estado_pedido,
+               pm.monto_total, pm.fecha_pedido, pm.fecha_aprobacion, pm.observacion_general,
+               pm.nombre_cliente, pm.telefono_cliente, pm.direccion_entrega,
+               m.numero_mesa,
+               json_agg(json_build_object(
+                   'id_detalle',      dp.id_detalle_pedido,
+                   'id_producto',     dp.id_producto,
+                   'nombre_producto', p.nombre_producto,
+                   'cantidad',        dp.cantidad_solicitada,
+                   'precio',          dp.precio_aplicado,
+                   'subtotal',        dp.subtotal_detalle,
+                   'nota_cliente',    dp.nota_cliente,
+                   'stock_disponible', COALESCE(i.cantidad_actual, 0)
+               ) ORDER BY dp.id_detalle_pedido) AS items
+        FROM pedido_mesa pm
+        LEFT JOIN mesa_local m ON m.id_mesa = pm.id_mesa
+        JOIN detalle_pedido  dp ON dp.id_pedido = pm.id_pedido
+        JOIN producto        p  ON p.id_producto = dp.id_producto
+        LEFT JOIN inventario_sucursal i ON i.id_producto = dp.id_producto AND i.id_sucursal = pm.id_sucursal
+        WHERE pm.id_sucursal = $1
+          AND pm.estado_pedido IN ('Pendiente_Cajero', 'Confirmado')
+        GROUP BY pm.id_pedido, m.numero_mesa
+        ORDER BY pm.fecha_pedido ASC
+    `, [id_sucursal]);
+    return r.rows;
+};
+
+// ─── CAJERO: ajustar la cantidad de un producto antes de confirmar ───
+// cantidad 0 = quitar el producto. El stock se reserva/devuelve según la diferencia.
+const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal }) => {
+    const nueva = Number(cantidad);
+    if (!Number.isInteger(nueva) || nueva < 0 || nueva > MAX_CANTIDAD_ITEM)
+        throw errorCodigo('PEDIDO_INVALIDO', 'Cantidad inválida');
+
+    return enTransaccion(async (client) => {
+        const pedido = await bloquearPedido(client, id_pedido, id_sucursal);
+        exigirEstado(pedido, 'Pendiente_Cajero');
+
+        exigirId(id_detalle);
+        const rDet = await client.query(
+            `SELECT * FROM detalle_pedido WHERE id_detalle_pedido = $1 AND id_pedido = $2`,
+            [id_detalle, id_pedido]);
+        if (!rDet.rows.length) throw errorCodigo('PEDIDO_NO_ENCONTRADO', 'Producto no encontrado en el pedido');
+        const det   = rDet.rows[0];
+        const delta = nueva - Number(det.cantidad_solicitada);
+
+        let cambios = [];
+        if (nueva === 0) {
+            const rOtros = await client.query(
+                `SELECT COUNT(*)::int AS n FROM detalle_pedido WHERE id_pedido = $1 AND id_detalle_pedido <> $2`,
+                [id_pedido, id_detalle]);
+            if (rOtros.rows[0].n === 0)
+                throw errorCodigo('ULTIMO_PRODUCTO', 'Es el único producto del pedido: recházalo en lugar de quitarlo');
+            cambios = await devolverStock(client, pedido.id_sucursal,
+                                          [{ id_producto: det.id_producto, cantidad: det.cantidad_solicitada }]);
+            await client.query(`DELETE FROM detalle_pedido WHERE id_detalle_pedido = $1`, [id_detalle]);
+        } else if (delta !== 0) {
+            const mov = { id_producto: det.id_producto, cantidad: Math.abs(delta) };
+            cambios = delta > 0
+                ? await reservarStock(client, pedido.id_sucursal, [mov])
+                : await devolverStock(client, pedido.id_sucursal, [mov]);
+            await client.query(`
+                UPDATE detalle_pedido
+                SET cantidad_solicitada = $1::int, subtotal_detalle = $1::int * precio_aplicado
+                WHERE id_detalle_pedido = $2
+            `, [nueva, id_detalle]);
+        }
+
+        const rMonto = await recalcularMontoPedido(client, id_pedido);
+        return { pedido, cambios, monto_total: rMonto.rows[0].monto_total };
+    });
+};
+
+// ─── CAJERO: confirmar → los productos pasan a la cuenta de la mesa ───
+const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
+    enTransaccion(async (client) => {
+        const pedido = await bloquearPedido(client, id_pedido, id_sucursal);
+        exigirEstado(pedido, 'Pendiente_Cajero');
+        if (pedido.tipo_pedido !== 'Mesa' || !pedido.id_mesa)
+            throw errorCodigo('PEDIDO_INVALIDO', 'Solo los pedidos de mesa se integran a una cuenta');
+
+        // Cuenta abierta de la mesa (se abre una si no existe)
+        let rCuenta = await client.query(
+            `SELECT id_cuenta FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta' FOR UPDATE`,
+            [pedido.id_mesa]);
+        let cuenta_nueva = false;
+        if (!rCuenta.rows.length) {
+            rCuenta = await client.query(`
+                INSERT INTO cuenta_mesa (id_mesa, id_usuario_apertura, estado, total_acumulado)
+                VALUES ($1, $2, 'Abierta', 0) RETURNING id_cuenta
+            `, [pedido.id_mesa, id_usuario]);
+            cuenta_nueva = true;
+        }
+        const id_cuenta = rCuenta.rows[0].id_cuenta;
+
+        // El stock ya se reservó al crear el pedido: aquí NO se vuelve a descontar
+        await client.query(`
+            INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, subtotal, nota, origen)
+            SELECT $1, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente, 'qr'
+            FROM detalle_pedido WHERE id_pedido = $2
+            ORDER BY id_detalle_pedido
+        `, [id_cuenta, id_pedido]);
+        await client.query(`
+            UPDATE cuenta_mesa
+            SET total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta = $1)
+            WHERE id_cuenta = $1
+        `, [id_cuenta]);
+        await client.query(`UPDATE mesa_local SET estado_mesa = 'Ocupada' WHERE id_mesa = $1`, [pedido.id_mesa]);
+
+        const rPed = await client.query(`
+            UPDATE pedido_mesa
+            SET estado_pedido = 'Confirmado', id_cuenta = $2, id_usuario_atencion = $3,
+                fecha_aprobacion = CURRENT_TIMESTAMP
+            WHERE id_pedido = $1
+            RETURNING *
+        `, [id_pedido, id_cuenta, id_usuario]);
+
+        return { pedido: rPed.rows[0], id_cuenta, cuenta_nueva };
+    });
+
+// Cancela un pedido pendiente ya bloqueado y devuelve su stock
+const cancelarPendiente = async (client, pedido, id_usuario = null) => {
+    const cambios = await devolverStock(client, pedido.id_sucursal, await itemsDelPedido(client, pedido.id_pedido));
+    const r = await client.query(`
+        UPDATE pedido_mesa SET estado_pedido = 'Cancelado', id_usuario_atencion = COALESCE($2, id_usuario_atencion)
+        WHERE id_pedido = $1 RETURNING *
+    `, [pedido.id_pedido, id_usuario]);
+    return { pedido: r.rows[0], cambios };
+};
+
+// ─── CAJERO: rechazar (sin motivo) ───
+const rechazarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
+    enTransaccion(async (client) => {
+        const pedido = await bloquearPedido(client, id_pedido, id_sucursal);
+        exigirEstado(pedido, 'Pendiente_Cajero');
+        return cancelarPendiente(client, pedido, id_usuario);
+    });
+
+// ─── CLIENTE: cancelar su pedido mientras nadie lo confirmó ───
+const cancelarPorCliente = async ({ id_pedido, id_mesa }) =>
+    enTransaccion(async (client) => {
+        const pedido = await bloquearPedido(client, id_pedido, null);
+        if (pedido.id_mesa !== id_mesa) throw errorCodigo('PEDIDO_NO_ENCONTRADO', 'Pedido no encontrado');
+        exigirEstado(pedido, 'Pendiente_Cajero');
+        return cancelarPendiente(client, pedido);
+    });
+
+// ─── CAJERO: marcar como entregado en la mesa ───
+const marcarEntregado = async ({ id_pedido, id_sucursal }) => {
+    exigirId(id_pedido);
+    const r = await db.query(`
+        UPDATE pedido_mesa SET estado_pedido = 'Entregado', fecha_entrega = CURRENT_TIMESTAMP
+        WHERE id_pedido = $1 AND ($2::int IS NULL OR id_sucursal = $2) AND estado_pedido = 'Confirmado'
+        RETURNING *
+    `, [id_pedido, id_sucursal ?? null]);
+    if (r.rows.length) return r.rows[0];
+
+    const rExiste = await db.query(
+        `SELECT estado_pedido FROM pedido_mesa WHERE id_pedido = $1 AND ($2::int IS NULL OR id_sucursal = $2)`,
+        [id_pedido, id_sucursal ?? null]);
+    if (!rExiste.rows.length) throw errorCodigo('PEDIDO_NO_ENCONTRADO', 'Pedido no encontrado');
+    throw errorCodigo('PEDIDO_YA_PROCESADO', 'El pedido no está confirmado', { estado_actual: rExiste.rows[0].estado_pedido });
+};
+
+// ─── Integración con cuentas y mesas ───
+
+// Al cerrar (Pagado) o cancelar (Cancelado) la cuenta, sus pedidos terminan igual
+const finalizarPedidosDeCuenta = async (client, id_cuenta, estadoFinal) =>
+    (await client.query(`
+        UPDATE pedido_mesa SET estado_pedido = $2
+        WHERE id_cuenta = $1 AND estado_pedido IN ('Confirmado', 'Entregado')
+        RETURNING id_pedido
+    `, [id_cuenta, estadoFinal])).rows.map(r => r.id_pedido);
+
+// Cancela los pedidos sin confirmar de una mesa (reset o eliminación de la mesa)
+const cancelarPendientesMesa = async (client, id_mesa) => {
+    const rPend = await client.query(
+        `SELECT * FROM pedido_mesa WHERE id_mesa = $1 AND estado_pedido = 'Pendiente_Cajero' ORDER BY id_pedido FOR UPDATE`,
+        [id_mesa]);
+    let cambios = [];
+    for (const pedido of rPend.rows)
+        cambios = cambios.concat((await cancelarPendiente(client, pedido)).cambios);
+    return { cambios, ids: rPend.rows.map(p => p.id_pedido) };
+};
+
+// ─── CLIENTE: estado de sus pedidos y consumo de la mesa ───
+const obtenerEstadoMesa = async (id_mesa, ids) => {
+    const rPed = await db.query(`
+        SELECT pm.id_pedido, pm.estado_pedido, pm.monto_total, pm.fecha_pedido,
+               json_agg(json_build_object(
+                   'nombre_producto', p.nombre_producto,
+                   'cantidad',        dp.cantidad_solicitada,
+                   'subtotal',        dp.subtotal_detalle,
+                   'nota_cliente',    dp.nota_cliente
+               ) ORDER BY dp.id_detalle_pedido) AS items
+        FROM pedido_mesa pm
+        JOIN detalle_pedido dp ON dp.id_pedido = pm.id_pedido
+        JOIN producto       p  ON p.id_producto = dp.id_producto
+        WHERE pm.id_mesa = $1 AND pm.id_pedido = ANY($2::int[])
+        GROUP BY pm.id_pedido
+        ORDER BY pm.id_pedido
+    `, [id_mesa, ids]);
+
+    const rCuenta = await db.query(`
+        SELECT c.id_cuenta, c.total_acumulado,
+               COALESCE((
+                   SELECT json_agg(x ORDER BY x.nombre_producto)
+                   FROM (SELECT p.nombre_producto, SUM(dc.cantidad)::int AS cantidad, SUM(dc.subtotal) AS subtotal
+                         FROM detalle_cuenta dc JOIN producto p ON p.id_producto = dc.id_producto
+                         WHERE dc.id_cuenta = c.id_cuenta
+                         GROUP BY p.nombre_producto) x
+               ), '[]'::json) AS items
+        FROM cuenta_mesa c
+        WHERE c.id_mesa = $1 AND c.estado = 'Abierta'
+    `, [id_mesa]);
+
+    return { pedidos: rPed.rows, cuenta: rCuenta.rows[0] || null };
+};
+
 module.exports = {
-    crearMesa, obtenerMesasPorSucursal,
-    crearPedido, agregarDetallePedido, obtenerPedidoCompleto,
-    obtenerPedidosPendientesCajero, aprobarPedido, rechazarPedido, verificarStockPedido,
-    obtenerPedidosKDS, actualizarEstadoCocinaItem,
-    obtenerEstadoPedidoPublico, cerrarCuentaMesa
+    MAX_PENDIENTES_MESA,
+    obtenerMesaPorCodigo, obtenerCatalogoMenu,
+    crearPedidoMesa, cancelarPorCliente, obtenerEstadoMesa,
+    obtenerBandeja, ajustarDetalle, confirmarPedido, rechazarPedido, marcarEntregado,
+    finalizarPedidosDeCuenta, cancelarPendientesMesa
 };

@@ -1,8 +1,7 @@
 -- Roles del sistema
 INSERT INTO rol_usuario (id_rol, nombre_rol, nivel_permiso) VALUES
 (1, 'Administrador', 1),
-(2, 'Cajero',        2),
-(3, 'Cocina',        3)
+(2, 'Cajero',        2)
 ON CONFLICT (id_rol) DO UPDATE
   SET nombre_rol = EXCLUDED.nombre_rol,
       nivel_permiso = EXCLUDED.nivel_permiso;

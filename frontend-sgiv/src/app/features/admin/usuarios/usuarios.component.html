@@ -9,7 +9,7 @@
   <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
     <div>
       <h2 class="text-2xl font-bold text-gray-800">Gestión de Usuarios</h2>
-      <p class="text-sm text-gray-500 mt-1">Administra cajeros, cocina y administradores</p>
+      <p class="text-sm text-gray-500 mt-1">Administra cajeros y administradores</p>
     </div>
     <button (click)="abrirModalNuevo()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 text-sm transition-colors">
       <lucide-icon [img]="icons.plus" class="w-4 h-4"></lucide-icon>
@@ -112,9 +112,6 @@
                       class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 active:scale-95 transition-all">
                 <lucide-icon [img]="icons.permissions" class="w-4 h-4"></lucide-icon>
               </button>
-              <span *ngIf="usr.estado_activo && +usr.id_rol === 3"
-                    class="inline-flex items-center justify-center w-9 h-9 text-gray-300"
-                    title="El rol de Cocina no tiene permisos configurables">—</span>
 
               <button *ngIf="+usr.id_rol === 2 && usr.estado_activo"
                       (click)="toggleCaja(usr)"

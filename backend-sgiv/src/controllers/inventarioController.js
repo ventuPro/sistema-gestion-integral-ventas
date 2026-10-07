@@ -1,4 +1,5 @@
 const inventarioModel = require('../models/inventarioModel');
+const { emitirStock } = require('../utils/tiempoReal');
 
 const agregarMovimiento = async (req, res) => {
     try {
@@ -17,6 +18,8 @@ const agregarMovimiento = async (req, res) => {
             cantidad_movida,
             motivo_movimiento
         });
+
+        emitirStock([{ id_producto, id_sucursal, nuevo_stock: resultado.cantidad_actual }]);
 
         res.status(201).json({ 
             mensaje: 'Movimiento de inventario registrado con éxito', 

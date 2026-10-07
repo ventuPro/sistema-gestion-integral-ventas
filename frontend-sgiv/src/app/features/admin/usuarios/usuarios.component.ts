@@ -234,8 +234,7 @@ export class UsuariosComponent implements OnInit {
   getBadge(rol: string): string {
     const m: any = {
       'Administrador': 'bg-purple-100 text-purple-700',
-      'Cajero':        'bg-blue-100 text-blue-700',
-      'Cocina':        'bg-orange-100 text-orange-700'
+      'Cajero':        'bg-blue-100 text-blue-700'
     };
     return m[rol] || 'bg-gray-100 text-gray-700';
   }

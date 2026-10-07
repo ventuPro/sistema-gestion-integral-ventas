@@ -51,34 +51,6 @@
   <!-- ═══ CONTENIDO NORMAL ═══ -->
   <ng-container *ngIf="!verificandoCaja && cajaHabilitada">
 
-    <!-- Pedidos pendientes QR -->
-    <div *ngIf="pedidosPendientes.length > 0"
-         class="bg-white rounded-xl border-2 border-amber-400 p-4">
-      <div class="flex items-center gap-3 mb-3">
-        <div class="w-3 h-3 rounded-full bg-amber-500 animate-ping"></div>
-        <h3 class="font-bold text-amber-800">Pedidos QR pendientes ({{ pedidosPendientes.length }})</h3>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        <div *ngFor="let pedido of pedidosPendientes"
-             class="border-2 border-amber-300 bg-amber-50 rounded-xl p-3">
-          <div class="flex justify-between items-center mb-2">
-            <span class="font-black text-amber-800">Mesa {{ pedido.numero_mesa }}</span>
-            <span class="text-sm font-bold text-green-700">Bs. {{ (+pedido.monto_total).toFixed(2) }}</span>
-          </div>
-          <div class="flex gap-2">
-            <button (click)="aprobarPedido(pedido.id_pedido)"
-                    class="flex-1 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700">
-              ✓ Aprobar
-            </button>
-            <button (click)="rechazarPedido(pedido.id_pedido)"
-                    class="flex-1 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600">
-              ✕ Rechazar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Plano de mesas -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div class="flex flex-wrap justify-between items-center mb-5 gap-3">
@@ -95,6 +67,11 @@
           <button (click)="cargarMesas()"
                   class="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">
             ⟳ Actualizar
+          </button>
+          <button (click)="abrirModalQR()" [disabled]="mesas.length === 0"
+                  class="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-40 inline-flex items-center gap-2">
+            <lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon>
+            Códigos QR
           </button>
           <button (click)="abrirModalMesa()"
                   class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg text-sm hover:bg-blue-700">
@@ -159,6 +136,69 @@
     <div class="px-6 pb-6 flex gap-3">
       <button (click)="cerrarModalMesa()" class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium">Cancelar</button>
       <button (click)="crearMesa()" class="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold">Crear Mesa</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal códigos QR -->
+<div *ngIf="mostrarModalQR"
+     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div class="bg-gray-900 p-4 text-white flex items-center justify-between">
+      <div>
+        <h3 class="font-bold text-lg">Códigos QR de las mesas</h3>
+        <p class="text-xs text-gray-400">Imprímelos y pégalos en cada mesa. El cliente escanea y pide desde su celular.</p>
+      </div>
+      <button (click)="cerrarModalQR()" class="text-2xl leading-none px-2 hover:text-gray-300">×</button>
+    </div>
+
+    <div class="p-5 border-b space-y-2">
+      <label class="block text-sm font-semibold text-gray-700">Dirección del sistema que abrirá el celular del cliente</label>
+      <div class="flex gap-2">
+        <input type="text" [(ngModel)]="baseUrlQR" (keyup.enter)="generarCodigosQR()"
+               class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+               placeholder="http://192.168.1.10:4200">
+        <button (click)="generarCodigosQR()" [disabled]="generandoQR"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold">
+          {{ generandoQR ? 'Generando…' : 'Generar' }}
+        </button>
+      </div>
+      <p *ngIf="baseUrlEsLocal" class="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+        ⚠ Con <b>localhost</b> el QR solo funciona en esta computadora. Escribe la IP de esta computadora en la red
+        del local (por ejemplo <b>http://192.168.1.10:4200</b>) para que funcione en el celular del cliente.
+      </p>
+      <p *ngIf="errorQR" class="text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">{{ errorQR }}</p>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-5">
+      <div *ngIf="generandoQR && !codigosQR.length" class="flex justify-center py-10">
+        <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div *ngFor="let c of codigosQR" class="border rounded-xl p-3 text-center">
+          <img [src]="c.qr" [alt]="'QR Mesa ' + c.numero_mesa" class="w-full aspect-square">
+          <p class="font-black text-gray-800">Mesa {{ c.numero_mesa }}</p>
+          <div class="flex gap-1 mt-2">
+            <button (click)="descargarQR(c)" title="Descargar imagen"
+                    class="flex-1 py-1.5 text-xs border rounded-lg hover:bg-gray-50 inline-flex items-center justify-center gap-1">
+              <lucide-icon [img]="icons.download" class="w-3.5 h-3.5"></lucide-icon> PNG
+            </button>
+            <button (click)="regenerarQR(c)" title="Invalida el QR impreso y genera uno nuevo"
+                    class="flex-1 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50">
+              Nuevo QR
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-4 border-t flex justify-end gap-3">
+      <button (click)="cerrarModalQR()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium">Cerrar</button>
+      <button (click)="imprimirQR()" [disabled]="!codigosQR.length || generandoQR"
+              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold inline-flex items-center gap-2">
+        <lucide-icon [img]="icons.printer" class="w-4 h-4"></lucide-icon>
+        Imprimir todos
+      </button>
     </div>
   </div>
 </div>

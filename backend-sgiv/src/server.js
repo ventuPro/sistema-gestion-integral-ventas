@@ -5,8 +5,9 @@ const http       = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 
-require('./config/db');
-const { origenPermitido } = require('./config/seguridad');
+const db = require('./config/db');
+const jwt = require('jsonwebtoken');
+const { origenPermitido, JWT_SECRET, JWT_ALGORITMOS } = require('./config/seguridad');
 
 const userRoutes      = require('./routes/userRoutes');
 const productoRoutes  = require('./routes/productoRoutes');
@@ -18,7 +19,6 @@ const sucursalRoutes  = require('./routes/sucursalRoutes');
 const permisoRoutes   = require('./routes/permisoRoutes');
 const menuRoutes      = require('./routes/menuRoutes');
 const mesaRoutes      = require('./routes/mesaRoutes');
-const kdsRoutes       = require('./routes/kdsRoutes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -66,17 +66,33 @@ app.use('/api/sucursales', sucursalRoutes);
 app.use('/api/permisos',   permisoRoutes);
 app.use('/api/menu',       menuRoutes);    // Público (sin auth)
 app.use('/api/mesas',      mesaRoutes);
-app.use('/api/kds',        kdsRoutes);
 app.use('/api/cuentas', require('./routes/cuentaRoutes'));
 
 // Socket.IO eventos
 io.on('connection', (socket) => {
     console.log(`🔌 Cliente conectado: ${socket.id}`);
 
-    // El cliente se une a una sala según su rol
-    socket.on('unirse_sala', (sala) => {
-        socket.join(sala);
-        console.log(`📡 ${socket.id} unido a sala: ${sala}`);
+    // Personal del sistema: la sala 'cajeros' exige un token válido
+    socket.on('unirse_sala', async (sala, token) => {
+        if (sala !== 'cajeros') return;
+        try {
+            const payload = jwt.verify(String(token || ''), JWT_SECRET, { algorithms: JWT_ALGORITMOS });
+            const r = await db.query(
+                `SELECT 1 FROM usuario WHERE id_usuario = $1 AND estado_activo = TRUE`, [payload.id_usuario]);
+            if (!r.rows.length) return;
+            socket.join(sala);
+            console.log(`📡 ${socket.id} unido a sala: ${sala}`);
+        } catch { /* token inválido: no se une */ }
+    });
+
+    // Menú digital: el cliente se une a la sala de su mesa con el código QR
+    socket.on('unirse_mesa', async (codigo) => {
+        try {
+            const r = await db.query(`SELECT id_mesa FROM mesa_local WHERE codigo_qr = $1`, [String(codigo || '')]);
+            if (r.rows.length) socket.join(`mesa_${r.rows[0].id_mesa}`);
+        } catch (e) {
+            console.error('unirse_mesa:', e.message);
+        }
     });
 
     socket.on('disconnect', () => {

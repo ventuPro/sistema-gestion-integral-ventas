@@ -1,5 +1,12 @@
 const db     = require('../config/db');
+const crypto = require('crypto');
 const QRCode = require('qrcode');
+const pedidoModel = require('./pedidoModel');
+const cuentaModel = require('./cuentaModel');
+
+// Código aleatorio que identifica la mesa en la URL del menú (/menu/<codigo>).
+// No se usa el id interno porque es fácil de adivinar.
+const nuevoCodigoQR = () => crypto.randomBytes(16).toString('hex');
 
 const crearMesa = async (id_sucursal, numero_mesa) => {
     // Verificar que no exista esa mesa en esa sucursal
@@ -10,7 +17,7 @@ const crearMesa = async (id_sucursal, numero_mesa) => {
     if (existe.rows.length > 0)
         throw new Error(`Ya existe la Mesa ${numero_mesa} en esa sucursal`);
 
-    const codigo_qr = `SUC${id_sucursal}-MESA${numero_mesa}-${Date.now()}`;
+    const codigo_qr = nuevoCodigoQR();
     const r = await db.query(
         `INSERT INTO mesa_local(id_sucursal, numero_mesa, codigo_qr, estado_mesa)
          VALUES($1, $2, $3, 'Libre') RETURNING *`,
@@ -43,7 +50,7 @@ const generarQR = async (id_mesa, base_url) => {
     if (!r.rows.length) throw new Error('Mesa no encontrada');
 
     const mesa = r.rows[0];
-    const url  = `${base_url}/menu/${id_mesa}`;
+    const url  = `${base_url}/menu/${mesa.codigo_qr}`;
 
     // Generar QR de alta calidad
     const qr = await QRCode.toDataURL(url, {
@@ -56,6 +63,16 @@ const generarQR = async (id_mesa, base_url) => {
     });
 
     return { url, qr, numero_mesa: mesa.numero_mesa, id_sucursal: mesa.id_sucursal };
+};
+
+// Invalida el QR anterior (por ejemplo, si alguien lo fotografió y hace pedidos falsos)
+const regenerarCodigoQR = async (id_mesa) => {
+    const r = await db.query(
+        `UPDATE mesa_local SET codigo_qr = $1 WHERE id_mesa = $2 RETURNING id_mesa, numero_mesa`,
+        [nuevoCodigoQR(), id_mesa]
+    );
+    if (!r.rows.length) throw new Error('Mesa no encontrada');
+    return r.rows[0];
 };
 
 const actualizarEstadoMesa = async (id_mesa, estado_mesa) => {
@@ -71,20 +88,19 @@ const eliminarMesa = async (id_mesa) => {
     try {
         await client.query('BEGIN');
 
-        // Cerrar cualquier cuenta activa primero
-        await client.query(`
-            UPDATE cuenta_mesa
-            SET estado = 'Cancelada', fecha_cierre = NOW()
-            WHERE id_mesa = $1 AND estado = 'Abierta'
-        `, [id_mesa]);
+        // Cancelar cualquier cuenta activa devolviendo su stock reservado
+        let cambiosStock = [];
+        const rCuentas = await client.query(
+            `SELECT id_cuenta FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta'`, [id_mesa]);
+        for (const { id_cuenta } of rCuentas.rows) {
+            cambiosStock = cambiosStock.concat(await cuentaModel.devolverStockCuenta(client, id_cuenta));
+            await pedidoModel.finalizarPedidosDeCuenta(client, id_cuenta, 'Cancelado');
+            await client.query(
+                `UPDATE cuenta_mesa SET estado = 'Cancelada', fecha_cierre = NOW() WHERE id_cuenta = $1`, [id_cuenta]);
+        }
 
-        // Cancelar pedidos activos
-        await client.query(`
-            UPDATE pedido_mesa
-            SET estado_pedido = 'Cancelado'
-            WHERE id_mesa = $1
-              AND estado_pedido IN ('Pendiente_Cajero', 'En_Cocina', 'Listo')
-        `, [id_mesa]);
+        // Pedidos QR sin confirmar: se cancelan y su stock vuelve
+        cambiosStock = cambiosStock.concat((await pedidoModel.cancelarPendientesMesa(client, id_mesa)).cambios);
 
         // detalle_pedido y venta_caja referencian pedido_mesa sin ON DELETE CASCADE:
         // sin esto, borrar una mesa que alguna vez recibió pedidos QR falla por FK.
@@ -106,7 +122,7 @@ const eliminarMesa = async (id_mesa) => {
         if (!r.rows.length) throw new Error('Mesa no encontrada');
 
         await client.query('COMMIT');
-        return r.rows[0];
+        return { mesa: r.rows[0], cambiosStock };
     } catch (e) {
         await client.query('ROLLBACK');
         throw e;
@@ -115,4 +131,4 @@ const eliminarMesa = async (id_mesa) => {
     }
 };
 
-module.exports = { crearMesa, obtenerMesasPorSucursal, generarQR, actualizarEstadoMesa, eliminarMesa };
+module.exports = { crearMesa, obtenerMesasPorSucursal, generarQR, regenerarCodigoQR, actualizarEstadoMesa, eliminarMesa };

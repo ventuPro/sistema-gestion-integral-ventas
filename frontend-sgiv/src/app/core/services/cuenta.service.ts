@@ -52,17 +52,12 @@ getProductos(id_sucursal: number = 1): Observable<any[]> {
   }
 
   getQR(id_mesa: number): Observable<any> {
-  // Construir la URL base del frontend correctamente
-  const protocol = window.location.protocol;
-  const hostname  = window.location.hostname;
-  const port      = window.location.port;
+    // Dirección que abrirá el celular del cliente: la configurada en
+    // Mesas → Códigos QR, o la de esta pantalla si no se configuró ninguna.
+    let base = window.location.origin;
+    try { base = localStorage.getItem('qr_base_url_sgiv') || base; } catch { }
 
-  // URL que el celular del cliente usará para escanear el QR
-  const frontendBase = port
-    ? `${protocol}//${hostname}:${port}`
-    : `${protocol}//${hostname}`;
-
-  const url = `${this.apiUrl}/mesas/${id_mesa}/qr?base_url=${encodeURIComponent(frontendBase)}`;
-  return this.http.get<any>(url, { headers: this.h() });
-}
+    const url = `${this.apiUrl}/mesas/${id_mesa}/qr?base_url=${encodeURIComponent(base)}`;
+    return this.http.get<any>(url, { headers: this.h() });
+  }
 }

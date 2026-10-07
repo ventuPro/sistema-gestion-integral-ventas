@@ -2,6 +2,8 @@ const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/cuentaController');
 const { verificarToken } = require('../middlewares/authMiddleware');
+const pedidoModel = require('../models/pedidoModel');
+const { emitirStock, emitirMesa } = require('../utils/tiempoReal');
 
 router.get  ('/mesas/:id_sucursal',       verificarToken, ctrl.getMesasConCuenta);
 router.get  ('/mesa/:id_mesa',            verificarToken, ctrl.getCuentaActiva);
@@ -31,17 +33,30 @@ router.post('/:id_cuenta/cancelar-si-vacia', verificarToken, async (req, res) =>
             return res.status(400).json({ error: 'CUENTA_NO_VACIA' });
 
         const id_mesa = c.rows[0].id_mesa;
-        await db.query(
-            `UPDATE cuenta_mesa SET estado='Cancelada', fecha_cierre=NOW() WHERE id_cuenta=$1`,
-            [id_cuenta]
-        );
-        await db.query(
-            `UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`,
-            [id_mesa]
-        );
+        const client = await db.connect();
+        try {
+            await client.query('BEGIN');
+            // Si el cajero quitó todos los productos de pedidos QR, esos pedidos quedan cancelados
+            await pedidoModel.finalizarPedidosDeCuenta(client, id_cuenta, 'Cancelado');
+            await client.query(
+                `UPDATE cuenta_mesa SET estado='Cancelada', fecha_cierre=NOW() WHERE id_cuenta=$1`,
+                [id_cuenta]
+            );
+            await client.query(
+                `UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`,
+                [id_mesa]
+            );
+            await client.query('COMMIT');
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
 
         global.io?.to('cajeros').emit('mesa:actualizada', { id_mesa });
         global.io?.to('cajeros').emit('cuenta:cerrada', { id_mesa });
+        emitirMesa(id_mesa, 'cuenta:cerrada', {});
         res.json({ mensaje: 'Cuenta vacía cancelada — mesa liberada', id_mesa });
     } catch(e) {
         console.error('cancelar-si-vacia:', e);
@@ -67,11 +82,16 @@ router.post('/reset-mesa', verificarToken, async (req, res) => {
             cambiosStock = cambiosStock.concat(
                 await cuentaModel.devolverStockCuenta(client, row.id_cuenta)
             );
+            await pedidoModel.finalizarPedidosDeCuenta(client, row.id_cuenta, 'Cancelado');
             await client.query(`
                 UPDATE cuenta_mesa SET estado='Cancelada', fecha_cierre=NOW()
                 WHERE id_cuenta=$1
             `, [row.id_cuenta]);
         }
+
+        // Pedidos QR sin confirmar de la mesa: se cancelan y su stock vuelve
+        const pendientes = await pedidoModel.cancelarPendientesMesa(client, id_mesa);
+        cambiosStock = cambiosStock.concat(pendientes.cambios);
 
         await client.query(
             `UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`, [id_mesa]
@@ -79,13 +99,9 @@ router.post('/reset-mesa', verificarToken, async (req, res) => {
         await client.query('COMMIT');
 
         global.io?.to('cajeros').emit('mesa:actualizada', { id_mesa });
-        for (const c of cambiosStock) {
-            global.io?.emit('actualizacion_stock_global', {
-                id_producto:               c.id_producto,
-                id_sucursal:               c.id_sucursal,
-                nueva_cantidad_disponible: c.nuevo_stock
-            });
-        }
+        global.io?.to('cajeros').emit('pedido:actualizado', { id_mesa, estado: 'Cancelado' });
+        emitirMesa(id_mesa, 'cuenta:cerrada', {});
+        emitirStock(cambiosStock);
 
         res.json({ mensaje: 'Mesa reseteada correctamente' });
     } catch(e) {

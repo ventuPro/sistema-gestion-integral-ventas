@@ -1,4 +1,17 @@
 const m = require('../models/mesaModel');
+const { emitirStock, emitirMesa } = require('../utils/tiempoReal');
+
+// URL del frontend que irá dentro del QR (la que abrirá el celular del cliente).
+// Solo http/https y sin ruta: evita generar QR que apunten a cualquier lado.
+const normalizarBaseUrl = (valor) => {
+    try {
+        const u = new URL(String(valor || ''));
+        if (!['http:', 'https:'].includes(u.protocol)) return null;
+        return u.origin;
+    } catch {
+        return null;
+    }
+};
 
 const agregarMesa = async (req, res) => {
     try {
@@ -23,17 +36,31 @@ const listarMesas = async (req, res) => {
 
 const obtenerQR = async (req, res) => {
     try {
-        const id_mesa  = req.params.id_mesa;
-        const base_url = req.query.base_url
-            ? decodeURIComponent(req.query.base_url)
-            : 'http://localhost:4200';
+        const id_mesa  = Number(req.params.id_mesa);
+        const base_url = normalizarBaseUrl(req.query.base_url || 'http://localhost:4200');
+        if (!id_mesa)  return res.status(400).json({ error: 'ID de mesa inválido' });
+        if (!base_url) return res.status(400).json({ error: 'La dirección del menú no es válida (use http:// o https://)' });
 
-        console.log(`🔗 Generando QR para Mesa ${id_mesa} → ${base_url}/menu/${id_mesa}`);
         const result = await m.generarQR(id_mesa, base_url);
         res.json(result);
     } catch(e) {
         console.error('obtenerQR:', e);
         res.status(500).json({ error: e.message });
+    }
+};
+
+// POST /api/mesas/:id_mesa/qr/regenerar — el QR impreso anterior deja de funcionar
+const regenerarQR = async (req, res) => {
+    try {
+        const id_mesa = Number(req.params.id_mesa);
+        if (!id_mesa) return res.status(400).json({ error: 'ID de mesa inválido' });
+        const mesa = await m.regenerarCodigoQR(id_mesa);
+        // Los celulares conectados con el QR anterior dejan de recibir avisos
+        global.io?.in(`mesa_${id_mesa}`).socketsLeave(`mesa_${id_mesa}`);
+        res.json({ mensaje: `Nuevo QR generado para la Mesa ${mesa.numero_mesa}. Imprímalo y reemplace el anterior.` });
+    } catch (e) {
+        console.error('regenerarQR:', e);
+        res.status(e.message === 'Mesa no encontrada' ? 404 : 500).json({ error: e.message });
     }
 };
 
@@ -51,10 +78,13 @@ const eliminarMesa = async (req, res) => {
         const id_mesa = Number(req.params.id_mesa);
         if (!id_mesa) return res.status(400).json({ error: 'ID de mesa inválido' });
 
-        await m.eliminarMesa(id_mesa);
+        const { cambiosStock } = await m.eliminarMesa(id_mesa);
 
         // Notificar a cajeros que la mesa fue eliminada
         global.io?.to('cajeros').emit('mesa:actualizada', { id_mesa });
+        global.io?.to('cajeros').emit('pedido:actualizado', { id_mesa, estado: 'Cancelado' });
+        emitirMesa(id_mesa, 'cuenta:cerrada', {});
+        emitirStock(cambiosStock);
 
         res.json({ mensaje: 'Mesa eliminada correctamente' });
     } catch (e) {
@@ -63,4 +93,4 @@ const eliminarMesa = async (req, res) => {
     }
 };
 
-module.exports = { agregarMesa, listarMesas, obtenerQR, actualizarEstado, eliminarMesa };
+module.exports = { agregarMesa, listarMesas, obtenerQR, regenerarQR, actualizarEstado, eliminarMesa };

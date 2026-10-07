@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { finalizarPedidosDeCuenta } = require('./pedidoModel');
 
 // ─── ABRIR CUENTA / COMANDA ───
 const abrirCuenta = async (id_mesa, id_usuario) => {
@@ -10,11 +11,17 @@ const abrirCuenta = async (id_mesa, id_usuario) => {
     if (existe.rows.length > 0)
         throw new Error('CUENTA_YA_ABIERTA');
 
-    // Abrir la cuenta
-    const r = await db.query(`
-        INSERT INTO cuenta_mesa (id_mesa, id_usuario_apertura, estado, total_acumulado)
-        VALUES ($1, $2, 'Abierta', 0.00) RETURNING *
-    `, [id_mesa, id_usuario]);
+    // Abrir la cuenta (el índice único uq_cuenta_abierta_mesa evita dos a la vez)
+    let r;
+    try {
+        r = await db.query(`
+            INSERT INTO cuenta_mesa (id_mesa, id_usuario_apertura, estado, total_acumulado)
+            VALUES ($1, $2, 'Abierta', 0.00) RETURNING *
+        `, [id_mesa, id_usuario]);
+    } catch (e) {
+        if (e.code === '23505') throw new Error('CUENTA_YA_ABIERTA');
+        throw e;
+    }
 
     // Cambiar estado de la mesa
     await db.query(
@@ -218,33 +225,6 @@ const devolverStockCuenta = async (client, id_cuenta) => {
     return cambios;
 };
 
-// ─── INTEGRAR PEDIDO QR EN LA COMANDA ───
-const integrarPedidoQR = async (id_cuenta, id_pedido) => {
-    // Traer items del pedido aprobado
-    const rItems = await db.query(`
-        SELECT dp.id_producto, dp.cantidad_solicitada, dp.precio_aplicado, dp.nota_cliente
-        FROM detalle_pedido dp WHERE dp.id_pedido=$1
-    `, [id_pedido]);
-
-    for (const item of rItems.rows) {
-        await agregarProductoCuenta(
-            id_cuenta,
-            item.id_producto,
-            item.cantidad_solicitada,
-            item.precio_aplicado,
-            item.nota_cliente,
-            'qr'
-        );
-    }
-
-    return obtenerCuentaActiva(await getCuentaMesaId(id_cuenta));
-};
-
-const getCuentaMesaId = async (id_cuenta) => {
-    const r = await db.query(`SELECT id_mesa FROM cuenta_mesa WHERE id_cuenta=$1`,[id_cuenta]);
-    return r.rows[0]?.id_mesa;
-};
-
 // ─── CERRAR CUENTA Y REGISTRAR VENTA ───
 const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, id_sucursal) => {
     const client = await db.connect();
@@ -285,6 +265,9 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, id_sucurs
             `, [id_venta, item.id_producto, item.cantidad, item.precio_unitario, item.subtotal]);
         }
 
+        // Los pedidos QR de esta cuenta quedan pagados
+        const pedidos_pagados = await finalizarPedidosDeCuenta(client, id_cuenta, 'Pagado');
+
         // Cerrar cuenta y liberar mesa
         await client.query(`
             UPDATE cuenta_mesa
@@ -298,7 +281,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, id_sucurs
         );
 
         await client.query('COMMIT');
-        return { id_venta, total: cuenta.total_acumulado, id_mesa: cuenta.id_mesa };
+        return { id_venta, total: cuenta.total_acumulado, id_mesa: cuenta.id_mesa, pedidos_pagados };
     } catch(e) {
         await client.query('ROLLBACK');
         throw e;
@@ -333,6 +316,6 @@ const obtenerMesasConCuenta = async (id_sucursal) => {
 
 module.exports = {
     abrirCuenta, obtenerCuentaActiva, agregarProductoCuenta,
-    quitarProductoCuenta, devolverStockCuenta, integrarPedidoQR, cerrarCuenta,
-    obtenerMesasConCuenta, getCuentaMesaId
+    quitarProductoCuenta, devolverStockCuenta, cerrarCuenta,
+    obtenerMesasConCuenta
 };

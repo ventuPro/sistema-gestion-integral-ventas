@@ -120,8 +120,8 @@
         </div>
       </div>
 
-      <!-- Recargar permisos (solo cajeros / cocina) -->
-      <button *ngIf="esCajero || (!esAdmin && !esCajero)"
+      <!-- Recargar permisos (solo cajeros) -->
+      <button *ngIf="esCajero"
               (click)="recargarPermisos()"
               [disabled]="recargandoPermisos"
               title="Recargar tus permisos sin cerrar sesión"
@@ -146,6 +146,9 @@
        class="fixed top-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium animate-bounce">
     {{ toastPermisos }}
   </div>
+
+  <!-- Pedidos del menú QR: visibles en cualquier pantalla del cajero -->
+  <app-bandeja-pedidos *ngIf="esCajero && tiene('mesas')"></app-bandeja-pedidos>
 
   <!-- ═══ CONTENIDO PRINCIPAL ═══ -->
   <div class="flex-1 flex flex-col overflow-hidden">

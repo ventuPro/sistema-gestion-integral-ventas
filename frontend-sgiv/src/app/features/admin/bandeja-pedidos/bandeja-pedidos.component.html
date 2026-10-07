@@ -1,0 +1,168 @@
+<!-- Aviso breve -->
+<div *ngIf="aviso"
+     class="fixed top-6 right-6 z-[60] bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium">
+  {{ aviso }}
+</div>
+
+<!-- ═══ BOTÓN FLOTANTE ═══ -->
+<button *ngIf="!abierta" (click)="alternar()"
+        class="fixed bottom-6 right-6 z-40 flex items-center gap-2 pl-4 pr-5 py-3 rounded-full shadow-2xl font-bold text-sm transition-colors"
+        [class.bg-amber-500]="pendientes.length > 0" [class.hover:bg-amber-600]="pendientes.length > 0" [class.text-white]="pendientes.length > 0"
+        [class.bg-white]="pendientes.length === 0" [class.text-gray-700]="pendientes.length === 0" [class.border]="pendientes.length === 0"
+        title="Pedidos del menú QR">
+  <span class="relative flex">
+    <lucide-icon [img]="icons.bell" class="w-5 h-5"></lucide-icon>
+    <span *ngIf="pendientes.length > 0" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></span>
+  </span>
+  <span *ngIf="pendientes.length > 0">{{ pendientes.length }} por confirmar</span>
+  <span *ngIf="pendientes.length === 0">Pedidos QR</span>
+  <span *ngIf="porEntregar.length > 0"
+        class="ml-1 px-2 py-0.5 rounded-full text-xs bg-blue-600 text-white">{{ porEntregar.length }} por entregar</span>
+</button>
+
+<!-- ═══ PANEL ═══ -->
+<div *ngIf="abierta" class="fixed inset-0 z-50 flex justify-end">
+  <div class="absolute inset-0 bg-gray-900/30" (click)="alternar()"></div>
+
+  <aside class="relative w-full max-w-md h-full bg-gray-50 shadow-2xl flex flex-col">
+
+    <!-- Encabezado -->
+    <div class="bg-gray-900 text-white px-5 py-4 flex items-center justify-between">
+      <div>
+        <h2 class="font-black text-lg">Pedidos del menú QR</h2>
+        <p class="text-xs text-gray-400">Confirma para cargarlos a la cuenta de la mesa</p>
+      </div>
+      <div class="flex items-center gap-1">
+        <button (click)="alternarSonido()"
+                class="p-2 rounded-lg hover:bg-gray-800"
+                [title]="sonidoActivo ? 'Silenciar avisos' : 'Activar sonido de avisos'">
+          <lucide-icon [img]="sonidoActivo ? icons.sonido : icons.silencio" class="w-5 h-5"></lucide-icon>
+        </button>
+        <button (click)="alternar()" class="p-2 rounded-lg hover:bg-gray-800" title="Cerrar">
+          <lucide-icon [img]="icons.x" class="w-5 h-5"></lucide-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Pestañas -->
+    <div class="flex bg-white border-b">
+      <button (click)="pestana = 'pendientes'"
+              class="flex-1 py-3 text-sm font-bold border-b-2 transition-colors"
+              [class.border-amber-500]="pestana === 'pendientes'" [class.text-amber-700]="pestana === 'pendientes'"
+              [class.border-transparent]="pestana !== 'pendientes'" [class.text-gray-500]="pestana !== 'pendientes'">
+        Por confirmar ({{ pendientes.length }})
+      </button>
+      <button (click)="pestana = 'entregar'"
+              class="flex-1 py-3 text-sm font-bold border-b-2 transition-colors"
+              [class.border-blue-600]="pestana === 'entregar'" [class.text-blue-700]="pestana === 'entregar'"
+              [class.border-transparent]="pestana !== 'entregar'" [class.text-gray-500]="pestana !== 'entregar'">
+        Por entregar ({{ porEntregar.length }})
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 space-y-3">
+
+      <!-- ─── POR CONFIRMAR ─── -->
+      <ng-container *ngIf="pestana === 'pendientes'">
+        <p *ngIf="pendientes.length === 0" class="text-center text-gray-400 text-sm py-16">
+          No hay pedidos esperando confirmación.
+        </p>
+
+        <div *ngFor="let p of pendientes"
+             class="bg-white rounded-xl border-2 shadow-sm overflow-hidden"
+             [class.border-red-300]="esperaLarga(p.fecha_pedido)"
+             [class.border-amber-300]="!esperaLarga(p.fecha_pedido)">
+
+          <div class="px-4 py-3 flex items-center justify-between"
+               [class.bg-red-50]="esperaLarga(p.fecha_pedido)" [class.bg-amber-50]="!esperaLarga(p.fecha_pedido)">
+            <div class="flex items-center gap-2">
+              <lucide-icon *ngIf="p.tipo_pedido === 'Delivery'" [img]="icons.delivery" class="w-4 h-4 text-gray-600"></lucide-icon>
+              <span class="font-black text-gray-800 text-lg">{{ etiqueta(p) }}</span>
+            </div>
+            <span class="text-xs font-semibold"
+                  [class.text-red-600]="esperaLarga(p.fecha_pedido)" [class.text-gray-500]="!esperaLarga(p.fecha_pedido)">
+              {{ minutos(p.fecha_pedido) }}
+            </span>
+          </div>
+
+          <ul class="divide-y divide-gray-100">
+            <li *ngFor="let it of p.items" class="px-4 py-2.5 flex items-center gap-3">
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-gray-800">{{ it.nombre_producto }}</p>
+                <p *ngIf="it.nota_cliente" class="text-xs text-amber-700">📝 {{ it.nota_cliente }}</p>
+                <p class="text-xs text-gray-400">Bs. {{ (+it.subtotal).toFixed(2) }}</p>
+              </div>
+              <div class="flex items-center gap-1.5 flex-shrink-0">
+                <button (click)="cambiarCantidad(p, it, it.cantidad - 1)" [disabled]="ocupado[p.id_pedido] || it.cantidad <= 1"
+                        class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-40 flex items-center justify-center"
+                        title="Uno menos">
+                  <lucide-icon [img]="icons.minus" class="w-3.5 h-3.5"></lucide-icon>
+                </button>
+                <span class="w-6 text-center font-black text-gray-800">{{ it.cantidad }}</span>
+                <button (click)="cambiarCantidad(p, it, it.cantidad + 1)" [disabled]="ocupado[p.id_pedido] || +it.stock_disponible <= 0"
+                        class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-40 flex items-center justify-center"
+                        [title]="+it.stock_disponible <= 0 ? 'Sin más stock' : 'Uno más'">
+                  <lucide-icon [img]="icons.plus" class="w-3.5 h-3.5"></lucide-icon>
+                </button>
+                <button (click)="cambiarCantidad(p, it, 0)" [disabled]="ocupado[p.id_pedido]"
+                        class="w-7 h-7 rounded-full text-red-500 hover:bg-red-50 disabled:opacity-40 flex items-center justify-center"
+                        title="Quitar del pedido">
+                  <lucide-icon [img]="icons.trash" class="w-3.5 h-3.5"></lucide-icon>
+                </button>
+              </div>
+            </li>
+          </ul>
+
+          <p *ngIf="p.observacion_general" class="mx-4 mb-2 text-xs bg-gray-50 border rounded-lg px-3 py-2 text-gray-600">
+            💬 {{ p.observacion_general }}
+          </p>
+
+          <p *ngIf="errores[p.id_pedido]" class="mx-4 mb-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">
+            {{ errores[p.id_pedido] }}
+          </p>
+
+          <div class="px-4 py-3 border-t flex items-center gap-2">
+            <span class="flex-1 font-black text-gray-800">Bs. {{ (+p.monto_total).toFixed(2) }}</span>
+            <button (click)="rechazar(p)" [disabled]="ocupado[p.id_pedido]"
+                    class="px-3 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-40">
+              Rechazar
+            </button>
+            <button (click)="confirmar(p)" [disabled]="ocupado[p.id_pedido]"
+                    class="px-4 py-2 rounded-lg text-sm font-bold bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 flex items-center gap-1">
+              <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon>
+              {{ ocupado[p.id_pedido] ? 'Procesando…' : 'Confirmar' }}
+            </button>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- ─── POR ENTREGAR ─── -->
+      <ng-container *ngIf="pestana === 'entregar'">
+        <p *ngIf="porEntregar.length === 0" class="text-center text-gray-400 text-sm py-16">
+          No hay pedidos pendientes de entrega.
+        </p>
+
+        <div *ngFor="let p of porEntregar" class="bg-white rounded-xl border border-blue-200 shadow-sm p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-black text-gray-800 text-lg">{{ etiqueta(p) }}</span>
+            <span class="text-xs text-gray-500">confirmado {{ minutos(p.fecha_aprobacion) }}</span>
+          </div>
+          <ul class="text-sm text-gray-700 space-y-1 mb-3">
+            <li *ngFor="let it of p.items">
+              <span class="font-bold">{{ it.cantidad }}×</span> {{ it.nombre_producto }}
+              <span *ngIf="it.nota_cliente" class="block text-xs text-amber-700 ml-5">📝 {{ it.nota_cliente }}</span>
+            </li>
+          </ul>
+          <p *ngIf="errores[p.id_pedido]" class="mb-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">
+            {{ errores[p.id_pedido] }}
+          </p>
+          <button (click)="entregado(p)" [disabled]="ocupado[p.id_pedido]"
+                  class="w-full py-2 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 flex items-center justify-center gap-1">
+            <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon>
+            Entregado en la mesa
+          </button>
+        </div>
+      </ng-container>
+    </div>
+  </aside>
+</div>

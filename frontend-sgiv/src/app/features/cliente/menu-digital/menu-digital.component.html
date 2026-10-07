@@ -1,77 +1,94 @@
-<div class="min-h-screen bg-gray-50 font-sans max-w-md mx-auto">
+<div class="min-h-screen bg-gray-50 font-sans max-w-md mx-auto relative">
 
-  <!-- Sin mesa válida -->
-  <div *ngIf="!id_mesa" class="flex flex-col items-center justify-center min-h-screen text-center p-8">
-    <div class="text-6xl mb-4">❌</div>
-    <h2 class="text-xl font-bold text-gray-700">Mesa no válida</h2>
-    <p class="text-gray-500 text-sm mt-2">El código QR no es correcto.</p>
+  <!-- Aviso -->
+  <div *ngIf="aviso"
+       class="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm bg-gray-900 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-2xl text-center">
+    {{ aviso }}
   </div>
 
-  <!-- Cargando -->
-  <div *ngIf="id_mesa && cargando" class="flex flex-col items-center justify-center min-h-screen gap-4">
+  <!-- ═══ QR NO VÁLIDO ═══ -->
+  <div *ngIf="estadoCarga === 'invalido'" class="flex flex-col items-center justify-center min-h-screen text-center p-8">
+    <div class="text-6xl mb-4">🔍</div>
+    <h2 class="text-xl font-bold text-gray-700">Código QR no válido</h2>
+    <p class="text-gray-500 text-sm mt-2">Este código ya no funciona. Pide ayuda en caja.</p>
+  </div>
+
+  <!-- ═══ ERROR DE CONEXIÓN ═══ -->
+  <div *ngIf="estadoCarga === 'error'" class="flex flex-col items-center justify-center min-h-screen text-center p-8">
+    <div class="text-6xl mb-4">📶</div>
+    <h2 class="text-xl font-bold text-gray-700">No pudimos cargar el menú</h2>
+    <p class="text-gray-500 text-sm mt-2">Revisa tu conexión a internet o al WiFi del local.</p>
+    <button (click)="cargarTodo()" class="mt-6 px-6 py-3 bg-blue-600 text-white font-bold rounded-xl">Reintentar</button>
+  </div>
+
+  <!-- ═══ CARGANDO ═══ -->
+  <div *ngIf="estadoCarga === 'cargando'" class="flex flex-col items-center justify-center min-h-screen gap-4">
     <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
     <p class="text-gray-500 text-sm">Cargando menú...</p>
   </div>
 
-  <ng-container *ngIf="id_mesa && !cargando">
+  <ng-container *ngIf="estadoCarga === 'listo' && info">
 
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-5 py-5 sticky top-0 z-30 shadow-lg">
+    <!-- ═══ ENCABEZADO ═══ -->
+    <header class="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-5 pt-5 pb-3 sticky top-0 z-30 shadow-lg">
       <h1 class="text-xl font-black">Pastelería Ricky's</h1>
-      <p class="text-blue-200 text-sm" *ngIf="infoMesa">
-        Mesa {{ infoMesa.numero_mesa }} — {{ infoMesa.nombre_sucursal }}
-      </p>
+      <p class="text-blue-200 text-sm">Mesa {{ info.numero_mesa }} · {{ info.nombre_sucursal }}</p>
 
-      <!-- Navegación -->
-      <div class="flex mt-3 bg-blue-800/50 rounded-xl p-1 gap-1">
-        <button (click)="vistaActual = 'catalogo'"
-                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center"
-                [class.bg-white]="vistaActual === 'catalogo'"
-                [class.text-blue-700]="vistaActual === 'catalogo'"
-                [class.text-blue-200]="vistaActual !== 'catalogo'">
+      <nav class="flex mt-3 bg-blue-800/50 rounded-xl p-1 gap-1">
+        <button (click)="vista = 'menu'"
+                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all"
+                [class.bg-white]="vista === 'menu'" [class.text-blue-700]="vista === 'menu'" [class.text-blue-200]="vista !== 'menu'">
           🍽 Menú
         </button>
-        <button (click)="vistaActual = 'carrito'"
-                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center relative"
-                [class.bg-white]="vistaActual === 'carrito'"
-                [class.text-blue-700]="vistaActual === 'carrito'"
-                [class.text-blue-200]="vistaActual !== 'carrito'">
+        <button (click)="vista = 'carrito'"
+                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all relative"
+                [class.bg-white]="vista === 'carrito'" [class.text-blue-700]="vista === 'carrito'" [class.text-blue-200]="vista !== 'carrito'">
           🛒 Carrito
-          <span *ngIf="cantidadTotal > 0"
-                class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-            {{ cantidadTotal }}
+          <span *ngIf="cantidadCarrito > 0"
+                class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-5 h-5 px-1 flex items-center justify-center font-bold">
+            {{ cantidadCarrito }}
           </span>
         </button>
-        <button *ngIf="pedidoActual" (click)="vistaActual = 'tracking'"
-                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-center"
-                [class.bg-white]="vistaActual === 'tracking'"
-                [class.text-blue-700]="vistaActual === 'tracking'"
-                [class.text-blue-200]="vistaActual !== 'tracking'">
-          📍 Estado
+        <button (click)="vista = 'pedidos'; refrescarEstado()"
+                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all relative"
+                [class.bg-white]="vista === 'pedidos'" [class.text-blue-700]="vista === 'pedidos'" [class.text-blue-200]="vista !== 'pedidos'">
+          🧾 Mi mesa
+          <span *ngIf="pedidosActivos > 0"
+                class="absolute -top-1 -right-1 bg-amber-400 text-gray-900 text-xs rounded-full min-w-5 h-5 px-1 flex items-center justify-center font-bold">
+            {{ pedidosActivos }}
+          </span>
         </button>
-      </div>
+      </nav>
+    </header>
+
+    <!-- Sin turno de caja: se puede ver el menú, pero no pedir -->
+    <div *ngIf="!info.recibe_pedidos"
+         class="mx-4 mt-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3">
+      En este momento no estamos recibiendo pedidos desde el menú. Puedes verlo y pedir en caja.
     </div>
 
-    <!-- ════ CATÁLOGO ════ -->
-    <div *ngIf="vistaActual === 'catalogo'" class="pb-28">
+    <!-- Agradecimiento al cerrar la cuenta -->
+    <div *ngIf="gracias" class="mx-4 mt-3 bg-green-50 border border-green-200 rounded-xl px-4 py-4 text-center">
+      <div class="text-4xl mb-1">🎉</div>
+      <p class="font-black text-green-800">¡Gracias por tu visita!</p>
+      <p class="text-sm text-green-700">Tu cuenta fue cerrada. Esperamos verte pronto.</p>
+    </div>
 
-      <!-- Buscador -->
+    <!-- ════════ MENÚ ════════ -->
+    <section *ngIf="vista === 'menu'" class="pb-28">
       <div class="px-4 pt-3 pb-1">
-        <input type="text" [(ngModel)]="busqueda"
-               placeholder="🔍 Buscar productos..."
-               class="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 bg-white shadow-sm">
+        <input type="search" [(ngModel)]="busqueda" placeholder="🔍 Buscar productos..."
+               class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 bg-white shadow-sm">
       </div>
 
-      <!-- Categorías -->
-      <div class="flex gap-2 px-4 py-2 overflow-x-auto">
+      <div class="flex gap-2 px-4 py-2 overflow-x-auto scrollbar-hide">
         <button (click)="categoriaActiva = null"
                 class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors"
                 [class.bg-blue-600]="categoriaActiva === null" [class.text-white]="categoriaActiva === null"
                 [class.bg-white]="categoriaActiva !== null" [class.text-gray-600]="categoriaActiva !== null">
           Todos
         </button>
-        <button *ngFor="let cat of categorias"
-                (click)="categoriaActiva = cat.id"
+        <button *ngFor="let cat of categorias" (click)="categoriaActiva = cat.id"
                 class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors whitespace-nowrap"
                 [class.bg-blue-600]="categoriaActiva === cat.id" [class.text-white]="categoriaActiva === cat.id"
                 [class.bg-white]="categoriaActiva !== cat.id" [class.text-gray-600]="categoriaActiva !== cat.id">
@@ -79,203 +96,203 @@
         </button>
       </div>
 
-      <!-- Sin productos -->
       <div *ngIf="catalogoFiltrado.length === 0" class="text-center py-16 text-gray-400">
         <div class="text-5xl mb-3">😔</div>
-        <p>Sin productos disponibles</p>
+        <p>No encontramos productos</p>
       </div>
 
-      <!-- Grid productos -->
       <div class="grid grid-cols-2 gap-3 px-4 pb-4">
         <div *ngFor="let prod of catalogoFiltrado"
-             class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col">
+             class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col"
+             [class.opacity-60]="prod.stock_actual <= 0">
 
-          <!-- Imagen -->
           <div class="relative h-32 bg-blue-50">
-            <img *ngIf="prod.url_imagen"
-                 [src]="getImagenUrl(prod.url_imagen)"
-                 [alt]="prod.nombre_producto"
-                 class="w-full h-full object-cover">
-            <div *ngIf="!prod.url_imagen"
-                 class="w-full h-full flex items-center justify-center text-4xl font-bold text-blue-200">
+            <img *ngIf="prod.url_imagen" [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto"
+                 class="w-full h-full object-cover" loading="lazy">
+            <div *ngIf="!prod.url_imagen" class="w-full h-full flex items-center justify-center text-4xl font-bold text-blue-200">
               {{ prod.nombre_producto?.charAt(0) }}
             </div>
-            <span class="absolute top-2 right-2 bg-white/90 text-xs font-bold px-2 py-0.5 rounded-full shadow"
-                  [class.text-green-600]="prod.stock_actual > 5"
-                  [class.text-orange-500]="prod.stock_actual > 0 && prod.stock_actual <= 5"
-                  [class.text-red-500]="prod.stock_actual === 0">
-              {{ prod.stock_actual === 0 ? 'Agotado' : prod.stock_actual + ' disp.' }}
+            <span class="absolute top-2 right-2 bg-white/95 text-xs font-bold px-2 py-0.5 rounded-full shadow"
+                  [class.text-red-600]="disponible(prod) === 0"
+                  [class.text-orange-600]="disponible(prod) > 0 && disponible(prod) <= 5"
+                  [class.text-green-700]="disponible(prod) > 5">
+              {{ prod.stock_actual <= 0 ? 'Agotado' : disponible(prod) === 0 ? 'Todo en tu carrito' : disponible(prod) <= 5 ? 'Quedan ' + disponible(prod) : disponible(prod) + ' disp.' }}
             </span>
           </div>
 
-          <!-- Info -->
           <div class="p-3 flex flex-col flex-1">
             <p class="font-bold text-gray-800 text-sm leading-tight mb-1">{{ prod.nombre_producto }}</p>
             <p *ngIf="prod.descripcion_producto" class="text-xs text-gray-400 mb-2 leading-tight line-clamp-2">
               {{ prod.descripcion_producto }}
             </p>
-            <p class="text-blue-700 font-black text-base mt-auto">Bs. {{ prod.precio_unitario }}</p>
-            <button (click)="agregarAlCarrito(prod)"
-                    [disabled]="prod.stock_actual <= 0"
-                    class="mt-2 w-full py-2 font-bold rounded-xl transition-colors text-sm"
-                    [class.bg-blue-600]="prod.stock_actual > 0" [class.hover:bg-blue-700]="prod.stock_actual > 0" [class.text-white]="prod.stock_actual > 0"
-                    [class.bg-gray-200]="prod.stock_actual <= 0" [class.text-gray-400]="prod.stock_actual <= 0" [class.cursor-not-allowed]="prod.stock_actual <= 0">
+            <p class="text-blue-700 font-black text-base mt-auto">Bs. {{ Number(prod.precio_unitario).toFixed(2) }}</p>
+
+            <button *ngIf="enCarrito(prod.id_producto) === 0" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0"
+                    class="mt-2 w-full py-2 font-bold rounded-xl transition-colors text-sm bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-200 disabled:text-gray-400">
               {{ prod.stock_actual > 0 ? '+ Agregar' : 'Agotado' }}
             </button>
+            <div *ngIf="enCarrito(prod.id_producto) > 0" class="mt-2 flex items-center justify-between bg-blue-50 rounded-xl p-1">
+              <button (click)="quitarUno(prod.id_producto)"
+                      class="w-8 h-8 rounded-lg bg-white text-blue-700 font-black shadow-sm">−</button>
+              <span class="font-black text-blue-800">{{ enCarrito(prod.id_producto) }}</span>
+              <button (click)="agregar(prod)" [disabled]="disponible(prod) <= 0"
+                      class="w-8 h-8 rounded-lg bg-blue-600 text-white font-black shadow-sm disabled:bg-gray-300">+</button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- ════ CARRITO ════ -->
-    <div *ngIf="vistaActual === 'carrito'" class="pb-28 p-4">
+    <!-- ════════ CARRITO ════════ -->
+    <section *ngIf="vista === 'carrito'" class="pb-28 p-4">
 
       <div *ngIf="carrito.length === 0" class="text-center py-16 text-gray-400">
         <div class="text-5xl mb-3">🛒</div>
         <p class="font-medium">Tu carrito está vacío</p>
-        <button (click)="vistaActual = 'catalogo'" class="mt-4 text-blue-600 font-semibold text-sm">
-          Ver el menú →
-        </button>
+        <button (click)="vista = 'menu'" class="mt-4 text-blue-600 font-semibold text-sm">Ver el menú →</button>
       </div>
 
       <div *ngIf="carrito.length > 0" class="space-y-3">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Tu pedido</h2>
+        <h2 class="text-xl font-bold text-gray-800">Tu pedido</h2>
 
         <div *ngFor="let item of carrito" class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <div class="flex gap-3 mb-2">
             <div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-blue-50">
-              <img *ngIf="item.url_imagen" [src]="getImagenUrl(item.url_imagen)" class="w-full h-full object-cover">
+              <img *ngIf="item.url_imagen" [src]="item.url_imagen | imagenUrl" class="w-full h-full object-cover">
               <div *ngIf="!item.url_imagen" class="w-full h-full flex items-center justify-center text-blue-200 font-black text-xl">
-                {{ item.nombre_producto?.charAt(0) }}
+                {{ item.nombre_producto.charAt(0) }}
               </div>
             </div>
-            <div class="flex-1">
-              <p class="font-bold text-gray-800">{{ item.nombre_producto }}</p>
-              <p class="text-blue-700 font-black">Bs. {{ (Number(item.precio_unitario) * item.cantidad).toFixed(2) }}</p>
+            <div class="flex-1 min-w-0">
+              <p class="font-bold text-gray-800 leading-tight">{{ item.nombre_producto }}</p>
+              <p class="text-blue-700 font-black">Bs. {{ (item.precio_unitario * item.cantidad).toFixed(2) }}</p>
+              <button (click)="eliminar(item)" class="text-xs text-red-500 font-semibold">Quitar</button>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
-              <button (click)="decrementarItem(item)"
-                      class="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold flex items-center justify-center">
-                −
-              </button>
+              <button (click)="quitarUno(item.id_producto)"
+                      class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 font-bold">−</button>
               <span class="font-black text-gray-800 w-5 text-center">{{ item.cantidad }}</span>
-              <button (click)="incrementarItem(item)"
-                      class="w-7 h-7 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center">
-                +
-              </button>
+              <button (click)="agregarUno(item)" [disabled]="!puedeSumar(item)"
+                      class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold disabled:bg-gray-300">+</button>
             </div>
           </div>
-          <input type="text" [(ngModel)]="item.nota_cliente"
-                 [name]="'nota_' + item.id_producto"
-                 placeholder="Observación: sin azúcar, extra etc..."
+          <input type="text" [(ngModel)]="item.nota_cliente" maxlength="200"
+                 placeholder="Observación: sin azúcar, para llevar..."
                  class="w-full px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 outline-none focus:ring-1 focus:ring-amber-400 placeholder-amber-300">
         </div>
 
-        <!-- Observación general -->
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <label class="block text-sm font-semibold text-gray-700 mb-2">Observación general (opcional)</label>
-          <textarea [(ngModel)]="observacionGeneral" rows="2"
-                    placeholder="Ej: somos 3 personas..."
+          <textarea [(ngModel)]="observacionGeneral" rows="2" maxlength="200"
+                    placeholder="Ej: traer todo junto"
                     class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-blue-500 resize-none"></textarea>
         </div>
 
-        <!-- Total y enviar -->
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
           <div class="flex justify-between items-center mb-4">
-            <span class="font-bold text-gray-600">Total</span>
+            <span class="font-bold text-gray-600">Total del pedido</span>
             <span class="text-3xl font-black text-blue-700">Bs. {{ totalCarrito.toFixed(2) }}</span>
           </div>
           <div *ngIf="errorEnvio" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm mb-3">
             {{ errorEnvio }}
           </div>
-          <button (click)="enviarPedido()" [disabled]="enviando"
+          <button (click)="enviarPedido()" [disabled]="enviando || !info.recibe_pedidos"
                   class="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-black text-lg rounded-2xl transition-colors shadow-md">
-            {{ enviando ? 'Enviando...' : '🚀 Enviar Pedido' }}
+            {{ enviando ? 'Enviando...' : 'Enviar pedido' }}
           </button>
-          <p class="text-center text-xs text-gray-400 mt-2">El cajero confirmará tu pedido antes de enviarlo a cocina</p>
+          <p class="text-center text-xs text-gray-400 mt-2">El cajero confirmará tu pedido. Pagas todo al final en caja.</p>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- ════ TRACKING ════ -->
-    <div *ngIf="vistaActual === 'tracking' && pedidoActual" class="pb-24 p-4 space-y-4">
-      <h2 class="text-xl font-bold text-gray-800">Estado de tu pedido</h2>
+    <!-- ════════ MI MESA: pedidos y consumo ════════ -->
+    <section *ngIf="vista === 'pedidos'" class="pb-28 p-4 space-y-4">
 
-      <!-- Estado actual -->
-      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-center">
-        <ng-container *ngIf="getEstadoInfo(pedidoActual.estado) as info">
-          <div class="text-6xl mb-3">{{ info.icon }}</div>
-          <p class="text-xl font-black mb-1" [ngClass]="info.color">{{ info.label }}</p>
-          <p class="text-gray-500 text-sm">{{ info.desc }}</p>
-        </ng-container>
+      <div *ngIf="pedidos.length === 0 && !cuenta" class="text-center py-16 text-gray-400">
+        <div class="text-5xl mb-3">🧾</div>
+        <p class="font-medium">Aún no hiciste pedidos</p>
+        <button (click)="vista = 'menu'" class="mt-4 text-blue-600 font-semibold text-sm">Ver el menú →</button>
       </div>
 
-      <!-- Timeline -->
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <h3 class="font-bold text-gray-700 mb-4 text-sm">Progreso del pedido</h3>
-        <div class="space-y-3">
-          <div *ngFor="let paso of [
-            {key:'Pendiente_Cajero', label:'Esperando cajero',  icon:'⏳'},
-            {key:'En_Cocina',        label:'En preparación',    icon:'🍳'},
-            {key:'Listo',            label:'Listo para servir', icon:'✅'}
-          ]" class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0"
-                 [class.bg-blue-600]="pedidoActual.estado === paso.key"
-                 [class.bg-green-100]="pedidoActual.estado !== paso.key && isEstadoPasado(pedidoActual.estado, paso.key)"
-                 [class.bg-gray-100]="!isEstadoPasado(pedidoActual.estado, paso.key) && pedidoActual.estado !== paso.key">
-              {{ paso.icon }}
+      <!-- Pedidos de este celular -->
+      <div *ngFor="let p of pedidos" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="px-4 py-3 flex items-center justify-between border-b">
+          <span class="font-bold text-gray-800">Pedido #{{ p.id_pedido }}</span>
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full" [ngClass]="infoEstado(p.estado_pedido).clase">
+            {{ infoEstado(p.estado_pedido).texto }}
+          </span>
+        </div>
+
+        <!-- Progreso -->
+        <div *ngIf="p.estado_pedido !== 'Cancelado'" class="px-4 pt-3 flex items-center">
+          <ng-container *ngFor="let paso of pasos; let ultimo = last">
+            <div class="flex flex-col items-center">
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black"
+                   [class.bg-green-500]="pasoAlcanzado(p, paso.estado)" [class.text-white]="pasoAlcanzado(p, paso.estado)"
+                   [class.bg-gray-200]="!pasoAlcanzado(p, paso.estado)" [class.text-gray-400]="!pasoAlcanzado(p, paso.estado)">✓</div>
+              <span class="text-[11px] mt-1"
+                    [class.text-green-700]="pasoAlcanzado(p, paso.estado)" [class.text-gray-400]="!pasoAlcanzado(p, paso.estado)">
+                {{ paso.texto }}
+              </span>
             </div>
-            <span class="text-sm font-medium"
-                  [class.text-blue-700]="pedidoActual.estado === paso.key"
-                  [class.text-green-700]="pedidoActual.estado !== paso.key && isEstadoPasado(pedidoActual.estado, paso.key)"
-                  [class.text-gray-400]="!isEstadoPasado(pedidoActual.estado, paso.key) && pedidoActual.estado !== paso.key">
-              {{ paso.label }}
+            <div *ngIf="!ultimo" class="flex-1 h-0.5 mb-5 mx-1"
+                 [class.bg-green-500]="pasoAlcanzado(p, pasos[pasos.indexOf(paso) + 1].estado)"
+                 [class.bg-gray-200]="!pasoAlcanzado(p, pasos[pasos.indexOf(paso) + 1].estado)"></div>
+          </ng-container>
+        </div>
+        <p class="px-4 pt-2 text-xs text-gray-500">{{ infoEstado(p.estado_pedido).detalle }}</p>
+
+        <ul class="px-4 py-2 text-sm">
+          <li *ngFor="let it of p.items" class="flex justify-between py-1">
+            <span class="text-gray-700">
+              <b>{{ it.cantidad }}×</b> {{ it.nombre_producto }}
+              <span *ngIf="it.nota_cliente" class="block text-xs text-amber-600 ml-5">📝 {{ it.nota_cliente }}</span>
             </span>
-          </div>
+            <span class="text-gray-600 ml-3">Bs. {{ Number(it.subtotal).toFixed(2) }}</span>
+          </li>
+        </ul>
+
+        <div *ngIf="p.estado_pedido === 'Pendiente_Cajero'" class="px-4 pb-3">
+          <button (click)="cancelar(p)" [disabled]="cancelando[p.id_pedido]"
+                  class="w-full py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 disabled:opacity-50">
+            {{ cancelando[p.id_pedido] ? 'Cancelando…' : 'Cancelar pedido' }}
+          </button>
         </div>
       </div>
 
-      <!-- Items del pedido -->
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <h3 class="font-bold text-gray-700 mb-3 text-sm">Tu pedido</h3>
-        <div *ngFor="let item of pedidoActual.items"
-             class="flex justify-between py-2 border-b border-gray-100 last:border-0">
-          <div>
-            <span class="text-sm font-medium text-gray-800">{{ item.nombre_producto }}</span>
-            <span *ngIf="item.nota_cliente" class="block text-xs text-amber-600">📝 {{ item.nota_cliente }}</span>
-          </div>
-          <div class="text-right ml-4">
-            <span class="text-xs text-gray-500">×{{ item.cantidad }}</span>
-            <span class="block text-sm font-bold text-blue-700">
-              Bs. {{ (Number(item.precio_unitario) * item.cantidad).toFixed(2) }}
-            </span>
-          </div>
+      <!-- Consumo de la mesa -->
+      <div *ngIf="cuenta" class="bg-white rounded-2xl shadow-sm border-2 border-blue-100 p-4">
+        <h3 class="font-bold text-gray-800 mb-2">Consumo de la mesa</h3>
+        <ul class="text-sm divide-y divide-gray-100">
+          <li *ngFor="let it of cuenta.items" class="flex justify-between py-1.5">
+            <span class="text-gray-700"><b>{{ it.cantidad }}×</b> {{ it.nombre_producto }}</span>
+            <span class="text-gray-600">Bs. {{ Number(it.subtotal).toFixed(2) }}</span>
+          </li>
+        </ul>
+        <div class="flex justify-between items-center pt-3 mt-2 border-t">
+          <span class="font-bold text-gray-700">Total a pagar</span>
+          <span class="text-2xl font-black text-blue-700">Bs. {{ Number(cuenta.total_acumulado).toFixed(2) }}</span>
         </div>
-        <div class="flex justify-between pt-3 font-black text-gray-800">
-          <span>Total</span>
-          <span class="text-blue-700">Bs. {{ totalCarrito.toFixed(2) }}</span>
-        </div>
+        <p class="text-xs text-gray-400 mt-1">Pagas todo al final en caja.</p>
       </div>
 
-      <button *ngIf="pedidoActual.estado === 'Listo' || pedidoActual.estado === 'Cancelado'"
-              (click)="pedidoActual = null; vistaActual = 'catalogo'"
+      <button *ngIf="pedidos.length > 0 || cuenta" (click)="vista = 'menu'"
               class="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-colors">
-        Hacer otro pedido
+        + Pedir algo más
       </button>
-    </div>
-
+    </section>
   </ng-container>
 
   <!-- Botón flotante del carrito -->
-  <div *ngIf="vistaActual === 'catalogo' && cantidadTotal > 0"
-       class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-4">
-    <button (click)="vistaActual = 'carrito'"
-            class="w-full py-4 bg-gray-900 text-white font-black rounded-2xl shadow-2xl flex justify-between items-center px-6 hover:bg-gray-800 transition-colors">
-      <span class="bg-white text-gray-900 rounded-full w-7 h-7 flex items-center justify-center text-sm font-black">
-        {{ cantidadTotal }}
+  <div *ngIf="estadoCarga === 'listo' && vista === 'menu' && cantidadCarrito > 0"
+       class="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-md px-4">
+    <button (click)="vista = 'carrito'"
+            class="w-full py-4 bg-gray-900 text-white font-black rounded-2xl shadow-2xl flex justify-between items-center px-6">
+      <span class="bg-white text-gray-900 rounded-full min-w-7 h-7 px-1 flex items-center justify-center text-sm font-black">
+        {{ cantidadCarrito }}
       </span>
       <span>Ver carrito</span>
-      <span class="font-black">Bs. {{ totalCarrito.toFixed(2) }}</span>
+      <span>Bs. {{ totalCarrito.toFixed(2) }}</span>
     </button>
   </div>
 </div>

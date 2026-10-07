@@ -130,35 +130,13 @@ CREATE TABLE notificacion_admin (
 -- 4. MENÚ DIGITAL INTERACTIVO (CLIENTE)
 -- ==========================================
 
+-- codigo_qr: token aleatorio que va en la URL del menú (/menu/<codigo_qr>)
 CREATE TABLE mesa_local (
     id_mesa SERIAL PRIMARY KEY,
     id_sucursal INT REFERENCES sucursal(id_sucursal),
     numero_mesa INT NOT NULL,
-    codigo_qr TEXT UNIQUE,
+    codigo_qr TEXT UNIQUE NOT NULL,
     estado_mesa VARCHAR(20) DEFAULT 'Libre'
-);
-
-CREATE TABLE pedido_mesa (
-    id_pedido SERIAL PRIMARY KEY,
-    id_mesa INT REFERENCES mesa_local(id_mesa) ON DELETE CASCADE,
-    estado_pedido VARCHAR(30) DEFAULT 'Pendiente',
-    monto_total DECIMAL(10, 2) DEFAULT 0.00,
-    fecha_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    observacion_general TEXT,
-    fecha_aprobacion TIMESTAMP,
-    fecha_entrega TIMESTAMP
-);
-
-CREATE TABLE detalle_pedido (
-    id_detalle_pedido SERIAL PRIMARY KEY,
-    id_pedido INT REFERENCES pedido_mesa(id_pedido) ON DELETE CASCADE,
-    id_producto INT REFERENCES producto(id_producto),
-    cantidad_solicitada INT NOT NULL,
-    precio_aplicado DECIMAL(10, 2) NOT NULL,
-    subtotal_detalle DECIMAL(10, 2) NOT NULL,
-    nota_cliente TEXT,
-    estado_cocina VARCHAR(20) DEFAULT 'Pendiente',
-    nota_cocina TEXT
 );
 
 -- Comanda / cuenta abierta de una mesa (atención directa del cajero + pedidos QR)
@@ -171,6 +149,43 @@ CREATE TABLE cuenta_mesa (
     metodo_pago VARCHAR(50),
     fecha_apertura TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_cierre TIMESTAMP
+);
+
+-- Pedidos hechos por el cliente (menú QR en mesa; preparado para delivery).
+-- Flujo: Pendiente_Cajero → Confirmado → Entregado → Pagado (o Cancelado).
+-- El stock se reserva al crear el pedido y se devuelve si se cancela.
+-- Al confirmarse, sus productos pasan a la cuenta de la mesa (id_cuenta).
+CREATE TABLE pedido_mesa (
+    id_pedido SERIAL PRIMARY KEY,
+    tipo_pedido VARCHAR(20) NOT NULL DEFAULT 'Mesa',
+    id_sucursal INT REFERENCES sucursal(id_sucursal),
+    id_mesa INT REFERENCES mesa_local(id_mesa) ON DELETE CASCADE,
+    id_cuenta INT REFERENCES cuenta_mesa(id_cuenta) ON DELETE SET NULL,
+    id_usuario_atencion INT REFERENCES usuario(id_usuario),
+    estado_pedido VARCHAR(30) NOT NULL DEFAULT 'Pendiente_Cajero',
+    monto_total DECIMAL(10, 2) DEFAULT 0.00,
+    fecha_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    observacion_general TEXT,
+    fecha_aprobacion TIMESTAMP,
+    fecha_entrega TIMESTAMP,
+    -- Datos de contacto (pedidos a delivery)
+    nombre_cliente VARCHAR(100),
+    telefono_cliente VARCHAR(20),
+    direccion_entrega TEXT,
+    CONSTRAINT pedido_mesa_estado_check
+        CHECK (estado_pedido IN ('Pendiente_Cajero', 'Confirmado', 'Entregado', 'Pagado', 'Cancelado')),
+    CONSTRAINT pedido_mesa_tipo_check
+        CHECK (tipo_pedido IN ('Mesa', 'Delivery') AND (tipo_pedido <> 'Mesa' OR id_mesa IS NOT NULL))
+);
+
+CREATE TABLE detalle_pedido (
+    id_detalle_pedido SERIAL PRIMARY KEY,
+    id_pedido INT REFERENCES pedido_mesa(id_pedido) ON DELETE CASCADE,
+    id_producto INT REFERENCES producto(id_producto),
+    cantidad_solicitada INT NOT NULL,
+    precio_aplicado DECIMAL(10, 2) NOT NULL,
+    subtotal_detalle DECIMAL(10, 2) NOT NULL,
+    nota_cliente TEXT
 );
 
 CREATE TABLE detalle_cuenta (
@@ -240,3 +255,7 @@ CREATE TABLE detalle_venta (
 CREATE INDEX idx_turno_cajero_estado      ON turno_caja (id_usuario_cajero, estado_turno);
 CREATE INDEX idx_venta_caja_cajero_fecha  ON venta_caja (id_usuario_cajero, fecha_venta);
 CREATE INDEX idx_cuenta_mesa_estado       ON cuenta_mesa (id_mesa, estado);
+CREATE UNIQUE INDEX uq_cuenta_abierta_mesa ON cuenta_mesa (id_mesa) WHERE estado = 'Abierta';
+CREATE INDEX idx_pedido_sucursal_estado   ON pedido_mesa (id_sucursal, estado_pedido);
+CREATE INDEX idx_pedido_mesa_estado       ON pedido_mesa (id_mesa, estado_pedido);
+CREATE INDEX idx_pedido_cuenta            ON pedido_mesa (id_cuenta);

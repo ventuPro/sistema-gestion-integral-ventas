@@ -20,28 +20,22 @@ export class MesaService {
     return this.http.post(`${this.apiUrl}/mesas`, datos, { headers: this.h() });
   }
 
-  obtenerQR(id_mesa: number): Observable<any> {
-    const params = new HttpParams().set('base_url', window.location.origin);
+  /** base_url: dirección del sistema que abrirá el celular del cliente al escanear */
+  obtenerQR(id_mesa: number, base_url = window.location.origin): Observable<any> {
+    const params = new HttpParams().set('base_url', base_url);
     return this.http.get(`${this.apiUrl}/mesas/${id_mesa}/qr`, { headers: this.h(), params });
+  }
+
+  /** Invalida el QR impreso anterior de la mesa */
+  regenerarQR(id_mesa: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/mesas/${id_mesa}/qr/regenerar`, {}, { headers: this.h() });
   }
 
   actualizarEstado(id_mesa: number, estado_mesa: string): Observable<any> {
     return this.http.patch(`${this.apiUrl}/mesas/${id_mesa}/estado`, { estado_mesa }, { headers: this.h() });
   }
 
-  listarPendientesCajero(id_sucursal = 1): Observable<any> {
-    return this.http.get(`${this.apiUrl}/pedidos/pendientes/${id_sucursal}`, { headers: this.h() });
-  }
-
-  aprobarPedido(id_pedido: number): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/pedidos/${id_pedido}/aprobar`, {}, { headers: this.h() });
-  }
-
-  rechazarPedido(id_pedido: number): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/pedidos/${id_pedido}/rechazar`, {}, { headers: this.h() });
-  }
-
   eliminarMesa(id_mesa: number): Observable<any> {
-  return this.http.delete(`${this.apiUrl}/mesas/${id_mesa}`, { headers: this.h() });
-}
+    return this.http.delete(`${this.apiUrl}/mesas/${id_mesa}`, { headers: this.h() });
+  }
 }

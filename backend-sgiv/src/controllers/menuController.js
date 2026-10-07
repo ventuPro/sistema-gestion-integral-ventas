@@ -1,163 +1,140 @@
-const db = require('../config/db');
-const pm = require('../models/pedidoModel');
+const pedidoModel = require('../models/pedidoModel');
+const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
 
-// ─── Middleware CORS para rutas públicas ───
-const setCorsPublico = (res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+// ════════════════════════════════════════════════════════════════════
+//  MENÚ DIGITAL (público, sin login)
+//  La mesa se identifica por su código QR aleatorio (/menu/<codigo>),
+//  no por su id interno, para que no se pueda pedir a nombre de otra mesa.
+// ════════════════════════════════════════════════════════════════════
+
+// ─── Límite de pedidos por IP (evita pedidos falsos en ráfaga) ───
+const MAX_PEDIDOS_IP   = Number(process.env.MENU_MAX_PEDIDOS_IP) || 10;
+const VENTANA_IP_MS    = 10 * 60 * 1000;
+const pedidosPorIp     = new Map();   // ip → { cantidad, desde }
+
+setInterval(() => {
+    const ahora = Date.now();
+    for (const [ip, r] of pedidosPorIp)
+        if (ahora - r.desde > VENTANA_IP_MS) pedidosPorIp.delete(ip);
+}, VENTANA_IP_MS).unref();
+
+const superaLimiteIp = (ip) => {
+    const r = pedidosPorIp.get(ip);
+    if (!r || Date.now() - r.desde > VENTANA_IP_MS) {
+        pedidosPorIp.set(ip, { cantidad: 1, desde: Date.now() });
+        return false;
+    }
+    r.cantidad++;
+    return r.cantidad > MAX_PEDIDOS_IP;
 };
 
-// GET /api/menu/mesa/:id_mesa — info de la mesa (público)
-const obtenerInfoMesa = async (req, res) => {
-    setCorsPublico(res);
+const ERRORES = {
+    PEDIDO_INVALIDO:        400,
+    PEDIDO_NO_ENCONTRADO:   404,
+    PEDIDO_YA_PROCESADO:    409,
+    STOCK_INSUFICIENTE:     409,
+    PRODUCTO_NO_DISPONIBLE: 409,
+    NO_RECIBE_PEDIDOS:      409,
+    DEMASIADOS_PENDIENTES:  429
+};
+const responderError = (res, e, contexto) => {
+    const status = ERRORES[e.code];
+    if (status) return res.status(status).json({
+        error: e.message, codigo: e.code, id_producto: e.id_producto, disponible: e.disponible
+    });
+    console.error(`${contexto}:`, e);
+    res.status(500).json({ error: 'No se pudo procesar tu solicitud. Intenta de nuevo.' });
+};
+
+// Middleware: resuelve la mesa a partir del código QR
+const cargarMesa = async (req, res, next) => {
     try {
-        const id_mesa = Number(req.params.id_mesa);
-        if (!id_mesa) return res.status(400).json({ error: 'ID de mesa inválido' });
-
-        const r = await db.query(`
-            SELECT m.id_mesa, m.numero_mesa, m.estado_mesa, m.id_sucursal,
-                   s.nombre_sucursal
-            FROM mesa_local m
-            JOIN sucursal   s ON m.id_sucursal = s.id_sucursal
-            WHERE m.id_mesa = $1
-        `, [id_mesa]);
-
-        if (!r.rows.length)
-            return res.status(404).json({ error: 'Mesa no encontrada' });
-
-        res.json(r.rows[0]);
+        const mesa = await pedidoModel.obtenerMesaPorCodigo(req.params.codigo);
+        if (!mesa) return res.status(404).json({ error: 'Código QR no válido. Pide ayuda en caja.' });
+        req.mesa = mesa;
+        next();
     } catch (e) {
-        console.error('obtenerInfoMesa error:', e.message);
-        res.status(500).json({ error: 'Error al obtener información de la mesa' });
+        responderError(res, e, 'cargarMesa');
     }
 };
 
-// GET /api/menu/catalogo?id_sucursal=1 — catálogo de la sucursal (público)
-const obtenerCatalogoPublico = async (req, res) => {
-    setCorsPublico(res);
+// GET /api/menu/m/:codigo — datos de la mesa
+const obtenerMesa = (req, res) => {
+    const { numero_mesa, nombre_sucursal, id_sucursal, recibe_pedidos } = req.mesa;
+    res.json({ numero_mesa, nombre_sucursal, id_sucursal, recibe_pedidos });
+};
+
+// GET /api/menu/m/:codigo/catalogo
+const obtenerCatalogo = async (req, res) => {
     try {
-        const id_sucursal = Number(req.query.id_sucursal) || 1;
-
-        const r = await db.query(`
-            SELECT
-                p.id_producto,
-                p.nombre_producto,
-                p.descripcion_producto,
-                p.precio_unitario,
-                p.url_imagen,
-                c.id_categoria,
-                c.nombre_categoria,
-                COALESCE(i.cantidad_actual, 0) AS stock_actual
-            FROM producto p
-            JOIN  categoria_producto    c ON p.id_categoria  = c.id_categoria
-            LEFT JOIN inventario_sucursal i ON p.id_producto = i.id_producto
-                                            AND i.id_sucursal = $1
-            WHERE p.estado_activo = TRUE
-              AND COALESCE(i.cantidad_actual, 0) > 0
-            ORDER BY c.nombre_categoria, p.nombre_producto
-        `, [id_sucursal]);
-
-        res.json(r.rows);
+        res.json(await pedidoModel.obtenerCatalogoMenu(req.mesa.id_sucursal));
     } catch (e) {
-        console.error('obtenerCatalogoPublico error:', e.message);
-        res.status(500).json({ error: 'Error al obtener el catálogo' });
+        responderError(res, e, 'obtenerCatalogo');
     }
 };
 
-// POST /api/menu/pedido — crear pedido desde el menú digital (público)
-const crearPedidoDesdeMenu = async (req, res) => {
-    setCorsPublico(res);
+// POST /api/menu/m/:codigo/pedidos  { items: [{ id_producto, cantidad, nota_cliente }], observacion_general }
+const crearPedido = async (req, res) => {
     try {
-        const { id_mesa, numero_mesa, observacion_general, items } = req.body;
+        if (superaLimiteIp(req.ip))
+            return res.status(429).json({ error: 'Hiciste muchos pedidos seguidos. Espera unos minutos o pide ayuda en caja.' });
 
-        // Validaciones
-        if (!id_mesa)       return res.status(400).json({ error: 'Falta id_mesa' });
-        if (!items || !items.length)
-            return res.status(400).json({ error: 'El carrito está vacío' });
-
-        // Validar que la mesa existe
-        const rMesa = await db.query(
-            `SELECT id_mesa, numero_mesa FROM mesa_local WHERE id_mesa = $1`,
-            [id_mesa]
-        );
-        if (!rMesa.rows.length)
-            return res.status(404).json({ error: 'Mesa no encontrada' });
-
-        // Crear el pedido
-        const pedido = await pm.crearPedido({
-            id_mesa:             Number(id_mesa),
-            observacion_general: observacion_general || null
+        const { pedido, cambios } = await pedidoModel.crearPedidoMesa({
+            mesa:                req.mesa,
+            items:               req.body?.items,
+            observacion_general: req.body?.observacion_general
         });
 
-        // Agregar cada ítem del carrito
-        for (const item of items) {
-            await pm.agregarDetallePedido(
-                pedido.id_pedido,
-                Number(item.id_producto),
-                Number(item.cantidad),
-                Number(item.precio_unitario),
-                item.nota_cliente || null
-            );
-        }
+        emitirStock(cambios);
+        emitirCajeros('pedido:nuevo', {
+            id_pedido:   pedido.id_pedido,
+            id_sucursal: pedido.id_sucursal,
+            id_mesa:     pedido.id_mesa,
+            numero_mesa: req.mesa.numero_mesa,
+            monto_total: pedido.monto_total
+        });
 
-        // Obtener el monto total actualizado
-        const rTotal = await db.query(
-            `SELECT monto_total FROM pedido_mesa WHERE id_pedido = $1`,
-            [pedido.id_pedido]
-        );
-        const monto_total = rTotal.rows[0]?.monto_total || 0;
-
-        // Notificar a cajeros por Socket.IO
-        const io = global.io;
-        if (io) {
-            io.to('cajeros').emit('nuevo_pedido_pendiente', {
-                id_pedido:   pedido.id_pedido,
-                id_mesa:     Number(id_mesa),
-                numero_mesa: numero_mesa || rMesa.rows[0].numero_mesa,
-                monto_total,
-                items
-            });
-        }
-
-        console.log(`✅ Pedido #${pedido.id_pedido} creado para Mesa ${numero_mesa}`);
         res.status(201).json({
-            mensaje:   'Pedido enviado correctamente',
-            id_pedido: pedido.id_pedido,
-            monto_total
+            mensaje:     'Pedido enviado. El cajero lo confirmará en breve.',
+            id_pedido:   pedido.id_pedido,
+            monto_total: pedido.monto_total
         });
     } catch (e) {
-        console.error('crearPedidoDesdeMenu error:', e.message);
-        res.status(500).json({ error: `Error al crear el pedido: ${e.message}` });
+        responderError(res, e, 'crearPedido');
     }
 };
 
-// GET /api/menu/pedido/:id_pedido — estado del pedido (público)
-const estadoPedido = async (req, res) => {
-    setCorsPublico(res);
+// POST /api/menu/m/:codigo/pedidos/:id_pedido/cancelar — solo si aún no fue confirmado
+const cancelarPedido = async (req, res) => {
     try {
-        const r = await db.query(
-            `SELECT id_pedido, estado_pedido, monto_total, id_mesa FROM pedido_mesa WHERE id_pedido = $1`,
-            [req.params.id_pedido]
-        );
-        if (!r.rows.length)
-            return res.status(404).json({ error: 'Pedido no encontrado' });
-        res.json(r.rows[0]);
+        const { pedido, cambios } = await pedidoModel.cancelarPorCliente({
+            id_pedido: Number(req.params.id_pedido),
+            id_mesa:   req.mesa.id_mesa
+        });
+        emitirStock(cambios);
+        emitirCajeros('pedido:actualizado', {
+            id_pedido: pedido.id_pedido, id_sucursal: pedido.id_sucursal,
+            id_mesa: pedido.id_mesa, estado: pedido.estado_pedido
+        });
+        emitirMesa(pedido.id_mesa, 'pedido:estado', { id_pedido: pedido.id_pedido, estado: pedido.estado_pedido });
+        res.json({ mensaje: 'Pedido cancelado' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        responderError(res, e, 'cancelarPedido');
     }
 };
 
-// OPTIONS — preflight CORS para peticiones desde el celular
-const handleOptions = (req, res) => {
-    setCorsPublico(res);
-    res.status(200).end();
+// GET /api/menu/m/:codigo/estado?ids=1,2,3 — pedidos de este celular + consumo de la mesa
+const obtenerEstado = async (req, res) => {
+    try {
+        const ids = String(req.query.ids || '')
+            .split(',')
+            .map(Number)
+            .filter(n => Number.isInteger(n) && n > 0)
+            .slice(0, 30);
+        res.json(await pedidoModel.obtenerEstadoMesa(req.mesa.id_mesa, ids));
+    } catch (e) {
+        responderError(res, e, 'obtenerEstado');
+    }
 };
 
-module.exports = {
-    obtenerInfoMesa,
-    obtenerCatalogoPublico,
-    crearPedidoDesdeMenu,
-    estadoPedido,
-    handleOptions
-};
+module.exports = { cargarMesa, obtenerMesa, obtenerCatalogo, crearPedido, cancelarPedido, obtenerEstado };

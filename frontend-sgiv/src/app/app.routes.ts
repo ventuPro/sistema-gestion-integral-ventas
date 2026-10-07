@@ -8,7 +8,6 @@ import { ArqueoComponent }      from './features/admin/arqueo/arqueo.component';
 import { UsuariosComponent }    from './features/admin/usuarios/usuarios.component';
 import { ReportesComponent }    from './features/admin/reportes/reportes.component';
 import { MesasComponent }       from './features/admin/mesas/mesas.component';
-import { KdsComponent }         from './features/cocina/kds/kds.component';
 import { MenuDigitalComponent } from './features/cliente/menu-digital/menu-digital.component';
 import { SinAccesoComponent }   from './features/shared/sin-acceso/sin-acceso.component';
 import { permisoGuard }         from './core/guards/permiso.guard';
@@ -18,11 +17,8 @@ export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
 
-  // App de cocina (acceso independiente)
-  { path: 'cocina', component: KdsComponent },
-
-  // Menú digital del cliente (sin auth)
-  { path: 'menu/:id_mesa', component: MenuDigitalComponent },
+  // Menú digital del cliente (sin auth). :codigo = código QR de la mesa
+  { path: 'menu/:codigo', component: MenuDigitalComponent },
 
   // Dashboard admin/cajero
   {

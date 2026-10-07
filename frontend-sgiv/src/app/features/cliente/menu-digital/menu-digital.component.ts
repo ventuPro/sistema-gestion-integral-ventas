@@ -5,336 +5,401 @@ import { ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../../environments/environment';
+import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 
-type Vista = 'catalogo' | 'carrito' | 'tracking';
+type Vista = 'menu' | 'carrito' | 'pedidos';
 
+interface ItemCarrito {
+  id_producto:     number;
+  nombre_producto: string;
+  precio_unitario: number;
+  url_imagen:      string | null;
+  cantidad:        number;
+  nota_cliente:    string;
+}
+
+interface PedidoGuardado { id: number; t: number; }
+
+// ════════════════════════════════════════════════════════════════════
+//  MENÚ DIGITAL (cliente en su mesa, sin login) — /menu/<codigo QR>
+//  · El stock que ve el cliente es el real y se actualiza en vivo.
+//  · El pedido llega al cajero, que lo confirma; luego se suma a la cuenta
+//    de la mesa. El cliente puede pedir más y paga todo al final en caja.
+//  · Los pedidos hechos desde este celular se recuerdan aunque recargue.
+// ════════════════════════════════════════════════════════════════════
 @Component({
   selector:    'app-menu-digital',
   standalone:  true,
-  imports:     [CommonModule, FormsModule],
+  imports:     [CommonModule, FormsModule, ImagenUrlPipe],
   templateUrl: './menu-digital.component.html',
   styleUrl:    './menu-digital.component.css'
 })
 export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly Number = Number;
 
-  private route  = inject(ActivatedRoute);
-  private http   = inject(HttpClient);
-  private cdr    = inject(ChangeDetectorRef);
+  private route = inject(ActivatedRoute);
+  private http  = inject(HttpClient);
+  private cdr   = inject(ChangeDetectorRef);
 
-  private apiUrl    = environment.apiUrl;
-  private socketUrl = environment.apiUrl.replace('/api', '');
+  private readonly api       = `${environment.apiUrl}/menu/m`;
+  private readonly socketUrl = environment.apiUrl.replace('/api', '');
+  private readonly VIGENCIA_PEDIDOS_MS = 6 * 60 * 60 * 1000;   // se olvidan tras 6 h
 
-  // ─── Datos de la mesa ───
-  id_mesa    = 0;
-  id_sucursal = 1;  // se obtiene de la mesa
-  infoMesa:  any   = null;
-  cargando   = true;
+  codigo = '';
+  estadoCarga: 'cargando' | 'invalido' | 'error' | 'listo' = 'cargando';
+  info: { numero_mesa: number; nombre_sucursal: string; id_sucursal: number; recibe_pedidos: boolean } | null = null;
+  vista: Vista = 'menu';
 
   // ─── Catálogo ───
   catalogo:   any[] = [];
-  categorias: any[] = [];
+  categorias: { id: number; nombre: string }[] = [];
   categoriaActiva: number | null = null;
-  busqueda    = '';
+  busqueda = '';
 
   // ─── Carrito ───
-  carrito:    any[] = [];
+  carrito: ItemCarrito[] = [];
   observacionGeneral = '';
   enviando   = false;
   errorEnvio = '';
 
-  // ─── Pedido / tracking ───
-  pedidoActual: any  = null;
-  vistaActual: Vista = 'catalogo';
+  // ─── Mis pedidos y cuenta de la mesa ───
+  pedidos: any[] = [];
+  cuenta: { total_acumulado: number; items: any[] } | null = null;
+  cancelando: Record<number, boolean> = {};
+  gracias = false;
 
-  // ─── Socket ───
+  aviso: string | null = null;
+
   private socket: Socket | null = null;
-  private pollInterval: any;
+  private timers: any[] = [];
+  private avisoTimer: any;
 
-ngOnInit() {
-  this.id_mesa = +this.route.snapshot.paramMap.get('id_mesa')!;
-  if (!this.id_mesa || isNaN(this.id_mesa)) {
-    this.cargando = false;
-    this.cdr.detectChanges();
-    return;
-  }
-  this.cargarDatos();
-  this.conectarSocket();
-}
-
-cargarDatos() {
-  this.cargando = true;
-
-  // PASO 1: obtener info de la mesa (incluye id_sucursal)
-  this.http.get<any>(`${this.apiUrl}/menu/mesa/${this.id_mesa}`).subscribe({
-    next: (mesa) => {
-      this.infoMesa    = mesa;
-      this.id_sucursal = Number(mesa.id_sucursal) || 1;
-
-      // PASO 2: cargar catálogo de ESA sucursal
-      this.http.get<any[]>(`${this.apiUrl}/menu/catalogo?id_sucursal=${this.id_sucursal}`).subscribe({
-        next: (items) => {
-          this.catalogo = items;
-
-          const cats = new Map<number, string>();
-          items.forEach(i => cats.set(Number(i.id_categoria), i.nombre_categoria));
-          this.categorias = Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre }));
-
-          this.cargando = false;
-          this.cdr.detectChanges();
-        },
-        error: (e) => {
-          console.error('Error cargando catálogo:', e);
-          this.cargando = false;
-          this.cdr.detectChanges();
-        }
-      });
-    },
-    error: (e) => {
-      console.error('Error cargando mesa:', e);
-      this.cargando = false;
-      this.cdr.detectChanges();
+  // ─── Ciclo de vida ───
+  ngOnInit() {
+    this.codigo = this.route.snapshot.paramMap.get('codigo') || '';
+    if (!/^[0-9a-f]{32}$/i.test(this.codigo)) {
+      this.estadoCarga = 'invalido';
+      return;
     }
-  });
-}
+    this.cargarTodo();
+    this.conectarSocket();
+
+    // Respaldo por si se pierde algún evento en tiempo real
+    this.timers.push(setInterval(() => this.refrescarEstado(), 20_000));
+    this.timers.push(setInterval(() => { this.cargarInfo(); this.cargarCatalogo(); }, 60_000));
+  }
 
   ngOnDestroy() {
     this.socket?.disconnect();
-    if (this.pollInterval) clearInterval(this.pollInterval);
+    this.timers.forEach(t => clearInterval(t));
+    clearTimeout(this.avisoTimer);
   }
 
-  // ─── Carga de datos ───
-  cargarMesaYCatalogo() {
-    this.cargando = true;
-
-    // Primero: info de la mesa (incluye id_sucursal)
-    this.http.get<any>(`${this.apiUrl}/menu/mesa/${this.id_mesa}`).subscribe({
-      next: (mesa) => {
-        this.infoMesa   = mesa;
-        this.id_sucursal = Number(mesa.id_sucursal) || 1;
-
-        // Luego: catálogo de ESA sucursal
-        this.cargarCatalogo();
+  // ─── Carga ───
+  cargarTodo() {
+    this.estadoCarga = 'cargando';
+    this.http.get<any>(`${this.api}/${this.codigo}`).subscribe({
+      next: (info) => {
+        this.info = info;
+        this.cargarCatalogo(() => { this.estadoCarga = 'listo'; this.cdr.detectChanges(); });
+        this.refrescarEstado();
       },
-      error: () => {
-        this.cargando = false;
+      error: (e) => {
+        this.estadoCarga = e.status === 404 ? 'invalido' : 'error';
         this.cdr.detectChanges();
       }
     });
   }
 
-  cargarCatalogo() {
-    this.http.get<any[]>(`${this.apiUrl}/menu/catalogo?id_sucursal=${this.id_sucursal}`).subscribe({
+  private cargarInfo() {
+    this.http.get<any>(`${this.api}/${this.codigo}`).subscribe({
+      next: (info) => { this.info = info; this.cdr.detectChanges(); }
+    });
+  }
+
+  cargarCatalogo(alTerminar?: () => void) {
+    this.http.get<any[]>(`${this.api}/${this.codigo}/catalogo`).subscribe({
       next: (items) => {
-        this.catalogo = items;
-
-        // Construir lista de categorías únicas
+        this.catalogo = items.map(p => ({ ...p, stock_actual: Number(p.stock_actual) || 0 }));
         const cats = new Map<number, string>();
-        items.forEach(i => cats.set(Number(i.id_categoria), i.nombre_categoria));
-        this.categorias = Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre }));
+        this.catalogo.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
+        this.categorias = [...cats.entries()].map(([id, nombre]) => ({ id, nombre }));
 
-        this.cargando = false;
+        // El carrito sigue al catálogo: precio actualizado y productos retirados fuera
+        const retirados: string[] = [];
+        this.carrito = this.carrito.filter(item => {
+          const p = this.catalogo.find(c => c.id_producto === item.id_producto);
+          if (!p) { retirados.push(item.nombre_producto); return false; }
+          item.precio_unitario = Number(p.precio_unitario);
+          return true;
+        });
+        if (retirados.length) this.mostrarAviso(`Ya no está disponible: ${retirados.join(', ')}`);
+        this.ajustarCarritoAlStock();
+
+        alTerminar?.();
         this.cdr.detectChanges();
       },
-      error: () => { this.cargando = false; this.cdr.detectChanges(); }
+      error: () => {
+        if (alTerminar) { this.estadoCarga = 'error'; this.cdr.detectChanges(); }
+      }
     });
+  }
+
+  // ─── Tiempo real ───
+  private conectarSocket() {
+    this.socket = io(this.socketUrl, { transports: ['websocket'] });
+    this.socket.on('connect', () => {
+      this.socket?.emit('unirse_mesa', this.codigo);
+      this.refrescarEstado();
+    });
+
+    this.socket.on('actualizacion_stock_global', (d: any) => {
+      if (!this.info || Number(d?.id_sucursal) !== Number(this.info.id_sucursal)) return;
+      const prod = this.catalogo.find(p => p.id_producto === Number(d.id_producto));
+      if (!prod) return;
+      prod.stock_actual = Math.max(0, Number(d.nueva_cantidad_disponible) || 0);
+      this.ajustarCarritoAlStock();
+      this.cdr.detectChanges();
+    });
+
+    this.socket.on('catalogo:actualizado', () => this.cargarCatalogo());
+
+    this.socket.on('pedido:estado', (d: any) => {
+      if (!this.idsGuardados().includes(Number(d?.id_pedido))) return;
+      if (d.estado === 'Confirmado') this.notificar('✅ ¡Tu pedido fue confirmado! Ya lo estamos preparando.');
+      if (d.estado === 'Entregado')  this.notificar('🍰 Tu pedido fue entregado. ¡Buen provecho!');
+      if (d.estado === 'Cancelado')  this.notificar('Tu pedido no pudo ser atendido. Consulta en caja.');
+      this.refrescarEstado();
+    });
+
+    this.socket.on('cuenta:actualizada', () => this.refrescarEstado());
+    this.socket.on('cuenta:cerrada',     () => this.refrescarEstado(true));
+  }
+
+  // ─── Disponibilidad ───
+  enCarrito(id_producto: number): number {
+    return this.carrito.find(i => i.id_producto === id_producto)?.cantidad || 0;
+  }
+
+  /** Lo que el cliente todavía puede agregar (stock real menos su carrito) */
+  disponible(prod: any): number {
+    return Math.max(0, Number(prod.stock_actual) - this.enCarrito(prod.id_producto));
+  }
+
+  /** Si el stock bajó (otra mesa o la caja vendió), el carrito se ajusta */
+  private ajustarCarritoAlStock() {
+    const ajustes: string[] = [];
+    for (const item of [...this.carrito]) {
+      const prod  = this.catalogo.find(p => p.id_producto === item.id_producto);
+      const stock = Number(prod?.stock_actual) || 0;
+      if (item.cantidad <= stock) continue;
+      if (stock === 0) {
+        this.carrito = this.carrito.filter(i => i !== item);
+        ajustes.push(`${item.nombre_producto} se agotó`);
+      } else {
+        item.cantidad = stock;
+        ajustes.push(`${item.nombre_producto}: solo quedan ${stock}`);
+      }
+    }
+    if (ajustes.length) this.mostrarAviso(`Actualizamos tu carrito — ${ajustes.join('; ')}`);
   }
 
   // ─── Catálogo filtrado ───
   get catalogoFiltrado(): any[] {
-    return this.catalogo.filter(p => {
-      const porCat  = !this.categoriaActiva || Number(p.id_categoria) === this.categoriaActiva;
-      const porNomb = !this.busqueda || p.nombre_producto.toLowerCase().includes(this.busqueda.toLowerCase());
-      return porCat && porNomb;
-    });
+    const texto = this.busqueda.trim().toLowerCase();
+    return this.catalogo.filter(p =>
+      (!this.categoriaActiva || Number(p.id_categoria) === this.categoriaActiva) &&
+      (!texto || p.nombre_producto.toLowerCase().includes(texto))
+    );
   }
 
   // ─── Carrito ───
-  agregarAlCarrito(producto: any) {
-    const stock = Number(producto.stock_actual) || 0;
-
-    if (stock <= 0) {
-      alert('Este producto no está disponible por el momento.');
-      return;
-    }
-
-    const item = this.carrito.find(i => i.id_producto === producto.id_producto);
-    if (item) {
-      item.cantidad++;
-    } else {
-      this.carrito.push({ ...producto, cantidad: 1, nota_cliente: '' });
-    }
-
-    // Decrementar stock visualizado (igual que POS, decrementa de 1 en 1)
-    producto.stock_actual = stock - 1;
-    this.cdr.detectChanges();
+  agregar(prod: any) {
+    if (this.disponible(prod) <= 0) return;
+    const item = this.carrito.find(i => i.id_producto === prod.id_producto);
+    if (item) item.cantidad++;
+    else this.carrito.push({
+      id_producto:     prod.id_producto,
+      nombre_producto: prod.nombre_producto,
+      precio_unitario: Number(prod.precio_unitario),
+      url_imagen:      prod.url_imagen,
+      cantidad:        1,
+      nota_cliente:    ''
+    });
   }
 
-  decrementarItem(item: any) {
+  quitarUno(id_producto: number) {
+    const item = this.carrito.find(i => i.id_producto === id_producto);
+    if (!item) return;
+    if (item.cantidad > 1) item.cantidad--;
+    else this.carrito = this.carrito.filter(i => i !== item);
+  }
+
+  agregarUno(item: ItemCarrito) {
     const prod = this.catalogo.find(p => p.id_producto === item.id_producto);
-    if (item.cantidad > 1) {
-      item.cantidad--;
-      if (prod) prod.stock_actual = Number(prod.stock_actual) + 1;
-    } else {
-      this.quitarDelCarrito(item.id_producto);
-    }
-    this.cdr.detectChanges();
+    if (prod) this.agregar(prod);
   }
 
-  incrementarItem(item: any) {
-    const prod  = this.catalogo.find(p => p.id_producto === item.id_producto);
-    const stock = Number(prod?.stock_actual) || 0;
-    if (stock <= 0) {
-      alert('Sin más stock disponible');
-      return;
-    }
-    item.cantidad++;
-    if (prod) prod.stock_actual = stock - 1;
-    this.cdr.detectChanges();
+  puedeSumar(item: ItemCarrito): boolean {
+    const prod = this.catalogo.find(p => p.id_producto === item.id_producto);
+    return !!prod && this.disponible(prod) > 0;
   }
 
-  quitarDelCarrito(id: number) {
-    const item = this.carrito.find(i => i.id_producto === id);
-    if (item) {
-      const prod = this.catalogo.find(p => p.id_producto === id);
-      if (prod) prod.stock_actual = Number(prod.stock_actual) + item.cantidad;
-      this.carrito = this.carrito.filter(i => i.id_producto !== id);
-      this.cdr.detectChanges();
-    }
+  eliminar(item: ItemCarrito) {
+    this.carrito = this.carrito.filter(i => i !== item);
   }
 
   get totalCarrito(): number {
-    return this.carrito.reduce((s, i) => s + (Number(i.precio_unitario) * i.cantidad), 0);
+    return this.carrito.reduce((s, i) => s + i.precio_unitario * i.cantidad, 0);
   }
 
-  get cantidadTotal(): number {
+  get cantidadCarrito(): number {
     return this.carrito.reduce((s, i) => s + i.cantidad, 0);
   }
 
   // ─── Enviar pedido ───
   enviarPedido() {
-    if (!this.carrito.length) return;
+    if (!this.carrito.length || this.enviando) return;
+    if (!this.info?.recibe_pedidos) {
+      this.errorEnvio = 'En este momento no estamos recibiendo pedidos desde el menú. Consulta en caja.';
+      return;
+    }
     this.enviando   = true;
     this.errorEnvio = '';
 
-    const payload = {
-      id_mesa:             this.id_mesa,
-      numero_mesa:         this.infoMesa?.numero_mesa,
-      observacion_general: this.observacionGeneral || null,
+    const body = {
+      observacion_general: this.observacionGeneral.trim() || null,
       items: this.carrito.map(i => ({
-        id_producto:     i.id_producto,
-        cantidad:        i.cantidad,
-        precio_unitario: Number(i.precio_unitario),
-        nota_cliente:    i.nota_cliente || ''
+        id_producto:  i.id_producto,
+        cantidad:     i.cantidad,
+        nota_cliente: i.nota_cliente.trim() || null
       }))
     };
 
-    this.http.post<any>(`${this.apiUrl}/menu/pedido`, payload).subscribe({
+    this.http.post<any>(`${this.api}/${this.codigo}/pedidos`, body).subscribe({
       next: (res) => {
-        this.pedidoActual = {
-          id_pedido: res.id_pedido,
-          estado:    'Pendiente_Cajero',
-          items:     [...this.carrito]
-        };
+        this.guardarId(res.id_pedido);
         this.carrito            = [];
         this.observacionGeneral = '';
         this.enviando           = false;
-        this.vistaActual        = 'tracking';
-        this.iniciarTracking(res.id_pedido);
-        this.cdr.detectChanges();
+        this.gracias            = false;
+        this.vista              = 'pedidos';
+        this.mostrarAviso('📨 Pedido enviado. El cajero lo confirmará en breve.');
+        this.refrescarEstado();
       },
-      error: () => {
-        this.errorEnvio = 'Error al enviar. Intenta de nuevo.';
-        this.enviando   = false;
-        this.cdr.detectChanges();
-      }
-    });
-  }
-
-  // ─── Socket y tracking ───
-  conectarSocket() {
-    this.socket = io(this.socketUrl, { transports: ['websocket'] });
-
-    // Escuchar actualizaciones de stock en tiempo real
-    this.socket.on('stock:actualizado', (data: any) => {
-      if (Number(data.id_sucursal) !== this.id_sucursal) return;
-
-      // Actualizar stock en el catálogo visualmente
-      data.productos?.forEach((p: any) => {
-        const prod = this.catalogo.find(c => c.id_producto === p.id_producto);
-        if (prod) {
-          const stockItem = this.carrito.find(c => c.id_producto === p.id_producto)?.cantidad || 0;
-          prod.stock_actual = Math.max(0, Number(prod.stock_actual) - p.cantidad_vendida + stockItem);
+      error: (e) => {
+        this.enviando = false;
+        const err = e?.error || {};
+        this.errorEnvio = err.error || 'No se pudo enviar el pedido. Revisa tu conexión e intenta de nuevo.';
+        if (err.codigo === 'STOCK_INSUFICIENTE' && err.id_producto) {
+          const prod = this.catalogo.find(p => p.id_producto === err.id_producto);
+          if (prod) prod.stock_actual = Number(err.disponible) || 0;
+          this.ajustarCarritoAlStock();
         }
-      });
-      this.cdr.detectChanges();
-    });
-  }
-
-  iniciarTracking(id_pedido: number) {
-    // Unirse a la sala de la mesa
-    this.socket?.emit('unirse_sala', `mesa_${this.id_mesa}`);
-
-    this.socket?.on('pedido_aprobado', (data: any) => {
-      if (data.id_pedido === id_pedido) {
-        this.pedidoActual.estado = 'En_Cocina';
+        if (err.codigo === 'PRODUCTO_NO_DISPONIBLE') this.cargarCatalogo();
+        if (err.codigo === 'NO_RECIBE_PEDIDOS' && this.info) this.info.recibe_pedidos = false;
         this.cdr.detectChanges();
       }
     });
+  }
 
-    this.socket?.on('pedido_listo', (data: any) => {
-      if (data.id_pedido === id_pedido) {
-        this.pedidoActual.estado = 'Listo';
-        if ('vibrate' in navigator) navigator.vibrate([300, 200, 300]);
+  // ─── Mis pedidos ───
+  private claveStorage(): string { return `sgiv_menu_${this.codigo}`; }
+
+  private leerGuardados(): PedidoGuardado[] {
+    try {
+      const lista = JSON.parse(localStorage.getItem(this.claveStorage()) || '[]');
+      return Array.isArray(lista) ? lista.filter(p => Date.now() - p.t < this.VIGENCIA_PEDIDOS_MS) : [];
+    } catch { return []; }
+  }
+
+  private escribirGuardados(lista: PedidoGuardado[]) {
+    try { localStorage.setItem(this.claveStorage(), JSON.stringify(lista)); } catch { }
+  }
+
+  private idsGuardados(): number[] { return this.leerGuardados().map(p => p.id); }
+
+  private guardarId(id: number) {
+    this.escribirGuardados([...this.leerGuardados(), { id, t: Date.now() }]);
+  }
+
+  /** cuentaCerrada: el cajero cobró o cerró la mesa → se muestra el agradecimiento */
+  refrescarEstado(cuentaCerrada = false) {
+    const ids = this.idsGuardados();
+    this.http.get<any>(`${this.api}/${this.codigo}/estado`, { params: { ids: ids.join(',') } }).subscribe({
+      next: (res) => {
+        const pedidos = (res.pedidos || []) as any[];
+        this.cuenta   = res.cuenta;
+
+        // Se olvidan los pedidos ya pagados (la visita terminó) y los consultados
+        // que ya no existen. Solo se tocan los ids de esta consulta: un pedido
+        // enviado mientras la consulta viajaba no se pierde.
+        const pagados = pedidos.filter(p => p.estado_pedido === 'Pagado');
+        if (pagados.length && cuentaCerrada) this.gracias = true;
+        const vigentes = new Set(pedidos.filter(p => p.estado_pedido !== 'Pagado').map(p => p.id_pedido));
+        this.escribirGuardados(this.leerGuardados().filter(g => !ids.includes(g.id) || vigentes.has(g.id)));
+
+        this.pedidos = pedidos
+          .filter(p => p.estado_pedido !== 'Pagado')
+          .sort((a, b) => b.id_pedido - a.id_pedido);
         this.cdr.detectChanges();
       }
     });
+  }
 
-    this.socket?.on('pedido_rechazado', (data: any) => {
-      if (data.id_pedido === id_pedido) {
-        this.pedidoActual.estado = 'Cancelado';
-        this.cdr.detectChanges();
+  cancelar(pedido: any) {
+    if (!confirm('¿Cancelar este pedido? Aún no fue confirmado por el cajero.')) return;
+    this.cancelando[pedido.id_pedido] = true;
+    this.http.post<any>(`${this.api}/${this.codigo}/pedidos/${pedido.id_pedido}/cancelar`, {}).subscribe({
+      next: () => {
+        delete this.cancelando[pedido.id_pedido];
+        this.mostrarAviso('Pedido cancelado');
+        this.refrescarEstado();
+      },
+      error: (e) => {
+        delete this.cancelando[pedido.id_pedido];
+        this.mostrarAviso(e?.error?.error || 'No se pudo cancelar el pedido');
+        this.refrescarEstado();
       }
     });
-
-    // Polling de respaldo cada 15s
-    this.pollInterval = setInterval(() => {
-      if (!this.pedidoActual || ['Pagado', 'Cancelado'].includes(this.pedidoActual.estado)) {
-        clearInterval(this.pollInterval);
-        return;
-      }
-      this.http.get<any>(`${this.apiUrl}/menu/pedido/${id_pedido}`).subscribe({
-        next: (p) => {
-          if (p?.estado_pedido && p.estado_pedido !== this.pedidoActual.estado) {
-            this.pedidoActual.estado = p.estado_pedido;
-            this.cdr.detectChanges();
-          }
-        }
-      });
-    }, 15000);
   }
 
-  isEstadoPasado(estadoActual: string, estadoCheck: string): boolean {
-    const orden = ['Pendiente_Cajero', 'En_Cocina', 'Listo', 'Pagado'];
-    return orden.indexOf(estadoActual) > orden.indexOf(estadoCheck);
+  get pedidosActivos(): number {
+    return this.pedidos.filter(p => ['Pendiente_Cajero', 'Confirmado'].includes(p.estado_pedido)).length;
   }
 
-  getEstadoInfo(estado: string): { label: string; icon: string; color: string; desc: string } {
-    const map: Record<string, any> = {
-      'Pendiente_Cajero': { label: 'Esperando confirmación', icon: '⏳', color: 'text-amber-600',  desc: 'El cajero revisará tu pedido en breve...' },
-      'En_Cocina':        { label: 'En preparación',         icon: '🍳', color: 'text-blue-600',   desc: 'Nuestro equipo está preparando tu pedido.' },
-      'Listo':            { label: '¡Tu pedido está listo!', icon: '✅', color: 'text-green-600',  desc: 'El mozo llevará tu pedido a la mesa.' },
-      'Cancelado':        { label: 'Pedido cancelado',       icon: '❌', color: 'text-red-600',    desc: 'El pedido fue cancelado. Consulta al cajero.' },
-      'Pagado':           { label: 'Pagado. ¡Gracias!',      icon: '🎉', color: 'text-purple-600', desc: '¡Esperamos verte pronto!' }
+  // ─── Presentación de estados ───
+  readonly pasos = [
+    { estado: 'Pendiente_Cajero', texto: 'Enviado' },
+    { estado: 'Confirmado',       texto: 'Confirmado' },
+    { estado: 'Entregado',        texto: 'Entregado' }
+  ];
+
+  pasoAlcanzado(pedido: any, paso: string): boolean {
+    const orden = this.pasos.map(p => p.estado);
+    return orden.indexOf(pedido.estado_pedido) >= orden.indexOf(paso);
+  }
+
+  infoEstado(estado: string): { texto: string; detalle: string; clase: string } {
+    const mapa: Record<string, { texto: string; detalle: string; clase: string }> = {
+      Pendiente_Cajero: { texto: 'Esperando confirmación', detalle: 'El cajero revisará tu pedido en un momento.', clase: 'bg-amber-100 text-amber-800' },
+      Confirmado:       { texto: 'Confirmado',             detalle: 'Estamos preparando tu pedido.',              clase: 'bg-blue-100 text-blue-800' },
+      Entregado:        { texto: 'Entregado',              detalle: '¡Buen provecho!',                             clase: 'bg-green-100 text-green-800' },
+      Cancelado:        { texto: 'No atendido',            detalle: 'Tu pedido no pudo ser atendido. Consulta en caja.', clase: 'bg-red-100 text-red-700' }
     };
-    return map[estado] ?? { label: estado, icon: '🔄', color: 'text-gray-600', desc: '' };
+    return mapa[estado] ?? { texto: estado, detalle: '', clase: 'bg-gray-100 text-gray-700' };
   }
 
-  // URL imagen — soporta base64 y rutas relativas
-  getImagenUrl(url: string | null): string {
-    if (!url) return '';
-    if (url.startsWith('data:') || url.startsWith('http')) return url;
-    // Ruta relativa del servidor
-    return `${this.socketUrl}${url}`;
+  // ─── Avisos ───
+  private notificar(msg: string) {
+    if ('vibrate' in navigator) navigator.vibrate?.([200, 100, 200]);
+    this.mostrarAviso(msg);
+  }
+
+  private mostrarAviso(msg: string) {
+    this.aviso = msg;
+    clearTimeout(this.avisoTimer);
+    this.avisoTimer = setTimeout(() => { this.aviso = null; this.cdr.detectChanges(); }, 4500);
+    this.cdr.detectChanges();
   }
 }
