@@ -7,7 +7,7 @@ import { CajaService } from '../../../core/services/caja.service';
 import { LucideAngularModule,
          Pencil, KeyRound, ShieldCheck, Lock, Unlock,
          UserCheck, UserX, Wallet, CircleSlash2,
-         X, Plus, Users, Smartphone } from 'lucide-angular';
+         X, Plus, Users } from 'lucide-angular';
 
 @Component({
   selector: 'app-usuarios',
@@ -34,8 +34,7 @@ export class UsuariosComponent implements OnInit {
     walletOff:   CircleSlash2,
     close:       X,
     plus:        Plus,
-    users:       Users,
-    mfaReset:    Smartphone
+    users:       Users
   };
 
   listaUsuarios:  any[] = [];
@@ -162,16 +161,6 @@ export class UsuariosComponent implements OnInit {
     this.usuarioService.cambiarContrasena(this.usuarioContrasena.id_usuario, this.cambioContrasena.nueva).subscribe({
       next: () => { this.cerrarModalContrasena(); this.cargandoContrasena = false; alert('Contraseña actualizada.'); },
       error: () => { this.errorContrasena = 'Error al cambiar.'; this.cargandoContrasena = false; }
-    });
-  }
-
-  // ─── Verificación en dos pasos ───
-  restablecerMfa(usr: any) {
-    const nombre = usr.nombre_completo;
-    if (!confirm(`¿Restablecer la verificación en dos pasos de "${nombre}"?\n\nEn su próximo ingreso deberá escanear un nuevo QR con su app autenticadora.`)) return;
-    this.usuarioService.restablecerMfa(Number(usr.id_usuario)).subscribe({
-      next: () => { this.mostrarToast(`Verificación de "${nombre}" restablecida.`); this.cargarDatos(); },
-      error: (e: any) => alert(e?.error?.error || 'Error al restablecer la verificación.')
     });
   }
 

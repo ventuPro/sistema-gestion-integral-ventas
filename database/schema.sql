@@ -49,11 +49,7 @@ CREATE TABLE usuario (
     -- Flag sincronizado automáticamente con turno_caja.estado_turno.
     -- TRUE  → el cajero tiene un turno abierto y puede operar.
     -- FALSE → no tiene turno abierto (sin apertura del día o cerrado).
-    caja_habilitada BOOLEAN DEFAULT FALSE,
-    -- Verificación en dos pasos (TOTP). El secreto se guarda cifrado por el backend.
-    mfa_secreto VARCHAR(255),
-    mfa_activo BOOLEAN NOT NULL DEFAULT FALSE,
-    mfa_ultimo_paso BIGINT
+    caja_habilitada BOOLEAN DEFAULT FALSE
 );
 
 -- Permisos granulares por usuario (sobreescriben los defaults del rol).

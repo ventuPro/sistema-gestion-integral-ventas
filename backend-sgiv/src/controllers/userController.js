@@ -2,13 +2,7 @@ const bcrypt      = require('bcryptjs');
 const jwt         = require('jsonwebtoken');
 const userModel   = require('../models/userModel');
 const db          = require('../config/db');
-const QRCode      = require('qrcode');
-const captcha     = require('../utils/captcha');
-const totp        = require('../utils/totp');
-const {
-    JWT_SECRET, JWT_OPCIONES, JWT_ALGORITMOS,
-    JWT_SECRET_MFA, JWT_OPCIONES_MFA, cifrarSecretoMfa, descifrarSecretoMfa
-} = require('../config/seguridad');
+const { JWT_SECRET, JWT_OPCIONES } = require('../config/seguridad');
 
 // Un usuario con permiso 'usuarios' que no es administrador no puede crear,
 // ascender ni modificar administradores.
@@ -40,7 +34,7 @@ const registrarUsuario = async (req, res) => {
     }
 };
 
-// ─── Login (paso 1: CAPTCHA + contraseña) ───
+// ─── Login ───
 // Mismo mensaje y mismo tiempo de respuesta si el correo no existe o la
 // contraseña es incorrecta, para no revelar qué correos están registrados.
 // Además se limita la cantidad de intentos fallidos por IP + correo.
@@ -55,10 +49,6 @@ setInterval(() => {
     for (const [clave, r] of intentosFallidos)
         if (ahora - r.desde > VENTANA_BLOQUEO_MS) intentosFallidos.delete(clave);
 }, VENTANA_BLOQUEO_MS).unref();
-
-const EMISOR_MFA   = 'SGIV Rickys';
-const MFA_EXPIRADO = { error: 'La verificación venció. Inicie sesión nuevamente.', codigo: 'MFA_EXPIRADO' };
-const MFA_DANADO   = { error: 'Su verificación en dos pasos no es válida. Pida al administrador que la restablezca.', codigo: 'MFA_INVALIDO' };
 
 const claveIntento = (req, correo) => `${req.ip}|${String(correo || '').toLowerCase()}`;
 
@@ -77,12 +67,9 @@ const registrarFallo = (clave) => {
 
 const loginUsuario = async (req, res) => {
     try {
-        const { correo_electronico, contrasena, id_captcha, captcha: respuestaCaptcha } = req.body || {};
+        const { correo_electronico, contrasena } = req.body || {};
         if (!correo_electronico || !contrasena)
             return res.status(400).json({ error: 'Ingrese correo y contraseña' });
-
-        if (!captcha.verificar(id_captcha, respuestaCaptcha))
-            return res.status(400).json({ error: 'El código de la imagen es incorrecto o venció', codigo: 'CAPTCHA_INVALIDO' });
 
         const clave = claveIntento(req, correo_electronico);
         if (estaBloqueado(clave))
@@ -96,68 +83,13 @@ const loginUsuario = async (req, res) => {
         }
         intentosFallidos.delete(clave);
 
-        // La contraseña es correcta: falta el segundo factor
-        const token_mfa = jwt.sign({ id_usuario: u.id_usuario, proposito: 'mfa' }, JWT_SECRET_MFA, JWT_OPCIONES_MFA);
-        let secreto = u.mfa_secreto ? descifrarSecretoMfa(u.mfa_secreto) : null;
+        // Obtener nombre de sucursal
+        const rSuc = await require('../config/db').query(
+            `SELECT nombre_sucursal FROM sucursal WHERE id_sucursal = $1`,
+            [u.id_sucursal]
+        );
+        const nombre_sucursal = rSuc.rows[0]?.nombre_sucursal || '';
 
-        if (u.mfa_activo) {
-            if (!secreto) return res.status(409).json(MFA_DANADO);
-            return res.json({ paso: 'verificar_mfa', token_mfa });
-        }
-
-        // Primer ingreso (o MFA restablecido): se reutiliza el secreto pendiente si existe
-        if (!secreto) {
-            secreto = totp.generarSecreto();
-            await userModel.guardarSecretoMfaPendiente(u.id_usuario, cifrarSecretoMfa(secreto));
-        }
-        const qr = await QRCode.toDataURL(totp.uriOtpauth(secreto, u.correo_electronico, EMISOR_MFA), { margin: 1, width: 240 });
-        res.json({
-            paso: 'configurar_mfa',
-            token_mfa,
-            mfa: { qr, secreto, emisor: EMISOR_MFA, cuenta: u.correo_electronico }
-        });
-    } catch(e) {
-        console.error('Error loginUsuario:', e);
-        res.status(500).json({ error: 'Error al iniciar sesión' });
-    }
-};
-
-const obtenerCaptcha = (req, res) => {
-    const { id, svg } = captcha.crear();
-    res.set('Cache-Control', 'no-store');
-    res.json({ id_captcha: id, imagen: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}` });
-};
-
-// ─── Segundo factor: código de la app autenticadora ───
-const verificarMfa = async (req, res) => {
-    try {
-        const { token_mfa, codigo } = req.body || {};
-        let payload;
-        try {
-            payload = jwt.verify(String(token_mfa || ''), JWT_SECRET_MFA, { algorithms: JWT_ALGORITMOS });
-        } catch { payload = null; }
-        if (!payload || payload.proposito !== 'mfa') return res.status(401).json(MFA_EXPIRADO);
-
-        const clave = `mfa|${payload.id_usuario}`;
-        if (estaBloqueado(clave))
-            return res.status(429).json({ error: 'Demasiados códigos incorrectos. Intente de nuevo en 15 minutos.' });
-
-        const u = await userModel.obtenerUsuarioActivoPorId(payload.id_usuario);
-        if (!u) return res.status(401).json(MFA_EXPIRADO);
-        const secreto = u.mfa_secreto ? descifrarSecretoMfa(u.mfa_secreto) : null;
-        if (!secreto) return res.status(409).json(MFA_DANADO);
-
-        // Cada código sirve una sola vez (el paso debe ser posterior al último usado)
-        const paso = totp.verificar(secreto, codigo);
-        const confirmado = paso !== null &&
-            await userModel.registrarPasoMfa(u.id_usuario, u.mfa_secreto, paso);
-        if (!confirmado) {
-            registrarFallo(clave);
-            return res.status(401).json({ error: 'Código incorrecto. Revise su app autenticadora.', codigo: 'MFA_CODIGO_INVALIDO' });
-        }
-        intentosFallidos.delete(clave);
-
-        const rSuc = await db.query(`SELECT nombre_sucursal FROM sucursal WHERE id_sucursal = $1`, [u.id_sucursal]);
         const token = jwt.sign(
             { id_usuario: u.id_usuario, id_rol: u.id_rol, id_sucursal: u.id_sucursal },
             JWT_SECRET,
@@ -172,25 +104,12 @@ const verificarMfa = async (req, res) => {
                 nombre_completo: u.nombre_completo,
                 id_rol:          u.id_rol,
                 id_sucursal:     u.id_sucursal,
-                nombre_sucursal: rSuc.rows[0]?.nombre_sucursal || ''
+                nombre_sucursal              // ← incluir aquí
             }
         });
-    } catch (e) {
-        console.error('Error verificarMfa:', e);
-        res.status(500).json({ error: 'Error al verificar el código' });
-    }
-};
-
-const restablecerMfa = async (req, res) => {
-    try {
-        if (!esAdmin(req) && await tocaAdmin(req.params.id))
-            return res.status(403).json({ error: 'Solo un administrador puede restablecer la verificación de un administrador' });
-        const r = await userModel.restablecerMfa(req.params.id);
-        if (!r) return res.status(404).json({ error: 'Usuario no encontrado' });
-        res.json({ mensaje: 'Verificación en dos pasos restablecida' });
-    } catch (e) {
-        console.error('Error restablecerMfa:', e);
-        res.status(500).json({ error: 'Error al restablecer la verificación' });
+    } catch(e) {
+        console.error('Error loginUsuario:', e);
+        res.status(500).json({ error: 'Error al iniciar sesión' });
     }
 };
 
@@ -266,7 +185,7 @@ const obtenerDatosFormulario = async (req, res) => {
 };
 
 module.exports = {
-    registrarUsuario, loginUsuario, obtenerCaptcha, verificarMfa, restablecerMfa, listarUsuarios,
+    registrarUsuario, loginUsuario, listarUsuarios,
     actualizarUsuario, desactivarUsuario, reactivarUsuario,
     cambiarContrasena, obtenerDatosFormulario
 };
