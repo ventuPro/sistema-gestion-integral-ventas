@@ -216,6 +216,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
       url_imagen:      prod.url_imagen,
       cantidad:        1
     });
+    this.cdr.detectChanges();
   }
 
   quitarUno(id_producto: number) {
@@ -223,6 +224,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     if (!item) return;
     if (item.cantidad > 1) item.cantidad--;
     else this.carrito = this.carrito.filter(i => i !== item);
+    this.cdr.detectChanges();
   }
 
   agregarUno(item: ItemCarrito) {
@@ -237,6 +239,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   eliminar(item: ItemCarrito) {
     this.carrito = this.carrito.filter(i => i !== item);
+    this.cdr.detectChanges();
   }
 
   get totalCarrito(): number {
