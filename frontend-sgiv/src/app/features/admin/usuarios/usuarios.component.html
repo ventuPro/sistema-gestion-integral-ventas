@@ -71,6 +71,11 @@
           <td class="px-4 py-3">
             <span *ngIf="usr.estado_activo"  class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">Activo</span>
             <span *ngIf="!usr.estado_activo" class="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold">Inactivo</span>
+            <span class="block mt-1.5 text-[11px] font-semibold"
+                  [class.text-emerald-600]="usr.mfa_activo" [class.text-gray-400]="!usr.mfa_activo"
+                  [title]="usr.mfa_activo ? 'Usa app autenticadora al iniciar sesión' : 'Configurará su app autenticadora en el próximo ingreso'">
+              {{ usr.mfa_activo ? '2 pasos: activo' : '2 pasos: pendiente' }}
+            </span>
           </td>
 
           <td class="px-4 py-3">
@@ -104,6 +109,13 @@
                       title="Cambiar la contraseña de este usuario"
                       class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200 active:scale-95 transition-all">
                 <lucide-icon [img]="icons.password" class="w-4 h-4"></lucide-icon>
+              </button>
+
+              <button *ngIf="usr.estado_activo && usr.mfa_activo"
+                      (click)="restablecerMfa(usr)"
+                      title="Restablecer verificación en dos pasos (si perdió su celular)"
+                      class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 active:scale-95 transition-all">
+                <lucide-icon [img]="icons.mfaReset" class="w-4 h-4"></lucide-icon>
               </button>
 
               <button *ngIf="usr.estado_activo && +usr.id_rol === 2"

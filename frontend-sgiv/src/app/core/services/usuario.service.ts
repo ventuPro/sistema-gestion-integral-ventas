@@ -39,4 +39,8 @@ export class UsuarioService {
   cambiarContrasena(id: number, nueva_contrasena: string): Observable<any> {
     return this.http.patch(`${this.apiUrl}/usuarios/${id}/contrasena`, { nueva_contrasena }, { headers: this.h() });
   }
+
+  restablecerMfa(id: number): Observable<any> {
+    return this.http.patch(`${this.apiUrl}/usuarios/${id}/mfa/restablecer`, {}, { headers: this.h() });
+  }
 }

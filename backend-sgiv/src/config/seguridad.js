@@ -24,6 +24,37 @@ const JWT_SECRET    = obtenerSecretoJWT();
 const JWT_OPCIONES  = { algorithm: 'HS256', expiresIn: '8h' };
 const JWT_ALGORITMOS = ['HS256'];
 
+// ─── Segundo factor (MFA) ───
+// El token del paso intermedio usa otra clave: no sirve como token de sesión.
+const JWT_SECRET_MFA  = crypto.createHmac('sha256', JWT_SECRET).update('sgiv-mfa-pendiente').digest('hex');
+const JWT_OPCIONES_MFA = { algorithm: 'HS256', expiresIn: '5m' };
+
+// Los secretos TOTP se guardan cifrados (AES-256-GCM). Clave: MFA_CLAVE o, si falta, JWT_SECRET.
+// Si cambia la clave, cada usuario debe volver a configurar su autenticador.
+const CLAVE_CIFRADO_MFA = crypto.createHash('sha256')
+    .update(`sgiv-mfa|${(process.env.MFA_CLAVE || '').trim() || JWT_SECRET}`)
+    .digest();
+
+const cifrarSecretoMfa = (texto) => {
+    const iv = crypto.randomBytes(12);
+    const c  = crypto.createCipheriv('aes-256-gcm', CLAVE_CIFRADO_MFA, iv);
+    const cifrado = Buffer.concat([c.update(texto, 'utf8'), c.final()]);
+    return ['v1', iv.toString('base64'), c.getAuthTag().toString('base64'), cifrado.toString('base64')].join(':');
+};
+
+/** Devuelve null si el valor no se puede descifrar (clave distinta o dato alterado). */
+const descifrarSecretoMfa = (valor) => {
+    try {
+        const [version, iv, tag, cifrado] = String(valor || '').split(':');
+        if (version !== 'v1') return null;
+        const d = crypto.createDecipheriv('aes-256-gcm', CLAVE_CIFRADO_MFA, Buffer.from(iv, 'base64'));
+        d.setAuthTag(Buffer.from(tag, 'base64'));
+        return Buffer.concat([d.update(Buffer.from(cifrado, 'base64')), d.final()]).toString('utf8');
+    } catch {
+        return null;
+    }
+};
+
 // ─── Orígenes permitidos (CORS) ───
 // Se permite:
 //   1. Los orígenes listados en CORS_ORIGINS (separados por coma).
@@ -58,4 +89,7 @@ const origenPermitido = (origin, hostPeticion) => {
     }
 };
 
-module.exports = { JWT_SECRET, JWT_OPCIONES, JWT_ALGORITMOS, origenPermitido };
+module.exports = {
+    JWT_SECRET, JWT_OPCIONES, JWT_ALGORITMOS, origenPermitido,
+    JWT_SECRET_MFA, JWT_OPCIONES_MFA, cifrarSecretoMfa, descifrarSecretoMfa
+};

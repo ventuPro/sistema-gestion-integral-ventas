@@ -2,6 +2,7 @@ const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const { crearBdPrueba } = require('../bdPrueba');
+const { crearLogin } = require('../sesionPrueba');
 
 // ─── Pruebas del menú digital QR (cliente → cajero) ───
 // Levantan el backend real contra una BD temporal.
@@ -26,8 +27,8 @@ const api = async (metodo, ruta, { token, body } = {}) => {
     return { status: r.status, body: datos };
 };
 
-const login = async (correo, contrasena = CLAVE) =>
-    (await api('POST', '/usuarios/login', { body: { correo_electronico: correo, contrasena } })).body.token;
+const iniciarSesion = crearLogin((...a) => api(...a), () => bd);
+const login = (correo, contrasena = CLAVE) => iniciarSesion(correo, contrasena);
 
 const crearUsuario = async (correo, id_rol) => {
     const hash = await bcrypt.hash(CLAVE, 4);

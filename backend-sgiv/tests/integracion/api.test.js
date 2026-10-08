@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
 const { crearBdPrueba } = require('../bdPrueba');
+const { crearLogin, resolverCaptcha, codigoActual, prepararMfa } = require('../sesionPrueba');
 
 // ─── Pruebas de integración de la API ───
 // Levantan el backend real (en un puerto libre) contra una BD temporal.
@@ -29,8 +30,8 @@ const api = async (metodo, ruta, { token, body, headers = {} } = {}) => {
     return { status: r.status, body: datos, headers: r.headers };
 };
 
-const login = async (correo, contrasena = CLAVE) =>
-    (await api('POST', '/usuarios/login', { body: { correo_electronico: correo, contrasena } })).body.token;
+const iniciarSesion = crearLogin((...a) => api(...a), () => bd);
+const login = (correo, contrasena = CLAVE) => iniciarSesion(correo, contrasena);
 
 const crearUsuario = async (correo, id_rol) => {
     const hash = await bcrypt.hash(CLAVE, 4);
@@ -78,21 +79,72 @@ after(async () => {
     if (bd)   await bd.eliminar();
 });
 
-// ─── Login ───
+// ─── Login: CAPTCHA + contraseña + segundo factor ───
 describe('Login', () => {
-    test('el admin del seed inicia sesión y recibe token', async () => {
-        const r = await api('POST', '/usuarios/login',
-            { body: { correo_electronico: 'admin@rickys.com', contrasena: 'password' } });
+    const paso1 = (correo, contrasena, extra = resolverCaptcha()) =>
+        api('POST', '/usuarios/login', { body: { correo_electronico: correo, contrasena, ...extra } });
+    const paso2 = (token_mfa, codigo) =>
+        api('POST', '/usuarios/login/mfa', { body: { token_mfa, codigo } });
+
+    test('el admin del seed configura su autenticador en el primer ingreso', async () => {
+        const r1 = await paso1('admin@rickys.com', 'password');
+        assert.equal(r1.status, 200);
+        assert.equal(r1.body.paso, 'configurar_mfa');
+        assert.equal(r1.body.token, undefined);
+        assert.match(r1.body.mfa.qr, /^data:image\/png;base64,/);
+        assert.match(r1.body.mfa.secreto, /^[A-Z2-7]{32}$/);
+
+        // Reintentar antes de confirmar entrega el mismo secreto (no hay que re-escanear)
+        const otra = await paso1('admin@rickys.com', 'password');
+        assert.equal(otra.body.mfa.secreto, r1.body.mfa.secreto);
+
+        const r2 = await paso2(r1.body.token_mfa, codigoActual(r1.body.mfa.secreto));
+        assert.equal(r2.status, 200);
+        assert.ok(r2.body.token);
+        assert.equal(r2.body.usuario.id_rol, 1);
+
+        // Desde ahora solo pide el código, sin mostrar el QR
+        const r3 = await paso1('admin@rickys.com', 'password');
+        assert.equal(r3.body.paso, 'verificar_mfa');
+        assert.equal(r3.body.mfa, undefined);
+    });
+
+    test('el secreto se guarda cifrado en la BD', async () => {
+        const [u] = await bd.sql(`SELECT mfa_secreto FROM usuario WHERE correo_electronico = 'admin@rickys.com'`);
+        assert.match(u.mfa_secreto, /^v1:/);
+        assert.doesNotMatch(u.mfa_secreto, /[A-Z2-7]{32}/);
+    });
+
+    test('sin CAPTCHA o con CAPTCHA incorrecto no se evalúa la contraseña', async () => {
+        const sin = await paso1('admin@rickys.com', 'password', {});
+        assert.equal(sin.status, 400);
+        assert.equal(sin.body.codigo, 'CAPTCHA_INVALIDO');
+
+        const { id_captcha } = resolverCaptcha();
+        const malo = await paso1('admin@rickys.com', 'password', { id_captcha, captcha: 'zzzzz' });
+        assert.equal(malo.status, 400);
+        assert.equal(malo.body.codigo, 'CAPTCHA_INVALIDO');
+    });
+
+    test('cada CAPTCHA sirve una sola vez y no distingue mayúsculas', async () => {
+        const c = resolverCaptcha();
+        const r1 = await paso1('admin@rickys.com', 'password', { ...c, captcha: c.captcha.toUpperCase() });
+        assert.equal(r1.status, 200);
+        const r2 = await paso1('admin@rickys.com', 'password', c);
+        assert.equal(r2.body.codigo, 'CAPTCHA_INVALIDO');
+    });
+
+    test('GET /captcha entrega una imagen SVG sin cachear', async () => {
+        const r = await api('GET', '/usuarios/captcha');
         assert.equal(r.status, 200);
-        assert.ok(r.body.token);
-        assert.equal(r.body.usuario.id_rol, 1);
+        assert.match(r.body.id_captcha, /^[0-9a-f]{32}$/);
+        assert.match(r.body.imagen, /^data:image\/svg\+xml;base64,/);
+        assert.equal(r.headers.get('cache-control'), 'no-store');
     });
 
     test('correo inexistente y contraseña incorrecta dan la misma respuesta', async () => {
-        const a = await api('POST', '/usuarios/login',
-            { body: { correo_electronico: 'nadie@prueba.com', contrasena: 'x' } });
-        const b = await api('POST', '/usuarios/login',
-            { body: { correo_electronico: 'admin@rickys.com', contrasena: 'x' } });
+        const a = await paso1('nadie@prueba.com', 'x');
+        const b = await paso1('admin@rickys.com', 'x');
         assert.equal(a.status, 401);
         assert.equal(b.status, 401);
         assert.deepEqual(a.body, b.body);
@@ -100,14 +152,67 @@ describe('Login', () => {
 
     test('bloquea tras 5 intentos fallidos (429) aunque luego la clave sea correcta', async () => {
         await crearUsuario('bloqueo@prueba.com', 2);
-        for (let i = 0; i < 5; i++) {
-            const r = await api('POST', '/usuarios/login',
-                { body: { correo_electronico: 'bloqueo@prueba.com', contrasena: 'mala' } });
-            assert.equal(r.status, 401);
-        }
-        const r = await api('POST', '/usuarios/login',
-            { body: { correo_electronico: 'bloqueo@prueba.com', contrasena: CLAVE } });
-        assert.equal(r.status, 429);
+        for (let i = 0; i < 5; i++)
+            assert.equal((await paso1('bloqueo@prueba.com', 'mala')).status, 401);
+        assert.equal((await paso1('bloqueo@prueba.com', CLAVE)).status, 429);
+    });
+
+    test('código incorrecto → 401 y un código ya usado no vuelve a servir', async () => {
+        await crearUsuario('mfa.codigo@prueba.com', 2);
+        await prepararMfa(bd, 'mfa.codigo@prueba.com');
+        const { body: { token_mfa } } = await paso1('mfa.codigo@prueba.com', CLAVE);
+
+        const malo = await paso2(token_mfa, codigoActual() === '000000' ? '111111' : '000000');
+        assert.equal(malo.status, 401);
+        assert.equal(malo.body.codigo, 'MFA_CODIGO_INVALIDO');
+
+        const codigo = codigoActual();
+        assert.equal((await paso2(token_mfa, codigo)).status, 200);
+        assert.equal((await paso2(token_mfa, codigo)).body.codigo, 'MFA_CODIGO_INVALIDO');
+    });
+
+    test('bloquea el segundo factor tras 5 códigos incorrectos', async () => {
+        await crearUsuario('mfa.bloqueo@prueba.com', 2);
+        await prepararMfa(bd, 'mfa.bloqueo@prueba.com');
+        const { body: { token_mfa } } = await paso1('mfa.bloqueo@prueba.com', CLAVE);
+        const malo = codigoActual() === '000000' ? '111111' : '000000';
+        for (let i = 0; i < 5; i++) assert.equal((await paso2(token_mfa, malo)).status, 401);
+        assert.equal((await paso2(token_mfa, codigoActual())).status, 429);
+    });
+
+    test('el token intermedio no sirve como sesión, ni la sesión como token intermedio', async () => {
+        await crearUsuario('mfa.token@prueba.com', 1);
+        await prepararMfa(bd, 'mfa.token@prueba.com');
+        const { body: { token_mfa } } = await paso1('mfa.token@prueba.com', CLAVE);
+        assert.equal((await api('GET', '/usuarios', { token: token_mfa })).status, 401);
+
+        const sesion = await login('mfa.token@prueba.com');
+        assert.equal((await paso2(sesion, codigoActual())).body.codigo, 'MFA_EXPIRADO');
+        assert.equal((await paso2('basura', codigoActual())).body.codigo, 'MFA_EXPIRADO');
+    });
+
+    test('un usuario desactivado entre ambos pasos no completa el login', async () => {
+        const id = await crearUsuario('mfa.desactivado@prueba.com', 2);
+        await prepararMfa(bd, 'mfa.desactivado@prueba.com');
+        const { body: { token_mfa } } = await paso1('mfa.desactivado@prueba.com', CLAVE);
+        await bd.sql(`UPDATE usuario SET estado_activo = FALSE WHERE id_usuario = $1`, [id]);
+        assert.equal((await paso2(token_mfa, codigoActual())).status, 401);
+    });
+
+    test('el admin restablece el MFA; un cajero sin permiso no puede', async () => {
+        const id = await crearUsuario('mfa.reset@prueba.com', 2);
+        await crearUsuario('mfa.reset.cajero@prueba.com', 2);
+        const tAdmin  = await login('admin@rickys.com', 'password');
+        const tCajero = await login('mfa.reset.cajero@prueba.com');
+
+        assert.equal((await api('PATCH', `/usuarios/${id}/mfa/restablecer`, { token: tCajero })).status, 403);
+        assert.equal((await api('PATCH', `/usuarios/${id}/mfa/restablecer`, { token: tAdmin })).status, 200);
+        assert.equal((await api('PATCH', `/usuarios/999999/mfa/restablecer`, { token: tAdmin })).status, 404);
+
+        const r = await paso1('mfa.reset@prueba.com', CLAVE);
+        assert.equal(r.body.paso, 'configurar_mfa');
+        const lista = (await api('GET', '/usuarios', { token: tAdmin })).body;
+        assert.equal(lista.find(u => u.id_usuario === id).mfa_activo, false);
     });
 });
 

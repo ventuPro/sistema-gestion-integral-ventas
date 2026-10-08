@@ -28,6 +28,7 @@ const listarUsuarios = async () => {
             u.id_sucursal,
             u.estado_activo,
             u.caja_habilitada,
+            u.mfa_activo,
             r.nombre_rol,
             s.nombre_sucursal
         FROM usuario u
@@ -73,6 +74,41 @@ const cambiarContrasena = async (id_usuario, contrasena_hash) => {
     return result.rows[0];
 };
 
+// ─── Segundo factor (MFA) ───
+const obtenerUsuarioActivoPorId = async (id_usuario) => {
+    const result = await db.query(
+        `SELECT * FROM usuario WHERE id_usuario=$1 AND estado_activo=TRUE`,
+        [id_usuario]
+    );
+    return result.rows[0];
+};
+
+const guardarSecretoMfaPendiente = async (id_usuario, secreto_cifrado) => {
+    await db.query(
+        `UPDATE usuario SET mfa_secreto=$2, mfa_ultimo_paso=NULL WHERE id_usuario=$1 AND mfa_activo=FALSE`,
+        [id_usuario, secreto_cifrado]
+    );
+};
+
+/** Activa el MFA y guarda el paso usado; falla si el código ya se usó o el secreto cambió. */
+const registrarPasoMfa = async (id_usuario, secreto_cifrado, paso) => {
+    const result = await db.query(`
+        UPDATE usuario SET mfa_activo=TRUE, mfa_ultimo_paso=$3
+        WHERE id_usuario=$1 AND mfa_secreto=$2 AND estado_activo=TRUE
+          AND (mfa_ultimo_paso IS NULL OR mfa_ultimo_paso < $3)
+        RETURNING id_usuario
+    `, [id_usuario, secreto_cifrado, paso]);
+    return result.rowCount === 1;
+};
+
+const restablecerMfa = async (id_usuario) => {
+    const result = await db.query(
+        `UPDATE usuario SET mfa_secreto=NULL, mfa_activo=FALSE, mfa_ultimo_paso=NULL WHERE id_usuario=$1 RETURNING id_usuario`,
+        [id_usuario]
+    );
+    return result.rows[0];
+};
+
 const obtenerRoles = async () => {
     const result = await db.query(
         `SELECT DISTINCT ON (nombre_rol) id_rol, nombre_rol 
@@ -90,5 +126,6 @@ const obtenerSucursales = async () => {
 module.exports = {
     crearUsuario, obtenerUsuarioPorCorreo, listarUsuarios,
     actualizarUsuario, desactivarUsuario, reactivarUsuario,
-    cambiarContrasena, obtenerRoles, obtenerSucursales
+    cambiarContrasena, obtenerRoles, obtenerSucursales,
+    obtenerUsuarioActivoPorId, guardarSecretoMfaPendiente, registrarPasoMfa, restablecerMfa
 };
