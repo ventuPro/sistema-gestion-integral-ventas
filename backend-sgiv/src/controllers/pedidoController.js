@@ -1,6 +1,7 @@
 const pedidoModel = require('../models/pedidoModel');
 const cuentaModel = require('../models/cuentaModel');
 const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
+const contexto    = require('../auditoria/contexto');
 
 // ─── Errores ───
 const ERRORES = {
@@ -116,7 +117,9 @@ const marcarEntregado = async (req, res) => {
 };
 
 // Revisa cada minuto los pedidos que nadie atendió
-const iniciarExpiracion = () => setInterval(async () => {
+const CONTEXTO_EXPIRACION = { usuario: 'Sistema', origen: 'Proceso automático: vencimiento de pedidos' };
+
+const iniciarExpiracion = () => setInterval(() => contexto.ejecutar({ ...CONTEXTO_EXPIRACION }, async () => {
     try {
         const r = await pedidoModel.expirarPendientes(MINUTOS_EXPIRACION);
         emitirStock(r.cambios);
@@ -124,6 +127,6 @@ const iniciarExpiracion = () => setInterval(async () => {
     } catch (e) {
         console.error('expirarPendientes:', e.message);
     }
-}, 60_000).unref();
+}), 60_000).unref();
 
 module.exports = { obtenerBandeja, ajustarDetalle, confirmarPedido, rechazarPedido, marcarEntregado, avisarCambio, iniciarExpiracion };

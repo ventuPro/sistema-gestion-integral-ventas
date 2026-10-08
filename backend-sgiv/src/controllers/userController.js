@@ -3,6 +3,8 @@ const jwt         = require('jsonwebtoken');
 const userModel   = require('../models/userModel');
 const db          = require('../config/db');
 const captcha     = require('../utils/captcha');
+const contexto    = require('../auditoria/contexto');
+const { marcarEvento } = require('../auditoria/registroAcceso');
 const { JWT_SECRET, JWT_OPCIONES } = require('../config/seguridad');
 
 // Un usuario con permiso 'usuarios' que no es administrador no puede crear,
@@ -72,20 +74,29 @@ const loginUsuario = async (req, res) => {
         if (!correo_electronico || !contrasena)
             return res.status(400).json({ error: 'Ingrese correo y contraseña' });
 
-        if (!captcha.verificar(id_captcha, respuestaCaptcha))
+        const correo = String(correo_electronico).toLowerCase();
+        if (!captcha.verificar(id_captcha, respuestaCaptcha)) {
+            marcarEvento(res, 'CAPTCHA_INCORRECTO', { correo });
             return res.status(400).json({ error: 'El código de la imagen es incorrecto o venció', codigo: 'CAPTCHA_INVALIDO' });
+        }
 
         const clave = claveIntento(req, correo_electronico);
-        if (estaBloqueado(clave))
+        if (estaBloqueado(clave)) {
+            marcarEvento(res, 'BLOQUEO_POR_INTENTOS', { correo });
             return res.status(429).json({ error: 'Demasiados intentos fallidos. Intente de nuevo en 15 minutos.' });
+        }
 
         const u = await userModel.obtenerUsuarioPorCorreo(correo_electronico);
         const valida = await bcrypt.compare(String(contrasena), u ? u.contrasena_hash : HASH_FICTICIO);
         if (!u || !valida) {
             registrarFallo(clave);
+            marcarEvento(res, 'INICIO_SESION_FALLIDO',
+                { correo, motivo: u ? 'Contraseña incorrecta' : 'Correo no registrado o usuario inactivo' });
             return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
         }
         intentosFallidos.delete(clave);
+        contexto.asignarUsuario(u.id_usuario, `${u.nombre_completo} <${u.correo_electronico}>`);
+        marcarEvento(res, 'INICIO_SESION');
 
         // Obtener nombre de sucursal
         const rSuc = await require('../config/db').query(
@@ -115,6 +126,12 @@ const loginUsuario = async (req, res) => {
         console.error('Error loginUsuario:', e);
         res.status(500).json({ error: 'Error al iniciar sesión' });
     }
+};
+
+// El token sigue siendo válido hasta que vence; esto deja constancia del cierre
+const cerrarSesion = (req, res) => {
+    marcarEvento(res, 'CIERRE_SESION');
+    res.json({ mensaje: 'Sesión cerrada' });
 };
 
 const obtenerCaptcha = (req, res) => {
@@ -195,7 +212,7 @@ const obtenerDatosFormulario = async (req, res) => {
 };
 
 module.exports = {
-    registrarUsuario, loginUsuario, obtenerCaptcha, listarUsuarios,
+    registrarUsuario, loginUsuario, cerrarSesion, obtenerCaptcha, listarUsuarios,
     actualizarUsuario, desactivarUsuario, reactivarUsuario,
     cambiarContrasena, obtenerDatosFormulario
 };

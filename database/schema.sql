@@ -1,4 +1,8 @@
 -- Archivo: database/schema.sql corregido
+--
+-- AUDITORÍA: la BD sgiv_auditoria, el esquema 'auditoria' y los triggers de
+-- todas las tablas los crea el backend al iniciar (backend-sgiv/src/auditoria).
+-- Consultas de ejemplo: database/consultas_auditoria.sql
 
 -- Limpieza previa para evitar errores de "ya existe" (Opcional pero recomendado en desarrollo)
 DROP TABLE IF EXISTS detalle_cuenta CASCADE;

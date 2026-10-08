@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "auditoria:instalar": "node src/auditoria/instalar.js",
     "test": "node --test --test-concurrency=1",
     "test:unitarias": "node --test \"tests/unitarias/*.test.js\""
   },

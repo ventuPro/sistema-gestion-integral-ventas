@@ -123,7 +123,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   cerrarSesion() {
-    this.authService.cerrarSesion();
+    this.authService.cerrarSesion(true);
     this.permisoService.limpiarPermisos();
     this.socketService.desconectar();
     this.router.navigate(['/login']);

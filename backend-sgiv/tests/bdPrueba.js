@@ -1,12 +1,14 @@
 const fs   = require('fs');
 const path = require('path');
 const { Client } = require('pg');
+const { instalarAuditoria } = require('../src/auditoria/instalar');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
 
 // ─── Base de datos temporal para pruebas de integración ───
 // Se crea una BD nueva a partir de database/schema.sql + seed.sql, se usa
 // durante las pruebas y se elimina al terminar. Nunca se toca la BD real.
+// También se crea su BD de auditoría (<nombre>_aud) con los triggers.
 const DIR_BD = path.join(__dirname, '..', '..', 'database');
 
 const conexion = (database) => ({
@@ -38,16 +40,26 @@ const crearBdPrueba = async () => {
     await c.query(fs.readFileSync(path.join(DIR_BD, 'seed.sql'),   'utf8'));
 
     // La app (config/db.js) lee DB_NAME al cargarse: debe requerirse después de esto
-    process.env.DB_NAME_REAL = process.env.DB_NAME;
-    process.env.DB_NAME      = nombre;
+    process.env.DB_NAME_REAL       = process.env.DB_NAME;
+    process.env.AUDIT_DB_NAME_REAL = process.env.AUDIT_DB_NAME || '';
+    process.env.DB_NAME            = nombre;
+    process.env.AUDIT_DB_NAME      = `${nombre}_aud`;
+    await instalarAuditoria();
+
+    const aud = new Client(conexion(process.env.AUDIT_DB_NAME));
+    await aud.connect();
 
     return {
         nombre,
-        sql: (texto, params) => c.query(texto, params).then(r => r.rows),
+        sql:          (texto, params) => c.query(texto, params).then(r => r.rows),
+        sqlAuditoria: (texto, params) => aud.query(texto, params).then(r => r.rows),
         eliminar: async () => {
             await c.end();
-            process.env.DB_NAME = process.env.DB_NAME_REAL;
+            await aud.end();
+            process.env.DB_NAME       = process.env.DB_NAME_REAL;
+            process.env.AUDIT_DB_NAME = process.env.AUDIT_DB_NAME_REAL;
             await conAdmin(a => a.query(`DROP DATABASE IF EXISTS ${nombre} WITH (FORCE)`));
+            await conAdmin(a => a.query(`DROP DATABASE IF EXISTS ${nombre}_aud WITH (FORCE)`));
         }
     };
 };

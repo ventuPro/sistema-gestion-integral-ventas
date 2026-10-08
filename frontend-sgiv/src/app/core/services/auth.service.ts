@@ -24,7 +24,13 @@ export class AuthService {
     return !!localStorage.getItem('token_sgiv');
   }
 
-  cerrarSesion(): void {
+  /** avisarServidor: deja constancia del cierre en la auditoría (no aplica a sesiones vencidas). */
+  cerrarSesion(avisarServidor = false): void {
+    const token = localStorage.getItem('token_sgiv');
+    if (avisarServidor && token) {
+      this.http.post(`${this.apiUrl}/usuarios/logout`, {}, { headers: { Authorization: `Bearer ${token}` } })
+        .subscribe({ error: () => {} });
+    }
     localStorage.removeItem('token_sgiv');
     localStorage.removeItem('usuario_sgiv');
     localStorage.removeItem('permisos_sgiv');

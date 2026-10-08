@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const db  = require('../config/db');
 const permisoModel = require('../models/permisoModel');
+const contexto     = require('../auditoria/contexto');
 const { JWT_SECRET, JWT_ALGORITMOS } = require('../config/seguridad');
 
 // ─── Verificación de token ───
@@ -22,7 +23,8 @@ const verificarToken = async (req, res, next) => {
 
     try {
         const r = await db.query(
-            `SELECT id_usuario, id_rol, id_sucursal, estado_activo FROM usuario WHERE id_usuario = $1`,
+            `SELECT id_usuario, id_rol, id_sucursal, estado_activo, nombre_completo, correo_electronico
+             FROM usuario WHERE id_usuario = $1`,
             [payload.id_usuario]
         );
         const u = r.rows[0];
@@ -30,6 +32,7 @@ const verificarToken = async (req, res, next) => {
             return res.status(401).json({ mensaje: 'Usuario desactivado. Inicie sesión nuevamente.' });
 
         req.usuario = { ...payload, id_rol: u.id_rol, id_sucursal: u.id_sucursal };
+        contexto.asignarUsuario(u.id_usuario, `${u.nombre_completo} <${u.correo_electronico}>`);
         next();
     } catch (error) {
         console.error('Error en verificarToken:', error);

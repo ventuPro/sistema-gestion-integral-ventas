@@ -9,6 +9,7 @@ const gestion = [verificarToken, verificarPermiso('usuarios')];
 router.post  ('/registro',          gestion, ctrl.registrarUsuario);
 router.get   ('/captcha',           ctrl.obtenerCaptcha);
 router.post  ('/login',             ctrl.loginUsuario);
+router.post  ('/logout',            verificarToken, ctrl.cerrarSesion);
 router.get   ('/',                  gestion, ctrl.listarUsuarios);
 router.get   ('/form-data',         gestion, ctrl.obtenerDatosFormulario);
 router.put   ('/:id',               gestion, ctrl.actualizarUsuario);

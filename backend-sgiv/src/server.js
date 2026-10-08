@@ -8,6 +8,8 @@ require('dotenv').config();
 const db = require('./config/db');
 const jwt = require('jsonwebtoken');
 const { origenPermitido, JWT_SECRET, JWT_ALGORITMOS } = require('./config/seguridad');
+const { registrarAcceso } = require('./auditoria/registroAcceso');
+const { instalarAuditoria } = require('./auditoria/instalar');
 
 const userRoutes      = require('./routes/userRoutes');
 const productoRoutes  = require('./routes/productoRoutes');
@@ -51,6 +53,9 @@ app.use(cors((req, callback) => {
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Auditoría: cada petición a la API queda registrada en la BD de auditoría
+app.use('/api', registrarAcceso);
 
 // Imágenes de productos guardadas por uploadMiddleware
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
@@ -106,12 +111,21 @@ app.get('/', (req, res) => {
 
 // Solo escucha cuando se ejecuta directamente (npm run dev / start);
 // las pruebas automatizadas importan app y server sin abrir el puerto 3000.
+// Sin auditoría el sistema no arranca.
 if (require.main === module) {
-    const PORT = process.env.PORT || 3000;
-    server.listen(PORT, () => {
-        console.log(`🚀 Servidor + WebSocket corriendo en puerto ${PORT}`);
-    });
-    require('./controllers/pedidoController').iniciarExpiracion();
+    instalarAuditoria()
+        .then(({ bdAuditoria, tablas }) => {
+            console.log(`🛡️  Auditoría activa en "${bdAuditoria}" (${tablas} tablas con triggers)`);
+            const PORT = process.env.PORT || 3000;
+            server.listen(PORT, () => {
+                console.log(`🚀 Servidor + WebSocket corriendo en puerto ${PORT}`);
+            });
+            require('./controllers/pedidoController').iniciarExpiracion();
+        })
+        .catch(e => {
+            console.error('❌ No se pudo preparar la auditoría:', e.message);
+            process.exit(1);
+        });
 }
 
 module.exports = { app, server, io };
