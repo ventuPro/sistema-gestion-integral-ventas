@@ -27,7 +27,7 @@ const api = async (metodo, ruta, { token, body } = {}) => {
     return { status: r.status, body: datos };
 };
 
-const iniciarSesion = crearLogin((...a) => api(...a), () => bd);
+const iniciarSesion = crearLogin((...a) => api(...a));
 const login = (correo, contrasena = CLAVE) => iniciarSesion(correo, contrasena);
 
 const crearUsuario = async (correo, id_rol) => {

@@ -16,10 +16,6 @@ export class AuthService {
     return this.http.post(`${this.apiUrl}/usuarios/login`, { correo_electronico, contrasena, id_captcha, captcha });
   }
 
-  verificarMfa(token_mfa: string, codigo: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/usuarios/login/mfa`, { token_mfa, codigo });
-  }
-
   guardarToken(token: string): void {
     localStorage.setItem('token_sgiv', token);
   }

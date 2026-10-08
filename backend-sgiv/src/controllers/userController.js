@@ -2,6 +2,7 @@ const bcrypt      = require('bcryptjs');
 const jwt         = require('jsonwebtoken');
 const userModel   = require('../models/userModel');
 const db          = require('../config/db');
+const captcha     = require('../utils/captcha');
 const { JWT_SECRET, JWT_OPCIONES } = require('../config/seguridad');
 
 // Un usuario con permiso 'usuarios' que no es administrador no puede crear,
@@ -34,7 +35,7 @@ const registrarUsuario = async (req, res) => {
     }
 };
 
-// ─── Login ───
+// ─── Login (CAPTCHA + contraseña) ───
 // Mismo mensaje y mismo tiempo de respuesta si el correo no existe o la
 // contraseña es incorrecta, para no revelar qué correos están registrados.
 // Además se limita la cantidad de intentos fallidos por IP + correo.
@@ -67,9 +68,12 @@ const registrarFallo = (clave) => {
 
 const loginUsuario = async (req, res) => {
     try {
-        const { correo_electronico, contrasena } = req.body || {};
+        const { correo_electronico, contrasena, id_captcha, captcha: respuestaCaptcha } = req.body || {};
         if (!correo_electronico || !contrasena)
             return res.status(400).json({ error: 'Ingrese correo y contraseña' });
+
+        if (!captcha.verificar(id_captcha, respuestaCaptcha))
+            return res.status(400).json({ error: 'El código de la imagen es incorrecto o venció', codigo: 'CAPTCHA_INVALIDO' });
 
         const clave = claveIntento(req, correo_electronico);
         if (estaBloqueado(clave))
@@ -111,6 +115,12 @@ const loginUsuario = async (req, res) => {
         console.error('Error loginUsuario:', e);
         res.status(500).json({ error: 'Error al iniciar sesión' });
     }
+};
+
+const obtenerCaptcha = (req, res) => {
+    const { id, svg } = captcha.crear();
+    res.set('Cache-Control', 'no-store');
+    res.json({ id_captcha: id, imagen: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}` });
 };
 
 const listarUsuarios = async (req, res) => {
@@ -185,7 +195,7 @@ const obtenerDatosFormulario = async (req, res) => {
 };
 
 module.exports = {
-    registrarUsuario, loginUsuario, listarUsuarios,
+    registrarUsuario, loginUsuario, obtenerCaptcha, listarUsuarios,
     actualizarUsuario, desactivarUsuario, reactivarUsuario,
     cambiarContrasena, obtenerDatosFormulario
 };

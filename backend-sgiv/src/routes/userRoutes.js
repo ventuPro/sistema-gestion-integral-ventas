@@ -7,6 +7,7 @@ const { verificarToken, verificarPermiso } = require('../middlewares/authMiddlew
 const gestion = [verificarToken, verificarPermiso('usuarios')];
 
 router.post  ('/registro',          gestion, ctrl.registrarUsuario);
+router.get   ('/captcha',           ctrl.obtenerCaptcha);
 router.post  ('/login',             ctrl.loginUsuario);
 router.get   ('/',                  gestion, ctrl.listarUsuarios);
 router.get   ('/form-data',         gestion, ctrl.obtenerDatosFormulario);
