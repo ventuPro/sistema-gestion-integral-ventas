@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../../environments/environment';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
+import { AjustesService } from '../../../core/services/ajustes.service';
 
 type Vista = 'menu' | 'carrito' | 'pedidos';
 
@@ -33,6 +34,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private http  = inject(HttpClient);
   private cdr   = inject(ChangeDetectorRef);
+  readonly ajustes = inject(AjustesService);
 
   private readonly api       = `${environment.apiUrl}/menu/m`;
   private readonly socketUrl = environment.apiUrl.replace('/api', '');

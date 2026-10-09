@@ -19,4 +19,12 @@ export class SucursalService {
   crearSucursal(datos: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/sucursales`, datos, { headers: this.h() });
   }
+
+  actualizarSucursal(id: number, datos: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/sucursales/${id}`, datos, { headers: this.h() });
+  }
+
+  cambiarEstado(id: number, estado_activo: boolean): Observable<any> {
+    return this.http.patch(`${this.apiUrl}/sucursales/${id}/estado`, { estado_activo }, { headers: this.h() });
+  }
 }

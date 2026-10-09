@@ -1,4 +1,5 @@
-const cajaModel = require('../models/cajaModel');
+const cajaModel     = require('../models/cajaModel');
+const sucursalModel = require('../models/sucursalModel');
 
 // ─── ESTADO COMPLETO (la fuente de verdad para el front) ──────────
 const getEstadoCompleto = async (req, res) => {
@@ -87,8 +88,11 @@ const getTurnoHoy = async (req, res) => {
 const abrirCaja = async (req, res) => {
     try {
         const { id_sucursal, monto_inicial } = req.body;
+        const sucursal = Number(id_sucursal) || req.usuario.id_sucursal;
+        if (!(await sucursalModel.estaActiva(sucursal)))
+            return res.status(400).json({ error: 'La sucursal está desactivada: no se puede abrir caja.' });
         const turno = await cajaModel.abrirTurno(
-            Number(id_sucursal) || req.usuario.id_sucursal,
+            sucursal,
             req.usuario.id_usuario,
             Number(monto_inicial) || 0
         );

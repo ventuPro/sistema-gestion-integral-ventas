@@ -6,6 +6,7 @@ import { CuentaService }  from '../../../core/services/cuenta.service';
 import { CajaService, EstadoCajaCompleto }    from '../../../core/services/caja.service';
 import { MesaService }    from '../../../core/services/mesa.service';
 import { SocketService }  from '../../../core/services/socket.service';
+import { AjustesService } from '../../../core/services/ajustes.service';
 import { MesaModalComponent } from './mesa-modal/mesa-modal.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, QrCode, Printer, Download } from 'lucide-angular';
@@ -23,6 +24,7 @@ export class MesasComponent implements OnInit, OnDestroy {
   private mesaService   = inject(MesaService);
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
+  private ajustes       = inject(AjustesService);
 
   readonly icons = {
     shieldAlert: ShieldAlert,
@@ -280,9 +282,12 @@ export class MesasComponent implements OnInit, OnDestroy {
 
   /** Hoja imprimible en una ventana aparte: no arrastra el resto del sistema */
   imprimirQR() {
+    const nombre = this.escaparHtml(this.ajustes.nombre());
+    const logo   = this.ajustes.logo() ? `<img class="logo" src="${this.ajustes.logo()}" alt="">` : '';
+    const color  = `rgb(${this.ajustes.colorPrimarioRgb().join(',')})`;
     const tarjetas = this.codigosQR.map(c => `
       <div class="tarjeta">
-        <p class="marca">Pastelería Ricky's</p>
+        ${logo}<p class="marca">${nombre}</p>
         <img src="${c.qr}" alt="QR Mesa ${c.numero_mesa}">
         <p class="mesa">Mesa ${c.numero_mesa}</p>
         <p class="ayuda">Escanea para ver el menú y pedir desde tu mesa</p>
@@ -296,12 +301,17 @@ export class MesasComponent implements OnInit, OnDestroy {
         .hoja { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10mm; }
         .tarjeta { border: 2px dashed #999; border-radius: 6mm; padding: 6mm; text-align: center; break-inside: avoid; }
         .tarjeta img { width: 60mm; height: 60mm; }
-        .marca { margin: 0 0 2mm; font-weight: bold; color: #1d4ed8; }
+        .marca { margin: 0 0 2mm; font-weight: bold; color: ${color}; }
+        .tarjeta img.logo { width: auto; height: 14mm; margin-bottom: 1mm; }
         .mesa  { margin: 2mm 0 0; font-size: 22pt; font-weight: 900; }
         .ayuda { margin: 1mm 0 0; font-size: 10pt; color: #555; }
       </style></head>
       <body><div class="hoja">${tarjetas}</div>
       <script>window.onload = () => { window.print(); }<\/script></body></html>`);
     ventana.document.close();
+  }
+
+  private escaparHtml(texto: string): string {
+    return texto.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
   }
 }

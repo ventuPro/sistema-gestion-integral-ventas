@@ -143,7 +143,7 @@ const itemsDelPedido = async (client, id_pedido) =>
 const obtenerMesaPorCodigo = async (codigo) => {
     const r = await db.query(`
         SELECT m.id_mesa, m.numero_mesa, m.id_sucursal, s.nombre_sucursal,
-               EXISTS (SELECT 1 FROM turno_caja t
+               s.estado_activo AND EXISTS (SELECT 1 FROM turno_caja t
                        WHERE t.id_sucursal = m.id_sucursal AND t.estado_turno = 'Abierto') AS recibe_pedidos
         FROM mesa_local m
         JOIN sucursal   s ON s.id_sucursal = m.id_sucursal
@@ -176,7 +176,8 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general }) => {
         await client.query(`SELECT id_mesa FROM mesa_local WHERE id_mesa = $1 FOR UPDATE`, [mesa.id_mesa]);
 
         const rTurno = await client.query(
-            `SELECT 1 FROM turno_caja WHERE id_sucursal = $1 AND estado_turno = 'Abierto' LIMIT 1`,
+            `SELECT 1 FROM turno_caja t JOIN sucursal s ON s.id_sucursal = t.id_sucursal
+             WHERE t.id_sucursal = $1 AND t.estado_turno = 'Abierto' AND s.estado_activo LIMIT 1`,
             [mesa.id_sucursal]);
         if (!rTurno.rows.length)
             throw errorCodigo('NO_RECIBE_PEDIDOS', 'En este momento no estamos recibiendo pedidos desde el menú. Consulta en caja.');

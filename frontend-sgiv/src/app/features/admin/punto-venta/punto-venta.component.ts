@@ -8,13 +8,14 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { Subscription } from 'rxjs';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
+import { EncabezadoTicketComponent } from '../../shared/encabezado-ticket/encabezado-ticket.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Inbox, Search, X } from 'lucide-angular';
 
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, EncabezadoTicketComponent],
   templateUrl: './punto-venta.component.html'
 })
 export class PuntoVentaComponent implements OnInit, OnDestroy {

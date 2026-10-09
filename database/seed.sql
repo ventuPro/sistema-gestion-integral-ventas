@@ -22,3 +22,6 @@ VALUES (
   TRUE
 )
 ON CONFLICT (correo_electronico) DO NOTHING;
+
+-- Configuración del negocio con los valores por defecto (módulo Ajustes)
+INSERT INTO configuracion (id_configuracion) VALUES (1) ON CONFLICT DO NOTHING;

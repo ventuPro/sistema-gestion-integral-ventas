@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ReporteService } from '../../../core/services/reporte.service';
 import { ProductoService } from '../../../core/services/producto.service';
+import { AjustesService } from '../../../core/services/ajustes.service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { Subscription } from 'rxjs';
@@ -23,6 +24,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
   private cdr             = inject(ChangeDetectorRef);
   private http            = inject(HttpClient);
+  private ajustes         = inject(AjustesService);
   private apiUrl          = environment.apiUrl;
 
   readonly icons = {
@@ -242,16 +244,22 @@ export class ReportesComponent implements OnInit, OnDestroy {
   }
 
   // ─── Exportar PDF ───
-  exportarPDF() {
+  async exportarPDF() {
     if (!this.datosReporte) return;
     const doc = new jsPDF();
     const { resumen, ventas_diarias, por_categoria, top_productos } = this.datosReporte;
+    const color = this.ajustes.colorPrimarioRgb();
+    const nombre = this.ajustes.nombre();
 
-    doc.setFillColor(37, 99, 235);
+    doc.setFillColor(...color);
     doc.rect(0, 0, 210, 38, 'F');
+    const logo = await this.ajustes.logoComoDataUri();
+    if (logo) {
+      try { doc.addImage(logo, 14, 6, 26, 26, undefined, 'FAST'); } catch { /* formato no soportado: sin logo */ }
+    }
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18); doc.setFont('helvetica', 'bold');
-    doc.text("PASTELERÍA RICKY'S", 105, 14, { align: 'center' });
+    doc.text(nombre.toUpperCase(), 105, 14, { align: 'center' });
     doc.setFontSize(11); doc.setFont('helvetica', 'normal');
     doc.text('Reporte de Ingresos', 105, 22, { align: 'center' });
     doc.setFontSize(9);
@@ -265,9 +273,9 @@ export class ReportesComponent implements OnInit, OnDestroy {
       doc.text(`Filtrado por categorías: ${nombres}`, 105, 36, { align: 'center' });
     }
 
-    doc.setTextColor(37, 99, 235); doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...color); doc.setFontSize(12); doc.setFont('helvetica', 'bold');
     doc.text('RESUMEN EJECUTIVO', 14, 52);
-    doc.setDrawColor(37, 99, 235); doc.line(14, 54, 196, 54);
+    doc.setDrawColor(...color); doc.line(14, 54, 196, 54);
 
     autoTable(doc, {
       startY: 58,
@@ -278,14 +286,14 @@ export class ReportesComponent implements OnInit, OnDestroy {
         ['Ticket Promedio',   `Bs. ${parseFloat(resumen?.ticket_promedio  || 0).toFixed(2)}`],
       ],
       theme: 'striped',
-      headStyles:  { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+      headStyles:  { fillColor: color, textColor: 255, fontStyle: 'bold' },
       columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
       margin: { left: 14, right: 14 }
     });
 
     if (por_categoria?.length > 0) {
       const y1 = (doc as any).lastAutoTable.finalY + 10;
-      doc.setTextColor(37, 99, 235); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...color); doc.setFont('helvetica', 'bold');
       doc.text('VENTAS POR CATEGORÍA', 14, y1);
       doc.line(14, y1 + 2, 196, y1 + 2);
       // FIX: usar campo correcto "ingresos"
@@ -294,7 +302,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
         head: [['Categoría', 'Unidades', 'Ingresos']],
         body: por_categoria.map((c: any) => [c.nombre_categoria, c.unidades, `Bs. ${parseFloat(c.ingresos || 0).toFixed(2)}`]),
         theme: 'striped',
-        headStyles:  { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+        headStyles:  { fillColor: color, textColor: 255, fontStyle: 'bold' },
         columnStyles: { 1: { halign: 'center' }, 2: { halign: 'right', fontStyle: 'bold' } },
         margin: { left: 14, right: 14 }
       });
@@ -303,7 +311,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
     if (top_productos?.length > 0) {
       const y2 = (doc as any).lastAutoTable.finalY + 10;
       const yFinal = y2 > 240 ? (doc.addPage(), 20) : y2;
-      doc.setTextColor(37, 99, 235); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...color); doc.setFont('helvetica', 'bold');
       doc.text('TOP PRODUCTOS MÁS VENDIDOS', 14, yFinal);
       doc.line(14, yFinal + 2, 196, yFinal + 2);
       autoTable(doc, {
@@ -311,7 +319,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
         head: [['#', 'Producto', 'Categoría', 'Unidades', 'Ingresos']],
         body: top_productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, p.unidades, `Bs. ${parseFloat(p.ingresos || 0).toFixed(2)}`]),
         theme: 'striped',
-        headStyles:  { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+        headStyles:  { fillColor: color, textColor: 255, fontStyle: 'bold' },
         columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'right', fontStyle: 'bold' } },
         margin: { left: 14, right: 14 }
       });
@@ -321,9 +329,9 @@ export class ReportesComponent implements OnInit, OnDestroy {
     for (let i = 1; i <= total; i++) {
       doc.setPage(i);
       doc.setFontSize(8); doc.setTextColor(150, 150, 150);
-      doc.text(`SGIV — Pastelería Ricky's — Pág. ${i}/${total}`, 105, 290, { align: 'center' });
+      doc.text(`SGIV — ${nombre} — Pág. ${i}/${total}`, 105, 290, { align: 'center' });
     }
-    doc.save(`Reporte_Rickys_${this.fechaInicio}_${this.fechaFin}.pdf`);
+    doc.save(`Reporte_${this.nombreArchivo}_${this.fechaInicio}_${this.fechaFin}.pdf`);
   }
 
   // ─── Exportar Excel ───
@@ -339,7 +347,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
       : 'Todas';
 
     const ws1 = XLSX.utils.aoa_to_sheet([
-      ["REPORTE DE INGRESOS — PASTELERÍA RICKY'S"],
+      [`REPORTE DE INGRESOS — ${this.ajustes.nombre().toUpperCase()}`],
       [`Período: ${this.fechaInicio} al ${this.fechaFin}`],
       [`Categorías: ${filtroNombres}`],
       [''],
@@ -379,7 +387,13 @@ export class ReportesComponent implements OnInit, OnDestroy {
       XLSX.utils.book_append_sheet(wb, ws4, 'Top Productos');
     }
 
-    XLSX.writeFile(wb, `Reporte_Rickys_${this.fechaInicio}_${this.fechaFin}.xlsx`);
+    XLSX.writeFile(wb, `Reporte_${this.nombreArchivo}_${this.fechaInicio}_${this.fechaFin}.xlsx`);
+  }
+
+  /** Nombre del negocio apto para archivo: "Pastelería Ricky's" → "Pasteleria_Rickys" */
+  private get nombreArchivo(): string {
+    return this.ajustes.nombre().normalize('NFD').replace(/\p{M}|'/gu, '')
+      .replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'Negocio';
   }
 
   get resumen() { return this.datosReporte?.resumen || {}; }

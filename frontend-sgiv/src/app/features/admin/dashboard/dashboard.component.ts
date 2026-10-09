@@ -4,10 +4,12 @@ import { CommonModule } from '@angular/common';
 import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
-         Landmark, LogOut, ChevronRight, Building2, RefreshCw } from 'lucide-angular';
+         Landmark, LogOut, ChevronRight, Building2, RefreshCw,
+         Settings } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
+import { AjustesService } from '../../../core/services/ajustes.service';
 import { BandejaPedidosComponent } from '../bandeja-pedidos/bandeja-pedidos.component';
 import { Subscription }   from 'rxjs';
 
@@ -23,6 +25,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private authService    = inject(AuthService);
   private socketService  = inject(SocketService);
   private cdr            = inject(ChangeDetectorRef);
+  readonly ajustes       = inject(AjustesService);
 
   usuario:        any  = null;
   esAdmin         = false;
@@ -49,7 +52,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     logout:     LogOut,
     chevron:    ChevronRight,
     sucursal:   Building2,
-    refresh:    RefreshCw
+    refresh:    RefreshCw,
+    ajustes:    Settings
   };
 
   ngOnInit() {

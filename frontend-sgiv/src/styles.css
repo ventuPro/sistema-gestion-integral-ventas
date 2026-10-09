@@ -1,3 +1,242 @@
 /* You can add global styles to this file, and also import other style files */
 
 @import 'tailwindcss';
+
+/* ─── Modo oscuro (Ajustes → Apariencia) ───
+   AjustesService pone la clase .tema-oscuro en <html>. Las reglas usan :where()
+   para tener la misma prioridad que las clases de Tailwind y van después de ellas,
+   así hover, focus y disabled siguen funcionando. Al imprimir se usa el modo claro. */
+html.tema-oscuro {
+  --o-fondo: #0f172a;
+  --o-superficie: #1e293b;
+  --o-superficie-2: #263449;
+  --o-superficie-3: #314158;
+  --o-superficie-hover: #2c3b52;
+  --o-borde: #2f3d52;
+  --o-borde-fuerte: #45556c;
+  --o-texto: #f1f5f9;
+  --o-texto-2: #d5dde8;
+  --o-texto-3: #b0bccc;
+  --o-texto-4: #94a3b8;
+}
+
+@media screen {
+  html.tema-oscuro { color-scheme: dark; }
+  html.tema-oscuro body { background-color: var(--o-fondo); color: var(--o-texto); }
+}
+
+/* Bordes sin color explícito (border, border-b...) */
+@layer base {
+  @media screen {
+    html.tema-oscuro *, html.tema-oscuro ::before, html.tema-oscuro ::after { border-color: var(--o-borde); }
+  }
+}
+
+@layer utilities {
+@media screen {
+  /* Neutros */
+  :where(.tema-oscuro) .bg-white { background-color: var(--o-superficie); }
+  :where(.tema-oscuro) .bg-white\/80 { background-color: color-mix(in oklab, var(--o-superficie) 80%, transparent); }
+  :where(.tema-oscuro) .bg-white\/95 { background-color: color-mix(in oklab, var(--o-superficie) 95%, transparent); }
+  :where(.tema-oscuro) .bg-gray-50 { background-color: var(--o-fondo); }
+  :where(.tema-oscuro) .bg-gray-100 { background-color: var(--o-superficie-2); }
+  :where(.tema-oscuro) .bg-gray-200 { background-color: var(--o-superficie-3); }
+  :where(.tema-oscuro) .bg-gray-300 { background-color: var(--o-borde-fuerte); }
+  :where(.tema-oscuro) .from-gray-50 { --tw-gradient-from: var(--o-fondo); }
+  :where(.tema-oscuro) .from-slate-50 { --tw-gradient-from: var(--o-fondo); }
+  :where(.tema-oscuro) .to-gray-100 { --tw-gradient-to: var(--o-superficie-2); }
+  :where(.tema-oscuro) :is(.text-gray-900, .text-gray-800, .text-slate-800, .text-black) { color: var(--o-texto); }
+  :where(.tema-oscuro) :is(.text-gray-700, .text-slate-700) { color: var(--o-texto-2); }
+  :where(.tema-oscuro) .text-gray-600 { color: var(--o-texto-3); }
+  :where(.tema-oscuro) :is(.text-gray-500, .text-slate-500) { color: var(--o-texto-4); }
+  :where(.tema-oscuro) :is(.border-gray-50, .border-gray-100, .border-gray-200) { border-color: var(--o-borde); }
+  :where(.tema-oscuro) .border-gray-300 { border-color: var(--o-borde-fuerte); }
+  :where(.tema-oscuro) .divide-gray-100 > :not(:last-child) { border-color: var(--o-borde); }
+  /* Neutros: estados */
+  :where(.tema-oscuro) :is(.hover\:bg-gray-50, .hover\:bg-gray-100):hover { background-color: var(--o-superficie-hover); }
+  :where(.tema-oscuro) .hover\:bg-gray-200:hover { background-color: var(--o-superficie-3); }
+  :where(.tema-oscuro) :is(.hover\:text-gray-700, .hover\:text-gray-600):hover { color: var(--o-texto); }
+  :where(.tema-oscuro) :is(.disabled\:bg-gray-200, .disabled\:bg-gray-300):disabled { background-color: var(--o-borde-fuerte); }
+  /* Colores: fondos y bordes suaves, textos oscuros */
+  :where(.tema-oscuro) .bg-blue-50 { background-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 12%, transparent); }
+  :where(.tema-oscuro) .bg-blue-100 { background-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 20%, transparent); }
+  :where(.tema-oscuro) .bg-blue-200 { background-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 30%, transparent); }
+  :where(.tema-oscuro) .bg-blue-50\/30 { background-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 8%, transparent); }
+  :where(.tema-oscuro) .bg-blue-50\/40 { background-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 8%, transparent); }
+  :where(.tema-oscuro) .bg-blue-50\/50 { background-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 8%, transparent); }
+  :where(.tema-oscuro) .bg-blue-50\/60 { background-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 8%, transparent); }
+  :where(.tema-oscuro) .from-blue-50 { --tw-gradient-from: color-mix(in oklab, var(--color-blue-500, #3b82f6) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-blue-50 { --tw-gradient-via: color-mix(in oklab, var(--color-blue-500, #3b82f6) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-blue-50, .to-blue-100) { --tw-gradient-to: color-mix(in oklab, var(--color-blue-500, #3b82f6) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-blue-50, .border-blue-100) { border-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-blue-200, .border-blue-300) { border-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-blue-700, .text-blue-800, .text-blue-900) { color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 55%, white); }
+  :where(.tema-oscuro) .text-blue-600 { color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-blue-50, .hover\:bg-blue-100):hover { background-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-blue-50\/50:hover { background-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-blue-200, .hover\:border-blue-300):hover { border-color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-blue-600, .hover\:text-blue-700, .hover\:text-blue-800):hover { color: color-mix(in oklab, var(--color-blue-500, #3b82f6) 65%, white); }
+  :where(.tema-oscuro) .bg-indigo-50 { background-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 12%, transparent); }
+  :where(.tema-oscuro) .bg-indigo-100 { background-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 20%, transparent); }
+  :where(.tema-oscuro) .bg-indigo-200 { background-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 30%, transparent); }
+  :where(.tema-oscuro) .bg-indigo-50\/30 { background-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 8%, transparent); }
+  :where(.tema-oscuro) .bg-indigo-50\/40 { background-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 8%, transparent); }
+  :where(.tema-oscuro) .bg-indigo-50\/50 { background-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 8%, transparent); }
+  :where(.tema-oscuro) .bg-indigo-50\/60 { background-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 8%, transparent); }
+  :where(.tema-oscuro) .from-indigo-50 { --tw-gradient-from: color-mix(in oklab, var(--color-indigo-500, #6366f1) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-indigo-50 { --tw-gradient-via: color-mix(in oklab, var(--color-indigo-500, #6366f1) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-indigo-50, .to-indigo-100) { --tw-gradient-to: color-mix(in oklab, var(--color-indigo-500, #6366f1) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-indigo-50, .border-indigo-100) { border-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-indigo-200, .border-indigo-300) { border-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-indigo-700, .text-indigo-800, .text-indigo-900) { color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 55%, white); }
+  :where(.tema-oscuro) .text-indigo-600 { color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-indigo-50, .hover\:bg-indigo-100):hover { background-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-indigo-50\/50:hover { background-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-indigo-200, .hover\:border-indigo-300):hover { border-color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-indigo-600, .hover\:text-indigo-700, .hover\:text-indigo-800):hover { color: color-mix(in oklab, var(--color-indigo-500, #6366f1) 65%, white); }
+  :where(.tema-oscuro) .bg-red-50 { background-color: color-mix(in oklab, var(--color-red-500, #ef4444) 12%, transparent); }
+  :where(.tema-oscuro) .bg-red-100 { background-color: color-mix(in oklab, var(--color-red-500, #ef4444) 20%, transparent); }
+  :where(.tema-oscuro) .bg-red-200 { background-color: color-mix(in oklab, var(--color-red-500, #ef4444) 30%, transparent); }
+  :where(.tema-oscuro) .bg-red-50\/30 { background-color: color-mix(in oklab, var(--color-red-500, #ef4444) 8%, transparent); }
+  :where(.tema-oscuro) .bg-red-50\/40 { background-color: color-mix(in oklab, var(--color-red-500, #ef4444) 8%, transparent); }
+  :where(.tema-oscuro) .bg-red-50\/50 { background-color: color-mix(in oklab, var(--color-red-500, #ef4444) 8%, transparent); }
+  :where(.tema-oscuro) .bg-red-50\/60 { background-color: color-mix(in oklab, var(--color-red-500, #ef4444) 8%, transparent); }
+  :where(.tema-oscuro) .from-red-50 { --tw-gradient-from: color-mix(in oklab, var(--color-red-500, #ef4444) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-red-50 { --tw-gradient-via: color-mix(in oklab, var(--color-red-500, #ef4444) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-red-50, .to-red-100) { --tw-gradient-to: color-mix(in oklab, var(--color-red-500, #ef4444) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-red-50, .border-red-100) { border-color: color-mix(in oklab, var(--color-red-500, #ef4444) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-red-200, .border-red-300) { border-color: color-mix(in oklab, var(--color-red-500, #ef4444) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-red-700, .text-red-800, .text-red-900) { color: color-mix(in oklab, var(--color-red-500, #ef4444) 55%, white); }
+  :where(.tema-oscuro) .text-red-600 { color: color-mix(in oklab, var(--color-red-500, #ef4444) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-red-50, .hover\:bg-red-100):hover { background-color: color-mix(in oklab, var(--color-red-500, #ef4444) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-red-50\/50:hover { background-color: color-mix(in oklab, var(--color-red-500, #ef4444) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-red-200, .hover\:border-red-300):hover { border-color: color-mix(in oklab, var(--color-red-500, #ef4444) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-red-600, .hover\:text-red-700, .hover\:text-red-800):hover { color: color-mix(in oklab, var(--color-red-500, #ef4444) 65%, white); }
+  :where(.tema-oscuro) .bg-green-50 { background-color: color-mix(in oklab, var(--color-green-500, #22c55e) 12%, transparent); }
+  :where(.tema-oscuro) .bg-green-100 { background-color: color-mix(in oklab, var(--color-green-500, #22c55e) 20%, transparent); }
+  :where(.tema-oscuro) .bg-green-200 { background-color: color-mix(in oklab, var(--color-green-500, #22c55e) 30%, transparent); }
+  :where(.tema-oscuro) .bg-green-50\/30 { background-color: color-mix(in oklab, var(--color-green-500, #22c55e) 8%, transparent); }
+  :where(.tema-oscuro) .bg-green-50\/40 { background-color: color-mix(in oklab, var(--color-green-500, #22c55e) 8%, transparent); }
+  :where(.tema-oscuro) .bg-green-50\/50 { background-color: color-mix(in oklab, var(--color-green-500, #22c55e) 8%, transparent); }
+  :where(.tema-oscuro) .bg-green-50\/60 { background-color: color-mix(in oklab, var(--color-green-500, #22c55e) 8%, transparent); }
+  :where(.tema-oscuro) .from-green-50 { --tw-gradient-from: color-mix(in oklab, var(--color-green-500, #22c55e) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-green-50 { --tw-gradient-via: color-mix(in oklab, var(--color-green-500, #22c55e) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-green-50, .to-green-100) { --tw-gradient-to: color-mix(in oklab, var(--color-green-500, #22c55e) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-green-50, .border-green-100) { border-color: color-mix(in oklab, var(--color-green-500, #22c55e) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-green-200, .border-green-300) { border-color: color-mix(in oklab, var(--color-green-500, #22c55e) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-green-700, .text-green-800, .text-green-900) { color: color-mix(in oklab, var(--color-green-500, #22c55e) 55%, white); }
+  :where(.tema-oscuro) .text-green-600 { color: color-mix(in oklab, var(--color-green-500, #22c55e) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-green-50, .hover\:bg-green-100):hover { background-color: color-mix(in oklab, var(--color-green-500, #22c55e) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-green-50\/50:hover { background-color: color-mix(in oklab, var(--color-green-500, #22c55e) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-green-200, .hover\:border-green-300):hover { border-color: color-mix(in oklab, var(--color-green-500, #22c55e) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-green-600, .hover\:text-green-700, .hover\:text-green-800):hover { color: color-mix(in oklab, var(--color-green-500, #22c55e) 65%, white); }
+  :where(.tema-oscuro) .bg-emerald-50 { background-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 12%, transparent); }
+  :where(.tema-oscuro) .bg-emerald-100 { background-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 20%, transparent); }
+  :where(.tema-oscuro) .bg-emerald-200 { background-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 30%, transparent); }
+  :where(.tema-oscuro) .bg-emerald-50\/30 { background-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 8%, transparent); }
+  :where(.tema-oscuro) .bg-emerald-50\/40 { background-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 8%, transparent); }
+  :where(.tema-oscuro) .bg-emerald-50\/50 { background-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 8%, transparent); }
+  :where(.tema-oscuro) .bg-emerald-50\/60 { background-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 8%, transparent); }
+  :where(.tema-oscuro) .from-emerald-50 { --tw-gradient-from: color-mix(in oklab, var(--color-emerald-500, #10b981) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-emerald-50 { --tw-gradient-via: color-mix(in oklab, var(--color-emerald-500, #10b981) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-emerald-50, .to-emerald-100) { --tw-gradient-to: color-mix(in oklab, var(--color-emerald-500, #10b981) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-emerald-50, .border-emerald-100) { border-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-emerald-200, .border-emerald-300) { border-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-emerald-700, .text-emerald-800, .text-emerald-900) { color: color-mix(in oklab, var(--color-emerald-500, #10b981) 55%, white); }
+  :where(.tema-oscuro) .text-emerald-600 { color: color-mix(in oklab, var(--color-emerald-500, #10b981) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-emerald-50, .hover\:bg-emerald-100):hover { background-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-emerald-50\/50:hover { background-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-emerald-200, .hover\:border-emerald-300):hover { border-color: color-mix(in oklab, var(--color-emerald-500, #10b981) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-emerald-600, .hover\:text-emerald-700, .hover\:text-emerald-800):hover { color: color-mix(in oklab, var(--color-emerald-500, #10b981) 65%, white); }
+  :where(.tema-oscuro) .bg-amber-50 { background-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 12%, transparent); }
+  :where(.tema-oscuro) .bg-amber-100 { background-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 20%, transparent); }
+  :where(.tema-oscuro) .bg-amber-200 { background-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 30%, transparent); }
+  :where(.tema-oscuro) .bg-amber-50\/30 { background-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 8%, transparent); }
+  :where(.tema-oscuro) .bg-amber-50\/40 { background-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 8%, transparent); }
+  :where(.tema-oscuro) .bg-amber-50\/50 { background-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 8%, transparent); }
+  :where(.tema-oscuro) .bg-amber-50\/60 { background-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 8%, transparent); }
+  :where(.tema-oscuro) .from-amber-50 { --tw-gradient-from: color-mix(in oklab, var(--color-amber-500, #f59e0b) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-amber-50 { --tw-gradient-via: color-mix(in oklab, var(--color-amber-500, #f59e0b) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-amber-50, .to-amber-100) { --tw-gradient-to: color-mix(in oklab, var(--color-amber-500, #f59e0b) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-amber-50, .border-amber-100) { border-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-amber-200, .border-amber-300) { border-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-amber-700, .text-amber-800, .text-amber-900) { color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 55%, white); }
+  :where(.tema-oscuro) .text-amber-600 { color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-amber-50, .hover\:bg-amber-100):hover { background-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-amber-50\/50:hover { background-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-amber-200, .hover\:border-amber-300):hover { border-color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-amber-600, .hover\:text-amber-700, .hover\:text-amber-800):hover { color: color-mix(in oklab, var(--color-amber-500, #f59e0b) 65%, white); }
+  :where(.tema-oscuro) .bg-orange-50 { background-color: color-mix(in oklab, var(--color-orange-500, #f97316) 12%, transparent); }
+  :where(.tema-oscuro) .bg-orange-100 { background-color: color-mix(in oklab, var(--color-orange-500, #f97316) 20%, transparent); }
+  :where(.tema-oscuro) .bg-orange-200 { background-color: color-mix(in oklab, var(--color-orange-500, #f97316) 30%, transparent); }
+  :where(.tema-oscuro) .bg-orange-50\/30 { background-color: color-mix(in oklab, var(--color-orange-500, #f97316) 8%, transparent); }
+  :where(.tema-oscuro) .bg-orange-50\/40 { background-color: color-mix(in oklab, var(--color-orange-500, #f97316) 8%, transparent); }
+  :where(.tema-oscuro) .bg-orange-50\/50 { background-color: color-mix(in oklab, var(--color-orange-500, #f97316) 8%, transparent); }
+  :where(.tema-oscuro) .bg-orange-50\/60 { background-color: color-mix(in oklab, var(--color-orange-500, #f97316) 8%, transparent); }
+  :where(.tema-oscuro) .from-orange-50 { --tw-gradient-from: color-mix(in oklab, var(--color-orange-500, #f97316) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-orange-50 { --tw-gradient-via: color-mix(in oklab, var(--color-orange-500, #f97316) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-orange-50, .to-orange-100) { --tw-gradient-to: color-mix(in oklab, var(--color-orange-500, #f97316) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-orange-50, .border-orange-100) { border-color: color-mix(in oklab, var(--color-orange-500, #f97316) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-orange-200, .border-orange-300) { border-color: color-mix(in oklab, var(--color-orange-500, #f97316) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-orange-700, .text-orange-800, .text-orange-900) { color: color-mix(in oklab, var(--color-orange-500, #f97316) 55%, white); }
+  :where(.tema-oscuro) .text-orange-600 { color: color-mix(in oklab, var(--color-orange-500, #f97316) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-orange-50, .hover\:bg-orange-100):hover { background-color: color-mix(in oklab, var(--color-orange-500, #f97316) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-orange-50\/50:hover { background-color: color-mix(in oklab, var(--color-orange-500, #f97316) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-orange-200, .hover\:border-orange-300):hover { border-color: color-mix(in oklab, var(--color-orange-500, #f97316) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-orange-600, .hover\:text-orange-700, .hover\:text-orange-800):hover { color: color-mix(in oklab, var(--color-orange-500, #f97316) 65%, white); }
+  :where(.tema-oscuro) .bg-purple-50 { background-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 12%, transparent); }
+  :where(.tema-oscuro) .bg-purple-100 { background-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 20%, transparent); }
+  :where(.tema-oscuro) .bg-purple-200 { background-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 30%, transparent); }
+  :where(.tema-oscuro) .bg-purple-50\/30 { background-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 8%, transparent); }
+  :where(.tema-oscuro) .bg-purple-50\/40 { background-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 8%, transparent); }
+  :where(.tema-oscuro) .bg-purple-50\/50 { background-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 8%, transparent); }
+  :where(.tema-oscuro) .bg-purple-50\/60 { background-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 8%, transparent); }
+  :where(.tema-oscuro) .from-purple-50 { --tw-gradient-from: color-mix(in oklab, var(--color-purple-500, #a855f7) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-purple-50 { --tw-gradient-via: color-mix(in oklab, var(--color-purple-500, #a855f7) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-purple-50, .to-purple-100) { --tw-gradient-to: color-mix(in oklab, var(--color-purple-500, #a855f7) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-purple-50, .border-purple-100) { border-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-purple-200, .border-purple-300) { border-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-purple-700, .text-purple-800, .text-purple-900) { color: color-mix(in oklab, var(--color-purple-500, #a855f7) 55%, white); }
+  :where(.tema-oscuro) .text-purple-600 { color: color-mix(in oklab, var(--color-purple-500, #a855f7) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-purple-50, .hover\:bg-purple-100):hover { background-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-purple-50\/50:hover { background-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-purple-200, .hover\:border-purple-300):hover { border-color: color-mix(in oklab, var(--color-purple-500, #a855f7) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-purple-600, .hover\:text-purple-700, .hover\:text-purple-800):hover { color: color-mix(in oklab, var(--color-purple-500, #a855f7) 65%, white); }
+  :where(.tema-oscuro) .bg-sky-50 { background-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 12%, transparent); }
+  :where(.tema-oscuro) .bg-sky-100 { background-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 20%, transparent); }
+  :where(.tema-oscuro) .bg-sky-200 { background-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 30%, transparent); }
+  :where(.tema-oscuro) .bg-sky-50\/30 { background-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 8%, transparent); }
+  :where(.tema-oscuro) .bg-sky-50\/40 { background-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 8%, transparent); }
+  :where(.tema-oscuro) .bg-sky-50\/50 { background-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 8%, transparent); }
+  :where(.tema-oscuro) .bg-sky-50\/60 { background-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 8%, transparent); }
+  :where(.tema-oscuro) .from-sky-50 { --tw-gradient-from: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-sky-50 { --tw-gradient-via: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-sky-50, .to-sky-100) { --tw-gradient-to: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-sky-50, .border-sky-100) { border-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-sky-200, .border-sky-300) { border-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-sky-700, .text-sky-800, .text-sky-900) { color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 55%, white); }
+  :where(.tema-oscuro) .text-sky-600 { color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-sky-50, .hover\:bg-sky-100):hover { background-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-sky-50\/50:hover { background-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-sky-200, .hover\:border-sky-300):hover { border-color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-sky-600, .hover\:text-sky-700, .hover\:text-sky-800):hover { color: color-mix(in oklab, var(--color-sky-500, #0ea5e9) 65%, white); }
+  :where(.tema-oscuro) .bg-yellow-50 { background-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 12%, transparent); }
+  :where(.tema-oscuro) .bg-yellow-100 { background-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 20%, transparent); }
+  :where(.tema-oscuro) .bg-yellow-200 { background-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 30%, transparent); }
+  :where(.tema-oscuro) .bg-yellow-50\/30 { background-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 8%, transparent); }
+  :where(.tema-oscuro) .bg-yellow-50\/40 { background-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 8%, transparent); }
+  :where(.tema-oscuro) .bg-yellow-50\/50 { background-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 8%, transparent); }
+  :where(.tema-oscuro) .bg-yellow-50\/60 { background-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 8%, transparent); }
+  :where(.tema-oscuro) .from-yellow-50 { --tw-gradient-from: color-mix(in oklab, var(--color-yellow-500, #eab308) 12%, var(--o-fondo)); }
+  :where(.tema-oscuro) .via-yellow-50 { --tw-gradient-via: color-mix(in oklab, var(--color-yellow-500, #eab308) 8%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.to-yellow-50, .to-yellow-100) { --tw-gradient-to: color-mix(in oklab, var(--color-yellow-500, #eab308) 14%, var(--o-fondo)); }
+  :where(.tema-oscuro) :is(.border-yellow-50, .border-yellow-100) { border-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 25%, transparent); }
+  :where(.tema-oscuro) :is(.border-yellow-200, .border-yellow-300) { border-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 40%, transparent); }
+  :where(.tema-oscuro) :is(.text-yellow-700, .text-yellow-800, .text-yellow-900) { color: color-mix(in oklab, var(--color-yellow-500, #eab308) 55%, white); }
+  :where(.tema-oscuro) .text-yellow-600 { color: color-mix(in oklab, var(--color-yellow-500, #eab308) 80%, white); }
+  :where(.tema-oscuro) :is(.hover\:bg-yellow-50, .hover\:bg-yellow-100):hover { background-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 24%, transparent); }
+  :where(.tema-oscuro) .hover\:bg-yellow-50\/50:hover { background-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 14%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:border-yellow-200, .hover\:border-yellow-300):hover { border-color: color-mix(in oklab, var(--color-yellow-500, #eab308) 55%, transparent); }
+  :where(.tema-oscuro) :is(.hover\:text-yellow-600, .hover\:text-yellow-700, .hover\:text-yellow-800):hover { color: color-mix(in oklab, var(--color-yellow-500, #eab308) 65%, white); }
+}
+}

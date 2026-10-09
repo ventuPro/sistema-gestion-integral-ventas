@@ -58,4 +58,9 @@ const verificarPermiso = (modulo) => {
     };
 };
 
-module.exports = { verificarToken, verificarPermiso };
+const soloAdministrador = (req, res, next) =>
+    Number(req.usuario?.id_rol) === 1
+        ? next()
+        : res.status(403).json({ error: 'Solo el administrador puede realizar esta acción' });
+
+module.exports = { verificarToken, verificarPermiso, soloAdministrador };

@@ -5,11 +5,12 @@ import { CuentaService } from '../../../../core/services/cuenta.service';
 import { SocketService } from '../../../../core/services/socket.service';
 import { Subscription } from 'rxjs';
 import { ImagenUrlPipe } from '../../../../core/pipes/imagen-url.pipe';
+import { EncabezadoTicketComponent } from '../../../shared/encabezado-ticket/encabezado-ticket.component';
 
 @Component({
   selector: 'app-mesa-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, ImagenUrlPipe],
+  imports: [CommonModule, FormsModule, ImagenUrlPipe, EncabezadoTicketComponent],
   templateUrl: './mesa-modal.component.html'
 })
 export class MesaModalComponent implements OnInit, OnDestroy {

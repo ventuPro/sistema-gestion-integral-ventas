@@ -83,7 +83,8 @@ const obtenerRoles = async () => {
 };
 
 const obtenerSucursales = async () => {
-    const result = await db.query(`SELECT id_sucursal, nombre_sucursal FROM sucursal ORDER BY id_sucursal`);
+    // Solo las activas: a una sucursal desactivada no se le asignan usuarios
+    const result = await db.query(`SELECT id_sucursal, nombre_sucursal FROM sucursal WHERE estado_activo ORDER BY id_sucursal`);
     return result.rows;
 };
 

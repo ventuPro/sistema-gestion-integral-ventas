@@ -3,10 +3,14 @@
   <!-- ═══ SIDEBAR ═══ -->
   <aside class="w-64 bg-gray-900 text-white flex flex-col shadow-2xl">
 
-    <!-- Logo -->
-    <div class="px-6 py-5 border-b border-gray-800">
-      <h1 class="text-xl font-black text-white tracking-tight">Pastelería</h1>
-      <p class="text-blue-400 font-bold text-sm">Ricky's</p>
+    <!-- Logo y nombre del negocio (Ajustes → Empresa / Apariencia) -->
+    <div class="px-5 py-5 border-b border-gray-800 flex items-center gap-3">
+      <img *ngIf="ajustes.logo()" [src]="ajustes.logo()" alt="Logo"
+           class="w-11 h-11 object-contain rounded-lg bg-white/10 p-1 flex-shrink-0">
+      <div class="min-w-0">
+        <h1 class="text-xl font-black text-white tracking-tight leading-tight break-words">{{ ajustes.nombre() }}</h1>
+        <p *ngIf="ajustes.config().eslogan" class="text-blue-400 font-bold text-xs truncate">{{ ajustes.config().eslogan }}</p>
+      </div>
     </div>
 
     <!-- Navegación -->
@@ -100,6 +104,12 @@
            class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
           <lucide-icon [img]="icons.usuarios" class="w-5 h-5 flex-shrink-0"></lucide-icon>
           Usuarios
+        </a>
+
+        <a routerLink="/dashboard/ajustes" routerLinkActive="bg-blue-600 text-white"
+           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
+          <lucide-icon [img]="icons.ajustes" class="w-5 h-5 flex-shrink-0"></lucide-icon>
+          Ajustes
         </a>
       </ng-container>
     </nav>

@@ -264,7 +264,7 @@ export class ResumenComponent implements OnInit, OnDestroy {
         this.cerrarModalSucursal();
         this.cargarSucursales();
       },
-      error: () => { this.errorSucursal = 'Error al crear la sucursal.'; this.cargandoSucursal = false; }
+      error: (e) => { this.errorSucursal = e?.error?.error || 'Error al crear la sucursal.'; this.cargandoSucursal = false; this.cdr.detectChanges(); }
     });
   }
 

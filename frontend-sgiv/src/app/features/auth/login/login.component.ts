@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LucideAngularModule, RefreshCw } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
 import { PermisoService } from '../../../core/services/permiso.service';
+import { AjustesService } from '../../../core/services/ajustes.service';
 
 // ─── Login: correo, contraseña y CAPTCHA ───
 @Component({
@@ -33,6 +34,7 @@ export class LoginComponent implements OnInit {
   private router         = inject(Router);
   private route          = inject(ActivatedRoute);
   private cdr            = inject(ChangeDetectorRef);
+  readonly ajustes       = inject(AjustesService);
 
   constructor() {
     // Redirigido por el interceptor: token vencido o usuario desactivado

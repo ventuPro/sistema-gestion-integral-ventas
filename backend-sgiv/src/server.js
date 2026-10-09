@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken');
 const { origenPermitido, JWT_SECRET, JWT_ALGORITMOS } = require('./config/seguridad');
 const { registrarAcceso } = require('./auditoria/registroAcceso');
 const { instalarAuditoria } = require('./auditoria/instalar');
+const { aplicarMigraciones } = require('./config/migraciones');
 
 const userRoutes      = require('./routes/userRoutes');
 const productoRoutes  = require('./routes/productoRoutes');
@@ -21,6 +22,7 @@ const sucursalRoutes  = require('./routes/sucursalRoutes');
 const permisoRoutes   = require('./routes/permisoRoutes');
 const menuRoutes      = require('./routes/menuRoutes');
 const mesaRoutes      = require('./routes/mesaRoutes');
+const ajusteRoutes    = require('./routes/ajusteRoutes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -40,10 +42,10 @@ const io = new Server(server, {
 global.io = io;
 
 // ─── CORS ───
-// El menú digital (QR) es público y acepta cualquier origen; el resto de la API
-// solo responde a los orígenes permitidos (ver config/seguridad.js).
+// El menú digital (QR) y los ajustes públicos aceptan cualquier origen; el resto
+// de la API solo responde a los orígenes permitidos (ver config/seguridad.js).
 app.use(cors((req, callback) => {
-    const publico = req.path.startsWith('/api/menu');
+    const publico = req.path.startsWith('/api/menu') || req.path === '/api/ajustes/publico';
     callback(null, {
         origin:         publico || origenPermitido(req.headers.origin, req.headers.host),
         methods:        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -72,6 +74,7 @@ app.use('/api/permisos',   permisoRoutes);
 app.use('/api/menu',       menuRoutes);    // Público (sin auth)
 app.use('/api/mesas',      mesaRoutes);
 app.use('/api/cuentas', require('./routes/cuentaRoutes'));
+app.use('/api/ajustes',    ajusteRoutes);
 
 // Socket.IO eventos
 io.on('connection', (socket) => {
@@ -111,9 +114,11 @@ app.get('/', (req, res) => {
 
 // Solo escucha cuando se ejecuta directamente (npm run dev / start);
 // las pruebas automatizadas importan app y server sin abrir el puerto 3000.
-// Sin auditoría el sistema no arranca.
+// Sin auditoría el sistema no arranca. Las migraciones van antes, para que
+// las tablas nuevas también queden con su trigger de auditoría.
 if (require.main === module) {
-    instalarAuditoria()
+    aplicarMigraciones()
+        .then(instalarAuditoria)
         .then(({ bdAuditoria, tablas }) => {
             console.log(`🛡️  Auditoría activa en "${bdAuditoria}" (${tablas} tablas con triggers)`);
             const PORT = process.env.PORT || 3000;
@@ -123,7 +128,7 @@ if (require.main === module) {
             require('./controllers/pedidoController').iniciarExpiracion();
         })
         .catch(e => {
-            console.error('❌ No se pudo preparar la auditoría:', e.message);
+            console.error('❌ No se pudo preparar la base de datos o la auditoría:', e.message);
             process.exit(1);
         });
 }

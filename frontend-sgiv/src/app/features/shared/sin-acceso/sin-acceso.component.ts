@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule,
          ShoppingCart, Wallet, Receipt,
          LayoutDashboard, ArrowRight, Sparkles } from 'lucide-angular';
+import { AjustesService } from '../../../core/services/ajustes.service';
 
 @Component({
   selector: 'app-sin-acceso',
@@ -27,7 +28,7 @@ import { LucideAngularModule,
         </div>
 
         <h1 class="text-4xl md:text-5xl font-black text-slate-800 mb-3 leading-tight">
-          Bienvenido a <span class="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Pastelería Ricky's</span>
+          Bienvenido a <span class="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{{ ajustes.nombre() }}</span>
         </h1>
 
         <p class="text-slate-500 max-w-md text-sm md:text-base mb-2">
@@ -71,6 +72,7 @@ import { LucideAngularModule,
   `
 })
 export class SinAccesoComponent implements OnInit {
+  readonly ajustes = inject(AjustesService);
   nombreCorto = '';
   saludo      = 'Hola';
   frase       = '';

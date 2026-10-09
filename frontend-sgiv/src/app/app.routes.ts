@@ -12,6 +12,7 @@ import { MenuDigitalComponent } from './features/cliente/menu-digital/menu-digit
 import { SinAccesoComponent }   from './features/shared/sin-acceso/sin-acceso.component';
 import { permisoGuard }         from './core/guards/permiso.guard';
 import { CierresCajaComponent } from './features/admin/cierres-caja/cierres-caja.component';
+import { AjustesComponent }     from './features/admin/ajustes/ajustes.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -61,6 +62,12 @@ export const routes: Routes = [
         path: 'reportes',
         component: ReportesComponent,
         canActivate: [permisoGuard('reportes')]
+      },
+      {
+        // Solo administrador: 'ajustes' no es un permiso asignable a cajeros
+        path: 'ajustes',
+        component: AjustesComponent,
+        canActivate: [permisoGuard('ajustes')]
       },
 
       { path: 'cierres-caja', component: CierresCajaComponent }
