@@ -82,13 +82,74 @@ const validarApariencia = (body) => {
     return datos;
 };
 
+// ─── Parámetros ───
+const ENTEROS = {
+    menu_minutos_expiracion:  { min: 5, max: 120,   nombre: 'Vencimiento de pedidos sin confirmar (minutos)' },
+    menu_max_pendientes_mesa: { min: 1, max: 10,    nombre: 'Pedidos pendientes por mesa' },
+    menu_max_pedidos_ip:      { min: 1, max: 100,   nombre: 'Pedidos por dispositivo cada 10 minutos' },
+    stock_minimo_defecto:     { min: 0, max: 10000, nombre: 'Stock mínimo por defecto' },
+    login_max_intentos:       { min: 3, max: 20,    nombre: 'Intentos de inicio de sesión' },
+    login_minutos_bloqueo:    { min: 1, max: 1440,  nombre: 'Minutos de bloqueo' },
+    sesion_horas:             { min: 1, max: 24,    nombre: 'Duración de la sesión (horas)' }
+};
+const BOOLEANOS = ['pago_efectivo', 'pago_qr', 'menu_activo', 'captcha_activo'];
+const TEXTOS = {
+    moneda_simbolo:          { max: 5,   obligatorio: true, nombre: 'símbolo de moneda' },
+    ticket_mensaje_pie:      { max: 150, obligatorio: true, nombre: 'mensaje del pie del ticket' },
+    menu_mensaje_bienvenida: { max: 200, nombre: 'mensaje de bienvenida' }
+};
+
+const validarParametros = (body) => {
+    const datos = {};
+    for (const [campo, r] of Object.entries(ENTEROS)) {
+        if (!(campo in body)) continue;
+        const n = Number(body[campo]);
+        if (!Number.isInteger(n) || n < r.min || n > r.max)
+            throw new ErrorValidacion(`${r.nombre}: debe ser un número entero entre ${r.min} y ${r.max}`);
+        datos[campo] = n;
+    }
+    for (const campo of BOOLEANOS) {
+        if (!(campo in body)) continue;
+        if (typeof body[campo] !== 'boolean') throw new ErrorValidacion(`Valor inválido en ${campo}`);
+        datos[campo] = body[campo];
+    }
+    for (const [campo, r] of Object.entries(TEXTOS)) {
+        if (!(campo in body)) continue;
+        const valor = body[campo] == null ? '' : String(body[campo]).trim();
+        if (!valor && r.obligatorio) throw new ErrorValidacion(`El ${r.nombre} es obligatorio`);
+        if (valor.length > r.max) throw new ErrorValidacion(`El ${r.nombre} admite hasta ${r.max} caracteres`);
+        datos[campo] = valor || null;
+    }
+    return datos;
+};
+
+// Se valida contra lo guardado: al menos un método de pago queda activo
+const validarParametrosCompletos = async (body) => {
+    const datos = validarParametros(body);
+    const actual = await ajusteModel.obtener();
+    const efectivo = datos.pago_efectivo ?? actual.pago_efectivo;
+    const qr       = datos.pago_qr ?? actual.pago_qr;
+    if (!efectivo && !qr) throw new ErrorValidacion('Debe quedar al menos un método de pago habilitado');
+    if ('qr_cobro' in body) {
+        if (body.qr_cobro === null) datos.url_qr_cobro = null;
+        else {
+            try {
+                datos.url_qr_cobro = guardarImagen(body.qr_cobro, { carpeta: 'empresa', prefijo: 'qr-cobro', maxBytes: 2 * 1024 * 1024 });
+            } catch (e) {
+                throw new ErrorValidacion(e.message);
+            }
+        }
+    }
+    return datos;
+};
+
 const avisarCambio = async () => {
     global.io?.emit('ajustes:actualizados', await ajusteModel.obtenerPublico());
 };
 
 const guardar = (validar, permitidos) => async (req, res) => {
     try {
-        const datos = validar(req.body || {});
+        const datos = await validar(req.body || {});
         const config = await ajusteModel.actualizar(datos, permitidos);
         await avisarCambio();
         res.json({ mensaje: 'Ajustes guardados', configuracion: config });
@@ -120,5 +181,6 @@ const obtener = async (req, res) => {
 
 const guardarEmpresa    = guardar(validarEmpresa,    ajusteModel.CAMPOS_EMPRESA);
 const guardarApariencia = guardar(validarApariencia, ajusteModel.CAMPOS_APARIENCIA);
+const guardarParametros = guardar(validarParametrosCompletos, ajusteModel.CAMPOS_PARAMETROS);
 
-module.exports = { obtenerPublico, obtener, guardarEmpresa, guardarApariencia };
+module.exports = { obtenerPublico, obtener, guardarEmpresa, guardarApariencia, guardarParametros };

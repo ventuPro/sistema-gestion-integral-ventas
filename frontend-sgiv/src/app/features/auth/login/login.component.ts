@@ -43,7 +43,12 @@ export class LoginComponent implements OnInit {
     }
   }
 
-  ngOnInit() { this.cargarCaptcha(); }
+  /** El servidor pidió CAPTCHA aunque la copia local de los ajustes dijera que no */
+  private forzarCaptcha = false;
+
+  get usaCaptcha(): boolean { return this.ajustes.config().captcha_activo || this.forzarCaptcha; }
+
+  ngOnInit() { if (this.usaCaptcha) this.cargarCaptcha(); }
 
   cargarCaptcha() {
     this.cargandoCaptcha = true;
@@ -69,7 +74,7 @@ export class LoginComponent implements OnInit {
     if (!this.correo || !this.contrasena) {
       this.mensajeError = 'Ingresa tu correo y contraseña.'; return;
     }
-    if (!this.captchaTexto.trim()) {
+    if (this.usaCaptcha && !this.captchaTexto.trim()) {
       this.mensajeError = 'Escribe los caracteres de la imagen.'; return;
     }
     this.cargando = true;
@@ -80,6 +85,7 @@ export class LoginComponent implements OnInit {
       error: (e) => {
         this.cargando = false;
         const err = e.error || {};
+        if (err.codigo === 'CAPTCHA_INVALIDO') this.forzarCaptcha = true;
         this.mensajeError = err.codigo === 'CAPTCHA_INVALIDO'
           ? 'Los caracteres de la imagen no coinciden. Prueba con la nueva imagen.'
           : e.status === 401
@@ -87,7 +93,7 @@ export class LoginComponent implements OnInit {
             : e.status === 429
               ? err.error
               : 'Error al conectar con el servidor.';
-        this.cargarCaptcha();
+        if (this.usaCaptcha) this.cargarCaptcha();
         this.cdr.detectChanges();
       }
     });

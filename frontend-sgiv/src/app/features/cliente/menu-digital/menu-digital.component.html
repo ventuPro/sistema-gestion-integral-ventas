@@ -66,10 +66,18 @@
       </nav>
     </header>
 
-    <!-- Sin turno de caja: se puede ver el menú, pero no pedir -->
-    <div *ngIf="!info.recibe_pedidos"
+    <!-- Bienvenida (Ajustes → Parámetros) -->
+    <div *ngIf="ajustes.config().menu_mensaje_bienvenida && vista === 'menu'"
+         class="mx-4 mt-3 bg-blue-50 border border-blue-100 text-blue-800 text-sm rounded-xl px-4 py-3">
+      {{ ajustes.config().menu_mensaje_bienvenida }}
+    </div>
+
+    <!-- Sin turno de caja o pedidos desactivados: se puede ver el menú, pero no pedir -->
+    <div *ngIf="!info.recibe_pedidos || !ajustes.config().menu_activo"
          class="mx-4 mt-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3">
-      En este momento no estamos recibiendo pedidos desde el menú. Puedes verlo y pedir en caja.
+      {{ info.pedidos_desactivados || !ajustes.config().menu_activo
+         ? 'Los pedidos desde el celular están desactivados. Puedes ver el menú y pedir en caja.'
+         : 'En este momento no estamos recibiendo pedidos desde el menú. Puedes verlo y pedir en caja.' }}
     </div>
 
     <!-- Agradecimiento al cerrar la cuenta -->
@@ -130,7 +138,7 @@
             <p *ngIf="prod.descripcion_producto" class="text-xs text-gray-400 mb-2 leading-tight line-clamp-2">
               {{ prod.descripcion_producto }}
             </p>
-            <p class="text-blue-700 font-black text-base mt-auto">Bs. {{ Number(prod.precio_unitario).toFixed(2) }}</p>
+            <p class="text-blue-700 font-black text-base mt-auto">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</p>
 
             <button *ngIf="enCarrito(prod.id_producto) === 0" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0"
                     class="mt-2 w-full py-2 font-bold rounded-xl transition-colors text-sm bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-200 disabled:text-gray-400">
@@ -170,7 +178,7 @@
             </div>
             <div class="flex-1 min-w-0">
               <p class="font-bold text-gray-800 leading-tight">{{ item.nombre_producto }}</p>
-              <p class="text-blue-700 font-black">Bs. {{ (item.precio_unitario * item.cantidad).toFixed(2) }}</p>
+              <p class="text-blue-700 font-black">{{ moneda() }} {{ (item.precio_unitario * item.cantidad).toFixed(2) }}</p>
               <button (click)="eliminar(item)" class="text-xs text-red-500 font-semibold">Quitar</button>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
@@ -193,12 +201,12 @@
         <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
           <div class="flex justify-between items-center mb-4">
             <span class="font-bold text-gray-600">Total del pedido</span>
-            <span class="text-3xl font-black text-blue-700">Bs. {{ totalCarrito.toFixed(2) }}</span>
+            <span class="text-3xl font-black text-blue-700">{{ moneda() }} {{ totalCarrito.toFixed(2) }}</span>
           </div>
           <div *ngIf="errorEnvio" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm mb-3">
             {{ errorEnvio }}
           </div>
-          <button (click)="enviarPedido()" [disabled]="enviando || !info.recibe_pedidos"
+          <button (click)="enviarPedido()" [disabled]="enviando || !info.recibe_pedidos || !ajustes.config().menu_activo"
                   class="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-black text-lg rounded-2xl transition-colors shadow-md">
             {{ enviando ? 'Enviando...' : 'Enviar pedido' }}
           </button>
@@ -250,7 +258,7 @@
               <b>{{ it.cantidad }}×</b> {{ it.nombre_producto }}
               <span *ngIf="it.nota_cliente" class="block text-xs text-amber-600 ml-5">📝 {{ it.nota_cliente }}</span>
             </span>
-            <span class="text-gray-600 ml-3">Bs. {{ Number(it.subtotal).toFixed(2) }}</span>
+            <span class="text-gray-600 ml-3">{{ moneda() }} {{ Number(it.subtotal).toFixed(2) }}</span>
           </li>
         </ul>
 
@@ -268,12 +276,12 @@
         <ul class="text-sm divide-y divide-gray-100">
           <li *ngFor="let it of cuenta.items" class="flex justify-between py-1.5">
             <span class="text-gray-700"><b>{{ it.cantidad }}×</b> {{ it.nombre_producto }}</span>
-            <span class="text-gray-600">Bs. {{ Number(it.subtotal).toFixed(2) }}</span>
+            <span class="text-gray-600">{{ moneda() }} {{ Number(it.subtotal).toFixed(2) }}</span>
           </li>
         </ul>
         <div class="flex justify-between items-center pt-3 mt-2 border-t">
           <span class="font-bold text-gray-700">Total a pagar</span>
-          <span class="text-2xl font-black text-blue-700">Bs. {{ Number(cuenta.total_acumulado).toFixed(2) }}</span>
+          <span class="text-2xl font-black text-blue-700">{{ moneda() }} {{ Number(cuenta.total_acumulado).toFixed(2) }}</span>
         </div>
         <p class="text-xs text-gray-400 mt-1">Pagas todo al final en caja.</p>
       </div>
@@ -294,7 +302,7 @@
         {{ cantidadCarrito }}
       </span>
       <span>Ver carrito</span>
-      <span>Bs. {{ totalCarrito.toFixed(2) }}</span>
+      <span>{{ moneda() }} {{ totalCarrito.toFixed(2) }}</span>
     </button>
   </div>
 </div>

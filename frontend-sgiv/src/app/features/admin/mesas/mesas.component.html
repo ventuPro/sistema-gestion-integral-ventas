@@ -109,7 +109,7 @@
 
       <div *ngIf="mesa.id_cuenta" class="space-y-0.5">
         <p class="text-xs font-bold text-orange-700">{{ mesa.num_items }} ítem(s)</p>
-        <p class="text-sm font-black text-orange-800">Bs. {{ (+mesa.total_acumulado || 0).toFixed(2) }}</p>
+        <p class="text-sm font-black text-orange-800">{{ moneda() }} {{ (+mesa.total_acumulado || 0).toFixed(2) }}</p>
       </div>
 
       <p *ngIf="!mesa.id_cuenta" class="text-xs text-gray-400">Toca para abrir</p>

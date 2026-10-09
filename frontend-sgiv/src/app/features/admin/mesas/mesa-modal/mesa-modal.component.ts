@@ -6,6 +6,7 @@ import { SocketService } from '../../../../core/services/socket.service';
 import { Subscription } from 'rxjs';
 import { ImagenUrlPipe } from '../../../../core/pipes/imagen-url.pipe';
 import { EncabezadoTicketComponent } from '../../../shared/encabezado-ticket/encabezado-ticket.component';
+import { AjustesService } from '../../../../core/services/ajustes.service';
 
 @Component({
   selector: 'app-mesa-modal',
@@ -21,6 +22,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   private cuentaService = inject(CuentaService);
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
+  readonly ajustes       = inject(AjustesService);
+  readonly moneda        = this.ajustes.moneda;
 
   esAdmin         = false;
   cargando        = false;
@@ -248,7 +251,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   irAPago() {
     this.montoPagado = 0;
-    this.metodoPago  = 'Efectivo';
+    this.metodoPago  = this.ajustes.config().pago_efectivo ? 'Efectivo' : 'QR';
     this.vista       = 'pago';
     setTimeout(() => {
       const el = this.inputMontoMesaRef?.nativeElement;

@@ -102,12 +102,12 @@
       </div>
       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <p class="text-sm font-bold text-gray-600 uppercase tracking-wider">Ingresos Totales</p>
-        <p class="text-4xl font-black text-green-600 mt-2">Bs. {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</p>
+        <p class="text-4xl font-black text-green-600 mt-2">{{ moneda() }} {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</p>
         <p class="text-xs text-gray-400 mt-1">bolivianos</p>
       </div>
       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <p class="text-sm font-bold text-gray-600 uppercase tracking-wider">Ticket Promedio</p>
-        <p class="text-4xl font-black text-blue-600 mt-2">Bs. {{ (+resumen.ticket_promedio || 0).toFixed(2) }}</p>
+        <p class="text-4xl font-black text-blue-600 mt-2">{{ moneda() }} {{ (+resumen.ticket_promedio || 0).toFixed(2) }}</p>
         <p class="text-xs text-gray-400 mt-1">por venta</p>
       </div>
     </div>
@@ -166,7 +166,7 @@
           <div *ngFor="let cat of datosReporte.por_categoria" class="space-y-1">
             <div class="flex justify-between text-sm">
               <span class="font-medium text-gray-700">{{ cat.nombre_categoria }}</span>
-              <span class="font-bold text-green-600">Bs. {{ (+cat.ingresos || 0).toFixed(2) }}</span>
+              <span class="font-bold text-green-600">{{ moneda() }} {{ (+cat.ingresos || 0).toFixed(2) }}</span>
             </div>
             <div class="w-full bg-gray-100 rounded-full h-2">
               <div class="bg-blue-500 h-2 rounded-full transition-all"
@@ -213,7 +213,7 @@
                 </td>
                 <td class="px-4 py-2.5 text-center text-gray-600">{{ p.unidades }}</td>
                 <!-- FIX: campo correcto -->
-                <td class="px-4 py-2.5 text-right font-bold text-green-600">Bs. {{ (+p.ingresos || 0).toFixed(2) }}</td>
+                <td class="px-4 py-2.5 text-right font-bold text-green-600">{{ moneda() }} {{ (+p.ingresos || 0).toFixed(2) }}</td>
               </tr>
             </tbody>
           </table>
@@ -254,7 +254,7 @@
                 </td>
                 <td class="px-6 py-3 font-medium text-gray-700">{{ d.dia }}</td>
                 <td class="px-6 py-3 text-center text-gray-600">{{ d.ventas }}</td>
-                <td class="px-6 py-3 text-right font-bold text-green-600">Bs. {{ (+d.ingresos || 0).toFixed(2) }}</td>
+                <td class="px-6 py-3 text-right font-bold text-green-600">{{ moneda() }} {{ (+d.ingresos || 0).toFixed(2) }}</td>
               </tr>
 
               <tr *ngIf="estaDiaExpandido(d.dia)" class="border-b border-blue-100 bg-blue-50/30">
@@ -271,7 +271,7 @@
                         <span class="text-sm font-bold">Desglose por categoría — {{ d.dia }}</span>
                       </div>
                       <span class="text-xs text-gray-500">
-                        {{ det.ventas_dia || 0 }} venta(s) · Bs. {{ (+det.total_dia || 0).toFixed(2) }}
+                        {{ det.ventas_dia || 0 }} venta(s) · {{ moneda() }} {{ (+det.total_dia || 0).toFixed(2) }}
                       </span>
                     </div>
 
@@ -293,7 +293,7 @@
                           <tr *ngFor="let r of det.desglose" class="border-t border-blue-50">
                             <td class="px-4 py-2 font-medium text-gray-700">{{ r.nombre_categoria }}</td>
                             <td class="px-4 py-2 text-center text-gray-600">{{ r.unidades }}</td>
-                            <td class="px-4 py-2 text-right font-bold text-green-600">Bs. {{ (+r.ingresos || 0).toFixed(2) }}</td>
+                            <td class="px-4 py-2 text-right font-bold text-green-600">{{ moneda() }} {{ (+r.ingresos || 0).toFixed(2) }}</td>
                             <td class="px-4 py-2">
                               <div class="flex items-center gap-2">
                                 <div class="flex-1 bg-gray-100 rounded-full h-1.5">
@@ -316,7 +316,7 @@
               <td class="px-3 py-4"></td>
               <td class="px-6 py-4 text-lg">TOTAL</td>
               <td class="px-6 py-4 text-center text-lg">{{ resumen.total_ventas || 0 }}</td>
-              <td class="px-6 py-4 text-right text-green-600 text-2xl">Bs. {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</td>
+              <td class="px-6 py-4 text-right text-green-600 text-2xl">{{ moneda() }} {{ (+resumen.ingresos_totales || 0).toFixed(2) }}</td>
             </tr>
           </tfoot>
         </table>

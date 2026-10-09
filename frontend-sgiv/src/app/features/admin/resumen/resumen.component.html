@@ -58,13 +58,13 @@
 
     <div class="bg-green-50 p-5 rounded-xl shadow-sm border border-green-100">
       <p class="text-xs font-bold text-green-600 uppercase tracking-wide">Efectivo</p>
-      <p class="text-3xl font-black text-green-700 mt-2">Bs. {{ totalEfectivo.toFixed(2) }}</p>
+      <p class="text-3xl font-black text-green-700 mt-2">{{ moneda() }} {{ totalEfectivo.toFixed(2) }}</p>
       <p class="text-xs text-green-500 mt-1">pagos en efectivo</p>
     </div>
 
     <div class="bg-purple-50 p-5 rounded-xl shadow-sm border border-purple-100">
       <p class="text-xs font-bold text-purple-600 uppercase tracking-wide">QR</p>
-      <p class="text-3xl font-black text-purple-700 mt-2">Bs. {{ totalQr.toFixed(2) }}</p>
+      <p class="text-3xl font-black text-purple-700 mt-2">{{ moneda() }} {{ totalQr.toFixed(2) }}</p>
       <p class="text-xs text-purple-500 mt-1">pagos por QR</p>
     </div>
 

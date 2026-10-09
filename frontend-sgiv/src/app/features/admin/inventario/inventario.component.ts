@@ -7,6 +7,7 @@ import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
          Pencil, Trash2, PackagePlus, Package, RotateCw,
          AlertTriangle, CheckCircle2, XCircle, Store } from 'lucide-angular';
+import { AjustesService } from '../../../core/services/ajustes.service';
 
 @Component({
   selector: 'app-inventario',
@@ -17,6 +18,7 @@ import { LucideAngularModule,
 export class InventarioComponent implements OnInit {
   private productoService = inject(ProductoService);
   private cdr             = inject(ChangeDetectorRef);
+  readonly moneda          = inject(AjustesService).moneda;
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
 

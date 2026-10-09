@@ -4,6 +4,7 @@ import { Subscription } from 'rxjs';
 import { LucideAngularModule, Bell, X, Check, Minus, Plus, Trash2, Volume2, VolumeX, Truck } from 'lucide-angular';
 import { PedidoService } from '../../../core/services/pedido.service';
 import { SocketService } from '../../../core/services/socket.service';
+import { AjustesService } from '../../../core/services/ajustes.service';
 
 type Pestana = 'pendientes' | 'entregar';
 
@@ -18,6 +19,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   private pedidoService = inject(PedidoService);
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
+  readonly moneda        = inject(AjustesService).moneda;
 
   readonly icons = { bell: Bell, x: X, check: Check, minus: Minus, plus: Plus,
                      trash: Trash2, sonido: Volume2, silencio: VolumeX, delivery: Truck };

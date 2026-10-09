@@ -284,6 +284,26 @@ CREATE TABLE configuracion (
     color_primario      VARCHAR(7),
     color_secundario    VARCHAR(7),
     tema                VARCHAR(10) NOT NULL DEFAULT 'claro' CHECK (tema IN ('claro', 'oscuro', 'auto')),
+    -- Parámetros: ventas y comprobantes
+    moneda_simbolo      VARCHAR(5)   NOT NULL DEFAULT 'Bs.',
+    pago_efectivo       BOOLEAN      NOT NULL DEFAULT TRUE,
+    pago_qr             BOOLEAN      NOT NULL DEFAULT TRUE,
+    url_qr_cobro        TEXT,
+    ticket_mensaje_pie  VARCHAR(150) NOT NULL DEFAULT '¡Gracias por su compra!',
+    -- Parámetros: menú QR
+    menu_activo              BOOLEAN NOT NULL DEFAULT TRUE,
+    menu_mensaje_bienvenida  VARCHAR(200),
+    menu_minutos_expiracion  INT NOT NULL DEFAULT 15 CHECK (menu_minutos_expiracion BETWEEN 5 AND 120),
+    menu_max_pendientes_mesa INT NOT NULL DEFAULT 3  CHECK (menu_max_pendientes_mesa BETWEEN 1 AND 10),
+    menu_max_pedidos_ip      INT NOT NULL DEFAULT 10 CHECK (menu_max_pedidos_ip BETWEEN 1 AND 100),
+    -- Parámetros: inventario
+    stock_minimo_defecto     INT NOT NULL DEFAULT 5  CHECK (stock_minimo_defecto BETWEEN 0 AND 10000),
+    -- Parámetros: seguridad
+    captcha_activo           BOOLEAN NOT NULL DEFAULT TRUE,
+    login_max_intentos       INT NOT NULL DEFAULT 5  CHECK (login_max_intentos BETWEEN 3 AND 20),
+    login_minutos_bloqueo    INT NOT NULL DEFAULT 15 CHECK (login_minutos_bloqueo BETWEEN 1 AND 1440),
+    sesion_horas             INT NOT NULL DEFAULT 8  CHECK (sesion_horas BETWEEN 1 AND 24),
+    CONSTRAINT configuracion_metodo_pago_check CHECK (pago_efectivo OR pago_qr),
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

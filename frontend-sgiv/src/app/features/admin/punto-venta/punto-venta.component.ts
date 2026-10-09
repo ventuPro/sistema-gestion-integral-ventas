@@ -11,6 +11,7 @@ import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { EncabezadoTicketComponent } from '../../shared/encabezado-ticket/encabezado-ticket.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Inbox, Search, X } from 'lucide-angular';
+import { AjustesService } from '../../../core/services/ajustes.service';
 
 @Component({
   selector: 'app-punto-venta',
@@ -23,6 +24,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   private cajaService     = inject(CajaService);
   private socketService   = inject(SocketService);
   private cdr             = inject(ChangeDetectorRef);
+  readonly ajustes         = inject(AjustesService);
+  readonly moneda          = this.ajustes.moneda;
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
 
@@ -320,7 +323,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       alert('La caja está cerrada. No puedes registrar ventas.');
       return;
     }
-    this.metodoPago  = 'Efectivo';
+    this.metodoPago  = this.ajustes.config().pago_efectivo ? 'Efectivo' : 'QR';
     this.montoPagado = 0;
     this.mostrarModalCobro = true;
     setTimeout(() => {
@@ -395,7 +398,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
             const precio = precios.get(Number(i.id_producto)) ?? Number(i.precio_unitario);
             return { ...i, precio_unitario: precio, subtotal: precio * Number(i.cantidad) };
           });
-          alert(`Los precios cambiaron. Nuevo total: Bs. ${Number(e.error.total).toFixed(2)}. Revise el carrito y vuelva a cobrar.`);
+          alert(`Los precios cambiaron. Nuevo total: ${this.moneda()} ${Number(e.error.total).toFixed(2)}. Revise el carrito y vuelva a cobrar.`);
           this.cargarCatalogo();
           this.cargando = false;
           this.cdr.detectChanges();

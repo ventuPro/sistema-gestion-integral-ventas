@@ -1,5 +1,6 @@
 const cajaModel     = require('../models/cajaModel');
 const sucursalModel = require('../models/sucursalModel');
+const ajusteModel   = require('../models/ajusteModel');
 
 // ─── ESTADO COMPLETO (la fuente de verdad para el front) ──────────
 const getEstadoCompleto = async (req, res) => {
@@ -160,6 +161,8 @@ const getCierresCaja = async (req, res) => {
 const cobrarVenta = async (req, res) => {
     try {
         const datos = { ...req.body, id_usuario_cajero: req.usuario.id_usuario };
+        const motivo = await ajusteModel.motivoMetodoPago(datos.metodo_pago);
+        if (motivo) return res.status(400).json({ error: 'VENTA_INVALIDA', detalle: motivo });
         const { id_venta, cambiosStock } = await cajaModel.registrarVenta(datos);
 
         for (const c of cambiosStock) {

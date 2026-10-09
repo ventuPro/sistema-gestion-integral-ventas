@@ -32,7 +32,7 @@
                  placeholder="••••••••">
         </div>
 
-        <div class="mb-6">
+        <div *ngIf="usaCaptcha" class="mb-6">
           <label for="captcha" class="block text-sm font-medium text-gray-700 mb-1">Verificación: ¿eres una persona?</label>
           <div class="flex items-center gap-2 mb-2">
             <div class="h-14 w-40 rounded-lg border border-gray-200 bg-blue-50 overflow-hidden flex items-center justify-center">
@@ -52,7 +52,7 @@
                  placeholder="Escribe los caracteres de la imagen">
         </div>
 
-        <button type="submit" [disabled]="cargando || cargandoCaptcha"
+        <button type="submit" [disabled]="cargando || (usaCaptcha && cargandoCaptcha)"
                 class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 disabled:opacity-50 flex justify-center">
           <span *ngIf="!cargando">Ingresar al Sistema</span>
           <span *ngIf="cargando">Verificando...</span>

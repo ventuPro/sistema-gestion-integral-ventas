@@ -46,7 +46,7 @@
       {{ errorTurno }}
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Monto inicial (Bs.)</label>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Monto inicial ({{ moneda() }})</label>
       <input type="number" [(ngModel)]="montoInicial" min="0"
              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-2xl text-center font-black outline-none focus:border-green-500"
              placeholder="0.00">
@@ -155,7 +155,7 @@
               </span>
             </div>
             <p class="font-bold text-gray-800 text-lg text-center leading-tight mb-1">{{ prod.nombre_producto }}</p>
-            <p class="text-blue-600 font-black text-xl">Bs. {{ prod.precio_unitario }}</p>
+            <p class="text-blue-600 font-black text-xl">{{ moneda() }} {{ prod.precio_unitario }}</p>
             <span class="text-sm font-semibold mt-1"
                   [class.text-green-600]="prod.stock_actual > 3"
                   [class.text-red-500]="prod.stock_actual <= 3">
@@ -171,7 +171,7 @@
         <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <div>
             <p class="font-bold text-gray-800">Historial de Ventas del Día</p>
-            <p class="text-xs text-gray-400">{{ ventasHoy.length }} transacción(es) · Total Bs. {{ totalVentasHoy.toFixed(2) }}</p>
+            <p class="text-xs text-gray-400">{{ ventasHoy.length }} transacción(es) · Total {{ moneda() }} {{ totalVentasHoy.toFixed(2) }}</p>
           </div>
           <button (click)="toggleHistorial()"
                   class="w-8 h-8 inline-flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
@@ -206,7 +206,7 @@
                     {{ venta.metodo_pago }}
                   </span>
                 </div>
-                <span class="font-black text-gray-800">Bs. {{ (+venta.monto_total_venta).toFixed(2) }}</span>
+                <span class="font-black text-gray-800">{{ moneda() }} {{ (+venta.monto_total_venta).toFixed(2) }}</span>
               </div>
 
               <div class="px-5 pb-3">
@@ -218,10 +218,10 @@
                       ×{{ item.cantidad_vendida }}
                     </span>
                     <span class="text-gray-600">{{ item.nombre_producto }}</span>
-                    <span class="text-gray-400 text-xs">@ Bs. {{ (+item.precio_unitario).toFixed(2) }}</span>
+                    <span class="text-gray-400 text-xs">@ {{ moneda() }} {{ (+item.precio_unitario).toFixed(2) }}</span>
                   </div>
                   <span class="font-bold text-gray-700 text-sm">
-                    Bs. {{ (+item.subtotal_venta).toFixed(2) }}
+                    {{ moneda() }} {{ (+item.subtotal_venta).toFixed(2) }}
                   </span>
                 </div>
               </div>
@@ -235,18 +235,18 @@
             <span class="text-gray-500">
               Efectivo:
               <strong class="text-green-600">
-                Bs. {{ ventasHoy.filter(v => v.metodo_pago === 'Efectivo').reduce((s,v) => s + (+v.monto_total_venta), 0).toFixed(2) }}
+                {{ moneda() }} {{ ventasHoy.filter(v => v.metodo_pago === 'Efectivo').reduce((s,v) => s + (+v.monto_total_venta), 0).toFixed(2) }}
               </strong>
             </span>
             <span class="text-gray-500">
               QR:
               <strong class="text-purple-600">
-                Bs. {{ ventasHoy.filter(v => v.metodo_pago === 'QR').reduce((s,v) => s + (+v.monto_total_venta), 0).toFixed(2) }}
+                {{ moneda() }} {{ ventasHoy.filter(v => v.metodo_pago === 'QR').reduce((s,v) => s + (+v.monto_total_venta), 0).toFixed(2) }}
               </strong>
             </span>
           </div>
           <div class="font-black text-gray-800 text-sm">
-            TOTAL: Bs. {{ totalVentasHoy.toFixed(2) }}
+            TOTAL: {{ moneda() }} {{ totalVentasHoy.toFixed(2) }}
           </div>
         </div>
       </div>
@@ -269,10 +269,10 @@
              class="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center shadow-sm">
           <div class="flex-1 min-w-0">
             <p class="font-bold text-gray-800 text-base truncate">{{ item.nombre_producto }}</p>
-            <p class="text-gray-500 text-sm font-medium">Bs. {{ item.precio_unitario }} × {{ item.cantidad }}</p>
+            <p class="text-gray-500 text-sm font-medium">{{ moneda() }} {{ item.precio_unitario }} × {{ item.cantidad }}</p>
           </div>
           <div class="flex items-center gap-2 ml-2">
-            <span class="font-black text-gray-800 text-lg">Bs. {{ item.subtotal }}</span>
+            <span class="font-black text-gray-800 text-lg">{{ moneda() }} {{ item.subtotal }}</span>
             <button (click)="quitarDelCarrito(i)"
                     title="Quitar producto"
                     class="p-1 rounded transition-colors">
@@ -288,7 +288,7 @@
       <div class="p-4 bg-white border-t flex-shrink-0">
         <div class="flex justify-between items-center mb-3">
           <span class="font-bold text-gray-700 text-lg">TOTAL:</span>
-          <span class="text-3xl font-black text-green-600">Bs. {{ total.toFixed(2) }}</span>
+          <span class="text-3xl font-black text-green-600">{{ moneda() }} {{ total.toFixed(2) }}</span>
         </div>
         <button [disabled]="carrito.length === 0"
                 (click)="abrirModalCobro()"
@@ -314,17 +314,17 @@
 
       <div class="flex justify-between items-center bg-green-50 border-2 border-green-200 rounded-xl p-5">
         <span class="font-bold text-green-700 text-base">TOTAL A COBRAR</span>
-        <span class="font-black text-green-600 text-5xl">Bs. {{ total.toFixed(2) }}</span>
+        <span class="font-black text-green-600 text-5xl">{{ moneda() }} {{ total.toFixed(2) }}</span>
       </div>
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">Método de pago</label>
-        <div class="grid grid-cols-2 gap-3">
-          <button (click)="metodoPago = 'Efectivo'"
+        <div class="grid gap-3" [class.grid-cols-2]="ajustes.config().pago_efectivo && ajustes.config().pago_qr">
+          <button *ngIf="ajustes.config().pago_efectivo" (click)="metodoPago = 'Efectivo'"
                   [class.bg-green-600]="metodoPago === 'Efectivo'" [class.text-white]="metodoPago === 'Efectivo'"
                   [class.bg-gray-100]="metodoPago !== 'Efectivo'" [class.text-gray-700]="metodoPago !== 'Efectivo'"
                   class="py-3 rounded-xl font-bold transition-colors">💵 Efectivo</button>
-          <button (click)="metodoPago = 'QR'"
+          <button *ngIf="ajustes.config().pago_qr" (click)="metodoPago = 'QR'"
                   [class.bg-blue-600]="metodoPago === 'QR'" [class.text-white]="metodoPago === 'QR'"
                   [class.bg-gray-100]="metodoPago !== 'QR'" [class.text-gray-700]="metodoPago !== 'QR'"
                   class="py-3 rounded-xl font-bold transition-colors">📱 QR</button>
@@ -333,7 +333,7 @@
 
       <div *ngIf="metodoPago === 'Efectivo'">
         <label class="block text-sm font-medium text-gray-700 mb-1">
-          Monto recibido (Bs.) <span class="text-gray-400 text-xs font-normal">— opcional</span>
+          Monto recibido ({{ moneda() }}) <span class="text-gray-400 text-xs font-normal">— opcional</span>
         </label>
         <input #inputMonto type="number" inputmode="decimal" [(ngModel)]="montoPagado"
                (focus)="inputMonto.select()"
@@ -342,13 +342,15 @@
         <div *ngIf="montoPagado >= total && montoPagado > 0"
              class="mt-3 bg-green-50 border border-green-200 rounded-xl p-3 text-center">
           <p class="text-sm text-green-600">Cambio</p>
-          <p class="text-3xl font-black text-green-700">Bs. {{ cambio.toFixed(2) }}</p>
+          <p class="text-3xl font-black text-green-700">{{ moneda() }} {{ cambio.toFixed(2) }}</p>
         </div>
       </div>
 
       <div *ngIf="metodoPago === 'QR'"
            class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center text-blue-600 text-sm">
-        Confirma cuando el cliente pague por QR.
+        <img *ngIf="ajustes.qrCobro()" [src]="ajustes.qrCobro()" alt="QR de cobro"
+             class="w-48 h-48 object-contain mx-auto mb-3 bg-white rounded-lg p-2">
+        {{ ajustes.qrCobro() ? 'Muestra este QR al cliente y confirma cuando pague.' : 'Confirma cuando el cliente pague por QR.' }}
       </div>
     </div>
 
@@ -380,19 +382,19 @@
       <div class="border-t-2 border-dashed border-gray-300 my-3"></div>
       <div *ngFor="let item of datosTicket?.items" class="flex justify-between text-xs mb-1">
         <span>{{ item.nombre_producto }} ×{{ item.cantidad }}</span>
-        <span>Bs. {{ item.subtotal }}</span>
+        <span>{{ moneda() }} {{ item.subtotal }}</span>
       </div>
       <div class="border-t-2 border-dashed border-gray-300 my-3"></div>
       <div class="flex justify-between font-black">
-        <span>TOTAL</span><span>Bs. {{ datosTicket?.total }}</span>
+        <span>TOTAL</span><span>{{ moneda() }} {{ datosTicket?.total }}</span>
       </div>
       <div class="flex justify-between text-xs text-gray-500 mt-1">
         <span>Método</span><span>{{ datosTicket?.metodo }}</span>
       </div>
       <div *ngIf="datosTicket?.metodo === 'Efectivo'" class="flex justify-between text-xs text-gray-500">
-        <span>Cambio</span><span>Bs. {{ datosTicket?.cambio?.toFixed(2) }}</span>
+        <span>Cambio</span><span>{{ moneda() }} {{ datosTicket?.cambio?.toFixed(2) }}</span>
       </div>
-      <p class="text-center text-xs italic mt-6">¡Gracias por su compra!</p>
+      <p class="text-center text-xs italic mt-6">{{ ajustes.config().ticket_mensaje_pie }}</p>
     </div>
     <div class="p-4 bg-gray-50 border-t flex gap-3">
       <button (click)="imprimirVenta()" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg">🖨 Imprimir</button>

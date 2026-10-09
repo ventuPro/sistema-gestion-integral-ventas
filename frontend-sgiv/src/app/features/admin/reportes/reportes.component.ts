@@ -23,6 +23,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
   private reporteService  = inject(ReporteService);
   private productoService = inject(ProductoService);
   private cdr             = inject(ChangeDetectorRef);
+  readonly moneda          = inject(AjustesService).moneda;
   private http            = inject(HttpClient);
   private ajustes         = inject(AjustesService);
   private apiUrl          = environment.apiUrl;
@@ -282,8 +283,8 @@ export class ReportesComponent implements OnInit, OnDestroy {
       head: [['Indicador', 'Valor']],
       body: [
         ['Total Ventas',      `${resumen?.total_ventas || 0} ventas`],
-        ['Ingresos Totales',  `Bs. ${parseFloat(resumen?.ingresos_totales || 0).toFixed(2)}`],
-        ['Ticket Promedio',   `Bs. ${parseFloat(resumen?.ticket_promedio  || 0).toFixed(2)}`],
+        ['Ingresos Totales',  `${this.moneda()} ${parseFloat(resumen?.ingresos_totales || 0).toFixed(2)}`],
+        ['Ticket Promedio',   `${this.moneda()} ${parseFloat(resumen?.ticket_promedio  || 0).toFixed(2)}`],
       ],
       theme: 'striped',
       headStyles:  { fillColor: color, textColor: 255, fontStyle: 'bold' },
@@ -300,7 +301,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
       autoTable(doc, {
         startY: y1 + 6,
         head: [['Categoría', 'Unidades', 'Ingresos']],
-        body: por_categoria.map((c: any) => [c.nombre_categoria, c.unidades, `Bs. ${parseFloat(c.ingresos || 0).toFixed(2)}`]),
+        body: por_categoria.map((c: any) => [c.nombre_categoria, c.unidades, `${this.moneda()} ${parseFloat(c.ingresos || 0).toFixed(2)}`]),
         theme: 'striped',
         headStyles:  { fillColor: color, textColor: 255, fontStyle: 'bold' },
         columnStyles: { 1: { halign: 'center' }, 2: { halign: 'right', fontStyle: 'bold' } },
@@ -317,7 +318,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
       autoTable(doc, {
         startY: yFinal + 6,
         head: [['#', 'Producto', 'Categoría', 'Unidades', 'Ingresos']],
-        body: top_productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, p.unidades, `Bs. ${parseFloat(p.ingresos || 0).toFixed(2)}`]),
+        body: top_productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, p.unidades, `${this.moneda()} ${parseFloat(p.ingresos || 0).toFixed(2)}`]),
         theme: 'striped',
         headStyles:  { fillColor: color, textColor: 255, fontStyle: 'bold' },
         columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'right', fontStyle: 'bold' } },
@@ -353,15 +354,15 @@ export class ReportesComponent implements OnInit, OnDestroy {
       [''],
       ['RESUMEN'],
       ['Total Ventas',     resumen?.total_ventas || 0],
-      ['Ingresos (Bs.)',   parseFloat(resumen?.ingresos_totales || 0).toFixed(2)],
-      ['Ticket Prom (Bs.)',parseFloat(resumen?.ticket_promedio  || 0).toFixed(2)],
+      [`Ingresos (${this.moneda()})`,   parseFloat(resumen?.ingresos_totales || 0).toFixed(2)],
+      [`Ticket Prom (${this.moneda()})`,parseFloat(resumen?.ticket_promedio  || 0).toFixed(2)],
     ]);
     ws1['!cols'] = [{ wch: 30 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, ws1, 'Resumen');
 
     if (ventas_diarias?.length > 0) {
       const ws2 = XLSX.utils.aoa_to_sheet([
-        ['Fecha', 'Ventas', 'Ingresos (Bs.)'],
+        ['Fecha', 'Ventas', `Ingresos (${this.moneda()})`],
         ...ventas_diarias.map((d: any) => [d.dia, parseInt(d.ventas), parseFloat(d.ingresos).toFixed(2)])
       ]);
       ws2['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 18 }];
@@ -371,7 +372,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
     if (por_categoria?.length > 0) {
       // FIX: usar campo correcto "ingresos"
       const ws3 = XLSX.utils.aoa_to_sheet([
-        ['Categoría', 'Unidades', 'Ingresos (Bs.)'],
+        ['Categoría', 'Unidades', `Ingresos (${this.moneda()})`],
         ...por_categoria.map((c: any) => [c.nombre_categoria, parseInt(c.unidades || 0), parseFloat(c.ingresos || 0).toFixed(2)])
       ]);
       ws3['!cols'] = [{ wch: 25 }, { wch: 12 }, { wch: 18 }];
@@ -380,7 +381,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
 
     if (top_productos?.length > 0) {
       const ws4 = XLSX.utils.aoa_to_sheet([
-        ['#', 'Producto', 'Categoría', 'Unidades', 'Ingresos (Bs.)'],
+        ['#', 'Producto', 'Categoría', 'Unidades', `Ingresos (${this.moneda()})`],
         ...top_productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, parseInt(p.unidades || 0), parseFloat(p.ingresos || 0).toFixed(2)])
       ]);
       ws4['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 20 }, { wch: 12 }, { wch: 18 }];

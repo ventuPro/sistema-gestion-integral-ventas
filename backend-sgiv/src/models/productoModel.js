@@ -77,7 +77,7 @@ const agregarStock = async (id_producto, cantidad, id_sucursal = 1) => {
     // Upsert: si existe el registro actualiza, si no existe lo crea
     const r = await db.query(`
         INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual, stock_minimo_alerta)
-        VALUES ($1, $2, $3, 5)
+        VALUES ($1, $2, $3, COALESCE((SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1), 5))
         ON CONFLICT (id_sucursal, id_producto)
         DO UPDATE SET cantidad_actual = inventario_sucursal.cantidad_actual + $3
         RETURNING *
@@ -89,7 +89,7 @@ const agregarStock = async (id_producto, cantidad, id_sucursal = 1) => {
 const asignarProductoASucursal = async (id_producto, id_sucursal, stock_inicial = 0) => {
     const r = await db.query(`
         INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual, stock_minimo_alerta)
-        VALUES ($1, $2, $3, 5)
+        VALUES ($1, $2, $3, COALESCE((SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1), 5))
         ON CONFLICT (id_sucursal, id_producto)
         DO UPDATE SET cantidad_actual = $3
         RETURNING *

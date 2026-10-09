@@ -1,6 +1,7 @@
 const cuentaModel  = require('../models/cuentaModel');
 const productoModel = require('../models/productoModel');
 const mesaModel    = require('../models/mesaModel');
+const ajusteModel  = require('../models/ajusteModel');
 const { emitirMesa } = require('../utils/tiempoReal');
 const io           = () => global.io;
 
@@ -113,6 +114,8 @@ const cerrarCuenta = async (req, res) => {
         const id_cuenta       = Number(req.params.id_cuenta);
         const { metodo_pago, id_sucursal } = req.body;
         const id_usuario_cajero = req.usuario.id_usuario;
+        const motivo = await ajusteModel.motivoMetodoPago(metodo_pago);
+        if (motivo) return res.status(400).json({ error: motivo });
 
         const resultado = await cuentaModel.cerrarCuenta(
             id_cuenta, metodo_pago, id_usuario_cajero, id_sucursal

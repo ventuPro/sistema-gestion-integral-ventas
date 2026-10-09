@@ -55,7 +55,30 @@ const MIGRACIONES = [
         porcentaje_participacion NUMERIC(5, 2) NOT NULL DEFAULT 0
             CHECK (porcentaje_participacion BETWEEN 0 AND 100),
         fecha_registro   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );`
+    );`,
+
+    // Ajustes → Parámetros (ventas, menú QR, inventario, seguridad)
+    `ALTER TABLE configuracion
+        ADD COLUMN IF NOT EXISTS moneda_simbolo      VARCHAR(5)   NOT NULL DEFAULT 'Bs.',
+        ADD COLUMN IF NOT EXISTS pago_efectivo       BOOLEAN      NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS pago_qr             BOOLEAN      NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS url_qr_cobro        TEXT,
+        ADD COLUMN IF NOT EXISTS ticket_mensaje_pie  VARCHAR(150) NOT NULL DEFAULT '¡Gracias por su compra!',
+        ADD COLUMN IF NOT EXISTS menu_activo              BOOLEAN NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS menu_mensaje_bienvenida  VARCHAR(200),
+        ADD COLUMN IF NOT EXISTS menu_minutos_expiracion  INT NOT NULL DEFAULT 15 CHECK (menu_minutos_expiracion BETWEEN 5 AND 120),
+        ADD COLUMN IF NOT EXISTS menu_max_pendientes_mesa INT NOT NULL DEFAULT 3  CHECK (menu_max_pendientes_mesa BETWEEN 1 AND 10),
+        ADD COLUMN IF NOT EXISTS menu_max_pedidos_ip      INT NOT NULL DEFAULT 10 CHECK (menu_max_pedidos_ip BETWEEN 1 AND 100),
+        ADD COLUMN IF NOT EXISTS stock_minimo_defecto     INT NOT NULL DEFAULT 5  CHECK (stock_minimo_defecto BETWEEN 0 AND 10000),
+        ADD COLUMN IF NOT EXISTS captcha_activo           BOOLEAN NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS login_max_intentos       INT NOT NULL DEFAULT 5  CHECK (login_max_intentos BETWEEN 3 AND 20),
+        ADD COLUMN IF NOT EXISTS login_minutos_bloqueo    INT NOT NULL DEFAULT 15 CHECK (login_minutos_bloqueo BETWEEN 1 AND 1440),
+        ADD COLUMN IF NOT EXISTS sesion_horas             INT NOT NULL DEFAULT 8  CHECK (sesion_horas BETWEEN 1 AND 24);
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'configuracion_metodo_pago_check') THEN
+            ALTER TABLE configuracion ADD CONSTRAINT configuracion_metodo_pago_check CHECK (pago_efectivo OR pago_qr);
+        END IF;
+    END $$;`
 ];
 
 const aplicarMigraciones = async () => {

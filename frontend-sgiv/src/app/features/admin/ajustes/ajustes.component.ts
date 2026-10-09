@@ -3,14 +3,15 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule,
          Building2, Palette, Upload, Trash2, RotateCcw, Save, Sun, Moon, MonitorSmartphone,
-         Check, ImageIcon, Undo2, Crown, Store } from 'lucide-angular';
+         Check, ImageIcon, Undo2, Crown, Store, SlidersHorizontal } from 'lucide-angular';
 import { AjustesService, Configuracion, Tema,
          COLOR_PRIMARIO_ORIGINAL, COLOR_SECUNDARIO_ORIGINAL } from '../../../core/services/ajustes.service';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { AjustesPropietariosComponent } from './propietarios/ajustes-propietarios.component';
 import { AjustesSucursalesComponent } from './sucursales/ajustes-sucursales.component';
+import { AjustesParametrosComponent } from './parametros/ajustes-parametros.component';
 
-type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales';
+type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'parametros';
 
 interface CampoEmpresa { clave: string; etiqueta: string; ejemplo: string; max: number; tipo?: string; ancho?: boolean }
 
@@ -26,7 +27,7 @@ const IMAGENES = {
   selector: 'app-ajustes',
   standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe,
-            AjustesPropietariosComponent, AjustesSucursalesComponent],
+            AjustesPropietariosComponent, AjustesSucursalesComponent, AjustesParametrosComponent],
   templateUrl: './ajustes.component.html'
 })
 export class AjustesComponent implements OnInit, OnDestroy {
@@ -96,7 +97,8 @@ export class AjustesComponent implements OnInit, OnDestroy {
     { id: 'empresa',      nombre: 'Empresa',      icono: Building2 },
     { id: 'apariencia',   nombre: 'Apariencia',   icono: Palette },
     { id: 'propietarios', nombre: 'Propietarios', icono: Crown },
-    { id: 'sucursales',   nombre: 'Sucursales',   icono: Store }
+    { id: 'sucursales',   nombre: 'Sucursales',   icono: Store },
+    { id: 'parametros',   nombre: 'Parámetros',   icono: SlidersHorizontal }
   ];
 
   pestana: Pestana = 'empresa';

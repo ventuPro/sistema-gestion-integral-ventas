@@ -2,6 +2,7 @@ const pedidoModel = require('../models/pedidoModel');
 const cuentaModel = require('../models/cuentaModel');
 const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
 const contexto    = require('../auditoria/contexto');
+const ajusteModel = require('../models/ajusteModel');
 
 // ─── Errores ───
 const ERRORES = {
@@ -18,7 +19,9 @@ const responderError = (res, e, contexto) => {
     res.status(500).json({ error: 'Error al procesar el pedido' });
 };
 
-const MINUTOS_EXPIRACION = Number(process.env.MENU_MINUTOS_EXPIRACION) || 15;
+// Ajustes → Parámetros; MENU_MINUTOS_EXPIRACION lo reemplaza si está definido
+const minutosExpiracion = async () =>
+    Number(process.env.MENU_MINUTOS_EXPIRACION) || (await ajusteModel.parametros()).menu_minutos_expiracion;
 
 // Admin: todas las sucursales
 const sucursalFiltro = (req) => Number(req.usuario.id_rol) === 1 ? null : Number(req.usuario.id_sucursal);
@@ -35,7 +38,7 @@ const avisarCambio = (pedido, extra = {}) => {
 const obtenerBandeja = async (req, res) => {
     try {
         const id_sucursal = sucursalFiltro(req) ?? (Number(req.query.id_sucursal) || Number(req.usuario.id_sucursal) || 1);
-        res.json(await pedidoModel.obtenerBandeja(id_sucursal, MINUTOS_EXPIRACION));
+        res.json(await pedidoModel.obtenerBandeja(id_sucursal, await minutosExpiracion()));
     } catch (e) {
         responderError(res, e, 'obtenerBandeja');
     }
@@ -121,7 +124,7 @@ const CONTEXTO_EXPIRACION = { usuario: 'Sistema', origen: 'Proceso automático: 
 
 const iniciarExpiracion = () => setInterval(() => contexto.ejecutar({ ...CONTEXTO_EXPIRACION }, async () => {
     try {
-        const r = await pedidoModel.expirarPendientes(MINUTOS_EXPIRACION);
+        const r = await pedidoModel.expirarPendientes(await minutosExpiracion());
         emitirStock(r.cambios);
         r.pedidos.forEach(p => avisarCambio(p));
     } catch (e) {

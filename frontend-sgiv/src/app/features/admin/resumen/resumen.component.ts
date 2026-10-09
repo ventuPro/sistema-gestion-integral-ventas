@@ -10,6 +10,7 @@ import { LucideAngularModule,
          Store, Plus, X,
          Wallet, QrCode, ShoppingCart,
          Activity } from 'lucide-angular';
+import { AjustesService } from '../../../core/services/ajustes.service';
 Chart.register(...registerables);
 
 @Component({
@@ -24,6 +25,7 @@ export class ResumenComponent implements OnInit, OnDestroy {
   private sucursalService = inject(SucursalService);
   private cajaService     = inject(CajaService);
   private cdr             = inject(ChangeDetectorRef);
+  readonly moneda          = inject(AjustesService).moneda;
   private router          = inject(Router);
 
   readonly icons = {
@@ -204,7 +206,7 @@ export class ResumenComponent implements OnInit, OnDestroy {
         data: {
           labels: this.datosAdmin.ventas_por_dia.map((d: any) => d.fecha),
           datasets: [{
-            label: 'Ingresos Bs.',
+            label: `Ingresos ${this.moneda()}`,
             data:  this.datosAdmin.ventas_por_dia.map((d: any) => parseFloat(d.ingresos)),
             backgroundColor: 'rgba(59, 130, 246, 0.7)',
             borderColor:     'rgba(59, 130, 246, 1)',

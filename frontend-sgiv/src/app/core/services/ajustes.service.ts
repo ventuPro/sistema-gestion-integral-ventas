@@ -38,6 +38,23 @@ export interface Configuracion {
   color_primario: string | null;
   color_secundario: string | null;
   tema: Tema;
+  // Parámetros
+  moneda_simbolo: string;
+  pago_efectivo: boolean;
+  pago_qr: boolean;
+  url_qr_cobro: string | null;
+  ticket_mensaje_pie: string;
+  menu_activo: boolean;
+  menu_mensaje_bienvenida: string | null;
+  captcha_activo: boolean;
+  // Solo con sesión de administrador
+  menu_minutos_expiracion?: number;
+  menu_max_pendientes_mesa?: number;
+  menu_max_pedidos_ip?: number;
+  stock_minimo_defecto?: number;
+  login_max_intentos?: number;
+  login_minutos_bloqueo?: number;
+  sesion_horas?: number;
   fecha_actualizacion?: string;
 }
 
@@ -46,7 +63,10 @@ export const CONFIG_ORIGINAL: Configuracion = {
   nombre_comercial: "Pastelería Ricky's", razon_social: null, nit: null, rubro: 'Pastelería',
   eslogan: null, telefono: null, whatsapp: null, correo: null, sitio_web: null, direccion: null,
   ciudad: 'La Paz', pais: 'Bolivia', facebook: null, instagram: null, tiktok: null,
-  url_logo: null, url_favicon: null, color_primario: null, color_secundario: null, tema: 'claro'
+  url_logo: null, url_favicon: null, color_primario: null, color_secundario: null, tema: 'claro',
+  moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, url_qr_cobro: null,
+  ticket_mensaje_pie: '¡Gracias por su compra!', menu_activo: true, menu_mensaje_bienvenida: null,
+  captcha_activo: true
 };
 
 // Tonos originales de Tailwind (blue-600 e indigo-600), para mostrar en el selector
@@ -61,6 +81,10 @@ const TONOS: [number, string, number][] = [
 
 const CLAVE_CACHE = 'ajustes_sgiv';
 
+// Llegan solo al administrador: no se guardan en la configuración compartida
+const PRIVADOS = ['menu_minutos_expiracion', 'menu_max_pendientes_mesa', 'menu_max_pedidos_ip', 'stock_minimo_defecto',
+                  'login_max_intentos', 'login_minutos_bloqueo', 'sesion_horas', 'id_configuracion', 'fecha_actualizacion'];
+
 // ─── Configuración del negocio: nombre, logo, colores y tema ───
 @Injectable({ providedIn: 'root' })
 export class AjustesService {
@@ -73,6 +97,8 @@ export class AjustesService {
 
   readonly nombre = computed(() => this.config().nombre_comercial);
   readonly logo   = computed(() => this.imagenUrl.transform(this.config().url_logo));
+  readonly moneda = computed(() => this.config().moneda_simbolo);
+  readonly qrCobro = computed(() => this.imagenUrl.transform(this.config().url_qr_cobro));
   /** Modo oscuro aplicado ahora mismo en <html> */
   readonly oscuro = signal(false);
 
@@ -111,6 +137,12 @@ export class AjustesService {
   /** logo/favicon: data URI para cambiarlo, null para quitarlo, sin enviar para dejarlo igual */
   guardarApariencia(datos: Partial<Configuracion> & { logo?: string | null; favicon?: string | null }): Observable<any> {
     return this.http.put(`${this.api}/apariencia`, datos, { headers: this.h() })
+      .pipe(tap((r: any) => this.establecer(r.configuracion)));
+  }
+
+  /** qr_cobro: data URI para cambiarlo, null para quitarlo, sin enviar para dejarlo igual */
+  guardarParametros(datos: Partial<Configuracion> & { qr_cobro?: string | null }): Observable<any> {
+    return this.http.put(`${this.api}/parametros`, datos, { headers: this.h() })
       .pipe(tap((r: any) => this.establecer(r.configuracion)));
   }
 
@@ -161,7 +193,9 @@ export class AjustesService {
   }
 
   private establecer(c: Configuracion) {
-    this.config.set({ ...CONFIG_ORIGINAL, ...c });
+    const publico: any = { ...CONFIG_ORIGINAL, ...c };
+    PRIVADOS.forEach(k => delete publico[k]);
+    this.config.set(publico);
     try { localStorage.setItem(CLAVE_CACHE, JSON.stringify(this.config())); } catch { }
     this.aplicar(this.config());
   }

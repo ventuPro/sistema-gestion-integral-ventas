@@ -235,3 +235,46 @@ test('sucursales: editar y desactivar con reglas de seguridad', async () => {
     assert.equal((await api('PATCH', `/sucursales/${norte.id_sucursal}/estado`, { token: tokenAdmin, body: { estado_activo: true } })).status, 200);
     assert.equal((await api('PUT', '/sucursales/abc', { token: tokenAdmin, body: { nombre_sucursal: 'X' } })).status, 404);
 });
+
+test('parámetros: valores originales, validación y método de pago', async () => {
+    const pub = (await api('GET', '/ajustes/publico')).body;
+    assert.equal(pub.moneda_simbolo, 'Bs.');
+    assert.equal(pub.ticket_mensaje_pie, '¡Gracias por su compra!');
+    assert.equal(pub.login_max_intentos, undefined);   // los de seguridad no son públicos
+
+    assert.equal((await api('PUT', '/ajustes/parametros', { token: tokenCajero, body: { pago_qr: false } })).status, 403);
+    for (const body of [{ sesion_horas: 0 }, { login_max_intentos: 2.5 }, { menu_activo: 'si' },
+                        { moneda_simbolo: '' }, { pago_efectivo: false, pago_qr: false }]) {
+        const r = await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body });
+        assert.equal(r.status, 400, JSON.stringify(body));
+    }
+
+    const r = await api('PUT', '/ajustes/parametros', { token: tokenAdmin,
+        body: { pago_qr: false, moneda_simbolo: ' $ ', stock_minimo_defecto: 8, qr_cobro: PNG } });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.configuracion.moneda_simbolo, '$');
+    assert.match(r.body.configuracion.url_qr_cobro, /^\/uploads\/empresa\/qr-cobro_\d+\.png$/);
+    fs.unlinkSync(path.join(__dirname, '..', '..', r.body.configuracion.url_qr_cobro));
+
+    // QR deshabilitado: el cobro por QR se rechaza
+    const v = await api('POST', '/caja/cobrar', { token: tokenAdmin, body: { id_sucursal: 1, metodo_pago: 'QR', detalles: [] } });
+    assert.equal(v.status, 400);
+    assert.match(v.body.detalle, /QR/);
+    assert.equal((await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body: { pago_efectivo: false } })).status, 400);
+
+    const vuelta = await api('PUT', '/ajustes/parametros', { token: tokenAdmin,
+        body: { pago_qr: true, moneda_simbolo: 'Bs.', stock_minimo_defecto: 5, qr_cobro: null } });
+    assert.equal(vuelta.body.configuracion.url_qr_cobro, null);
+});
+
+test('parámetros: sin CAPTCHA y con duración de sesión configurada', async () => {
+    await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body: { captcha_activo: false, sesion_horas: 2 } });
+    const r = await api('POST', '/usuarios/login', { body: { correo_electronico: 'admin@rickys.com', contrasena: 'password' } });
+    assert.equal(r.status, 200);
+    const { exp, iat } = JSON.parse(Buffer.from(r.body.token.split('.')[1], 'base64url').toString());
+    assert.equal(exp - iat, 2 * 3600);
+
+    await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body: { captcha_activo: true, sesion_horas: 8 } });
+    const sin = await api('POST', '/usuarios/login', { body: { correo_electronico: 'admin@rickys.com', contrasena: 'password' } });
+    assert.equal(sin.status, 400);
+});

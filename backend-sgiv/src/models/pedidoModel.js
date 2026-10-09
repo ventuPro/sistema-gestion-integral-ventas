@@ -169,7 +169,7 @@ const obtenerCatalogoMenu = async (id_sucursal) => {
 };
 
 // ─── CLIENTE: crear pedido desde la mesa ───
-const crearPedidoMesa = async ({ mesa, items, observacion_general }) => {
+const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes = MAX_PENDIENTES_MESA }) => {
     const lista = normalizarItems(items);
 
     return enTransaccion(async (client) => {
@@ -185,7 +185,7 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general }) => {
         const rPend = await client.query(
             `SELECT COUNT(*)::int AS n FROM pedido_mesa WHERE id_mesa = $1 AND estado_pedido = 'Pendiente_Cajero'`,
             [mesa.id_mesa]);
-        if (rPend.rows[0].n >= MAX_PENDIENTES_MESA)
+        if (rPend.rows[0].n >= maxPendientes)
             throw errorCodigo('DEMASIADOS_PENDIENTES', 'Tu mesa ya tiene pedidos esperando confirmación. Espera a que el cajero los confirme.');
 
         const rProd = await client.query(`

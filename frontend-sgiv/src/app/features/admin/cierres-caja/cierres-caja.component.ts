@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { CajaService } from '../../../core/services/caja.service';
 import { environment } from '../../../../environments/environment';
+import { AjustesService } from '../../../core/services/ajustes.service';
 
 @Component({
   selector: 'app-cierres-caja',
@@ -13,6 +14,7 @@ import { environment } from '../../../../environments/environment';
 export class CierresCajaComponent implements OnInit {
   private cajaService = inject(CajaService);
   private cdr         = inject(ChangeDetectorRef);
+  readonly moneda      = inject(AjustesService).moneda;
   private http        = inject(HttpClient);
   private apiUrl      = environment.apiUrl;
 

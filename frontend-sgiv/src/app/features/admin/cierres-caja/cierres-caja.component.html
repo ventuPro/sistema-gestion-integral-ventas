@@ -77,13 +77,13 @@
               </span>
             </td>
             <td class="px-5 py-3 text-right text-green-600 font-semibold">
-              Bs. {{ (+c.total_efectivo).toFixed(2) }}
+              {{ moneda() }} {{ (+c.total_efectivo).toFixed(2) }}
             </td>
             <td class="px-5 py-3 text-right text-purple-600 font-semibold">
-              Bs. {{ (+c.total_qr).toFixed(2) }}
+              {{ moneda() }} {{ (+c.total_qr).toFixed(2) }}
             </td>
             <td class="px-5 py-3 text-right font-black text-gray-800">
-              Bs. {{ (+c.total_recaudado).toFixed(2) }}
+              {{ moneda() }} {{ (+c.total_recaudado).toFixed(2) }}
             </td>
           </tr>
         </tbody>
@@ -93,7 +93,7 @@
               {{ sucursalFiltro ? sucursalFiltro.nombre_sucursal : 'Total general' }}:
             </td>
             <td class="px-5 py-3 text-right font-black text-green-600 text-lg">
-              Bs. {{ getTotalGeneral().toFixed(2) }}
+              {{ moneda() }} {{ getTotalGeneral().toFixed(2) }}
             </td>
           </tr>
         </tfoot>

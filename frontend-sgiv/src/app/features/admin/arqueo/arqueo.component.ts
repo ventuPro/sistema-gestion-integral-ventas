@@ -5,6 +5,7 @@ import { CajaService } from '../../../core/services/caja.service';
 import { Router } from '@angular/router';
 import { LucideAngularModule,
          ShieldAlert, Landmark, FileText, Inbox } from 'lucide-angular';
+import { AjustesService } from '../../../core/services/ajustes.service';
 
 @Component({
   selector: 'app-arqueo',
@@ -16,6 +17,7 @@ import { LucideAngularModule,
 export class ArqueoComponent implements OnInit {
   private cajaService = inject(CajaService);
   private cdr         = inject(ChangeDetectorRef);
+  readonly moneda      = inject(AjustesService).moneda;
   private router      = inject(Router);
 
   readonly icons = {

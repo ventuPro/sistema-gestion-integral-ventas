@@ -36,7 +36,7 @@
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
         <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">Ingresos Totales</p>
         <p class="text-3xl font-black text-green-600">
-          Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
+          {{ moneda() }} {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
         </p>
         <p class="text-xs text-gray-400 mt-1">del día</p>
       </div>
@@ -44,14 +44,14 @@
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
         <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">💵 Efectivo</p>
         <p class="text-3xl font-black text-blue-600">
-          Bs. {{ (+arqueo.resumen?.total_efectivo || 0).toFixed(2) }}
+          {{ moneda() }} {{ (+arqueo.resumen?.total_efectivo || 0).toFixed(2) }}
         </p>
       </div>
 
       <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
         <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">📱 QR</p>
         <p class="text-3xl font-black text-purple-600">
-          Bs. {{ (+arqueo.resumen?.total_qr || 0).toFixed(2) }}
+          {{ moneda() }} {{ (+arqueo.resumen?.total_qr || 0).toFixed(2) }}
         </p>
       </div>
 
@@ -69,7 +69,7 @@
           <p class="text-xs text-gray-500">
             Turno #{{ arqueo.turno_activo.id_turno }} ·
             Abierto el {{ arqueo.turno_activo.fecha_hora_apertura | date:'dd/MM/yyyy HH:mm' }} ·
-            Monto inicial: Bs. {{ arqueo.turno_activo.monto_inicial }}
+            Monto inicial: {{ moneda() }} {{ arqueo.turno_activo.monto_inicial }}
           </p>
         </div>
         <span class="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">ABIERTO</span>
@@ -140,7 +140,7 @@
                 </span>
               </td>
               <td class="px-4 py-3 text-right font-black text-gray-800 text-lg">
-                Bs. {{ (+venta.monto_total_venta).toFixed(2) }}
+                {{ moneda() }} {{ (+venta.monto_total_venta).toFixed(2) }}
               </td>
             </tr>
           </tbody>
@@ -148,7 +148,7 @@
             <tr>
               <td colspan="4" class="px-4 py-4 font-black text-gray-800 text-right text-lg">TOTAL DEL DÍA:</td>
               <td class="px-4 py-4 text-right font-black text-green-600 text-3xl">
-                Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
+                {{ moneda() }} {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
               </td>
             </tr>
           </tfoot>
@@ -228,15 +228,15 @@
         </div>
         <div class="flex justify-between text-sm">
           <span class="text-gray-500">💵 Efectivo:</span>
-          <span class="font-bold text-blue-600">Bs. {{ (+arqueo.resumen?.total_efectivo || 0).toFixed(2) }}</span>
+          <span class="font-bold text-blue-600">{{ moneda() }} {{ (+arqueo.resumen?.total_efectivo || 0).toFixed(2) }}</span>
         </div>
         <div class="flex justify-between text-sm">
           <span class="text-gray-500">📱 QR:</span>
-          <span class="font-bold text-purple-600">Bs. {{ (+arqueo.resumen?.total_qr || 0).toFixed(2) }}</span>
+          <span class="font-bold text-purple-600">{{ moneda() }} {{ (+arqueo.resumen?.total_qr || 0).toFixed(2) }}</span>
         </div>
         <div class="flex justify-between text-sm pt-2 mt-2 border-t border-gray-200">
           <span class="text-gray-700 font-bold">TOTAL:</span>
-          <span class="font-black text-green-600">Bs. {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}</span>
+          <span class="font-black text-green-600">{{ moneda() }} {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}</span>
         </div>
       </div>
       <p class="text-xs text-red-500 font-medium">

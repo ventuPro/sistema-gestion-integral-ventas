@@ -90,7 +90,7 @@
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-semibold text-gray-800">{{ it.nombre_producto }}</p>
                 <p *ngIf="it.nota_cliente" class="text-xs text-amber-700">📝 {{ it.nota_cliente }}</p>
-                <p class="text-xs text-gray-400">Bs. {{ (+it.subtotal).toFixed(2) }}</p>
+                <p class="text-xs text-gray-400">{{ moneda() }} {{ (+it.subtotal).toFixed(2) }}</p>
               </div>
               <div class="flex items-center gap-1.5 flex-shrink-0">
                 <button (click)="cambiarCantidad(p, it, it.cantidad - 1)" [disabled]="ocupado[p.id_pedido] || it.cantidad <= 1"
@@ -122,7 +122,7 @@
           </p>
 
           <div class="px-4 py-3 border-t flex items-center gap-2">
-            <span class="flex-1 font-black text-gray-800">Bs. {{ (+p.monto_total).toFixed(2) }}</span>
+            <span class="flex-1 font-black text-gray-800">{{ moneda() }} {{ (+p.monto_total).toFixed(2) }}</span>
             <button (click)="rechazar(p)" [disabled]="ocupado[p.id_pedido]"
                     class="px-3 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-40">
               Rechazar

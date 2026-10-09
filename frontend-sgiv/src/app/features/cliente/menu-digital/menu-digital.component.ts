@@ -34,6 +34,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private http  = inject(HttpClient);
   private cdr   = inject(ChangeDetectorRef);
+  readonly moneda = inject(AjustesService).moneda;
   readonly ajustes = inject(AjustesService);
 
   private readonly api       = `${environment.apiUrl}/menu/m`;
@@ -42,7 +43,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   codigo = '';
   estadoCarga: 'cargando' | 'invalido' | 'error' | 'listo' = 'cargando';
-  info: { numero_mesa: number; nombre_sucursal: string; id_sucursal: number; recibe_pedidos: boolean } | null = null;
+  info: { numero_mesa: number; nombre_sucursal: string; id_sucursal: number; recibe_pedidos: boolean; pedidos_desactivados?: boolean } | null = null;
   vista: Vista = 'menu';
 
   // ─── Catálogo ───

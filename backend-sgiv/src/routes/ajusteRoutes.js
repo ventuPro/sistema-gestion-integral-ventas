@@ -12,6 +12,7 @@ router.get('/publico',    ctrl.obtenerPublico);
 router.get('/',           admin, ctrl.obtener);
 router.put('/empresa',    admin, ctrl.guardarEmpresa);
 router.put('/apariencia', admin, ctrl.guardarApariencia);
+router.put('/parametros', admin, ctrl.guardarParametros);
 
 // Propietarios: datos privados, solo el administrador
 router.get   ('/propietarios',     admin, propietarios.listar);

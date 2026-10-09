@@ -1,10 +1,10 @@
 const pedidoModel = require('../models/pedidoModel');
+const ajusteModel = require('../models/ajusteModel');
 const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
 
 // ─── Menú digital público: la mesa se identifica por su código QR ───
 
-// ─── Límite de pedidos por IP ───
-const MAX_PEDIDOS_IP   = Number(process.env.MENU_MAX_PEDIDOS_IP) || 10;
+// ─── Límite de pedidos por IP (Ajustes → Parámetros; MENU_MAX_PEDIDOS_IP lo reemplaza en pruebas) ───
 const VENTANA_IP_MS    = 10 * 60 * 1000;
 const pedidosPorIp     = new Map();   // ip → { cantidad, desde }
 
@@ -14,14 +14,14 @@ setInterval(() => {
         if (ahora - r.desde > VENTANA_IP_MS) pedidosPorIp.delete(ip);
 }, VENTANA_IP_MS).unref();
 
-const superaLimiteIp = (ip) => {
+const superaLimiteIp = (ip, maximo) => {
     const r = pedidosPorIp.get(ip);
     if (!r || Date.now() - r.desde > VENTANA_IP_MS) {
         pedidosPorIp.set(ip, { cantidad: 1, desde: Date.now() });
         return false;
     }
     r.cantidad++;
-    return r.cantidad > MAX_PEDIDOS_IP;
+    return r.cantidad > maximo;
 };
 
 const ERRORES = {
@@ -55,9 +55,15 @@ const cargarMesa = async (req, res, next) => {
 };
 
 // GET /api/menu/m/:codigo
-const obtenerMesa = (req, res) => {
-    const { numero_mesa, nombre_sucursal, id_sucursal, recibe_pedidos } = req.mesa;
-    res.json({ numero_mesa, nombre_sucursal, id_sucursal, recibe_pedidos });
+const obtenerMesa = async (req, res) => {
+    try {
+        const { numero_mesa, nombre_sucursal, id_sucursal, recibe_pedidos } = req.mesa;
+        const { menu_activo } = await ajusteModel.parametros();
+        res.json({ numero_mesa, nombre_sucursal, id_sucursal,
+                   recibe_pedidos: recibe_pedidos && menu_activo, pedidos_desactivados: !menu_activo });
+    } catch (e) {
+        responderError(res, e, 'obtenerMesa');
+    }
 };
 
 // GET /api/menu/m/:codigo/catalogo
@@ -72,13 +78,17 @@ const obtenerCatalogo = async (req, res) => {
 // POST /api/menu/m/:codigo/pedidos
 const crearPedido = async (req, res) => {
     try {
-        if (superaLimiteIp(req.ip))
+        const p = await ajusteModel.parametros();
+        if (!p.menu_activo)
+            return res.status(409).json({ error: 'Los pedidos desde el menú están desactivados. Pide en caja.', codigo: 'NO_RECIBE_PEDIDOS' });
+        if (superaLimiteIp(req.ip, Number(process.env.MENU_MAX_PEDIDOS_IP) || p.menu_max_pedidos_ip))
             return res.status(429).json({ error: 'Hiciste muchos pedidos seguidos. Espera unos minutos o pide ayuda en caja.' });
 
         const { pedido, cambios } = await pedidoModel.crearPedidoMesa({
             mesa:                req.mesa,
             items:               req.body?.items,
-            observacion_general: req.body?.observacion_general
+            observacion_general: req.body?.observacion_general,
+            maxPendientes:       p.menu_max_pendientes_mesa
         });
 
         emitirStock(cambios);

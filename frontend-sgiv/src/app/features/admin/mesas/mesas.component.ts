@@ -24,6 +24,7 @@ export class MesasComponent implements OnInit, OnDestroy {
   private mesaService   = inject(MesaService);
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
+  readonly moneda        = inject(AjustesService).moneda;
   private ajustes       = inject(AjustesService);
 
   readonly icons = {

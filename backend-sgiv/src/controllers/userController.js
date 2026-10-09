@@ -1,6 +1,7 @@
 const bcrypt      = require('bcryptjs');
 const jwt         = require('jsonwebtoken');
 const userModel   = require('../models/userModel');
+const ajusteModel = require('../models/ajusteModel');
 const db          = require('../config/db');
 const captcha     = require('../utils/captcha');
 const contexto    = require('../auditoria/contexto');
@@ -40,31 +41,31 @@ const registrarUsuario = async (req, res) => {
 // ─── Login (CAPTCHA + contraseña) ───
 // Mismo mensaje y mismo tiempo de respuesta si el correo no existe o la
 // contraseña es incorrecta, para no revelar qué correos están registrados.
-// Además se limita la cantidad de intentos fallidos por IP + correo.
+// Además se limita la cantidad de intentos fallidos por IP + correo
+// (cantidad y minutos de bloqueo en Ajustes → Parámetros).
 const HASH_FICTICIO       = bcrypt.hashSync('sgiv-hash-ficticio', 10);
-const MAX_INTENTOS        = 5;
-const VENTANA_BLOQUEO_MS  = 15 * 60 * 1000;
+const VENTANA_MAXIMA_MS   = 24 * 60 * 60 * 1000;
 const intentosFallidos    = new Map();   // clave → { cantidad, desde }
 
 // Limpieza periódica para que el registro de intentos no crezca indefinidamente
 setInterval(() => {
     const ahora = Date.now();
     for (const [clave, r] of intentosFallidos)
-        if (ahora - r.desde > VENTANA_BLOQUEO_MS) intentosFallidos.delete(clave);
-}, VENTANA_BLOQUEO_MS).unref();
+        if (ahora - r.desde > VENTANA_MAXIMA_MS) intentosFallidos.delete(clave);
+}, 15 * 60 * 1000).unref();
 
 const claveIntento = (req, correo) => `${req.ip}|${String(correo || '').toLowerCase()}`;
 
-const estaBloqueado = (clave) => {
+const estaBloqueado = (clave, { maxIntentos, ventanaMs }) => {
     const r = intentosFallidos.get(clave);
     if (!r) return false;
-    if (Date.now() - r.desde > VENTANA_BLOQUEO_MS) { intentosFallidos.delete(clave); return false; }
-    return r.cantidad >= MAX_INTENTOS;
+    if (Date.now() - r.desde > ventanaMs) { intentosFallidos.delete(clave); return false; }
+    return r.cantidad >= maxIntentos;
 };
 
-const registrarFallo = (clave) => {
+const registrarFallo = (clave, { ventanaMs }) => {
     const r = intentosFallidos.get(clave);
-    if (!r || Date.now() - r.desde > VENTANA_BLOQUEO_MS) intentosFallidos.set(clave, { cantidad: 1, desde: Date.now() });
+    if (!r || Date.now() - r.desde > ventanaMs) intentosFallidos.set(clave, { cantidad: 1, desde: Date.now() });
     else r.cantidad++;
 };
 
@@ -75,21 +76,23 @@ const loginUsuario = async (req, res) => {
             return res.status(400).json({ error: 'Ingrese correo y contraseña' });
 
         const correo = String(correo_electronico).toLowerCase();
-        if (!captcha.verificar(id_captcha, respuestaCaptcha)) {
+        const p = await ajusteModel.parametros();
+        const limite = { maxIntentos: p.login_max_intentos, ventanaMs: p.login_minutos_bloqueo * 60 * 1000 };
+        if (p.captcha_activo && !captcha.verificar(id_captcha, respuestaCaptcha)) {
             marcarEvento(res, 'CAPTCHA_INCORRECTO', { correo });
             return res.status(400).json({ error: 'El código de la imagen es incorrecto o venció', codigo: 'CAPTCHA_INVALIDO' });
         }
 
         const clave = claveIntento(req, correo_electronico);
-        if (estaBloqueado(clave)) {
+        if (estaBloqueado(clave, limite)) {
             marcarEvento(res, 'BLOQUEO_POR_INTENTOS', { correo });
-            return res.status(429).json({ error: 'Demasiados intentos fallidos. Intente de nuevo en 15 minutos.' });
+            return res.status(429).json({ error: `Demasiados intentos fallidos. Intente de nuevo en ${p.login_minutos_bloqueo} minutos.` });
         }
 
         const u = await userModel.obtenerUsuarioPorCorreo(correo_electronico);
         const valida = await bcrypt.compare(String(contrasena), u ? u.contrasena_hash : HASH_FICTICIO);
         if (!u || !valida) {
-            registrarFallo(clave);
+            registrarFallo(clave, limite);
             marcarEvento(res, 'INICIO_SESION_FALLIDO',
                 { correo, motivo: u ? 'Contraseña incorrecta' : 'Correo no registrado o usuario inactivo' });
             return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
@@ -108,7 +111,7 @@ const loginUsuario = async (req, res) => {
         const token = jwt.sign(
             { id_usuario: u.id_usuario, id_rol: u.id_rol, id_sucursal: u.id_sucursal },
             JWT_SECRET,
-            JWT_OPCIONES
+            { ...JWT_OPCIONES, expiresIn: `${p.sesion_horas}h` }
         );
 
         res.json({

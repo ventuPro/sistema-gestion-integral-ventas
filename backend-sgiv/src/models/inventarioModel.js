@@ -14,8 +14,8 @@ const registrarMovimiento = async (datos) => {
 
         // 1. Actualizar o Insertar en el inventario de la sucursal
         const queryInventario = `
-            INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual)
-            VALUES ($1, $2, $3)
+            INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual, stock_minimo_alerta)
+            VALUES ($1, $2, $3, COALESCE((SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1), 5))
             ON CONFLICT (id_sucursal, id_producto)
             DO UPDATE SET cantidad_actual = inventario_sucursal.cantidad_actual + EXCLUDED.cantidad_actual
             RETURNING id_inventario, cantidad_actual;
