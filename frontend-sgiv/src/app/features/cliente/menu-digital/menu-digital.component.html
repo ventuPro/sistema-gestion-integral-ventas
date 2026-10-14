@@ -1,308 +1,296 @@
-<div class="min-h-screen bg-gray-50 font-sans max-w-md mx-auto relative">
+<div class="pagina">
 
-  <!-- Aviso -->
-  <div *ngIf="aviso"
-       class="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm bg-gray-900 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-2xl text-center">
-    {{ aviso }}
-  </div>
+  @if (aviso) { <div class="aviso-menu" role="status">{{ aviso }}</div> }
 
-  <!-- ═══ QR NO VÁLIDO ═══ -->
-  <div *ngIf="estadoCarga === 'invalido'" class="flex flex-col items-center justify-center min-h-screen text-center p-8">
-    <div class="text-6xl mb-4">🔍</div>
-    <h2 class="text-xl font-bold text-gray-700">Código QR no válido</h2>
-    <p class="text-gray-500 text-sm mt-2">Este código ya no funciona. Pide ayuda en caja.</p>
-  </div>
+  <!-- ═══ QR NO VÁLIDO / ERROR / CARGANDO ═══ -->
+  @if (estadoCarga === 'invalido') {
+    <div class="estado-pantalla">
+      <lucide-icon [img]="icons.qrInvalido" class="w-10 h-10 inf-sutil"></lucide-icon>
+      <h2 class="inf-tinta text-lg font-semibold mt-3">Código QR no válido</h2>
+      <p class="inf-tenue text-sm mt-1">Este código ya no funciona. Pide ayuda en caja.</p>
+    </div>
+  }
+  @if (estadoCarga === 'error') {
+    <div class="estado-pantalla">
+      <lucide-icon [img]="icons.sinConexion" class="w-10 h-10 inf-sutil"></lucide-icon>
+      <h2 class="inf-tinta text-lg font-semibold mt-3">No pudimos cargar el menú</h2>
+      <p class="inf-tenue text-sm mt-1">Revisa tu conexión a internet o al WiFi del local.</p>
+      <button class="boton-primario mt-6" (click)="cargarTodo()">Reintentar</button>
+    </div>
+  }
+  @if (estadoCarga === 'cargando') {
+    <div class="p-4 space-y-3">
+      <div class="inf-esqueleto h-28"></div>
+      <div class="grid grid-cols-2 gap-3">
+        @for (n of [1,2,3,4]; track n) { <div class="inf-esqueleto h-52"></div> }
+      </div>
+    </div>
+  }
 
-  <!-- ═══ ERROR DE CONEXIÓN ═══ -->
-  <div *ngIf="estadoCarga === 'error'" class="flex flex-col items-center justify-center min-h-screen text-center p-8">
-    <div class="text-6xl mb-4">📶</div>
-    <h2 class="text-xl font-bold text-gray-700">No pudimos cargar el menú</h2>
-    <p class="text-gray-500 text-sm mt-2">Revisa tu conexión a internet o al WiFi del local.</p>
-    <button (click)="cargarTodo()" class="mt-6 px-6 py-3 bg-blue-600 text-white font-bold rounded-xl">Reintentar</button>
-  </div>
-
-  <!-- ═══ CARGANDO ═══ -->
-  <div *ngIf="estadoCarga === 'cargando'" class="flex flex-col items-center justify-center min-h-screen gap-4">
-    <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    <p class="text-gray-500 text-sm">Cargando menú...</p>
-  </div>
-
-  <ng-container *ngIf="estadoCarga === 'listo' && info">
+  @if (estadoCarga === 'listo' && info) {
 
     <!-- ═══ ENCABEZADO ═══ -->
-    <header class="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-5 pt-5 pb-3 sticky top-0 z-30 shadow-lg">
+    <header class="cabecera bg-gradient-to-br from-blue-600 to-indigo-600">
       <div class="flex items-center gap-3">
-        <img *ngIf="ajustes.logo()" [src]="ajustes.logo()" alt="" class="w-11 h-11 object-contain rounded-lg bg-white/15 p-1 flex-shrink-0">
+        @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="w-11 h-11 object-contain rounded-lg bg-white/15 p-1 flex-shrink-0"> }
         <div class="min-w-0">
-          <h1 class="text-xl font-black truncate">{{ ajustes.nombre() }}</h1>
-          <p class="text-blue-200 text-sm">Mesa {{ info.numero_mesa }} · {{ info.nombre_sucursal }}</p>
+          <h1 class="text-lg font-semibold truncate">{{ ajustes.nombre() }}</h1>
+          <p class="text-white/75 text-[13px]">Mesa {{ info.numero_mesa }} · {{ info.nombre_sucursal }}</p>
         </div>
       </div>
 
-      <nav class="flex mt-3 bg-blue-800/50 rounded-xl p-1 gap-1">
-        <button (click)="vista = 'menu'"
-                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all"
-                [class.bg-white]="vista === 'menu'" [class.text-blue-700]="vista === 'menu'" [class.text-blue-200]="vista !== 'menu'">
-          🍽 Menú
+      <nav class="pestanas-menu" aria-label="Secciones">
+        <button [class.activa]="vista === 'menu'" (click)="vista = 'menu'">
+          <lucide-icon [img]="icons.menu" class="w-4 h-4"></lucide-icon> Menú
         </button>
-        <button (click)="vista = 'carrito'"
-                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all relative"
-                [class.bg-white]="vista === 'carrito'" [class.text-blue-700]="vista === 'carrito'" [class.text-blue-200]="vista !== 'carrito'">
-          🛒 Carrito
-          <span *ngIf="cantidadCarrito > 0"
-                class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-5 h-5 px-1 flex items-center justify-center font-bold">
-            {{ cantidadCarrito }}
-          </span>
+        <button [class.activa]="vista === 'carrito'" (click)="vista = 'carrito'">
+          <lucide-icon [img]="icons.carrito" class="w-4 h-4"></lucide-icon> Carrito
+          @if (cantidadCarrito > 0) { <span class="globo">{{ cantidadCarrito }}</span> }
         </button>
-        <button (click)="vista = 'pedidos'; refrescarEstado()"
-                class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all relative"
-                [class.bg-white]="vista === 'pedidos'" [class.text-blue-700]="vista === 'pedidos'" [class.text-blue-200]="vista !== 'pedidos'">
-          🧾 Mi mesa
-          <span *ngIf="pedidosActivos > 0"
-                class="absolute -top-1 -right-1 bg-amber-400 text-gray-900 text-xs rounded-full min-w-5 h-5 px-1 flex items-center justify-center font-bold">
-            {{ pedidosActivos }}
-          </span>
+        <button [class.activa]="vista === 'pedidos'" (click)="vista = 'pedidos'; refrescarEstado()">
+          <lucide-icon [img]="icons.mesa" class="w-4 h-4"></lucide-icon> Mi mesa
+          @if (pedidosActivos > 0) { <span class="globo aviso">{{ pedidosActivos }}</span> }
         </button>
       </nav>
     </header>
 
-    <!-- Bienvenida (Ajustes → Parámetros) -->
-    <div *ngIf="ajustes.config().menu_mensaje_bienvenida && vista === 'menu'"
-         class="mx-4 mt-3 bg-blue-50 border border-blue-100 text-blue-800 text-sm rounded-xl px-4 py-3">
-      {{ ajustes.config().menu_mensaje_bienvenida }}
-    </div>
-
-    <!-- Sin turno de caja o pedidos desactivados: se puede ver el menú, pero no pedir -->
-    <div *ngIf="!info.recibe_pedidos || !ajustes.config().menu_activo"
-         class="mx-4 mt-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3">
-      {{ info.pedidos_desactivados || !ajustes.config().menu_activo
-         ? 'Los pedidos desde el celular están desactivados. Puedes ver el menú y pedir en caja.'
-         : 'En este momento no estamos recibiendo pedidos desde el menú. Puedes verlo y pedir en caja.' }}
-    </div>
-
-    <!-- Agradecimiento al cerrar la cuenta -->
-    <div *ngIf="gracias" class="mx-4 mt-3 bg-green-50 border border-green-200 rounded-xl px-4 py-4 text-center">
-      <div class="text-4xl mb-1">🎉</div>
-      <p class="font-black text-green-800">¡Gracias por tu visita!</p>
-      <p class="text-sm text-green-700">Tu cuenta fue cerrada. Esperamos verte pronto.</p>
+    <div class="px-4 space-y-3 mt-3 empty:hidden">
+      @if (ajustes.config().menu_mensaje_bienvenida && vista === 'menu') {
+        <p class="nota">{{ ajustes.config().menu_mensaje_bienvenida }}</p>
+      }
+      @if (!info.recibe_pedidos || !ajustes.config().menu_activo) {
+        <p class="aviso-suave">
+          {{ info.pedidos_desactivados || !ajustes.config().menu_activo
+             ? 'Los pedidos desde el celular están desactivados. Puedes ver el menú y pedir en caja.'
+             : 'En este momento no estamos recibiendo pedidos desde el menú. Puedes verlo y pedir en caja.' }}
+        </p>
+      }
+      @if (gracias) {
+        <div class="inf-hoja p-4 text-center">
+          <lucide-icon [img]="icons.gracias" class="w-8 h-8 mx-auto inf-sube"></lucide-icon>
+          <p class="inf-tinta font-semibold mt-2">¡Gracias por tu visita!</p>
+          <p class="inf-tenue text-sm">Tu cuenta fue cerrada. Esperamos verte pronto.</p>
+        </div>
+      }
     </div>
 
     <!-- ════════ MENÚ ════════ -->
-    <section *ngIf="vista === 'menu'" class="pb-28">
-      <div class="px-4 pt-3 pb-1">
-        <input type="search" [(ngModel)]="busqueda" placeholder="🔍 Buscar productos..."
-               class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 bg-white shadow-sm">
-      </div>
-
-      <div class="flex gap-2 px-4 py-2 overflow-x-auto scrollbar-hide">
-        <button (click)="categoriaActiva = null"
-                class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors"
-                [class.bg-blue-600]="categoriaActiva === null" [class.text-white]="categoriaActiva === null"
-                [class.bg-white]="categoriaActiva !== null" [class.text-gray-600]="categoriaActiva !== null">
-          Todos
-        </button>
-        <button *ngFor="let cat of categorias" (click)="categoriaActiva = cat.id"
-                class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors whitespace-nowrap"
-                [class.bg-blue-600]="categoriaActiva === cat.id" [class.text-white]="categoriaActiva === cat.id"
-                [class.bg-white]="categoriaActiva !== cat.id" [class.text-gray-600]="categoriaActiva !== cat.id">
-          {{ cat.nombre }}
-        </button>
-      </div>
-
-      <div *ngIf="catalogoFiltrado.length === 0" class="text-center py-16 text-gray-400">
-        <div class="text-5xl mb-3">😔</div>
-        <p>No encontramos productos</p>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3 px-4 pb-4">
-        <div *ngFor="let prod of catalogoFiltrado"
-             class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col"
-             [class.opacity-60]="prod.stock_actual <= 0">
-
-          <div class="relative h-32 bg-blue-50">
-            <img *ngIf="prod.url_imagen" [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto"
-                 class="w-full h-full object-cover" loading="lazy">
-            <div *ngIf="!prod.url_imagen" class="w-full h-full flex items-center justify-center text-4xl font-bold text-blue-200">
-              {{ prod.nombre_producto?.charAt(0) }}
-            </div>
-            <span class="absolute top-2 right-2 bg-white/95 text-xs font-bold px-2 py-0.5 rounded-full shadow"
-                  [class.text-red-600]="disponible(prod) === 0"
-                  [class.text-orange-600]="disponible(prod) > 0 && disponible(prod) <= 5"
-                  [class.text-green-700]="disponible(prod) > 5">
-              {{ prod.stock_actual <= 0 ? 'Agotado' : disponible(prod) === 0 ? 'Todo en tu carrito' : disponible(prod) <= 5 ? 'Quedan ' + disponible(prod) : disponible(prod) + ' disp.' }}
-            </span>
+    @if (vista === 'menu') {
+      <section class="pb-28">
+        <div class="filtros">
+          <div class="buscador">
+            <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
+            <input type="search" [(ngModel)]="busqueda" placeholder="Buscar productos" aria-label="Buscar productos">
+            @if (busqueda) {
+              <button class="quitar" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+                <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
+              </button>
+            }
           </div>
-
-          <div class="p-3 flex flex-col flex-1">
-            <p class="font-bold text-gray-800 text-sm leading-tight mb-1">{{ prod.nombre_producto }}</p>
-            <p *ngIf="prod.descripcion_producto" class="text-xs text-gray-400 mb-2 leading-tight line-clamp-2">
-              {{ prod.descripcion_producto }}
-            </p>
-            <p class="text-blue-700 font-black text-base mt-auto">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</p>
-
-            <button *ngIf="enCarrito(prod.id_producto) === 0" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0"
-                    class="mt-2 w-full py-2 font-bold rounded-xl transition-colors text-sm bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-200 disabled:text-gray-400">
-              {{ prod.stock_actual > 0 ? '+ Agregar' : 'Agotado' }}
-            </button>
-            <div *ngIf="enCarrito(prod.id_producto) > 0" class="mt-2 flex items-center justify-between bg-blue-50 rounded-xl p-1">
-              <button (click)="quitarUno(prod.id_producto)"
-                      class="w-10 h-10 rounded-lg bg-white text-blue-700 text-lg font-black shadow-sm">−</button>
-              <span class="font-black text-blue-800">{{ enCarrito(prod.id_producto) }}</span>
-              <button (click)="agregar(prod)" [disabled]="disponible(prod) <= 0"
-                      class="w-10 h-10 rounded-lg bg-blue-600 text-white text-lg font-black shadow-sm disabled:bg-gray-300">+</button>
-            </div>
+          <div class="chips">
+            <button [class.activa]="categoriaActiva === null" (click)="categoriaActiva = null">Todos</button>
+            @for (cat of categorias; track cat.id) {
+              <button [class.activa]="categoriaActiva === cat.id" (click)="categoriaActiva = cat.id">{{ cat.nombre }}</button>
+            }
           </div>
         </div>
-      </div>
-    </section>
+
+        @if (catalogoFiltrado.length === 0) {
+          <div class="estado-vacio">
+            <lucide-icon [img]="icons.sinResultados" class="w-8 h-8 inf-sutil"></lucide-icon>
+            <p>No encontramos productos</p>
+          </div>
+        }
+
+        <div class="grid grid-cols-2 gap-3 px-4">
+          @for (prod of catalogoFiltrado; track prod.id_producto) {
+            <article class="plato" [class.agotado]="prod.stock_actual <= 0">
+              <div class="foto">
+                @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
+                @else { <span>{{ prod.nombre_producto?.charAt(0) }}</span> }
+                @if (prod.stock_actual <= 0) { <span class="etiqueta mal">Agotado</span> }
+                @else if (disponible(prod) === 0) { <span class="etiqueta">En tu carrito</span> }
+                @else if (disponible(prod) <= 5) { <span class="etiqueta aviso">Quedan {{ disponible(prod) }}</span> }
+              </div>
+              <div class="datos">
+                <p class="nombre">{{ prod.nombre_producto }}</p>
+                @if (prod.descripcion_producto) { <p class="descripcion">{{ prod.descripcion_producto }}</p> }
+                <p class="precio">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</p>
+
+                @if (enCarrito(prod.id_producto) === 0) {
+                  <button class="agregar" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0">
+                    @if (prod.stock_actual > 0) { <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon> Agregar } @else { Agotado }
+                  </button>
+                } @else {
+                  <div class="contador">
+                    <button (click)="quitarUno(prod.id_producto)" aria-label="Quitar uno">
+                      <lucide-icon [img]="icons.menos" class="w-4 h-4"></lucide-icon>
+                    </button>
+                    <span>{{ enCarrito(prod.id_producto) }}</span>
+                    <button class="sumar" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0" aria-label="Agregar uno">
+                      <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon>
+                    </button>
+                  </div>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+    }
 
     <!-- ════════ CARRITO ════════ -->
-    <section *ngIf="vista === 'carrito'" class="pb-28 p-4">
+    @if (vista === 'carrito') {
+      <section class="pb-28 p-4 space-y-3">
+        @if (carrito.length === 0) {
+          <div class="estado-vacio">
+            <lucide-icon [img]="icons.carrito" class="w-8 h-8 inf-sutil"></lucide-icon>
+            <p>Tu carrito está vacío</p>
+            <button class="inf-enlace mt-2" (click)="vista = 'menu'">Ver el menú</button>
+          </div>
+        } @else {
+          <h2 class="inf-titulo text-xl!">Tu pedido</h2>
 
-      <div *ngIf="carrito.length === 0" class="text-center py-16 text-gray-400">
-        <div class="text-5xl mb-3">🛒</div>
-        <p class="font-medium">Tu carrito está vacío</p>
-        <button (click)="vista = 'menu'" class="mt-4 text-blue-600 font-semibold text-sm">Ver el menú →</button>
-      </div>
-
-      <div *ngIf="carrito.length > 0" class="space-y-3">
-        <h2 class="text-xl font-bold text-gray-800">Tu pedido</h2>
-
-        <div *ngFor="let item of carrito" class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div class="flex gap-3">
-            <div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-blue-50">
-              <img *ngIf="item.url_imagen" [src]="item.url_imagen | imagenUrl" class="w-full h-full object-cover">
-              <div *ngIf="!item.url_imagen" class="w-full h-full flex items-center justify-center text-blue-200 font-black text-xl">
-                {{ item.nombre_producto.charAt(0) }}
+          <div class="inf-hoja">
+            @for (item of carrito; track item.id_producto) {
+              <div class="linea">
+                <div class="miniatura">
+                  @if (item.url_imagen) { <img [src]="item.url_imagen | imagenUrl" alt=""> }
+                  @else { {{ item.nombre_producto.charAt(0) }} }
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="inf-tinta font-medium text-[14px] leading-tight">{{ item.nombre_producto }}</p>
+                  <p class="inf-tenue text-[13px]">{{ moneda() }} {{ (item.precio_unitario * item.cantidad).toFixed(2) }}</p>
+                  <button class="text-[12px] inf-baja font-medium" (click)="eliminar(item)">Quitar</button>
+                </div>
+                <div class="contador compacto">
+                  <button (click)="quitarUno(item.id_producto)" aria-label="Quitar uno">
+                    <lucide-icon [img]="icons.menos" class="w-4 h-4"></lucide-icon>
+                  </button>
+                  <span>{{ item.cantidad }}</span>
+                  <button class="sumar" (click)="agregarUno(item)" [disabled]="!puedeSumar(item)" aria-label="Agregar uno">
+                    <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon>
+                  </button>
+                </div>
               </div>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="font-bold text-gray-800 leading-tight">{{ item.nombre_producto }}</p>
-              <p class="text-blue-700 font-black">{{ moneda() }} {{ (item.precio_unitario * item.cantidad).toFixed(2) }}</p>
-              <button (click)="eliminar(item)" class="text-xs text-red-500 font-semibold">Quitar</button>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <button (click)="quitarUno(item.id_producto)"
-                      class="w-10 h-10 rounded-full bg-gray-200 text-gray-700 text-lg font-bold">−</button>
-              <span class="font-black text-gray-800 w-5 text-center">{{ item.cantidad }}</span>
-              <button (click)="agregarUno(item)" [disabled]="!puedeSumar(item)"
-                      class="w-10 h-10 rounded-full bg-blue-600 text-white text-lg font-bold disabled:bg-gray-300">+</button>
-            </div>
+            }
           </div>
-        </div>
 
-        <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <label class="block text-sm font-semibold text-gray-700 mb-2">Observación general (opcional)</label>
-          <textarea [(ngModel)]="observacionGeneral" rows="2" maxlength="200"
-                    placeholder="Ej: traer todo junto"
-                    class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-blue-500 resize-none"></textarea>
-        </div>
+          <div class="inf-hoja p-4 grupo">
+            <label class="inf-etiqueta" for="observacion">Observación para el cajero <span class="inf-sutil">(opcional)</span></label>
+            <textarea id="observacion" class="campo" [(ngModel)]="observacionGeneral" rows="2" maxlength="200" placeholder="Ej.: traer todo junto"></textarea>
+          </div>
 
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <div class="flex justify-between items-center mb-4">
-            <span class="font-bold text-gray-600">Total del pedido</span>
-            <span class="text-3xl font-black text-blue-700">{{ moneda() }} {{ totalCarrito.toFixed(2) }}</span>
+          <div class="inf-hoja p-4 space-y-3">
+            <div class="flex justify-between items-baseline">
+              <span class="inf-etiqueta">Total del pedido</span>
+              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ totalCarrito.toFixed(2) }}</span>
+            </div>
+            @if (errorEnvio) { <p class="error-formulario">{{ errorEnvio }}</p> }
+            <button class="boton-primario w-full py-3.5! text-base!" (click)="enviarPedido()"
+                    [disabled]="enviando || !info.recibe_pedidos || !ajustes.config().menu_activo">
+              {{ enviando ? 'Enviando…' : 'Enviar pedido' }}
+            </button>
+            <p class="text-center ayuda">El cajero confirmará tu pedido. Pagas todo al final en caja.</p>
           </div>
-          <div *ngIf="errorEnvio" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm mb-3">
-            {{ errorEnvio }}
-          </div>
-          <button (click)="enviarPedido()" [disabled]="enviando || !info.recibe_pedidos || !ajustes.config().menu_activo"
-                  class="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-black text-lg rounded-2xl transition-colors shadow-md">
-            {{ enviando ? 'Enviando...' : 'Enviar pedido' }}
-          </button>
-          <p class="text-center text-xs text-gray-400 mt-2">El cajero confirmará tu pedido. Pagas todo al final en caja.</p>
-        </div>
-      </div>
-    </section>
+        }
+      </section>
+    }
 
     <!-- ════════ MI MESA: pedidos y consumo ════════ -->
-    <section *ngIf="vista === 'pedidos'" class="pb-28 p-4 space-y-4">
+    @if (vista === 'pedidos') {
+      <section class="pb-28 p-4 space-y-3">
+        @if (pedidos.length === 0 && !cuenta) {
+          <div class="estado-vacio">
+            <lucide-icon [img]="icons.mesa" class="w-8 h-8 inf-sutil"></lucide-icon>
+            <p>Aún no hiciste pedidos</p>
+            <button class="inf-enlace mt-2" (click)="vista = 'menu'">Ver el menú</button>
+          </div>
+        }
 
-      <div *ngIf="pedidos.length === 0 && !cuenta" class="text-center py-16 text-gray-400">
-        <div class="text-5xl mb-3">🧾</div>
-        <p class="font-medium">Aún no hiciste pedidos</p>
-        <button (click)="vista = 'menu'" class="mt-4 text-blue-600 font-semibold text-sm">Ver el menú →</button>
-      </div>
-
-      <!-- Pedidos de este celular -->
-      <div *ngFor="let p of pedidos" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-4 py-3 flex items-center justify-between border-b">
-          <span class="font-bold text-gray-800">Pedido #{{ p.id_pedido }}</span>
-          <span class="text-xs font-bold px-2.5 py-1 rounded-full" [ngClass]="infoEstado(p.estado_pedido).clase">
-            {{ infoEstado(p.estado_pedido).texto }}
-          </span>
-        </div>
-
-        <!-- Progreso -->
-        <div *ngIf="p.estado_pedido !== 'Cancelado'" class="px-4 pt-3 flex items-center">
-          <ng-container *ngFor="let paso of pasos; let ultimo = last">
-            <div class="flex flex-col items-center">
-              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black"
-                   [class.bg-green-500]="pasoAlcanzado(p, paso.estado)" [class.text-white]="pasoAlcanzado(p, paso.estado)"
-                   [class.bg-gray-200]="!pasoAlcanzado(p, paso.estado)" [class.text-gray-400]="!pasoAlcanzado(p, paso.estado)">✓</div>
-              <span class="text-[11px] mt-1"
-                    [class.text-green-700]="pasoAlcanzado(p, paso.estado)" [class.text-gray-400]="!pasoAlcanzado(p, paso.estado)">
-                {{ paso.texto }}
-              </span>
+        @for (p of pedidos; track p.id_pedido) {
+          <article class="inf-hoja overflow-hidden">
+            <div class="px-4 py-3 flex items-center justify-between separador-inferior">
+              <span class="inf-tinta font-semibold">Pedido #{{ p.id_pedido }}</span>
+              <span class="inf-estado" [ngClass]="infoEstado(p.estado_pedido).clase">{{ infoEstado(p.estado_pedido).texto }}</span>
             </div>
-            <div *ngIf="!ultimo" class="flex-1 h-0.5 mb-5 mx-1"
-                 [class.bg-green-500]="pasoAlcanzado(p, pasos[pasos.indexOf(paso) + 1].estado)"
-                 [class.bg-gray-200]="!pasoAlcanzado(p, pasos[pasos.indexOf(paso) + 1].estado)"></div>
-          </ng-container>
-        </div>
-        <p class="px-4 pt-2 text-xs text-gray-500">{{ infoEstado(p.estado_pedido).detalle }}</p>
 
-        <ul class="px-4 py-2 text-sm">
-          <li *ngFor="let it of p.items" class="flex justify-between py-1">
-            <span class="text-gray-700">
-              <b>{{ it.cantidad }}×</b> {{ it.nombre_producto }}
-              <span *ngIf="it.nota_cliente" class="block text-xs text-amber-600 ml-5">📝 {{ it.nota_cliente }}</span>
-            </span>
-            <span class="text-gray-600 ml-3">{{ moneda() }} {{ Number(it.subtotal).toFixed(2) }}</span>
-          </li>
-        </ul>
+            @if (p.estado_pedido !== 'Cancelado') {
+              <ol class="progreso">
+                @for (paso of pasos; track paso.estado) {
+                  <li [class.hecho]="pasoAlcanzado(p, paso.estado)">
+                    <span class="punto"><lucide-icon [img]="icons.listo" class="w-3.5 h-3.5"></lucide-icon></span>
+                    {{ paso.texto }}
+                  </li>
+                }
+              </ol>
+            }
+            <p class="px-4 pt-2 ayuda">{{ infoEstado(p.estado_pedido).detalle }}</p>
 
-        <div *ngIf="p.estado_pedido === 'Pendiente_Cajero'" class="px-4 pb-3">
-          <button (click)="cancelar(p)" [disabled]="cancelando[p.id_pedido]"
-                  class="w-full py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 disabled:opacity-50">
-            {{ cancelando[p.id_pedido] ? 'Cancelando…' : 'Cancelar pedido' }}
+            <ul class="px-4 py-2 text-[13.5px]">
+              @for (it of p.items; track $index) {
+                <li class="flex justify-between gap-3 py-1">
+                  <span>
+                    <b class="inf-tinta">{{ it.cantidad }}×</b> {{ it.nombre_producto }}
+                    @if (it.nota_cliente) { <span class="block text-xs inf-aviso ml-5">{{ it.nota_cliente }}</span> }
+                  </span>
+                  <span class="inf-tenue whitespace-nowrap">{{ moneda() }} {{ Number(it.subtotal).toFixed(2) }}</span>
+                </li>
+              }
+            </ul>
+
+            @if (p.estado_pedido === 'Pendiente_Cajero') {
+              <div class="px-4 pb-4">
+                <button class="inf-boton inf-baja w-full justify-center py-2!" (click)="pedidoACancelar = p" [disabled]="cancelando[p.id_pedido]">
+                  {{ cancelando[p.id_pedido] ? 'Cancelando…' : 'Cancelar pedido' }}
+                </button>
+              </div>
+            }
+          </article>
+        }
+
+        @if (cuenta) {
+          <article class="inf-hoja p-4">
+            <h3 class="inf-tinta font-semibold mb-2">Consumo de la mesa</h3>
+            <ul class="text-[13.5px]">
+              @for (it of cuenta.items; track $index) {
+                <li class="flex justify-between gap-3 py-1.5 separador-inferior last:border-b-0">
+                  <span><b class="inf-tinta">{{ it.cantidad }}×</b> {{ it.nombre_producto }}</span>
+                  <span class="inf-tenue whitespace-nowrap">{{ moneda() }} {{ Number(it.subtotal).toFixed(2) }}</span>
+                </li>
+              }
+            </ul>
+            <div class="flex justify-between items-baseline pt-3 mt-2 separador">
+              <span class="inf-etiqueta">Total a pagar</span>
+              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ Number(cuenta.total_acumulado).toFixed(2) }}</span>
+            </div>
+            <p class="ayuda mt-1">Pagas todo al final en caja.</p>
+          </article>
+        }
+
+        @if (pedidos.length > 0 || cuenta) {
+          <button class="boton-primario w-full py-3.5!" (click)="vista = 'menu'">
+            <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon> Pedir algo más
           </button>
-        </div>
-      </div>
-
-      <!-- Consumo de la mesa -->
-      <div *ngIf="cuenta" class="bg-white rounded-2xl shadow-sm border-2 border-blue-100 p-4">
-        <h3 class="font-bold text-gray-800 mb-2">Consumo de la mesa</h3>
-        <ul class="text-sm divide-y divide-gray-100">
-          <li *ngFor="let it of cuenta.items" class="flex justify-between py-1.5">
-            <span class="text-gray-700"><b>{{ it.cantidad }}×</b> {{ it.nombre_producto }}</span>
-            <span class="text-gray-600">{{ moneda() }} {{ Number(it.subtotal).toFixed(2) }}</span>
-          </li>
-        </ul>
-        <div class="flex justify-between items-center pt-3 mt-2 border-t">
-          <span class="font-bold text-gray-700">Total a pagar</span>
-          <span class="text-2xl font-black text-blue-700">{{ moneda() }} {{ Number(cuenta.total_acumulado).toFixed(2) }}</span>
-        </div>
-        <p class="text-xs text-gray-400 mt-1">Pagas todo al final en caja.</p>
-      </div>
-
-      <button *ngIf="pedidos.length > 0 || cuenta" (click)="vista = 'menu'"
-              class="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-colors">
-        + Pedir algo más
-      </button>
-    </section>
-  </ng-container>
+        }
+      </section>
+    }
+  }
 
   <!-- Botón flotante del carrito -->
-  <div *ngIf="estadoCarga === 'listo' && vista === 'menu' && cantidadCarrito > 0"
-       class="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-md px-4">
-    <button (click)="vista = 'carrito'"
-            class="w-full py-4 bg-gray-900 text-white font-black rounded-2xl shadow-2xl flex justify-between items-center px-6">
-      <span class="bg-white text-gray-900 rounded-full min-w-7 h-7 px-1 flex items-center justify-center text-sm font-black">
-        {{ cantidadCarrito }}
-      </span>
-      <span>Ver carrito</span>
-      <span>{{ moneda() }} {{ totalCarrito.toFixed(2) }}</span>
-    </button>
-  </div>
+  @if (estadoCarga === 'listo' && vista === 'menu' && cantidadCarrito > 0) {
+    <div class="flotante">
+      <button (click)="vista = 'carrito'">
+        <span class="cuenta-items">{{ cantidadCarrito }}</span>
+        <span>Ver carrito</span>
+        <span>{{ moneda() }} {{ totalCarrito.toFixed(2) }}</span>
+      </button>
+    </div>
+  }
 </div>
+
+@if (pedidoACancelar; as p) {
+  <app-confirmacion titulo="¿Cancelar este pedido?" mensaje="Aún no fue confirmado por el cajero."
+                    textoConfirmar="Sí, cancelar" [peligro]="true"
+                    (confirmar)="cancelar(p)" (cancelar)="pedidoACancelar = null" />
+}

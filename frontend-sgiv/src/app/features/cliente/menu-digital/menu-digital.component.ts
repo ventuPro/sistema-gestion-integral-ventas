@@ -8,6 +8,9 @@ import { environment } from '../../../../environments/environment';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { sondeo } from '../../../core/utils/sondeo';
+import { ConfirmacionComponent } from '../../shared/confirmacion/confirmacion.component';
+import { LucideAngularModule, UtensilsCrossed, ShoppingBag, ReceiptText, Search, X, Minus, Plus, Check,
+         SearchX, WifiOff, PartyPopper } from 'lucide-angular';
 
 type Vista = 'menu' | 'carrito' | 'pedidos';
 
@@ -25,12 +28,16 @@ interface PedidoGuardado { id: number; t: number; }
 @Component({
   selector:    'app-menu-digital',
   standalone:  true,
-  imports:     [CommonModule, FormsModule, ImagenUrlPipe],
+  imports:     [CommonModule, FormsModule, ImagenUrlPipe, LucideAngularModule, ConfirmacionComponent],
   templateUrl: './menu-digital.component.html',
-  styleUrl:    './menu-digital.component.css'
+  styleUrls:   ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
+                '../../shared/formulario/formulario.css', './menu-digital.component.css']
 })
 export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly Number = Number;
+  readonly icons  = { menu: UtensilsCrossed, carrito: ShoppingBag, mesa: ReceiptText, buscar: Search, cerrar: X,
+                      menos: Minus, mas: Plus, listo: Check, sinResultados: SearchX, sinConexion: WifiOff,
+                      qrInvalido: SearchX, gracias: PartyPopper };
 
   private route = inject(ActivatedRoute);
   private http  = inject(HttpClient);
@@ -63,6 +70,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   pedidos: any[] = [];
   cuenta: { total_acumulado: number; items: any[] } | null = null;
   cancelando: Record<number, boolean> = {};
+  pedidoACancelar: any = null;
   gracias = false;
 
   aviso: string | null = null;
@@ -202,10 +210,11 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   // ─── Catálogo filtrado ───
   get catalogoFiltrado(): any[] {
     const texto = this.busqueda.trim().toLowerCase();
+    // Los agotados van al final para que el cliente vea primero lo que puede pedir
     return this.catalogo.filter(p =>
       (!this.categoriaActiva || Number(p.id_categoria) === this.categoriaActiva) &&
       (!texto || p.nombre_producto.toLowerCase().includes(texto))
-    );
+    ).sort((a, b) => Number(a.stock_actual <= 0) - Number(b.stock_actual <= 0));
   }
 
   // ─── Carrito ───
@@ -338,7 +347,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   }
 
   cancelar(pedido: any) {
-    if (!confirm('¿Cancelar este pedido? Aún no fue confirmado por el cajero.')) return;
+    this.pedidoACancelar = null;
     this.cancelando[pedido.id_pedido] = true;
     this.http.post<any>(`${this.api}/${this.codigo}/pedidos/${pedido.id_pedido}/cancelar`, {}).subscribe({
       next: () => {
@@ -372,12 +381,12 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   infoEstado(estado: string): { texto: string; detalle: string; clase: string } {
     const mapa: Record<string, { texto: string; detalle: string; clase: string }> = {
-      Pendiente_Cajero: { texto: 'Esperando confirmación', detalle: 'El cajero revisará tu pedido en un momento.', clase: 'bg-amber-100 text-amber-800' },
-      Confirmado:       { texto: 'Confirmado',             detalle: 'Estamos preparando tu pedido.',              clase: 'bg-blue-100 text-blue-800' },
-      Entregado:        { texto: 'Entregado',              detalle: '¡Buen provecho!',                             clase: 'bg-green-100 text-green-800' },
-      Cancelado:        { texto: 'No atendido',            detalle: 'Tu pedido no pudo ser atendido. Consulta en caja.', clase: 'bg-red-100 text-red-700' }
+      Pendiente_Cajero: { texto: 'Esperando confirmación', detalle: 'El cajero revisará tu pedido en un momento.', clase: 'aviso' },
+      Confirmado:       { texto: 'Confirmado',             detalle: 'Estamos preparando tu pedido.',              clase: 'ok' },
+      Entregado:        { texto: 'Entregado',              detalle: '¡Buen provecho!',                             clase: 'ok' },
+      Cancelado:        { texto: 'No atendido',            detalle: 'Tu pedido no pudo ser atendido. Consulta en caja.', clase: 'mal' }
     };
-    return mapa[estado] ?? { texto: estado, detalle: '', clase: 'bg-gray-100 text-gray-700' };
+    return mapa[estado] ?? { texto: estado, detalle: '', clase: 'neutro' };
   }
 
   // ─── Avisos ───

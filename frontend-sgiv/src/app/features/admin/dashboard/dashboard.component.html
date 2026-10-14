@@ -37,6 +37,18 @@
           }
         </div>
       }
+
+      @if (bandeja(); as b) {
+        <div class="border-t border-gray-800 my-3"></div>
+        <button (click)="abrirBandeja()"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium"
+                [class]="b.conteo().pendientes ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25' : 'text-gray-400 hover:bg-gray-800 hover:text-white'">
+          <lucide-icon [img]="icons.pedidos" class="w-5 h-5 flex-shrink-0" [class.animate-pulse]="b.conteo().pendientes"></lucide-icon>
+          <span class="flex-1 text-left">Pedidos QR</span>
+          @if (b.conteo().pendientes) { <span class="contador-pedidos bg-amber-500 text-gray-900">{{ b.conteo().pendientes }}</span> }
+          @if (b.conteo().porEntregar) { <span class="contador-pedidos bg-blue-600 text-white" title="Por entregar">{{ b.conteo().porEntregar }}</span> }
+        </button>
+      }
     </nav>
 
     <!-- Usuario y sesión -->
@@ -74,7 +86,7 @@
   }
 
   <!-- Pedidos del menú QR: visibles en cualquier pantalla del cajero -->
-  @if (esCajero && tiene('mesas')) { <app-bandeja-pedidos /> }
+  @if (esCajero && tiene('mesas')) { <app-bandeja-pedidos [flotante]="false" /> }
 
   <!-- ═══ CONTENIDO PRINCIPAL ═══ -->
   <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -85,7 +97,19 @@
         <lucide-icon [img]="icons.menu" class="w-5 h-5"></lucide-icon>
       </button>
       @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="w-8 h-8 object-contain rounded-md bg-white/10 p-0.5"> }
-      <span class="font-semibold text-[15px] truncate">{{ ajustes.nombre() }}</span>
+      <span class="font-semibold text-[15px] truncate flex-1">{{ ajustes.nombre() }}</span>
+      @if (bandeja(); as b) {
+        <button class="relative p-2 rounded-md hover:bg-gray-800" (click)="abrirBandeja()" aria-label="Pedidos QR"
+                [class.text-amber-300]="b.conteo().pendientes">
+          <lucide-icon [img]="icons.pedidos" class="w-5 h-5"></lucide-icon>
+          @if (b.conteo().pendientes + b.conteo().porEntregar) {
+            <span class="absolute top-0.5 right-0.5 contador-pedidos min-w-4! h-4! text-[10px]!"
+                  [class]="b.conteo().pendientes ? 'bg-amber-500 text-gray-900' : 'bg-blue-600 text-white'">
+              {{ b.conteo().pendientes || b.conteo().porEntregar }}
+            </span>
+          }
+        </button>
+      }
     </header>
 
     <main class="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">

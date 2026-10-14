@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { LucideAngularModule, Bell, X, Check, Minus, Plus, Trash2, Volume2, VolumeX, Truck } from 'lucide-angular';
@@ -30,6 +30,10 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   private readonly CLAVE_SONIDO    = 'bandeja_sonido_sgiv';
 
   abierta  = false;
+  /** false = el botón para abrirla lo pone el panel (barra lateral / superior) */
+  flotante = input(true);
+  /** Para mostrar el aviso fuera de este componente */
+  readonly conteo = signal({ pendientes: 0, porEntregar: 0 });
   pestana: Pestana = 'pendientes';
   pendientes: any[] = [];
   porEntregar: any[] = [];
@@ -94,6 +98,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
       next: (lista) => {
         this.pendientes  = lista.filter(p => p.estado_pedido === 'Pendiente_Cajero');
         this.porEntregar = lista.filter(p => p.estado_pedido === 'Confirmado');
+        this.conteo.set({ pendientes: this.pendientes.length, porEntregar: this.porEntregar.length });
         document.title = this.pendientes.length
           ? `(${this.pendientes.length}) ${this.tituloOriginal}`
           : this.tituloOriginal;

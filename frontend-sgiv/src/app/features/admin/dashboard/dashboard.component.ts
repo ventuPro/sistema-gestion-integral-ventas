@@ -1,11 +1,11 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, HostListener } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, HostListener, viewChild } from '@angular/core';
 import { Router, RouterOutlet, RouterModule, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
          Landmark, LogOut, Building2, RefreshCw,
-         Settings, Menu, X } from 'lucide-angular';
+         Settings, Menu, X, Bell } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
@@ -45,6 +45,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   /** Menú lateral abierto (solo en celular y tablet) */
   menuAbierto = false;
+  readonly bandeja = viewChild(BandejaPedidosComponent);
   secciones: { titulo: string; enlaces: Enlace[] }[] = [];
 
   // Iconos
@@ -59,6 +60,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     cierres:    Landmark,
     logout:     LogOut,
     menu:       Menu,
+    pedidos:    Bell,
     cerrar:     X,
     sucursal:   Building2,
     refresh:    RefreshCw,
@@ -134,6 +136,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
       ]}
     ];
     return [];
+  }
+
+  abrirBandeja() {
+    this.cerrarMenu();
+    this.bandeja()?.alternar();
   }
 
   cerrarMenu() {

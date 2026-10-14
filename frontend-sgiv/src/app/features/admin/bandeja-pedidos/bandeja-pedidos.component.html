@@ -5,7 +5,7 @@
 </div>
 
 <!-- ═══ BOTÓN FLOTANTE ═══ -->
-<button *ngIf="!abierta" (click)="alternar()"
+<button *ngIf="!abierta && flotante()" (click)="alternar()"
         class="fixed bottom-6 right-6 z-40 flex items-center gap-2 pl-4 pr-5 py-3 rounded-full shadow-2xl font-bold text-sm transition-colors"
         [class.bg-amber-500]="pendientes.length > 0" [class.hover:bg-amber-600]="pendientes.length > 0" [class.text-white]="pendientes.length > 0"
         [class.bg-white]="pendientes.length === 0" [class.text-gray-700]="pendientes.length === 0" [class.border]="pendientes.length === 0"
