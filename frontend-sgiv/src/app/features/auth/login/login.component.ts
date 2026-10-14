@@ -18,7 +18,6 @@ import { AjustesService } from '../../../core/services/ajustes.service';
 })
 export class LoginComponent implements OnInit {
   readonly icons = { refrescar: RefreshCw, ver: Eye, ocultar: EyeOff };
-  readonly anio  = new Date().getFullYear();
 
   correo     = '';
   contrasena = '';
@@ -48,6 +47,8 @@ export class LoginComponent implements OnInit {
 
   /** El servidor pidió CAPTCHA aunque la copia local de los ajustes dijera que no */
   private forzarCaptcha = false;
+
+  get titulo(): string { return this.ajustes.config().login_titulo || this.ajustes.nombre(); }
 
   get usaCaptcha(): boolean { return this.ajustes.config().captcha_activo || this.forzarCaptcha; }
 

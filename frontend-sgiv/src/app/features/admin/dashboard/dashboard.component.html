@@ -1,168 +1,94 @@
-<div class="flex h-screen bg-gray-50 font-sans">
+<div class="flex h-dvh bg-gray-50 font-sans">
 
-  <!-- ═══ SIDEBAR ═══ -->
-  <aside class="w-64 bg-gray-900 text-white flex flex-col shadow-2xl">
+  <!-- Fondo oscuro del menú en celular -->
+  @if (menuAbierto) { <div class="fondo-menu lg:hidden" (click)="cerrarMenu()"></div> }
+
+  <!-- ═══ BARRA LATERAL ═══ -->
+  <aside class="lateral bg-gray-900 text-white flex flex-col" [class.abierta]="menuAbierto" aria-label="Menú principal">
 
     <!-- Logo y nombre del negocio (Ajustes → Empresa / Apariencia) -->
     <div class="px-5 py-5 border-b border-gray-800 flex items-center gap-3">
-      <img *ngIf="ajustes.logo()" [src]="ajustes.logo()" alt="Logo"
-           class="w-11 h-11 object-contain rounded-lg bg-white/10 p-1 flex-shrink-0">
-      <div class="min-w-0">
-        <h1 class="text-xl font-black text-white tracking-tight leading-tight break-words">{{ ajustes.nombre() }}</h1>
-        <p *ngIf="ajustes.config().eslogan" class="text-blue-400 font-bold text-xs truncate">{{ ajustes.config().eslogan }}</p>
+      @if (ajustes.logo()) {
+        <img [src]="ajustes.logo()" alt="Logo" class="w-11 h-11 object-contain rounded-lg bg-white/10 p-1 flex-shrink-0">
+      }
+      <div class="min-w-0 flex-1">
+        <p class="text-lg font-bold text-white tracking-tight leading-tight break-words">{{ ajustes.nombre() }}</p>
+        @if (ajustes.config().eslogan) { <p class="text-blue-400 font-semibold text-xs truncate">{{ ajustes.config().eslogan }}</p> }
       </div>
+      <button class="lg:hidden p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-800" (click)="cerrarMenu()" aria-label="Cerrar menú">
+        <lucide-icon [img]="icons.cerrar" class="w-5 h-5"></lucide-icon>
+      </button>
     </div>
 
     <!-- Navegación -->
-    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-
-      <ng-container *ngIf="esCajero">
-        <p class="text-gray-500 text-xs font-bold uppercase tracking-widest px-3 pb-2">Operaciones</p>
-
-        <a *ngIf="tiene('dashboard')"
-           routerLink="/dashboard/resumen" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.dashboard" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Panel Principal
-        </a>
-
-        <a *ngIf="tiene('punto_venta')"
-           routerLink="/dashboard/punto-venta" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.pos" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Punto de Venta
-        </a>
-
-        <a *ngIf="tiene('mesas')"
-           routerLink="/dashboard/mesas" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.mesas" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Mesas
-        </a>
-
-        <a *ngIf="tiene('arqueo')"
-           routerLink="/dashboard/arqueo" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.arqueo" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Arqueo de Caja
-        </a>
-
-        <a *ngIf="tiene('inventario')"
-           routerLink="/dashboard/inventario" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.inventario" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Inventario
-        </a>
-
-        <a *ngIf="tiene('reportes')"
-           routerLink="/dashboard/reportes" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.reportes" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Reportes
-        </a>
-
-        <a *ngIf="tiene('usuarios')"
-           routerLink="/dashboard/usuarios" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.usuarios" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Usuarios
-        </a>
-      </ng-container>
-
-      <!-- ADMIN -->
-      <ng-container *ngIf="esAdmin">
-        <p class="text-gray-500 text-xs font-bold uppercase tracking-widest px-3 pb-2">Administración</p>
-
-        <a routerLink="/dashboard/resumen" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.dashboard" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Panel Principal
-        </a>
-
-        <a routerLink="/dashboard/inventario" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.inventario" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Inventario
-        </a>
-
-        <a routerLink="/dashboard/reportes" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.reportes" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Reportes
-        </a>
-
-        <a routerLink="/dashboard/cierres-caja" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.cierres" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Cierres de Caja
-        </a>
-
-        <div class="border-t border-gray-800 my-2"></div>
-        <p class="text-gray-500 text-xs font-bold uppercase tracking-widest px-3 pb-2">Sistema</p>
-
-        <a routerLink="/dashboard/usuarios" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.usuarios" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Usuarios
-        </a>
-
-        <a routerLink="/dashboard/ajustes" routerLinkActive="bg-blue-600 text-white"
-           class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-all text-sm font-medium">
-          <lucide-icon [img]="icons.ajustes" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-          Ajustes
-        </a>
-      </ng-container>
+    <nav class="flex-1 px-3 py-4 overflow-y-auto">
+      @for (seccion of secciones; track seccion.titulo; let primera = $first) {
+        @if (!primera) { <div class="border-t border-gray-800 my-3"></div> }
+        <p class="text-gray-500 text-[11px] font-semibold uppercase tracking-widest px-3 pb-2">{{ seccion.titulo }}</p>
+        <div class="space-y-1">
+          @for (item of seccion.enlaces; track item.ruta) {
+            @if (!item.modulo || tiene(item.modulo)) {
+              <a [routerLink]="'/dashboard/' + item.ruta" routerLinkActive="bg-blue-600 text-white!"
+                 class="flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-sm font-medium">
+                <lucide-icon [img]="item.icono" class="w-5 h-5 flex-shrink-0"></lucide-icon>
+                {{ item.texto }}
+              </a>
+            }
+          }
+        </div>
+      }
     </nav>
 
-    <!-- Footer del sidebar -->
-    <div class="px-3 py-4 border-t border-gray-800 space-y-3">
-      <!-- Info usuario -->
-      <div class="flex items-center gap-3 px-3">
+    <!-- Usuario y sesión -->
+    <div class="px-3 py-4 border-t border-gray-800 space-y-2">
+      <div class="flex items-center gap-3 px-3 pb-1">
         <div class="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
           {{ usuario?.nombre_completo?.charAt(0)?.toUpperCase() }}
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-semibold text-gray-200 truncate">{{ usuario?.nombre_completo }}</p>
-          <div class="flex items-center gap-1">
-            <lucide-icon [img]="icons.sucursal" class="w-3 h-3 text-blue-400"></lucide-icon>
-            <p class="text-xs text-blue-400 truncate">{{ nombreSucursal }}</p>
-          </div>
+          <p class="flex items-center gap-1 text-xs text-blue-400 truncate">
+            <lucide-icon [img]="icons.sucursal" class="w-3 h-3 flex-shrink-0"></lucide-icon> {{ nombreSucursal }}
+          </p>
         </div>
       </div>
 
-      <!-- Recargar permisos (solo cajeros) -->
-      <button *ngIf="esCajero"
-              (click)="recargarPermisos()"
-              [disabled]="recargandoPermisos"
-              title="Recargar tus permisos sin cerrar sesión"
-              class="w-full flex items-center gap-3 px-3 py-2.5 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200 disabled:opacity-50 rounded-lg transition-all text-sm font-medium">
-        <lucide-icon [img]="icons.refresh"
-                     class="w-5 h-5 flex-shrink-0"
-                     [class.animate-spin]="recargandoPermisos"></lucide-icon>
-        {{ recargandoPermisos ? 'Actualizando…' : 'Recargar permisos' }}
-      </button>
+      @if (esCajero) {
+        <button (click)="recargarPermisos()" [disabled]="recargandoPermisos" title="Recargar tus permisos sin cerrar sesión"
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200 disabled:opacity-50 rounded-lg transition-colors text-sm font-medium">
+          <lucide-icon [img]="icons.refresh" class="w-5 h-5 flex-shrink-0" [class.animate-spin]="recargandoPermisos"></lucide-icon>
+          {{ recargandoPermisos ? 'Actualizando…' : 'Recargar permisos' }}
+        </button>
+      }
 
-      <!-- Cerrar sesión -->
       <button (click)="cerrarSesion()"
-              class="w-full flex items-center gap-3 px-3 py-2.5 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-all text-sm font-medium">
+              class="w-full flex items-center gap-3 px-3 py-2.5 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors text-sm font-medium">
         <lucide-icon [img]="icons.logout" class="w-5 h-5 flex-shrink-0"></lucide-icon>
-        Cerrar Sesión
+        Cerrar sesión
       </button>
     </div>
   </aside>
 
-  <!-- Toast de permisos -->
-  <div *ngIf="toastPermisos"
-       class="fixed top-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium animate-bounce">
-    {{ toastPermisos }}
-  </div>
+  @if (toastPermisos) {
+    <div class="fixed top-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-lg shadow-2xl text-sm font-medium">{{ toastPermisos }}</div>
+  }
 
   <!-- Pedidos del menú QR: visibles en cualquier pantalla del cajero -->
-  <app-bandeja-pedidos *ngIf="esCajero && tiene('mesas')"></app-bandeja-pedidos>
+  @if (esCajero && tiene('mesas')) { <app-bandeja-pedidos /> }
 
   <!-- ═══ CONTENIDO PRINCIPAL ═══ -->
-  <div class="flex-1 flex flex-col overflow-hidden">
-    <main class="flex-1 overflow-y-auto bg-gray-50 p-8">
+  <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
+
+    <!-- Barra superior (celular y tablet) -->
+    <header class="lg:hidden flex items-center gap-3 h-14 px-3 bg-gray-900 text-white flex-shrink-0">
+      <button class="p-2 rounded-md hover:bg-gray-800" (click)="menuAbierto = true" aria-label="Abrir menú" [attr.aria-expanded]="menuAbierto">
+        <lucide-icon [img]="icons.menu" class="w-5 h-5"></lucide-icon>
+      </button>
+      @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="w-8 h-8 object-contain rounded-md bg-white/10 p-0.5"> }
+      <span class="font-semibold text-[15px] truncate">{{ ajustes.nombre() }}</span>
+    </header>
+
+    <main class="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
       <router-outlet></router-outlet>
     </main>
   </div>

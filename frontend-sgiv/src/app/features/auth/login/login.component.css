@@ -13,7 +13,9 @@
   .marca {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
     padding: 40px 48px;
   }
 }
@@ -32,11 +34,11 @@
 
 .captcha {
   flex: 1;
-  height: 48px;
+  height: 64px;
   border: 1px solid var(--i-linea);
   border-radius: 7px;
   background: #fff;
   overflow: hidden;
   display: flex;
 }
-.captcha img { width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; }
+.captcha img { width: 100%; height: 100%; object-fit: contain; background: #eff6ff; user-select: none; pointer-events: none; }

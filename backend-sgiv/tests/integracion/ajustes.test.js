@@ -73,6 +73,15 @@ test('el administrador guarda los datos de la empresa (vacío = NULL)', async ()
     assert.equal(r.body.configuracion.ciudad, 'La Paz');   // lo no enviado no cambia
 });
 
+test('texto del inicio de sesión: se ve sin sesión y vacío vuelve al nombre comercial', async () => {
+    let r = await api('PUT', '/ajustes/empresa', { token: tokenAdmin, body: { login_titulo: ' Bienvenidos ' } });
+    assert.equal(r.status, 200);
+    assert.equal((await api('GET', '/ajustes/publico')).body.login_titulo, 'Bienvenidos');
+    assert.equal((await api('PUT', '/ajustes/empresa', { token: tokenAdmin, body: { login_titulo: 'x'.repeat(101) } })).status, 400);
+    r = await api('PUT', '/ajustes/empresa', { token: tokenAdmin, body: { login_titulo: '' } });
+    assert.equal(r.body.configuracion.login_titulo, null);
+});
+
 test('datos de empresa inválidos se rechazan sin guardar nada', async () => {
     const casos = [
         { nombre_comercial: '   ' },

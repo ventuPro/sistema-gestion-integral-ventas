@@ -20,12 +20,13 @@ const REGLAS_EMPRESA = {
     pais:             { max: 60 },
     facebook:         { max: 150, patron: URL_WEB, mensaje: 'El enlace de Facebook debe empezar con https://' },
     instagram:        { max: 150, patron: URL_WEB, mensaje: 'El enlace de Instagram debe empezar con https://' },
-    tiktok:           { max: 150, patron: URL_WEB, mensaje: 'El enlace de TikTok debe empezar con https://' }
+    tiktok:           { max: 150, patron: URL_WEB, mensaje: 'El enlace de TikTok debe empezar con https://' },
+    login_titulo:     { max: 100 }
 };
 
 const ETIQUETAS = {
     nombre_comercial: 'nombre comercial', razon_social: 'razón social', sitio_web: 'sitio web',
-    direccion: 'dirección', pais: 'país'
+    direccion: 'dirección', pais: 'país', login_titulo: 'texto del inicio de sesión'
 };
 
 const COLOR = /^#[0-9a-f]{6}$/i;

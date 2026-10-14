@@ -4,7 +4,8 @@ const db = require('../config/db');
 // La tabla la crea config/migraciones.js. Los valores por defecto son los del
 // sistema original; colores en NULL = colores originales.
 const CAMPOS_EMPRESA = ['nombre_comercial', 'razon_social', 'nit', 'rubro', 'eslogan', 'telefono', 'whatsapp',
-                        'correo', 'sitio_web', 'direccion', 'ciudad', 'pais', 'facebook', 'instagram', 'tiktok'];
+                        'correo', 'sitio_web', 'direccion', 'ciudad', 'pais', 'facebook', 'instagram', 'tiktok',
+                        'login_titulo'];
 const CAMPOS_APARIENCIA = ['url_logo', 'url_favicon', 'color_primario', 'color_secundario', 'tema'];
 const CAMPOS_PARAMETROS = ['moneda_simbolo', 'pago_efectivo', 'pago_qr', 'url_qr_cobro', 'ticket_mensaje_pie', 'ticket_ancho',
                            'menu_activo', 'menu_mensaje_bienvenida', 'menu_minutos_expiracion',

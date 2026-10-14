@@ -2,17 +2,8 @@
 
   <!-- Marca (solo en pantallas grandes) -->
   <aside class="marca bg-gradient-to-br from-blue-600 to-indigo-600">
-    <div class="flex items-center gap-3">
-      @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="h-11 w-11 object-contain rounded-lg bg-white/15 p-1"> }
-      <span class="text-white font-semibold text-[15px]">{{ ajustes.nombre() }}</span>
-    </div>
-    <div>
-      <p class="text-white text-3xl font-semibold leading-tight tracking-tight max-w-sm">
-        {{ ajustes.config().eslogan || 'Ventas, mesas e inventario en un solo lugar.' }}
-      </p>
-      <p class="text-white/70 text-sm mt-3">Sistema de Gestión Integral de Ventas e Inventario</p>
-    </div>
-    <p class="text-white/50 text-xs">{{ anio }} · {{ ajustes.nombre() }}</p>
+    @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="h-28 w-28 object-contain rounded-2xl bg-white/15 p-2"> }
+    <p class="text-white text-4xl font-semibold leading-tight tracking-tight text-center">{{ titulo }}</p>
   </aside>
 
   <!-- Formulario -->
@@ -21,7 +12,7 @@
 
       <div class="lg:hidden flex flex-col items-center text-center mb-8">
         @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="h-16 w-16 object-contain mb-3"> }
-        <p class="inf-tinta font-semibold text-lg">{{ ajustes.nombre() }}</p>
+        <p class="inf-tinta font-semibold text-lg">{{ titulo }}</p>
       </div>
 
       <h1 class="inf-titulo">Iniciar sesión</h1>
@@ -59,12 +50,12 @@
                   <span class="inf-esqueleto w-full h-full"></span>
                 }
               </div>
-              <button type="button" class="inf-boton h-12" (click)="cargarCaptcha()" [disabled]="cargandoCaptcha"
+              <button type="button" class="inf-boton h-16" (click)="cargarCaptcha()" [disabled]="cargandoCaptcha"
                       title="Mostrar otra imagen" aria-label="Mostrar otra imagen">
                 <lucide-icon [img]="icons.refrescar" class="w-4 h-4"></lucide-icon>
               </button>
             </div>
-            <input class="campo tracking-[0.3em] uppercase" type="text" id="captcha" name="captcha" [(ngModel)]="captchaTexto" maxlength="5"
+            <input class="campo tracking-[0.25em]" type="text" id="captcha" name="captcha" [(ngModel)]="captchaTexto" maxlength="5"
                    autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
           </div>
         }

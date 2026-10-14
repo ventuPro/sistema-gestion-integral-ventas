@@ -84,6 +84,9 @@ const MIGRACIONES = [
     `ALTER TABLE configuracion
         ADD COLUMN IF NOT EXISTS ticket_ancho VARCHAR(3) NOT NULL DEFAULT '80' CHECK (ticket_ancho IN ('58', '80', 'A4'));`,
 
+    // Texto grande de la pantalla de inicio de sesión (NULL = nombre comercial)
+    `ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS login_titulo VARCHAR(100);`,
+
     // Índices de las consultas frecuentes (panel, informes, arqueo, cuentas)
     `CREATE INDEX IF NOT EXISTS idx_venta_caja_sucursal_fecha ON venta_caja (id_sucursal, fecha_venta);
     CREATE INDEX IF NOT EXISTS idx_venta_caja_turno          ON venta_caja (id_turno);

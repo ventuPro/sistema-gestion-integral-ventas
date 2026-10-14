@@ -1,23 +1,26 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
-import { Router, RouterOutlet, RouterModule } from '@angular/router';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, HostListener } from '@angular/core';
+import { Router, RouterOutlet, RouterModule, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
-         Landmark, LogOut, ChevronRight, Building2, RefreshCw,
-         Settings } from 'lucide-angular';
+         Landmark, LogOut, Building2, RefreshCw,
+         Settings, Menu, X } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { BandejaPedidosComponent } from '../bandeja-pedidos/bandeja-pedidos.component';
-import { Subscription }   from 'rxjs';
+import { Subscription, filter } from 'rxjs';
+
+interface Enlace { ruta: string; texto: string; icono: any; modulo?: string }
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [RouterOutlet, RouterModule, CommonModule, LucideAngularModule, BandejaPedidosComponent],
-  templateUrl: './dashboard.component.html'
+  templateUrl: './dashboard.component.html',
+  styleUrl: './dashboard.component.css'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   private router         = inject(Router);
@@ -38,6 +41,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   toastPermisos: string | null = null;
 
   private subPermisos?: Subscription;
+  private subRuta?: Subscription;
+
+  /** Menú lateral abierto (solo en celular y tablet) */
+  menuAbierto = false;
+  secciones: { titulo: string; enlaces: Enlace[] }[] = [];
 
   // Iconos
   readonly icons = {
@@ -50,7 +58,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     usuarios:   Users,
     cierres:    Landmark,
     logout:     LogOut,
-    chevron:    ChevronRight,
+    menu:       Menu,
+    cerrar:     X,
     sucursal:   Building2,
     refresh:    RefreshCw,
     ajustes:    Settings
@@ -64,6 +73,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.esCajero      = this.usuario.id_rol === 2;
       this.nombreSucursal = this.usuario.nombre_sucursal || '';
     }
+    this.secciones = this.armarMenu();
+
+    // En celular el menú se cierra al cambiar de pantalla
+    this.subRuta = this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => this.cerrarMenu());
 
     // Inicializar cache con lo que haya en localStorage
     try {
@@ -78,7 +91,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.permisosActuales = p;
       this.cdr.detectChanges();
       if (previo !== nuevo && !this.esAdmin) {
-        this.mostrarToast('🔄 Tus permisos fueron actualizados por el administrador.');
+        this.mostrarToast('Tus permisos fueron actualizados por el administrador.');
       }
     });
 
@@ -90,8 +103,47 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.subPermisos?.unsubscribe();
+    this.subRuta?.unsubscribe();
     this.permisoService.detenerPoll();
   }
+
+  // ─── Menú ───
+  private armarMenu(): { titulo: string; enlaces: Enlace[] }[] {
+    const i = this.icons;
+    if (this.esAdmin) return [
+      { titulo: 'Administración', enlaces: [
+        { ruta: 'resumen',      texto: 'Panel principal', icono: i.dashboard },
+        { ruta: 'inventario',   texto: 'Inventario',      icono: i.inventario },
+        { ruta: 'reportes',     texto: 'Reportes',        icono: i.reportes },
+        { ruta: 'cierres-caja', texto: 'Cierres de caja', icono: i.cierres }
+      ]},
+      { titulo: 'Sistema', enlaces: [
+        { ruta: 'usuarios', texto: 'Usuarios', icono: i.usuarios },
+        { ruta: 'ajustes',  texto: 'Ajustes',  icono: i.ajustes }
+      ]}
+    ];
+    if (this.esCajero) return [
+      { titulo: 'Operaciones', enlaces: [
+        { ruta: 'resumen',     texto: 'Panel principal', icono: i.dashboard,  modulo: 'dashboard' },
+        { ruta: 'punto-venta', texto: 'Punto de venta',  icono: i.pos,        modulo: 'punto_venta' },
+        { ruta: 'mesas',       texto: 'Mesas',           icono: i.mesas,      modulo: 'mesas' },
+        { ruta: 'arqueo',      texto: 'Arqueo de caja',  icono: i.arqueo,     modulo: 'arqueo' },
+        { ruta: 'inventario',  texto: 'Inventario',      icono: i.inventario, modulo: 'inventario' },
+        { ruta: 'reportes',    texto: 'Reportes',        icono: i.reportes,   modulo: 'reportes' },
+        { ruta: 'usuarios',    texto: 'Usuarios',        icono: i.usuarios,   modulo: 'usuarios' }
+      ]}
+    ];
+    return [];
+  }
+
+  cerrarMenu() {
+    if (!this.menuAbierto) return;
+    this.menuAbierto = false;
+    this.cdr.detectChanges();
+  }
+
+  @HostListener('document:keydown.escape')
+  alPresionarEscape() { this.cerrarMenu(); }
 
   tiene(modulo: string): boolean {
     if (this.esAdmin) return true;
@@ -109,7 +161,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.permisoService.recargarPermisos().subscribe({
       next: () => {
         this.recargandoPermisos = false;
-        this.mostrarToast('✓ Permisos actualizados.');
+        this.mostrarToast('Permisos actualizados.');
         this.cdr.detectChanges();
       },
       error: () => {

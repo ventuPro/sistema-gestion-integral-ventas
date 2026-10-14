@@ -23,6 +23,7 @@ export interface Configuracion {
   nit: string | null;
   rubro: string | null;
   eslogan: string | null;
+  login_titulo: string | null;
   telefono: string | null;
   whatsapp: string | null;
   correo: string | null;
@@ -62,7 +63,7 @@ export interface Configuracion {
 // Mismos valores por defecto que la tabla configuracion
 export const CONFIG_ORIGINAL: Configuracion = {
   nombre_comercial: "Pastelería Ricky's", razon_social: null, nit: null, rubro: 'Pastelería',
-  eslogan: null, telefono: null, whatsapp: null, correo: null, sitio_web: null, direccion: null,
+  eslogan: null, login_titulo: null, telefono: null, whatsapp: null, correo: null, sitio_web: null, direccion: null,
   ciudad: 'La Paz', pais: 'Bolivia', facebook: null, instagram: null, tiktok: null,
   url_logo: null, url_favicon: null, color_primario: null, color_secundario: null, tema: 'claro',
   moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, url_qr_cobro: null,

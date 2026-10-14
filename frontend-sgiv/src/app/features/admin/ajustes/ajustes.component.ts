@@ -16,7 +16,8 @@ type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'param
 interface CampoEmpresa { clave: string; etiqueta: string; ejemplo: string; max: number; tipo?: string; ancho?: boolean }
 
 const CAMPOS_EMPRESA = ['nombre_comercial', 'razon_social', 'nit', 'rubro', 'eslogan', 'telefono', 'whatsapp',
-                        'correo', 'sitio_web', 'direccion', 'ciudad', 'pais', 'facebook', 'instagram', 'tiktok'] as const;
+                        'correo', 'sitio_web', 'direccion', 'ciudad', 'pais', 'facebook', 'instagram', 'tiktok',
+                        'login_titulo'] as const;
 
 const IMAGENES = {
   logo:    { tipos: ['image/png', 'image/jpeg', 'image/webp'], maxKb: 2048 },
@@ -70,6 +71,9 @@ export class AjustesComponent implements OnInit, OnDestroy {
       { clave: 'nombre_comercial', etiqueta: 'Nombre comercial *', ejemplo: "Pastelería Ricky's", max: 100 },
       { clave: 'rubro',            etiqueta: 'Rubro',               ejemplo: 'Pastelería, cafetería, panadería…', max: 60 },
       { clave: 'eslogan',          etiqueta: 'Eslogan',             ejemplo: 'El sabor de siempre', max: 150, ancho: true }
+    ]},
+    { titulo: 'Inicio de sesión', detalle: 'Texto grande junto al formulario de ingreso. Si lo dejas vacío, se muestra el nombre comercial.', campos: [
+      { clave: 'login_titulo', etiqueta: 'Texto del inicio de sesión', ejemplo: "Pastelería Ricky's", max: 100, ancho: true }
     ]},
     { titulo: 'Datos legales', detalle: 'Se imprimen en los comprobantes.', campos: [
       { clave: 'razon_social', etiqueta: 'Razón social', ejemplo: 'Ricky’s S.R.L.', max: 150 },

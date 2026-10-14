@@ -269,6 +269,7 @@ CREATE TABLE configuracion (
     nit                 VARCHAR(20),
     rubro               VARCHAR(60) DEFAULT 'Pastelería',
     eslogan             VARCHAR(150),
+    login_titulo        VARCHAR(100),
     telefono            VARCHAR(20),
     whatsapp            VARCHAR(20),
     correo              VARCHAR(100),

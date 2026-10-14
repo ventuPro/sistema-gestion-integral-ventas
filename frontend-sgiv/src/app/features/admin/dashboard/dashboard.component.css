@@ -1,0 +1,32 @@
+/* ─── Barra lateral: fija en escritorio, menú deslizable en celular ─── */
+.lateral {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 50;
+  width: 264px;
+  max-width: 85vw;
+  transform: translateX(-100%);
+  transition: transform 200ms ease;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
+}
+.lateral.abierta { transform: none; }
+
+.fondo-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(15, 23, 42, 0.55);
+  animation: aparecer 150ms ease;
+}
+@keyframes aparecer { from { opacity: 0; } }
+
+@media (min-width: 1024px) {
+  .lateral {
+    position: static;
+    width: 256px;
+    flex-shrink: 0;
+    transform: none;
+    transition: none;
+    box-shadow: none;
+  }
+}
