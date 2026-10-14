@@ -10,16 +10,19 @@ import { Subscription } from 'rxjs';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { TicketComponent } from '../../shared/ticket/ticket.component';
 import { LucideAngularModule,
-         ShieldAlert, Landmark, RefreshCw, Check, Inbox, Search, X } from 'lucide-angular';
+         ShieldAlert, Landmark, RefreshCw, Check, Search, X, ReceiptText, Trash2,
+         ShoppingCart, Banknote, QrCode, Printer } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../core/services/impresion.service';
 import { sondeo } from '../../../core/utils/sondeo';
+import { cifra, fechaLarga } from '../../../core/utils/informe';
 
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent],
-  templateUrl: './punto-venta.component.html'
+  templateUrl: './punto-venta.component.html',
+  styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './punto-venta.component.css']
 })
 export class PuntoVentaComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
@@ -39,10 +42,18 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     landmark:    Landmark,
     refresh:     RefreshCw,
     check:       Check,
-    empty:       Inbox,
     search:      Search,
-    close:       X
+    close:       X,
+    historial:   ReceiptText,
+    quitar:      Trash2,
+    carrito:     ShoppingCart,
+    efectivo:    Banknote,
+    qr:          QrCode,
+    imprimir:    Printer
   };
+
+  readonly cifra    = cifra;
+  readonly hoyTexto = fechaLarga(new Date());
 
   // ─── Estado de acceso (fuente: backend) ───
   verificandoCaja = true;
@@ -78,6 +89,10 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   // ─── Carrito ───
   carrito: any[] = [];
 
+  get unidades(): number {
+    return this.carrito.reduce((s, i) => s + Number(i.cantidad), 0);
+  }
+
   get total(): number {
     return this.carrito.reduce(
       (s, i) => s + (Number(i.precio_unitario) * Number(i.cantidad) || 0),
@@ -108,6 +123,12 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   get totalVentasHoy(): number {
     return this.ventasHoy.reduce((s, v) => s + Number(v.monto_total_venta), 0);
+  }
+
+  get metodosHoy(): { metodo: string; total: number }[] {
+    const totales = new Map<string, number>();
+    for (const v of this.ventasHoy) totales.set(v.metodo_pago, (totales.get(v.metodo_pago) || 0) + v.monto_total_venta);
+    return [...totales].map(([metodo, total]) => ({ metodo, total }));
   }
 
   private headers(): HttpHeaders {

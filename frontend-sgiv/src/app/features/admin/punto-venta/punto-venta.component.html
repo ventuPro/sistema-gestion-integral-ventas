@@ -1,385 +1,349 @@
-<!-- ═══ VERIFICANDO ═══ -->
-<div *ngIf="verificandoCaja" class="flex justify-center items-center h-64">
-  <div class="flex flex-col items-center gap-3">
-    <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    <p class="text-gray-400 text-sm">Verificando estado de caja...</p>
-  </div>
-</div>
-
-<div *ngIf="!verificandoCaja && estadoCaja === 'CERRADA'"
-     class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl shadow-sm border border-red-200">
-  <div class="w-24 h-24 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center mb-6">
-    <lucide-icon [img]="icons.shieldAlert" class="w-12 h-12 text-red-500"></lucide-icon>
-  </div>
-  <h2 class="text-3xl font-black text-red-600 mb-3">Caja CERRADA</h2>
-  <p class="text-gray-600 mb-2 max-w-md">
-    Tu caja ya fue cerrada hoy. No puedes registrar más ventas hasta que el administrador la reabra.
-  </p>
-  <div *ngIf="turnoActivo" class="mt-4 bg-gray-50 rounded-xl p-4 text-left text-sm">
-    <p class="text-gray-500">
-      Turno #{{ turnoActivo.id_turno }} — Abierto: {{ turnoActivo.fecha_hora_apertura | date:'dd/MM HH:mm' }}<br>
-      Cerrado: {{ turnoActivo.fecha_hora_cierre | date:'dd/MM HH:mm' }}
-    </p>
-  </div>
-  <p class="text-gray-400 text-sm mt-4">
-    Solicita al <span class="font-bold text-blue-600">Administrador</span> que reabra tu caja.
-  </p>
-  <button (click)="verificarAccesoCaja()"
-          class="mt-6 px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 inline-flex items-center gap-2">
-    <lucide-icon [img]="icons.refresh" class="w-4 h-4"></lucide-icon>
-    Verificar de nuevo
-  </button>
-</div>
-
-<div *ngIf="!verificandoCaja && estadoCaja === 'SIN_APERTURA' && mostrarAbrirTurno"
-     class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl shadow-sm border border-gray-100">
-  <div class="w-24 h-24 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center mb-5">
-    <lucide-icon [img]="icons.landmark" class="w-12 h-12 text-blue-600"></lucide-icon>
-  </div>
-  <h2 class="text-2xl font-black text-gray-800 mb-2">Abrir Caja del Día</h2>
-  <p class="text-gray-500 mb-6 text-sm">
-    Es tu primera operación de hoy. Ingresa el monto inicial en caja para comenzar a vender.<br>
-    <span class="text-amber-600 font-medium">No necesitas autorización del administrador.</span>
-  </p>
-  <div class="w-full max-w-xs space-y-4">
-    <div *ngIf="errorTurno" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-      {{ errorTurno }}
+@if (verificandoCaja) {
+  <div class="space-y-5">
+    <div class="inf-esqueleto h-12 w-64"></div>
+    <div class="grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-5">
+      <div class="inf-esqueleto h-96"></div>
+      <div class="inf-esqueleto h-96"></div>
     </div>
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Monto inicial ({{ moneda() }})</label>
-      <input type="number" [(ngModel)]="montoInicial" min="0"
-             class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-2xl text-center font-black outline-none focus:border-green-500"
-             placeholder="0.00">
-    </div>
-    <button (click)="confirmarAbrirTurno()" [disabled]="abriendoTurno"
-            class="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-black text-lg rounded-2xl transition-colors shadow-md inline-flex items-center justify-center gap-2">
-      <lucide-icon *ngIf="!abriendoTurno" [img]="icons.check" class="w-5 h-5"></lucide-icon>
-      {{ abriendoTurno ? 'Abriendo...' : 'Abrir Caja y Comenzar' }}
-    </button>
   </div>
-</div>
+}
+
+<!-- ═══ CAJA CERRADA ═══ -->
+@if (!verificandoCaja && estadoCaja === 'CERRADA') {
+  <div class="space-y-5">
+    <header>
+      <p class="inf-antetitulo"><span>{{ hoyTexto }}</span><span class="inf-estado mal">Caja cerrada</span></p>
+      <h1 class="inf-titulo">Punto de venta</h1>
+    </header>
+    <section class="inf-hoja max-w-lg p-6">
+      <div class="flex items-start gap-4">
+        <lucide-icon [img]="icons.shieldAlert" class="w-6 h-6 inf-baja flex-shrink-0 mt-0.5"></lucide-icon>
+        <div>
+          <h2 class="inf-tinta font-semibold text-[15px]">Tu caja ya fue cerrada hoy</h2>
+          <p class="inf-tenue text-sm mt-1">No puedes registrar ventas hasta que el administrador la reabra.</p>
+        </div>
+      </div>
+      @if (turnoActivo) {
+        <dl class="inf-pares mt-5 pt-4 separador">
+          <div><dt>Turno</dt><dd>#{{ turnoActivo.id_turno }}</dd></div>
+          <div><dt>Apertura</dt><dd>{{ turnoActivo.fecha_hora_apertura | date:'dd/MM HH:mm' }}</dd></div>
+          <div><dt>Cierre</dt><dd>{{ turnoActivo.fecha_hora_cierre | date:'dd/MM HH:mm' }}</dd></div>
+        </dl>
+      }
+      <button class="inf-boton mt-5" (click)="verificarAccesoCaja()">
+        <lucide-icon [img]="icons.refresh" class="w-3.5 h-3.5"></lucide-icon> Verificar de nuevo
+      </button>
+    </section>
+  </div>
+}
+
+<!-- ═══ APERTURA DEL DÍA ═══ -->
+@if (!verificandoCaja && estadoCaja === 'SIN_APERTURA' && mostrarAbrirTurno) {
+  <div class="space-y-5">
+    <header>
+      <p class="inf-antetitulo"><span>{{ hoyTexto }}</span><span class="inf-estado neutro">Sin abrir</span></p>
+      <h1 class="inf-titulo">Punto de venta</h1>
+    </header>
+    <section class="inf-hoja max-w-lg">
+      <div class="p-6">
+        <div class="flex items-start gap-4">
+          <lucide-icon [img]="icons.landmark" class="w-6 h-6 flex-shrink-0 mt-0.5" style="color: var(--i-acento)"></lucide-icon>
+          <div>
+            <h2 class="inf-tinta font-semibold text-[15px]">Abrir la caja del día</h2>
+            <p class="inf-tenue text-sm mt-1">Es tu primera operación de hoy. Cuenta el efectivo con el que empiezas; no necesitas autorización del administrador.</p>
+          </div>
+        </div>
+        <label class="inf-etiqueta block mt-6 mb-2">Fondo inicial</label>
+        <div class="campo-monto">
+          <span>{{ moneda() }}</span>
+          <input type="number" min="0" step="0.01" [(ngModel)]="montoInicial" placeholder="0.00"
+                 (keyup.enter)="confirmarAbrirTurno()">
+        </div>
+        @if (errorTurno) { <p class="text-sm inf-baja mt-3">{{ errorTurno }}</p> }
+      </div>
+      <div class="inf-pie-hoja flex justify-end">
+        <button class="boton-primario" (click)="confirmarAbrirTurno()" [disabled]="abriendoTurno">
+          @if (!abriendoTurno) { <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> }
+          {{ abriendoTurno ? 'Abriendo…' : 'Abrir caja y comenzar' }}
+        </button>
+      </div>
+    </section>
+  </div>
+}
 
 <!-- ═══ POS ACTIVO ═══ -->
-<ng-container *ngIf="!verificandoCaja && estadoCaja === 'ABIERTA'">
+@if (!verificandoCaja && estadoCaja === 'ABIERTA') {
+  <div class="pos flex flex-col gap-5">
 
-  <!-- Layout principal con alto fijo -->
-  <div class="flex flex-col md:flex-row gap-4 h-full">
-
-    <!-- Catálogo -->
-    <div class="w-full md:w-3/5 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative">
-
-      <!-- Cabecera fija -->
-      <div class="p-5 pb-3 border-b border-gray-100 flex-shrink-0">
-        <div class="flex items-center justify-between mb-3 gap-3 flex-wrap">
-          <div class="flex items-center gap-3">
-            <h2 class="text-xl font-bold text-gray-800">Catálogo</h2>
-
-            <!-- Botón Historial -->
-            <button (click)="toggleHistorial()"
-                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors"
-                    [class.bg-blue-600]="mostrarHistorial"
-                    [class.text-white]="mostrarHistorial"
-                    [class.border-blue-600]="mostrarHistorial"
-                    [class.bg-gray-50]="!mostrarHistorial"
-                    [class.text-gray-600]="!mostrarHistorial"
-                    [class.border-gray-200]="!mostrarHistorial">
-              <span>Historial del día</span>
-              <span class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold"
-                    [class.bg-white]="mostrarHistorial"
-                    [class.text-blue-600]="mostrarHistorial"
-                    [class.bg-blue-100]="!mostrarHistorial"
-                    [class.text-blue-700]="!mostrarHistorial">
-                {{ ventasHoy.length }}
-              </span>
-              <span class="text-[10px] opacity-80">{{ mostrarHistorial ? '▲' : '▼' }}</span>
-            </button>
-          </div>
-
-          <span class="inline-flex items-center gap-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">
-            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            CAJA ABIERTA
-            <span *ngIf="turnoActivo" class="font-normal opacity-80">· Turno #{{ turnoActivo.id_turno }}</span>
-          </span>
-        </div>
-
-        <div class="relative">
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            <lucide-icon [img]="icons.search" class="w-4 h-4"></lucide-icon>
-          </span>
-          <input type="text" [(ngModel)]="busqueda"
-                 placeholder="Buscar producto por nombre o categoría..."
-                 class="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all">
-          <button *ngIf="busqueda"
-                  (click)="busqueda = ''"
-                  title="Limpiar"
-                  class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
-            <lucide-icon [img]="icons.close" class="w-3.5 h-3.5"></lucide-icon>
-          </button>
-        </div>
-
-        <div class="flex gap-1.5 overflow-x-auto pb-1 mt-3">
-          <button (click)="categoriaFiltro = null"
-                  class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
-                  [class.bg-green-600]="!categoriaFiltro" [class.text-white]="!categoriaFiltro"
-                  [class.bg-gray-100]="!!categoriaFiltro" [class.text-gray-600]="!!categoriaFiltro">
-            Todos
-          </button>
-          <button *ngFor="let cat of categorias" (click)="categoriaFiltro = cat.id"
-                  class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
-                  [class.bg-green-600]="categoriaFiltro === cat.id" [class.text-white]="categoriaFiltro === cat.id"
-                  [class.bg-gray-100]="categoriaFiltro !== cat.id" [class.text-gray-600]="categoriaFiltro !== cat.id">
-            {{ cat.nombre }}
-          </button>
-        </div>
+    <header class="flex flex-wrap items-end justify-between gap-4 flex-shrink-0">
+      <div>
+        <p class="inf-antetitulo">
+          <span>{{ hoyTexto }}</span>
+          <span class="inf-vivo">Caja abierta</span>
+          @if (turnoActivo) { <span>Turno #{{ turnoActivo.id_turno }}</span> }
+        </p>
+        <h1 class="inf-titulo">Punto de venta</h1>
       </div>
+      <button class="inf-boton" [class.activo]="mostrarHistorial" (click)="toggleHistorial()">
+        <lucide-icon [img]="icons.historial" class="w-3.5 h-3.5"></lucide-icon>
+        Ventas de hoy
+        <span class="inf-ficha">{{ ventasHoy.length }}</span>
+      </button>
+    </header>
 
-      <!-- Zona scrolleable de productos -->
-      <div class="flex-1 overflow-y-auto p-5 pt-3">
-        <div *ngIf="cargando" class="text-center py-10 text-gray-400 text-sm">Cargando productos...</div>
-        <div *ngIf="!cargando && productosDisponibles.length === 0"
-             class="text-center py-10 text-gray-400 text-sm">Sin productos con stock.</div>
-        <div *ngIf="!cargando && productosDisponibles.length > 0 && productosFiltrados.length === 0"
-             class="text-center py-10 text-gray-400 text-sm">
-          Sin resultados para "<strong>{{ busqueda }}</strong>".
+    <div class="flex-1 min-h-0 grid lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)] gap-5">
+
+      <!-- Catálogo -->
+      <section class="inf-hoja relative flex flex-col min-h-0 overflow-hidden">
+        <div class="p-4 pb-3 separador-inferior flex-shrink-0 space-y-3">
+          <div class="buscador">
+            <lucide-icon [img]="icons.search" class="w-4 h-4 inf-tenue"></lucide-icon>
+            <input type="text" [(ngModel)]="busqueda" placeholder="Buscar producto o categoría">
+            @if (busqueda) {
+              <button class="quitar" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+                <lucide-icon [img]="icons.close" class="w-3.5 h-3.5"></lucide-icon>
+              </button>
+            }
+          </div>
+          <nav class="inf-pestanas">
+            <button [class.activa]="!categoriaFiltro" (click)="categoriaFiltro = null">Todos</button>
+            @for (cat of categorias; track cat.id) {
+              <button [class.activa]="categoriaFiltro === cat.id" (click)="categoriaFiltro = cat.id">{{ cat.nombre }}</button>
+            }
+          </nav>
         </div>
 
-        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          <button *ngFor="let prod of productosFiltrados"
-                  (click)="agregarAlCarrito(prod)"
-                  [disabled]="prod.stock_actual <= 0"
-                  class="flex flex-col items-center p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all active:scale-95">
-            <div class="w-full aspect-square rounded-lg overflow-hidden mb-2 bg-blue-100 flex items-center justify-center">
-              <img *ngIf="prod.url_imagen" [src]="prod.url_imagen | imagenUrl" class="w-full h-full object-cover">
-              <span *ngIf="!prod.url_imagen" class="text-3xl font-black text-blue-300">
-                {{ prod.nombre_producto?.charAt(0) }}
-              </span>
+        <div class="flex-1 overflow-y-auto p-4">
+          @if (cargando) {
+            <div class="catalogo">
+              @for (n of [1,2,3,4,5,6]; track n) { <div class="inf-esqueleto h-48"></div> }
             </div>
-            <p class="font-bold text-gray-800 text-lg text-center leading-tight mb-1">{{ prod.nombre_producto }}</p>
-            <p class="text-blue-600 font-black text-xl">{{ moneda() }} {{ prod.precio_unitario }}</p>
-            <span class="text-sm font-semibold mt-1"
-                  [class.text-green-600]="prod.stock_actual > 3"
-                  [class.text-red-500]="prod.stock_actual <= 3">
-              Stock: {{ prod.stock_actual }}
-            </span>
-          </button>
+          } @else if (productosDisponibles.length === 0) {
+            <p class="inf-vacio">No hay productos con stock en esta sucursal.</p>
+          } @else if (productosFiltrados.length === 0) {
+            <p class="inf-vacio">Sin resultados para «{{ busqueda }}».</p>
+          } @else {
+            <div class="catalogo">
+              @for (prod of productosFiltrados; track prod.id_producto) {
+                <button class="producto" (click)="agregarAlCarrito(prod)" [disabled]="prod.stock_actual <= 0">
+                  <div class="foto">
+                    @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
+                    @else { {{ prod.nombre_producto?.charAt(0) }} }
+                  </div>
+                  <div class="datos">
+                    <span class="nombre">{{ prod.nombre_producto }}</span>
+                    <span class="precio">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</span>
+                    <span class="stock" [class.bajo]="prod.stock_actual <= 3">{{ prod.stock_actual }} disponibles</span>
+                  </div>
+                </button>
+              }
+            </div>
+          }
         </div>
-      </div>
 
-      <!-- Panel flotante Historial -->
-      <div *ngIf="mostrarHistorial"
-           class="absolute inset-0 bg-white z-20 flex flex-col rounded-xl">
-        <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <div>
-            <p class="font-bold text-gray-800">Historial de Ventas del Día</p>
-            <p class="text-xs text-gray-400">{{ ventasHoy.length }} transacción(es) · Total {{ moneda() }} {{ totalVentasHoy.toFixed(2) }}</p>
+        <!-- Ventas de hoy (sobre el catálogo) -->
+        @if (mostrarHistorial) {
+          <div class="historial">
+            <div class="flex items-center justify-between px-5 py-4 separador-inferior flex-shrink-0">
+              <div>
+                <h2 class="inf-tinta font-semibold text-[15px]">Ventas de hoy</h2>
+                <p class="inf-sub">{{ ventasHoy.length }} venta(s) · {{ moneda() }} {{ cifra(totalVentasHoy) }}</p>
+              </div>
+              <button class="quitar" (click)="toggleHistorial()" aria-label="Cerrar">
+                <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
+              </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto">
+              @if (cargandoVentas) {
+                <div class="p-5 space-y-3">
+                  <div class="inf-esqueleto h-14"></div><div class="inf-esqueleto h-14"></div><div class="inf-esqueleto h-14"></div>
+                </div>
+              } @else if (ventasHoy.length === 0) {
+                <p class="inf-vacio">Todavía no hay ventas hoy.</p>
+              } @else {
+                <table class="inf-tabla">
+                  <thead>
+                    <tr><th>Venta</th><th>Detalle</th><th>Método</th><th class="num">Total</th></tr>
+                  </thead>
+                  <tbody>
+                    @for (venta of ventasHoy; track venta.id_venta) {
+                      <tr>
+                        <td class="align-top">
+                          <span class="fuerte">#{{ venta.id_venta }}</span>
+                          <span class="inf-secundario">{{ venta.fecha_venta | date:'HH:mm' }}</span>
+                        </td>
+                        <td>
+                          @for (item of venta.items; track $index) {
+                            <span class="block text-[13px]">{{ item.cantidad_vendida }} × {{ item.nombre_producto }}</span>
+                          } @empty {
+                            <span class="inf-sutil">Sin detalle</span>
+                          }
+                        </td>
+                        <td class="align-top"><span class="inf-ficha">{{ venta.metodo_pago }}</span></td>
+                        <td class="num fuerte align-top">{{ moneda() }} {{ cifra(venta.monto_total_venta) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+            </div>
+
+            @if (!cargandoVentas && ventasHoy.length > 0) {
+              <div class="inf-pie-hoja flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+                <span class="flex flex-wrap gap-4">
+                  @for (m of metodosHoy; track m.metodo) {
+                    <span>{{ m.metodo }}: <strong class="inf-tinta">{{ moneda() }} {{ cifra(m.total) }}</strong></span>
+                  }
+                </span>
+                <strong class="inf-tinta text-[13px]">Total {{ moneda() }} {{ cifra(totalVentasHoy) }}</strong>
+              </div>
+            }
           </div>
-          <button (click)="toggleHistorial()"
-                  class="w-8 h-8 inline-flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
-            <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
-          </button>
+        }
+      </section>
+
+      <!-- Carrito -->
+      <section class="inf-hoja flex flex-col min-h-0 overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 separador-inferior flex-shrink-0">
+          <h2 class="inf-tinta font-semibold text-[15px]">Venta actual</h2>
+          @if (carrito.length) {
+            <span class="inf-nota">{{ unidades }} producto(s)</span>
+          }
         </div>
 
         <div class="flex-1 overflow-y-auto">
-          <div *ngIf="cargandoVentas" class="flex justify-center py-8">
-            <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-
-          <div *ngIf="!cargandoVentas && ventasHoy.length === 0"
-               class="text-center py-10 text-gray-400">
-            <div class="w-14 h-14 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center mx-auto mb-3">
-              <lucide-icon [img]="icons.empty" class="w-7 h-7 text-gray-400"></lucide-icon>
-            </div>
-            <p class="text-sm">Sin ventas registradas hoy.</p>
-          </div>
-
-          <div *ngIf="!cargandoVentas && ventasHoy.length > 0" class="divide-y divide-gray-100">
-            <div *ngFor="let venta of ventasHoy" class="hover:bg-gray-50 transition-colors">
-              <div class="flex items-center justify-between px-5 py-3">
-                <div class="flex items-center gap-3">
-                  <span class="font-black text-gray-600 text-sm">#{{ venta.id_venta }}</span>
-                  <span class="text-gray-400 text-xs">{{ venta.fecha_venta | date:'HH:mm' }}</span>
-                  <span class="px-2 py-0.5 rounded-full text-xs font-bold"
-                        [class.bg-green-100]="venta.metodo_pago === 'Efectivo'"
-                        [class.text-green-700]="venta.metodo_pago === 'Efectivo'"
-                        [class.bg-purple-100]="venta.metodo_pago === 'QR'"
-                        [class.text-purple-700]="venta.metodo_pago === 'QR'">
-                    {{ venta.metodo_pago }}
-                  </span>
-                </div>
-                <span class="font-black text-gray-800">{{ moneda() }} {{ (+venta.monto_total_venta).toFixed(2) }}</span>
+          @for (item of carrito; track item.id_producto; let i = $index) {
+            <div class="linea-carrito">
+              <div class="min-w-0">
+                <p class="inf-tinta text-[13.5px] font-medium truncate">{{ item.nombre_producto }}</p>
+                <p class="inf-sub mt-0!">{{ moneda() }} {{ cifra(item.precio_unitario) }} c/u</p>
               </div>
-
-              <div class="px-5 pb-3">
-                <div *ngIf="!venta.items?.length" class="text-xs text-gray-400 italic">Sin detalle</div>
-                <div *ngFor="let item of venta.items"
-                     class="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
-                  <div class="flex items-center gap-2 text-sm">
-                    <span class="bg-gray-100 text-gray-600 text-xs font-bold px-1.5 py-0.5 rounded">
-                      ×{{ item.cantidad_vendida }}
-                    </span>
-                    <span class="text-gray-600">{{ item.nombre_producto }}</span>
-                    <span class="text-gray-400 text-xs">@ {{ moneda() }} {{ (+item.precio_unitario).toFixed(2) }}</span>
-                  </div>
-                  <span class="font-bold text-gray-700 text-sm">
-                    {{ moneda() }} {{ (+item.subtotal_venta).toFixed(2) }}
-                  </span>
-                </div>
+              <span class="cantidad">×{{ item.cantidad }}</span>
+              <div class="flex items-center gap-1">
+                <span class="inf-tinta font-semibold text-[14px] whitespace-nowrap">{{ moneda() }} {{ cifra(item.subtotal) }}</span>
+                <button class="quitar" (click)="quitarDelCarrito(i)" title="Quitar" aria-label="Quitar producto">
+                  <lucide-icon [img]="icons.quitar" class="w-4 h-4"></lucide-icon>
+                </button>
               </div>
             </div>
-          </div>
+          } @empty {
+            <div class="h-full flex flex-col items-center justify-center gap-2 py-12 inf-sutil">
+              <lucide-icon [img]="icons.carrito" class="w-7 h-7"></lucide-icon>
+              <p class="text-[13px]">Toca un producto para agregarlo.</p>
+            </div>
+          }
         </div>
 
-        <div *ngIf="!cargandoVentas && ventasHoy.length > 0"
-             class="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-between items-center flex-shrink-0">
-          <div class="flex gap-4 text-xs">
-            <span class="text-gray-500">
-              Efectivo:
-              <strong class="text-green-600">
-                {{ moneda() }} {{ ventasHoy.filter(v => v.metodo_pago === 'Efectivo').reduce((s,v) => s + (+v.monto_total_venta), 0).toFixed(2) }}
-              </strong>
-            </span>
-            <span class="text-gray-500">
-              QR:
-              <strong class="text-purple-600">
-                {{ moneda() }} {{ ventasHoy.filter(v => v.metodo_pago === 'QR').reduce((s,v) => s + (+v.monto_total_venta), 0).toFixed(2) }}
-              </strong>
-            </span>
+        <div class="p-5 separador flex-shrink-0">
+          <div class="flex items-end justify-between gap-3 mb-4">
+            <span class="inf-etiqueta">Total</span>
+            <span class="inf-valor mt-0! text-[28px]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total) }}</span>
           </div>
-          <div class="font-black text-gray-800 text-sm">
-            TOTAL: {{ moneda() }} {{ totalVentasHoy.toFixed(2) }}
-          </div>
+          <button class="boton-primario w-full py-3!" [disabled]="carrito.length === 0" (click)="abrirModalCobro()">
+            Cobrar
+          </button>
         </div>
-      </div>
+      </section>
     </div>
+  </div>
+}
 
-    <!-- Carrito -->
-    <div class="w-full md:w-2/5 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col overflow-hidden">
-      <div class="bg-gray-800 text-white px-4 py-3 text-center flex-shrink-0">
-        <h2 class="font-bold text-lg">Detalle de Venta</h2>
-        <p *ngIf="turnoActivo" class="text-sm text-gray-400 mt-0.5">
-          Turno #{{ turnoActivo.id_turno }} abierto
-        </p>
+<!-- ═══ COBRO ═══ -->
+@if (mostrarModalCobro) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalCobro()">
+    <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[15px]">Cobrar venta</h3>
+        <button class="quitar" (click)="cerrarModalCobro()" aria-label="Cancelar">
+          <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
+        </button>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50">
-        <div *ngIf="carrito.length === 0" class="text-center text-gray-400 text-base py-10 italic">
-          Toca los productos para agregarlos.
+      <div class="p-5 space-y-5">
+        <div>
+          <p class="inf-etiqueta">Total a cobrar</p>
+          <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total) }}</p>
         </div>
-        <div *ngFor="let item of carrito; let i = index"
-             class="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center shadow-sm">
-          <div class="flex-1 min-w-0">
-            <p class="font-bold text-gray-800 text-base truncate">{{ item.nombre_producto }}</p>
-            <p class="text-gray-500 text-sm font-medium">{{ moneda() }} {{ item.precio_unitario }} × {{ item.cantidad }}</p>
-          </div>
-          <div class="flex items-center gap-2 ml-2">
-            <span class="font-black text-gray-800 text-lg">{{ moneda() }} {{ item.subtotal }}</span>
-            <button (click)="quitarDelCarrito(i)"
-                    title="Quitar producto"
-                    class="p-1 rounded transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-                   class="w-5 h-5 text-gray-400 hover:text-red-500 cursor-pointer transition-colors">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+
+        <div>
+          <p class="inf-etiqueta mb-2">Método de pago</p>
+          <div class="metodos">
+            @if (ajustes.config().pago_efectivo) {
+              <button class="metodo" [class.activo]="metodoPago === 'Efectivo'" (click)="metodoPago = 'Efectivo'">
+                <lucide-icon [img]="icons.efectivo" class="w-4 h-4"></lucide-icon> Efectivo
+              </button>
+            }
+            @if (ajustes.config().pago_qr) {
+              <button class="metodo" [class.activo]="metodoPago === 'QR'" (click)="metodoPago = 'QR'">
+                <lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon> QR
+              </button>
+            }
           </div>
         </div>
+
+        @if (metodoPago === 'Efectivo') {
+          <div>
+            <p class="inf-etiqueta mb-2">Monto recibido <span class="inf-sutil font-normal">· opcional</span></p>
+            <div class="campo-monto">
+              <span>{{ moneda() }}</span>
+              <input #inputMonto type="number" inputmode="decimal" [(ngModel)]="montoPagado"
+                     (focus)="inputMonto.select()" (keyup.enter)="confirmarVenta()">
+            </div>
+            @if (montoPagado > 0) {
+              <dl class="inf-pares mt-3">
+                @if (montoPagado >= total) {
+                  <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio) }}</dd></div>
+                } @else {
+                  <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(total - montoPagado) }}</dd></div>
+                }
+              </dl>
+            }
+          </div>
+        }
+
+        @if (metodoPago === 'QR') {
+          <div class="flex flex-col items-center gap-3 text-center">
+            @if (ajustes.qrCobro()) { <img [src]="ajustes.qrCobro()" alt="QR de cobro" class="qr-cobro"> }
+            <p class="inf-tenue text-[13px]">
+              {{ ajustes.qrCobro() ? 'Muestra este QR al cliente y confirma cuando pague.' : 'Confirma cuando el cliente pague por QR.' }}
+            </p>
+          </div>
+        }
       </div>
 
-      <div class="p-4 bg-white border-t flex-shrink-0">
-        <div class="flex justify-between items-center mb-3">
-          <span class="font-bold text-gray-700 text-lg">TOTAL:</span>
-          <span class="text-3xl font-black text-green-600">{{ moneda() }} {{ total.toFixed(2) }}</span>
-        </div>
-        <button [disabled]="carrito.length === 0"
-                (click)="abrirModalCobro()"
-                class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors text-lg">
-          Cobrar
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button class="inf-boton" (click)="cerrarModalCobro()">Cancelar</button>
+        <button class="boton-primario" (click)="confirmarVenta()">
+          <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> Confirmar venta
         </button>
       </div>
     </div>
   </div>
+}
 
-</ng-container>
-
-
-<!-- ═══ MODAL COBRO ═══ -->
-<div *ngIf="mostrarModalCobro"
-     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto overflow-hidden">
-    <div class="bg-green-600 px-6 py-4 text-white text-center">
-      <h3 class="font-black text-2xl">Cobrar Venta</h3>
-    </div>
-
-    <div class="p-6 space-y-5">
-
-      <div class="flex justify-between items-center bg-green-50 border-2 border-green-200 rounded-xl p-5">
-        <span class="font-bold text-green-700 text-base">TOTAL A COBRAR</span>
-        <span class="font-black text-green-600 text-5xl">{{ moneda() }} {{ total.toFixed(2) }}</span>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Método de pago</label>
-        <div class="grid gap-3" [class.grid-cols-2]="ajustes.config().pago_efectivo && ajustes.config().pago_qr">
-          <button *ngIf="ajustes.config().pago_efectivo" (click)="metodoPago = 'Efectivo'"
-                  [class.bg-green-600]="metodoPago === 'Efectivo'" [class.text-white]="metodoPago === 'Efectivo'"
-                  [class.bg-gray-100]="metodoPago !== 'Efectivo'" [class.text-gray-700]="metodoPago !== 'Efectivo'"
-                  class="py-3 rounded-xl font-bold transition-colors">💵 Efectivo</button>
-          <button *ngIf="ajustes.config().pago_qr" (click)="metodoPago = 'QR'"
-                  [class.bg-blue-600]="metodoPago === 'QR'" [class.text-white]="metodoPago === 'QR'"
-                  [class.bg-gray-100]="metodoPago !== 'QR'" [class.text-gray-700]="metodoPago !== 'QR'"
-                  class="py-3 rounded-xl font-bold transition-colors">📱 QR</button>
+<!-- ═══ COMPROBANTE ═══ -->
+@if (mostrarTicket) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarTicket()">
+    <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[90vh]" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <div>
+          <h3 class="inf-tinta font-semibold text-[15px]">Venta registrada</h3>
+          <p class="inf-sub mt-0!">Comprobante #{{ datosTicket?.id_venta }}</p>
         </div>
+        <button class="quitar" (click)="cerrarTicket()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
+        </button>
       </div>
-
-      <div *ngIf="metodoPago === 'Efectivo'">
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          Monto recibido ({{ moneda() }}) <span class="text-gray-400 text-xs font-normal">— opcional</span>
-        </label>
-        <input #inputMonto type="number" inputmode="decimal" [(ngModel)]="montoPagado"
-               (focus)="inputMonto.select()"
-               (keyup.enter)="confirmarVenta()"
-               class="w-full px-4 py-4 border-2 border-gray-200 rounded-xl text-3xl text-center font-black outline-none focus:border-green-500">
-        <div *ngIf="montoPagado >= total && montoPagado > 0"
-             class="mt-3 bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-          <p class="text-sm text-green-600">Cambio</p>
-          <p class="text-3xl font-black text-green-700">{{ moneda() }} {{ cambio.toFixed(2) }}</p>
-        </div>
+      <div #zonaTicket class="overflow-y-auto p-4 flex justify-center" style="background: var(--i-fondo)">
+        @if (datosTicket) { <div class="shadow-sm"><app-ticket [datos]="datosTicket" [fecha]="fechaTicket" /></div> }
       </div>
-
-      <div *ngIf="metodoPago === 'QR'"
-           class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center text-blue-600 text-sm">
-        <img *ngIf="ajustes.qrCobro()" [src]="ajustes.qrCobro()" alt="QR de cobro"
-             class="w-48 h-48 object-contain mx-auto mb-3 bg-white rounded-lg p-2">
-        {{ ajustes.qrCobro() ? 'Muestra este QR al cliente y confirma cuando pague.' : 'Confirma cuando el cliente pague por QR.' }}
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button class="inf-boton" (click)="cerrarTicket()">Cerrar</button>
+        <button class="boton-primario" (click)="imprimirVenta()">
+          <lucide-icon [img]="icons.imprimir" class="w-4 h-4"></lucide-icon> Imprimir
+        </button>
       </div>
-    </div>
-
-    <div class="px-6 pb-6 flex gap-3">
-      <button (click)="cerrarModalCobro()"
-              class="flex-1 py-4 bg-gray-100 text-gray-700 font-bold rounded-xl">Cancelar</button>
-      <button (click)="confirmarVenta()"
-              class="flex-1 py-4 bg-green-600 hover:bg-green-700 text-white font-black text-lg rounded-xl transition-colors">
-        ✓ Confirmar
-      </button>
     </div>
   </div>
-</div>
-
-
-<!-- ═══ TICKET ═══ -->
-<div *ngIf="mostrarTicket"
-     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-    <div class="bg-gray-100 p-4 border-b flex justify-between items-center">
-      <h3 class="font-bold text-gray-700">Comprobante #{{ datosTicket?.id_venta }}</h3>
-      <button (click)="cerrarTicket()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
-    </div>
-    <div #zonaTicket class="overflow-y-auto bg-gray-100 p-4 flex justify-center">
-      @if (datosTicket) { <div class="shadow-sm"><app-ticket [datos]="datosTicket" [fecha]="fechaTicket" /></div> }
-    </div>
-    <div class="p-4 bg-gray-50 border-t flex gap-3">
-      <button (click)="imprimirVenta()" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg">🖨 Imprimir</button>
-      <button (click)="cerrarTicket()" class="flex-1 bg-gray-200 text-gray-700 font-bold py-2 rounded-lg">Cerrar</button>
-    </div>
-  </div>
-</div>
+}

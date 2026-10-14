@@ -1,5 +1,7 @@
-:host {
-  display: block;
-  height: 100%;
-  overflow: hidden;
+/* ─── Punto de venta ───
+   En escritorio ocupa el alto visible (main tiene p-8) y cada panel hace su propio scroll. */
+@media (min-width: 1024px) {
+  .pos { height: calc(100dvh - 4rem); }
 }
+
+.historial { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--i-papel); border-radius: 8px; }

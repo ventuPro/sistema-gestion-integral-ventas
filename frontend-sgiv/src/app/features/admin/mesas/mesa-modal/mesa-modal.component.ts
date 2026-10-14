@@ -8,12 +8,15 @@ import { ImagenUrlPipe } from '../../../../core/pipes/imagen-url.pipe';
 import { TicketComponent } from '../../../shared/ticket/ticket.component';
 import { AjustesService } from '../../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../../core/services/impresion.service';
+import { cifra } from '../../../../core/utils/informe';
+import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download } from 'lucide-angular';
 
 @Component({
   selector: 'app-mesa-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, ImagenUrlPipe, TicketComponent],
-  templateUrl: './mesa-modal.component.html'
+  imports: [CommonModule, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule],
+  templateUrl: './mesa-modal.component.html',
+  styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css']
 })
 export class MesaModalComponent implements OnInit, OnDestroy {
   @Input()  mesa:             any = null;
@@ -26,6 +29,12 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly ajustes       = inject(AjustesService);
   private impresion = inject(ImpresionService);
   readonly moneda        = this.ajustes.moneda;
+  readonly cifra         = cifra;
+
+  readonly icons = {
+    cerrar: X, buscar: Search, quitar: Trash2, carrito: ShoppingCart, efectivo: Banknote,
+    qr: QrCode, check: Check, imprimir: Printer, descargar: Download
+  };
 
   esAdmin         = false;
   cargando        = false;

@@ -1,5 +1,6 @@
 import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subscription, forkJoin, of, catchError } from 'rxjs';
 import { CuentaService }  from '../../../core/services/cuenta.service';
@@ -9,15 +10,16 @@ import { SocketService }  from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { MesaModalComponent } from './mesa-modal/mesa-modal.component';
 import { LucideAngularModule,
-         ShieldAlert, Landmark, RefreshCw, QrCode, Printer, Download } from 'lucide-angular';
+         ShieldAlert, Landmark, RefreshCw, QrCode, Printer, Download, Plus, Trash2, X } from 'lucide-angular';
 import { sondeo } from '../../../core/utils/sondeo';
+import { cifra, fechaLarga } from '../../../core/utils/informe';
 
 @Component({
   selector: 'app-mesas',
   standalone: true,
-  imports: [CommonModule, FormsModule, MesaModalComponent, LucideAngularModule],
+  imports: [CommonModule, FormsModule, RouterLink, MesaModalComponent, LucideAngularModule],
   templateUrl: './mesas.component.html',
-  styleUrl:    './mesas.component.css'
+  styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './mesas.component.css']
 })
 export class MesasComponent implements OnInit, OnDestroy {
   private cuentaService = inject(CuentaService);
@@ -34,8 +36,14 @@ export class MesasComponent implements OnInit, OnDestroy {
     refresh:     RefreshCw,
     qr:          QrCode,
     printer:     Printer,
-    download:    Download
+    download:    Download,
+    mas:         Plus,
+    quitar:      Trash2,
+    cerrar:      X
   };
+
+  readonly cifra    = cifra;
+  readonly hoyTexto = fechaLarga(new Date());
 
   // ─── Control de acceso (basado en estado real del turno) ───
   verificandoCaja  = true;
@@ -147,7 +155,7 @@ export class MesasComponent implements OnInit, OnDestroy {
       this.subs.push(this.socketService.escuchar<any>(evento).subscribe(() => this.cargarMesas()));
 
     this.subs.push(this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
-      this.mostrarToast(`🍽 Pedido QR cargado a la Mesa ${data.numero_mesa || ''}`);
+      this.mostrarToast(`Pedido QR cargado a la Mesa ${data.numero_mesa || ''}`);
       this.cargarMesas();
     }));
   }
@@ -173,16 +181,18 @@ export class MesasComponent implements OnInit, OnDestroy {
   onMesaActualizada()        { this.cargarMesas(); }
 
   // ─── ESTILOS ───
-  getEstiloMesa(mesa: any): string {
-    if (mesa.id_cuenta)             return 'border-orange-400 bg-orange-50 hover:bg-orange-100';
-    if (mesa.estado_mesa === 'Ocupada') return 'border-red-400 bg-red-50 hover:bg-red-100';
-    return 'border-green-300 bg-green-50 hover:bg-green-100';
+  claseMesa(mesa: any): string {
+    if (mesa.id_cuenta) return 'cuenta';
+    return mesa.estado_mesa === 'Ocupada' ? 'ocupada' : 'libre';
   }
 
-  getIconoMesa(mesa: any): string {
-    if (mesa.id_cuenta)             return '🟠';
-    if (mesa.estado_mesa === 'Ocupada') return '🔴';
-    return '🟢';
+  get resumen() {
+    const conCuenta = this.mesas.filter(m => m.id_cuenta);
+    return {
+      libres:    this.mesas.filter(m => this.claseMesa(m) === 'libre').length,
+      conCuenta: conCuenta.length,
+      porCobrar: conCuenta.reduce((s, m) => s + (Number(m.total_acumulado) || 0), 0)
+    };
   }
 
   // ─── NUEVA MESA ───
@@ -210,7 +220,7 @@ export class MesasComponent implements OnInit, OnDestroy {
 
     this.mesaService.eliminarMesa(mesa.id_mesa).subscribe({
       next: () => {
-        this.mostrarToast(`🗑 Mesa ${mesa.numero_mesa} eliminada`);
+        this.mostrarToast(`Mesa ${mesa.numero_mesa} eliminada`);
         this.cargarMesas();
       },
       error: (e: any) => {

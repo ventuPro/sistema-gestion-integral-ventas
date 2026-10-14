@@ -1,0 +1,63 @@
+/* ─── Plano de mesas ─── */
+.plano {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.mesa {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 14px 12px;
+  text-align: left;
+  border: 1px solid var(--i-linea);
+  border-top: 3px solid var(--estado, var(--i-linea));
+  border-radius: 8px;
+  background: var(--i-papel);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.mesa:hover { box-shadow: 0 0 0 3px var(--i-acento-suave); border-color: var(--i-acento); border-top-color: var(--estado); }
+.mesa.libre { --estado: var(--i-sube); }
+.mesa.cuenta { --estado: var(--i-aviso); }
+.mesa.ocupada { --estado: var(--i-baja); }
+.mesa .numero { font-size: 26px; line-height: 1.1; font-weight: 600; letter-spacing: -0.02em; color: var(--i-tinta); }
+.mesa .total { font-size: 15px; font-weight: 600; color: var(--i-tinta); margin-top: 8px; }
+
+.eliminar {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.contenedor-mesa:hover .eliminar, .eliminar:focus-visible { opacity: 1; }
+
+.aviso-local {
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--i-aviso);
+  background: color-mix(in oklab, var(--i-aviso) 10%, transparent);
+}
+
+.tarjeta-qr { border: 1px solid var(--i-linea); border-radius: 8px; padding: 12px; text-align: center; }
+.tarjeta-qr img { width: 100%; aspect-ratio: 1; background: #fff; border-radius: 4px; }
+
+.aviso-flotante {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 60;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  background: #0f172a;
+  box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.5);
+  animation: entrar 200ms ease;
+}
+@keyframes entrar { from { opacity: 0; transform: translateY(-6px); } }
