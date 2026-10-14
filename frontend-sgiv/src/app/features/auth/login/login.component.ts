@@ -2,7 +2,7 @@ import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { LucideAngularModule, RefreshCw } from 'lucide-angular';
+import { LucideAngularModule, RefreshCw, Eye, EyeOff } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
@@ -13,15 +13,18 @@ import { AjustesService } from '../../../core/services/ajustes.service';
   standalone: true,
   imports: [FormsModule, CommonModule, LucideAngularModule],
   templateUrl: './login.component.html',
-  styleUrl: './login.component.css'
+  styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
+              '../../shared/formulario/formulario.css', './login.component.css']
 })
 export class LoginComponent implements OnInit {
-  readonly icons = { refrescar: RefreshCw };
+  readonly icons = { refrescar: RefreshCw, ver: Eye, ocultar: EyeOff };
+  readonly anio  = new Date().getFullYear();
 
   correo     = '';
   contrasena = '';
   mensajeError = '';
   cargando = false;
+  verContrasena = false;
 
   // ─── CAPTCHA ───
   captchaId       = '';

@@ -2,8 +2,8 @@ import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angula
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule,
-         Building2, Palette, Upload, Trash2, RotateCcw, Save, Sun, Moon, MonitorSmartphone,
-         Check, ImageIcon, Undo2, Crown, Store, SlidersHorizontal } from 'lucide-angular';
+         Building2, Palette, Upload, RotateCcw, Save, Sun, Moon, MonitorSmartphone,
+         ImageIcon, Undo2, Crown, Store, SlidersHorizontal } from 'lucide-angular';
 import { AjustesService, Configuracion, Tema,
          COLOR_PRIMARIO_ORIGINAL, COLOR_SECUNDARIO_ORIGINAL } from '../../../core/services/ajustes.service';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
@@ -28,16 +28,16 @@ const IMAGENES = {
   standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe,
             AjustesPropietariosComponent, AjustesSucursalesComponent, AjustesParametrosComponent],
-  templateUrl: './ajustes.component.html'
+  templateUrl: './ajustes.component.html',
+  styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
+              '../../shared/formulario/formulario.css', './ajustes.css']
 })
 export class AjustesComponent implements OnInit, OnDestroy {
   private ajustes = inject(AjustesService);
   private cdr     = inject(ChangeDetectorRef);
 
   readonly icons = {
-    empresa: Building2, apariencia: Palette, subir: Upload, quitar: Trash2, original: RotateCcw,
-    guardar: Save, claro: Sun, oscuro: Moon, auto: MonitorSmartphone, check: Check,
-    imagen: ImageIcon, descartar: Undo2
+    subir: Upload, original: RotateCcw, guardar: Save, imagen: ImageIcon, descartar: Undo2
   };
 
   readonly COLOR_PRIMARIO_ORIGINAL   = COLOR_PRIMARIO_ORIGINAL;
@@ -65,13 +65,13 @@ export class AjustesComponent implements OnInit, OnDestroy {
     { valor: 'auto',   nombre: 'Automático', detalle: 'Según el dispositivo',      icono: MonitorSmartphone }
   ];
 
-  readonly gruposEmpresa: { titulo: string; campos: CampoEmpresa[] }[] = [
-    { titulo: 'Identidad', campos: [
+  readonly gruposEmpresa: { titulo: string; detalle?: string; campos: CampoEmpresa[] }[] = [
+    { titulo: 'Identidad', detalle: 'Aparece en el menú, los tickets y el menú QR.', campos: [
       { clave: 'nombre_comercial', etiqueta: 'Nombre comercial *', ejemplo: "Pastelería Ricky's", max: 100 },
       { clave: 'rubro',            etiqueta: 'Rubro',               ejemplo: 'Pastelería, cafetería, panadería…', max: 60 },
       { clave: 'eslogan',          etiqueta: 'Eslogan',             ejemplo: 'El sabor de siempre', max: 150, ancho: true }
     ]},
-    { titulo: 'Datos legales', campos: [
+    { titulo: 'Datos legales', detalle: 'Se imprimen en los comprobantes.', campos: [
       { clave: 'razon_social', etiqueta: 'Razón social', ejemplo: 'Ricky’s S.R.L.', max: 150 },
       { clave: 'nit',          etiqueta: 'NIT',          ejemplo: '1234567019', max: 20 }
     ]},
@@ -144,7 +144,7 @@ export class AjustesComponent implements OnInit, OnDestroy {
     if (!this.empresa['nombre_comercial']?.trim()) return this.mostrarError('El nombre comercial es obligatorio.');
     this.guardando = true;
     this.ajustes.guardarEmpresa(this.empresa).subscribe({
-      next: (r) => { this.llenar(r.configuracion); this.terminar('✓ Datos de la empresa guardados'); },
+      next: (r) => { this.llenar(r.configuracion); this.terminar('Datos de la empresa guardados'); },
       error: (e) => { this.guardando = false; this.mostrarError(e?.error?.error || 'No se pudieron guardar los datos.'); }
     });
   }
@@ -233,7 +233,7 @@ export class AjustesComponent implements OnInit, OnDestroy {
     if (this.faviconNuevo !== undefined) datos.favicon = this.faviconNuevo;
     this.guardando = true;
     this.ajustes.guardarApariencia(datos).subscribe({
-      next: (r) => { this.llenar(r.configuracion); this.terminar('✓ Apariencia guardada'); },
+      next: (r) => { this.llenar(r.configuracion); this.terminar('Apariencia guardada'); },
       error: (e) => { this.guardando = false; this.mostrarError(e?.error?.error || 'No se pudo guardar la apariencia.'); }
     });
   }
@@ -248,6 +248,7 @@ export class AjustesComponent implements OnInit, OnDestroy {
   }
 
   private mostrarError(mensaje: string) {
+    this.mensajeExito = null;
     this.mensajeError = mensaje;
     this.cdr.detectChanges();
     setTimeout(() => { this.mensajeError = null; this.cdr.detectChanges(); }, 5000);

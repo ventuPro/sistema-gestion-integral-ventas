@@ -1,8 +1,9 @@
 import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, Plus, Pencil, X, Store, MapPin, Phone, Clock, Power, Copy } from 'lucide-angular';
+import { LucideAngularModule, Plus, Pencil, X, MapPin, Phone, Clock, Copy } from 'lucide-angular';
 import { SucursalService } from '../../../../core/services/sucursal.service';
+import { ConfirmacionComponent } from '../../../shared/confirmacion/confirmacion.component';
 
 interface DiaHorario { dia_semana: number; abierto: boolean; hora_apertura: string; hora_cierre: string }
 
@@ -13,15 +14,17 @@ const DIAS_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 @Component({
   selector: 'app-ajustes-sucursales',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
-  templateUrl: './ajustes-sucursales.component.html'
+  imports: [CommonModule, FormsModule, LucideAngularModule, ConfirmacionComponent],
+  templateUrl: './ajustes-sucursales.component.html',
+  styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css',
+              '../../../shared/formulario/formulario.css', '../ajustes.css', './ajustes-sucursales.component.css']
 })
 export class AjustesSucursalesComponent implements OnInit {
   private sucursalService = inject(SucursalService);
   private cdr             = inject(ChangeDetectorRef);
 
-  readonly icons = { nuevo: Plus, editar: Pencil, cerrar: X, sucursal: Store, direccion: MapPin,
-                     telefono: Phone, horario: Clock, estado: Power, copiar: Copy };
+  readonly icons = { nuevo: Plus, editar: Pencil, cerrar: X, direccion: MapPin,
+                     telefono: Phone, horario: Clock, copiar: Copy };
   readonly DIAS = DIAS;
 
   sucursales: any[] = [];
@@ -34,6 +37,10 @@ export class AjustesSucursalesComponent implements OnInit {
   formulario = { nombre_sucursal: '', direccion_fisica: '', telefono_contacto: '' };
   horario: DiaHorario[] = [];
   errorFormulario = '';
+
+  aDesactivar: any = null;
+  cambiandoEstado = false;
+  errorEstado     = '';
 
   ngOnInit() { this.cargar(); }
 
@@ -107,7 +114,7 @@ export class AjustesSucursalesComponent implements OnInit {
       next: (r) => {
         this.guardando = false;
         this.modalAbierto = false;
-        this.avisar('ok', `✓ ${r.mensaje}`);
+        this.avisar('ok', r.mensaje);
         this.cargar();
       },
       error: (e) => {
@@ -118,12 +125,28 @@ export class AjustesSucursalesComponent implements OnInit {
     });
   }
 
+  // Activar es directo; desactivar pide confirmación
+  pedirCambioEstado(s: any) {
+    if (s.estado_activo) { this.aDesactivar = s; this.errorEstado = ''; }
+    else this.cambiarEstado(s);
+  }
+
   cambiarEstado(s: any) {
-    const activar = !s.estado_activo;
-    if (!activar && !confirm(`¿Desactivar "${s.nombre_sucursal}"?\n\nNo se podrá abrir caja ni recibir pedidos del menú QR en ella. Su historial se conserva.`)) return;
-    this.sucursalService.cambiarEstado(s.id_sucursal, activar).subscribe({
-      next: (r) => { this.avisar('ok', `✓ ${r.mensaje}`); this.cargar(); },
-      error: (e) => this.avisar('error', e?.error?.error || 'No se pudo cambiar el estado.')
+    this.cambiandoEstado = true;
+    this.sucursalService.cambiarEstado(s.id_sucursal, !s.estado_activo).subscribe({
+      next: (r) => {
+        this.cambiandoEstado = false;
+        this.aDesactivar     = null;
+        this.avisar('ok', r.mensaje);
+        this.cargar();
+      },
+      error: (e) => {
+        this.cambiandoEstado = false;
+        const msg = e?.error?.error || 'No se pudo cambiar el estado.';
+        if (this.aDesactivar) this.errorEstado = msg;
+        else this.avisar('error', msg);
+        this.cdr.detectChanges();
+      }
     });
   }
 

@@ -1,12 +1,14 @@
 import { Routes } from '@angular/router';
-import { LoginComponent } from './features/auth/login/login.component';
 import { permisoGuard }   from './core/guards/permiso.guard';
 
 // Cada pantalla se descarga recién cuando se abre (carga diferida): el login y el
 // menú QR del cliente no traen el panel, los gráficos ni las librerías de PDF/Excel.
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
-  { path: 'login', component: LoginComponent },
+  {
+    path: 'login',
+    loadComponent: () => import('./features/auth/login/login.component').then(m => m.LoginComponent)
+  },
 
   // Menú digital del cliente (sin auth). :codigo = código QR de la mesa
   {

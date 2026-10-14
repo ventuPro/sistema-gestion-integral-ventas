@@ -1,8 +1,7 @@
 import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, Receipt, QrCode, Package, ShieldCheck, Save, Undo2, RotateCcw,
-         Upload, Trash2, ImageIcon } from 'lucide-angular';
+import { LucideAngularModule, Save, Undo2, RotateCcw, Upload, ImageIcon } from 'lucide-angular';
 import { AjustesService, Configuracion } from '../../../../core/services/ajustes.service';
 import { ImagenUrlPipe } from '../../../../core/pipes/imagen-url.pipe';
 
@@ -39,14 +38,15 @@ interface CampoNumero { clave: keyof Parametros; etiqueta: string; ayuda: string
   selector: 'app-ajustes-parametros',
   standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe],
-  templateUrl: './ajustes-parametros.component.html'
+  templateUrl: './ajustes-parametros.component.html',
+  styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css',
+              '../../../shared/formulario/formulario.css', '../ajustes.css', './ajustes-parametros.component.css']
 })
 export class AjustesParametrosComponent implements OnInit {
   private ajustes = inject(AjustesService);
   private cdr     = inject(ChangeDetectorRef);
 
-  readonly icons = { ventas: Receipt, menu: QrCode, inventario: Package, seguridad: ShieldCheck,
-                     guardar: Save, descartar: Undo2, original: RotateCcw, subir: Upload, quitar: Trash2, imagen: ImageIcon };
+  readonly icons = { guardar: Save, descartar: Undo2, original: RotateCcw, subir: Upload, imagen: ImageIcon };
 
   readonly monedas = ['Bs.', '$us', '$', 'S/', '€'];
 
@@ -160,7 +160,7 @@ export class AjustesParametrosComponent implements OnInit {
     if (this.qrNuevo !== undefined) datos.qr_cobro = this.qrNuevo;
     this.guardando = true;
     this.ajustes.guardarParametros(datos).subscribe({
-      next: (r) => { this.llenar(r.configuracion); this.guardando = false; this.avisar('ok', '✓ Parámetros guardados'); },
+      next: (r) => { this.llenar(r.configuracion); this.guardando = false; this.avisar('ok', 'Parámetros guardados'); },
       error: (e) => { this.guardando = false; this.avisar('error', e?.error?.error || 'No se pudieron guardar los parámetros.'); }
     });
   }

@@ -1,0 +1,30 @@
+/* ─── Ajustes → Sucursales ─── */
+.sucursal {
+  border: 1px solid var(--i-linea);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sucursal.inactiva { background: var(--i-fondo); }
+.sucursal.inactiva h3 { color: var(--i-tenue); }
+
+.datos { display: grid; gap: 6px; font-size: 13px; }
+.datos > div { display: flex; gap: 8px; align-items: flex-start; }
+.datos dt { color: var(--i-sutil); padding-top: 2px; }
+.datos dd { color: var(--i-texto); }
+
+.horario { border: 1px solid var(--i-linea); border-radius: 8px; }
+.dia {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 13.5px;
+  border-bottom: 1px solid var(--i-linea-suave);
+}
+.dia:last-child { border-bottom: none; }
+.dia input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--i-acento); }
+.dia .campo { padding: 5px 8px; }

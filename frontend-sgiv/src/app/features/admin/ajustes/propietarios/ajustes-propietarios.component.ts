@@ -1,8 +1,9 @@
 import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, Plus, Pencil, Trash2, X, Users } from 'lucide-angular';
+import { LucideAngularModule, Plus, Pencil, Trash2, X } from 'lucide-angular';
 import { AjustesService, Propietario } from '../../../../core/services/ajustes.service';
+import { ConfirmacionComponent } from '../../../shared/confirmacion/confirmacion.component';
 
 const VACIO: Propietario = {
   nombre_completo: '', ci: '', cargo: '', telefono: '', correo: '', porcentaje_participacion: 0
@@ -12,14 +13,16 @@ const VACIO: Propietario = {
 @Component({
   selector: 'app-ajustes-propietarios',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
-  templateUrl: './ajustes-propietarios.component.html'
+  imports: [CommonModule, FormsModule, LucideAngularModule, ConfirmacionComponent],
+  templateUrl: './ajustes-propietarios.component.html',
+  styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css',
+              '../../../shared/formulario/formulario.css', '../ajustes.css']
 })
 export class AjustesPropietariosComponent implements OnInit {
   private ajustes = inject(AjustesService);
   private cdr     = inject(ChangeDetectorRef);
 
-  readonly icons = { nuevo: Plus, editar: Pencil, eliminar: Trash2, cerrar: X, vacio: Users };
+  readonly icons = { nuevo: Plus, editar: Pencil, eliminar: Trash2, cerrar: X };
 
   propietarios: Propietario[] = [];
   cargando = true;
@@ -29,6 +32,10 @@ export class AjustesPropietariosComponent implements OnInit {
   modalAbierto = false;
   formulario: Propietario = { ...VACIO };
   errorFormulario = '';
+
+  aEliminar: Propietario | null = null;
+  eliminando    = false;
+  errorEliminar = '';
 
   ngOnInit() { this.cargar(); }
 
@@ -77,7 +84,7 @@ export class AjustesPropietariosComponent implements OnInit {
       next: (r) => {
         this.guardando = false;
         this.modalAbierto = false;
-        this.avisar('ok', `✓ ${r.mensaje}`);
+        this.avisar('ok', r.mensaje);
         this.cargar();
       },
       error: (e) => {
@@ -89,10 +96,19 @@ export class AjustesPropietariosComponent implements OnInit {
   }
 
   eliminar(p: Propietario) {
-    if (!confirm(`¿Eliminar a ${p.nombre_completo} de la lista de propietarios?`)) return;
+    this.eliminando = true;
     this.ajustes.eliminarPropietario(p.id_propietario!).subscribe({
-      next: () => { this.avisar('ok', '✓ Propietario eliminado'); this.cargar(); },
-      error: (e) => this.avisar('error', e?.error?.error || 'No se pudo eliminar.')
+      next: () => {
+        this.eliminando = false;
+        this.aEliminar  = null;
+        this.avisar('ok', 'Propietario eliminado');
+        this.cargar();
+      },
+      error: (e) => {
+        this.eliminando    = false;
+        this.errorEliminar = e?.error?.error || 'No se pudo eliminar.';
+        this.cdr.detectChanges();
+      }
     });
   }
 

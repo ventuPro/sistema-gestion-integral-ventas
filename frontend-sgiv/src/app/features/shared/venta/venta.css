@@ -191,5 +191,7 @@
   box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.5);
   animation: entrar 200ms ease;
 }
+/* Variante de error */
+.aviso-flotante.error { background: #b42318; max-width: 380px; }
 @keyframes entrar { from { opacity: 0; transform: translateY(-6px); } }
 
