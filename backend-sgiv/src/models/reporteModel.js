@@ -279,7 +279,8 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
         `, params),
         filas(porProducto, params),
         filas(`
-            SELECT p.nombre_producto, c.nombre_categoria, COALESCE(SUM(i.cantidad_actual), 0)::int AS stock
+            SELECT p.nombre_producto, c.nombre_categoria, p.precio_unitario::float8 AS precio,
+                   COALESCE(SUM(GREATEST(i.cantidad_actual, 0)), 0)::int AS stock
             FROM producto p
             JOIN categoria_producto c  ON c.id_categoria = p.id_categoria
             JOIN inventario_sucursal i ON i.id_producto = p.id_producto AND ${deSucursal('i.id_sucursal')}
@@ -289,11 +290,13 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
                   WHERE dv.id_producto = p.id_producto AND ${deSucursal('vc.id_sucursal')}
                     AND vc.fecha_venta >= $2::date AND vc.fecha_venta < $3::date + 1)
             GROUP BY p.id_producto, p.nombre_producto, c.nombre_categoria
-            ORDER BY c.nombre_categoria, p.nombre_producto
+            ORDER BY c.nombre_categoria, stock DESC, p.nombre_producto
         `, params),
         filas(`
             SELECT t.id_turno, u.nombre_completo AS cajero, s.nombre_sucursal,
                    t.fecha_hora_apertura, t.fecha_hora_cierre, t.monto_inicial::float8 AS monto_inicial,
+                   t.monto_calculado::float8 AS efectivo_esperado, t.monto_real_declarado::float8 AS efectivo_contado,
+                   t.diferencia::float8 AS diferencia,
                    COUNT(v.id_venta)::int AS ventas,
                    ROUND(COALESCE(SUM(v.monto_total_venta), 0), 2)::float8 AS total,
                    ROUND(COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = 'Efectivo'), 0), 2)::float8 AS efectivo

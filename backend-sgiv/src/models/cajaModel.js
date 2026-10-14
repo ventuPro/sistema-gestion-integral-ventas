@@ -115,18 +115,29 @@ const abrirTurno = async (id_sucursal, id_usuario_cajero, monto_inicial) => {
     }
 };
 
-const cerrarCaja = async (id_sucursal, id_usuario_cajero) => {
+// efectivo_contado (opcional): lo que el cajero contó en caja; se guarda con la diferencia
+const cerrarCaja = async (id_sucursal, id_usuario_cajero, efectivo_contado = null) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
 
         const r = await client.query(`
-            UPDATE turno_caja
-            SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado'
-            WHERE id_usuario_cajero = $1
-              AND estado_turno      = 'Abierto'
-            RETURNING id_turno
-        `, [id_usuario_cajero]);
+            UPDATE turno_caja t
+            SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado',
+                monto_calculado = t.monto_inicial + e.efectivo,
+                monto_real_declarado = $2::numeric,
+                diferencia = $2::numeric - (t.monto_inicial + e.efectivo)
+            FROM (
+                SELECT t2.id_turno,
+                       COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = 'Efectivo'), 0) AS efectivo
+                FROM turno_caja t2
+                LEFT JOIN venta_caja v ON v.id_turno = t2.id_turno
+                WHERE t2.id_usuario_cajero = $1 AND t2.estado_turno = 'Abierto'
+                GROUP BY t2.id_turno
+            ) e
+            WHERE t.id_turno = e.id_turno
+            RETURNING t.id_turno, t.monto_calculado::float8, t.monto_real_declarado::float8, t.diferencia::float8
+        `, [id_usuario_cajero, efectivo_contado]);
 
         // Sincronizar flag → FALSE
         await client.query(
@@ -135,9 +146,13 @@ const cerrarCaja = async (id_sucursal, id_usuario_cajero) => {
         );
 
         await client.query('COMMIT');
+        const t = r.rows[0];
         return {
             mensaje: 'Caja cerrada correctamente',
-            id_turno_cerrado: r.rows[0]?.id_turno || null
+            id_turno_cerrado: t?.id_turno || null,
+            efectivo_esperado: t?.monto_calculado ?? null,
+            efectivo_contado:  t?.monto_real_declarado ?? null,
+            diferencia:        t?.diferencia ?? null
         };
     } catch (e) {
         await client.query('ROLLBACK');
@@ -320,7 +335,8 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
 
     // Turno activo (abierto). Si no hay, devolver último de hoy con su estado.
     const turnoActivo = await db.query(`
-        SELECT id_turno, monto_inicial, fecha_hora_apertura, fecha_hora_cierre, estado_turno
+        SELECT id_turno, monto_inicial, fecha_hora_apertura, fecha_hora_cierre, estado_turno,
+               monto_real_declarado::float8 AS efectivo_contado, diferencia::float8 AS diferencia
         FROM turno_caja
         WHERE id_usuario_cajero = $2
           AND id_sucursal       = $1
@@ -332,7 +348,8 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
     let turnoFinal = turnoActivo.rows[0] || null;
     if (!turnoFinal) {
         const ultimoHoy = await db.query(`
-            SELECT id_turno, monto_inicial, fecha_hora_apertura, fecha_hora_cierre, estado_turno
+            SELECT id_turno, monto_inicial, fecha_hora_apertura, fecha_hora_cierre, estado_turno,
+               monto_real_declarado::float8 AS efectivo_contado, diferencia::float8 AS diferencia
             FROM turno_caja
             WHERE id_usuario_cajero = $2
               AND id_sucursal       = $1
@@ -343,10 +360,29 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
         turnoFinal = ultimoHoy.rows[0] || null;
     }
 
+    // Lo que corresponde al turno (puede abarcar más de un día): base del arqueo
+    let turnoResumen = null;
+    if (turnoFinal) {
+        const m = await db.query(`
+            SELECT metodo_pago, COUNT(*)::int AS ventas, ROUND(SUM(monto_total_venta), 2)::float8 AS total
+            FROM venta_caja WHERE id_turno = $1
+            GROUP BY metodo_pago ORDER BY total DESC
+        `, [turnoFinal.id_turno]);
+        const efectivo = m.rows.find(x => x.metodo_pago === 'Efectivo')?.total || 0;
+        turnoResumen = {
+            metodos: m.rows,
+            ventas:  m.rows.reduce((a, x) => a + x.ventas, 0),
+            total:   +m.rows.reduce((a, x) => a + x.total, 0).toFixed(2),
+            efectivo,
+            efectivo_esperado: +(Number(turnoFinal.monto_inicial) + efectivo).toFixed(2)
+        };
+    }
+
     return {
-        resumen:      resumen.rows[0],
-        ventas:       ventas.rows,
-        turno_activo: turnoFinal
+        resumen:       resumen.rows[0],
+        ventas:        ventas.rows,
+        turno_activo:  turnoFinal,
+        turno_resumen: turnoResumen
     };
 };
 
@@ -568,6 +604,10 @@ const obtenerCierresCaja = async () => {
             t.fecha_hora_apertura,
             t.fecha_hora_cierre,
             t.monto_inicial,
+            t.monto_calculado::float8      AS efectivo_esperado,
+            t.monto_real_declarado::float8 AS efectivo_contado,
+            t.diferencia::float8           AS diferencia,
+            s.id_sucursal,
             u.nombre_completo            AS nombre_cajero,
             s.nombre_sucursal,
             COUNT(v.id_venta)::int       AS total_ventas,
@@ -588,8 +628,7 @@ const obtenerCierresCaja = async () => {
             )
         )
         WHERE t.estado_turno = 'Cerrado'
-        GROUP BY t.id_turno, t.fecha_hora_apertura, t.fecha_hora_cierre,
-                 t.monto_inicial, u.nombre_completo, s.nombre_sucursal
+        GROUP BY t.id_turno, s.id_sucursal, u.nombre_completo, s.nombre_sucursal
         ORDER BY t.fecha_hora_cierre DESC
     `);
     return result.rows;

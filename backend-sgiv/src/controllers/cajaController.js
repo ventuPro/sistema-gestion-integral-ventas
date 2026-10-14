@@ -108,10 +108,18 @@ const abrirCaja = async (req, res) => {
 
 const cerrarCaja = async (req, res) => {
     try {
-        const { id_sucursal } = req.body;
+        const { id_sucursal, efectivo_contado } = req.body;
+        let contado = null;
+        if (efectivo_contado !== undefined && efectivo_contado !== null && efectivo_contado !== '') {
+            contado = Number(efectivo_contado);
+            if (!Number.isFinite(contado) || contado < 0 || contado > 10000000)
+                return res.status(400).json({ error: 'Efectivo contado inválido' });
+            contado = Math.round(contado * 100) / 100;
+        }
         const r = await cajaModel.cerrarCaja(
             Number(id_sucursal) || req.usuario.id_sucursal,
-            req.usuario.id_usuario
+            req.usuario.id_usuario,
+            contado
         );
         res.json(r);
     } catch (e) {

@@ -285,23 +285,46 @@
           }
         } @else { <p class="inf-vacio">Sin ventas en el período.</p> }
 
-        @if (datos.sin_ventas?.length) {
-          <div class="inf-pie-hoja">
-            <button class="flex items-center gap-1.5 inf-aviso font-medium" (click)="verSinVentas = !verSinVentas">
-              <lucide-icon [img]="verSinVentas ? icons.abajo : icons.derecha" class="w-3.5 h-3.5"></lucide-icon>
-              {{ datos.sin_ventas.length }} {{ datos.sin_ventas.length === 1 ? 'producto activo no se vendió' : 'productos activos no se vendieron' }} en el período
-            </button>
-            @if (verSinVentas) {
-              <div class="flex flex-wrap gap-1.5 mt-3">
-                @for (p of datos.sin_ventas; track p.nombre_producto) {
-                  <span class="inf-ficha" [title]="p.nombre_categoria">{{ p.nombre_producto }} · stock {{ p.stock }}</span>
+      </section>
+    </div>
+
+    <!-- Productos sin ventas -->
+    @if (datos.sin_ventas?.length) {
+      <section class="inf-hoja">
+        <button class="sin-ventas-cabecera" (click)="verSinVentas = !verSinVentas" [attr.aria-expanded]="verSinVentas">
+          <lucide-icon [img]="verSinVentas ? icons.abajo : icons.derecha" class="w-4 h-4 inf-tenue"></lucide-icon>
+          <span class="flex-1 text-left">
+            <span class="inf-tinta font-semibold text-[13.5px]">
+              {{ datos.sin_ventas.length }} {{ datos.sin_ventas.length === 1 ? 'producto activo no se vendió' : 'productos activos no se vendieron' }}
+            </span>
+            <span class="inf-sub block">
+              {{ resumenSinVentas.conStock }} con stock ({{ entero(resumenSinVentas.unidades) }} uds. · {{ moneda() }} {{ cifra(resumenSinVentas.valor) }} a precio de venta)
+              · {{ resumenSinVentas.agotados }} agotados
+            </span>
+          </span>
+          <span class="inf-enlace">{{ verSinVentas ? 'Ocultar' : 'Ver detalle' }}</span>
+        </button>
+        @if (verSinVentas) {
+          <div class="sin-ventas">
+            @for (g of sinVentasPorCategoria; track g.categoria) {
+              <div class="sin-ventas-grupo">
+                <p class="sin-ventas-categoria">{{ g.categoria }} <span>{{ g.productos.length }}</span></p>
+                @for (p of g.productos; track p.nombre_producto) {
+                  <div class="sin-ventas-fila">
+                    <span class="truncate" [title]="p.nombre_producto">{{ p.nombre_producto }}</span>
+                    @if (p.stock > 0) {
+                      <span class="whitespace-nowrap"><b class="inf-tinta">{{ p.stock }}</b>&nbsp;<span class="inf-sutil">uds. · {{ moneda() }} {{ cifra(p.stock * p.precio) }}</span></span>
+                    } @else {
+                      <span class="inf-estado mal">Agotado</span>
+                    }
+                  </div>
                 }
               </div>
             }
           </div>
         }
       </section>
-    </div>
+    }
 
     <!-- 06 Caja, inventario y menú QR -->
     <div class="grid lg:grid-cols-3 gap-5">
@@ -315,7 +338,7 @@
         @if (datos.cierres?.length) {
           <div class="overflow-x-auto">
             <table class="inf-tabla">
-              <thead><tr><th>Cajero</th><th>Turno</th><th class="num">Ventas</th><th class="num">Efectivo</th><th class="num">Total</th></tr></thead>
+              <thead><tr><th>Cajero</th><th>Turno</th><th class="num">Ventas</th><th class="num">Efectivo</th><th class="num">Total</th><th class="num">Arqueo</th></tr></thead>
               <tbody>
                 @for (c of turnosVisibles; track c.id_turno) {
                   <tr>
@@ -324,6 +347,11 @@
                     <td class="num">{{ entero(c.ventas) }}</td>
                     <td class="num">{{ moneda() }} {{ cifra(c.efectivo) }}</td>
                     <td class="num fuerte">{{ moneda() }} {{ cifra(c.total) }}</td>
+                    <td class="num">
+                      @if (c.diferencia === null) { <span class="inf-sutil text-xs">sin conteo</span> }
+                      @else if (c.diferencia === 0) { <span class="inf-estado ok">Cuadra</span> }
+                      @else { <span class="inf-estado" [ngClass]="c.diferencia < 0 ? 'mal' : 'aviso'">{{ c.diferencia < 0 ? 'Falta' : 'Sobra' }} {{ cifra(c.diferencia < 0 ? -c.diferencia : c.diferencia) }}</span> }
+                    </td>
                   </tr>
                 }
               </tbody>

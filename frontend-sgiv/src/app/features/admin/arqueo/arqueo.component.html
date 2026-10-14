@@ -1,257 +1,249 @@
-<div class="space-y-6">
+<div class="space-y-5">
 
-  <!-- Header -->
-  <div class="flex flex-wrap justify-between items-center gap-3">
+  <!-- Encabezado -->
+  <header class="flex flex-wrap items-end justify-between gap-4">
     <div>
-      <h2 class="text-2xl font-bold text-gray-800">Arqueo de Caja</h2>
-      <p class="text-sm text-gray-500 mt-1">
-        Resumen del día — {{ hoy | date:'EEEE d MMMM yyyy':'':'es' }}
+      <p class="inf-antetitulo">
+        <span>{{ hoyTexto }}</span>
+        @if (abierto) { <span class="inf-vivo">Caja abierta</span> }
+        @if (cerrado) { <span class="inf-estado mal">Caja cerrada</span> }
       </p>
+      <h1 class="inf-titulo">Arqueo de caja</h1>
     </div>
-    <button (click)="cargarArqueo()"
-            class="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-      ⟳ Actualizar
+    <button class="inf-boton" (click)="cargarArqueo()">
+      <lucide-icon [img]="icons.actualizar" class="w-3.5 h-3.5"></lucide-icon> Actualizar
     </button>
-  </div>
+  </header>
 
-  <!-- Cargando -->
-  <div *ngIf="cargando" class="flex justify-center items-center py-20">
-    <div class="flex flex-col items-center gap-3">
-      <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      <p class="text-gray-400 text-sm">Cargando datos del día...</p>
+  @if (error) {
+    <p class="inf-hoja px-4 py-3 text-sm inf-baja">{{ error }}</p>
+  }
+
+  @if (cargando) {
+    <div class="space-y-5">
+      <div class="inf-esqueleto h-48"></div>
+      <div class="inf-esqueleto h-24"></div>
+      <div class="inf-esqueleto h-64"></div>
     </div>
-  </div>
+  } @else {
 
-  <ng-container *ngIf="!cargando">
-
-    <!-- KPIs -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">Total Ventas</p>
-        <p class="text-3xl font-black text-gray-800">{{ arqueo.resumen?.total_ventas || 0 }}</p>
-        <p class="text-xs text-gray-400 mt-1">transacciones hoy</p>
-      </div>
-
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">Ingresos Totales</p>
-        <p class="text-3xl font-black text-green-600">
-          {{ moneda() }} {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
-        </p>
-        <p class="text-xs text-gray-400 mt-1">del día</p>
-      </div>
-
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">💵 Efectivo</p>
-        <p class="text-3xl font-black text-blue-600">
-          {{ moneda() }} {{ (+arqueo.resumen?.total_efectivo || 0).toFixed(2) }}
-        </p>
-      </div>
-
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-        <p class="text-gray-600 text-sm font-semibold uppercase tracking-wider mb-1">📱 QR</p>
-        <p class="text-3xl font-black text-purple-600">
-          {{ moneda() }} {{ (+arqueo.resumen?.total_qr || 0).toFixed(2) }}
-        </p>
-      </div>
-
-    </div>
-
-    <!-- Estado del turno -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-      <h3 class="font-bold text-gray-700 mb-3">Estado de la Caja</h3>
-
-      <!-- ABIERTA -->
-      <div *ngIf="arqueo.turno_activo?.estado_turno === 'Abierto'" class="flex items-center gap-3">
-        <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-        <div class="flex-1">
-          <p class="text-sm font-black text-green-700">CAJA ABIERTA</p>
-          <p class="text-xs text-gray-500">
-            Turno #{{ arqueo.turno_activo.id_turno }} ·
-            Abierto el {{ arqueo.turno_activo.fecha_hora_apertura | date:'dd/MM/yyyy HH:mm' }} ·
-            Monto inicial: {{ moneda() }} {{ arqueo.turno_activo.monto_inicial }}
-          </p>
+    <!-- Turno abierto: lo que debe haber en caja -->
+    @if (abierto) {
+      <section class="inf-hoja grid lg:grid-cols-2">
+        <div class="p-6 bloque-linea lg:border-r">
+          <p class="inf-etiqueta">Efectivo que debe haber en caja</p>
+          <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(tr.efectivo_esperado) }}</p>
+          <dl class="inf-pares mt-5 pt-4 separador">
+            <div><dt>Fondo inicial</dt><dd>{{ moneda() }} {{ cifra(turno.monto_inicial) }}</dd></div>
+            <div><dt>+ Cobrado en efectivo</dt><dd>{{ moneda() }} {{ cifra(tr.efectivo) }}</dd></div>
+            <div class="total"><dt>= Esperado en caja</dt><dd>{{ moneda() }} {{ cifra(tr.efectivo_esperado) }}</dd></div>
+          </dl>
+          <p class="inf-sub mt-4">Turno #{{ turno.id_turno }} · abierto desde {{ desde(turno.fecha_hora_apertura) }}</p>
         </div>
-        <span class="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">ABIERTO</span>
-      </div>
 
-      <!-- CERRADA HOY -->
-      <div *ngIf="arqueo.turno_activo?.estado_turno === 'Cerrado'" class="flex items-center gap-3">
-        <div class="w-3 h-3 rounded-full bg-red-400"></div>
-        <div class="flex-1">
-          <p class="text-sm font-black text-red-600">CAJA CERRADA</p>
-          <p class="text-xs text-gray-500">
-            Turno #{{ arqueo.turno_activo.id_turno }} ·
-            Abierto: {{ arqueo.turno_activo.fecha_hora_apertura | date:'dd/MM HH:mm' }} ·
-            Cerrado: {{ arqueo.turno_activo.fecha_hora_cierre | date:'dd/MM HH:mm' }}
-          </p>
+        <div class="p-6">
+          <div class="flex items-baseline justify-between gap-3">
+            <p class="inf-etiqueta">Cobros del turno</p>
+            <p class="inf-tenue text-xs">{{ entero(tr.ventas) }} ventas</p>
+          </div>
+          <p class="inf-valor">{{ moneda() }} {{ cifra(tr.total) }}</p>
+          @if (tr.metodos.length) {
+            <div class="inf-apilada my-4">
+              @for (m of tr.metodos; track m.metodo_pago; let i = $index) {
+                <span [style.width.%]="porcentaje(m.total, tr.total)" [style.background]="colorSerie(i)"></span>
+              }
+            </div>
+            <table class="inf-tabla">
+              <tbody>
+                @for (m of tr.metodos; track m.metodo_pago; let i = $index) {
+                  <tr>
+                    <td class="pl-0!"><span class="flex items-center gap-2"><i class="inf-muestra" [style.background]="colorSerie(i)"></i>{{ m.metodo_pago }}</span></td>
+                    <td class="num inf-tenue">{{ m.ventas }} vta.</td>
+                    <td class="num fuerte pr-0!">{{ moneda() }} {{ cifra(m.total) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            <p class="inf-sub mt-3">Solo el efectivo debe estar físicamente en caja; los demás métodos se verifican en su cuenta.</p>
+          } @else {
+            <p class="inf-vacio">Todavía no hay cobros en este turno.</p>
+          }
         </div>
-        <span class="inline-block bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold">CERRADO</span>
-      </div>
+      </section>
 
-      <!-- SIN APERTURA -->
-      <div *ngIf="!arqueo.turno_activo" class="flex items-center gap-3">
-        <div class="w-3 h-3 rounded-full bg-gray-300"></div>
-        <p class="text-sm text-gray-500">Sin apertura de caja hoy</p>
-      </div>
-    </div>
+      <!-- Cierre (solo cajero) -->
+      @if (!esAdmin) {
+        <section class="inf-hoja p-6">
+          <div class="inf-seccion"><h2>Cerrar el turno</h2></div>
+          <div class="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6">
+            <div>
+              <p class="paso"><span>1</span>Cuenta el efectivo de la caja</p>
+              <div class="flex flex-wrap items-center gap-3 mt-3">
+                <div class="campo-monto">
+                  <span>{{ moneda() }}</span>
+                  <input type="number" min="0" step="0.1" placeholder="0.00" [(ngModel)]="efectivoContado" aria-label="Efectivo contado">
+                </div>
+                @if (diferencia !== null) {
+                  <span class="inf-estado" [ngClass]="claseDiferencia(diferencia)">{{ textoDiferencia(diferencia) }}</span>
+                }
+              </div>
+              <p class="inf-sub mt-2">Opcional. Si lo ingresas, queda registrado junto con la diferencia para el administrador.</p>
 
-    <!-- Detalle de ventas -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-        <h3 class="font-bold text-gray-700">Ventas del Día</h3>
-        <span class="text-sm text-gray-400">{{ arqueo.ventas?.length || 0 }} registros</span>
-      </div>
+              @if (conBilletes) {
+                <button class="flex items-center gap-1.5 inf-enlace mt-4" (click)="mostrarConteo = !mostrarConteo">
+                  <lucide-icon [img]="mostrarConteo ? icons.abajo : icons.derecha" class="w-3.5 h-3.5"></lucide-icon>
+                  Contar por billetes y monedas
+                </button>
+                @if (mostrarConteo) {
+                  <div class="conteo mt-3">
+                    @for (d of denominaciones; track d) {
+                      <label>
+                        <span class="inf-tenue">{{ d >= 1 ? d : (d * 100) + ' ctv.' }}</span>
+                        <input type="number" min="0" step="1" placeholder="0" [(ngModel)]="conteo[d]" (ngModelChange)="actualizarConteo()">
+                      </label>
+                    }
+                  </div>
+                  <p class="inf-sub mt-2">Total contado: <b class="inf-tinta">{{ moneda() }} {{ cifra(totalConteo) }}</b></p>
+                }
+              }
+            </div>
 
-      <div *ngIf="!arqueo.ventas || arqueo.ventas.length === 0"
-           class="text-center py-10 text-gray-400">
-        <div class="w-14 h-14 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center mx-auto mb-3">
-          <lucide-icon [img]="icons.empty" class="w-7 h-7 text-gray-400"></lucide-icon>
+            <div class="flex flex-col justify-between gap-4">
+              <div>
+                <p class="paso"><span>2</span>Confirma el cierre</p>
+                <p class="text-[13px] inf-tenue mt-3 leading-relaxed">
+                  Al cerrar ya no podrás registrar ventas hasta que el administrador reabra tu caja.
+                  Al día siguiente podrás abrir caja con un nuevo fondo inicial.
+                </p>
+              </div>
+              <button class="boton-cerrar self-start" (click)="confirmarCierre()">Cerrar caja</button>
+            </div>
+          </div>
+        </section>
+      }
+    }
+
+    <!-- Turno ya cerrado -->
+    @if (cerrado) {
+      <section class="inf-hoja p-6">
+        <div class="inf-seccion">
+          <h2>Turno #{{ turno.id_turno }} cerrado</h2>
+          <span class="inf-nota">{{ desde(turno.fecha_hora_apertura) }} → {{ hora(turno.fecha_hora_cierre) }}</span>
         </div>
-        <p>Sin ventas registradas hoy.</p>
-      </div>
-
-      <div class="overflow-x-auto" *ngIf="arqueo.ventas?.length > 0">
-        <table class="w-full text-base">
-          <thead class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
-            <tr>
-              <th class="px-4 py-3 text-left">#Venta</th>
-              <th class="px-4 py-3 text-left">Hora</th>
-              <th class="px-4 py-3 text-left">Ítems</th>
-              <th class="px-4 py-3 text-left">Método</th>
-              <th class="px-4 py-3 text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let venta of arqueo.ventas"
-                class="border-b border-gray-100 hover:bg-gray-50">
-              <td class="px-4 py-3 font-bold text-gray-800 text-base">#{{ venta.id_venta }}</td>
-              <td class="px-4 py-3 text-gray-600 text-base">
-                {{ venta.fecha_venta | date:'HH:mm' }}
-              </td>
-              <td class="px-4 py-3 text-gray-600 text-base">{{ venta.num_items }} ítem(s)</td>
-              <td class="px-4 py-3">
-                <span class="px-3 py-1 rounded-full text-sm font-bold"
-                      [class.bg-green-100]="venta.metodo_pago === 'Efectivo'"
-                      [class.text-green-700]="venta.metodo_pago === 'Efectivo'"
-                      [class.bg-purple-100]="venta.metodo_pago === 'QR'"
-                      [class.text-purple-700]="venta.metodo_pago === 'QR'">
-                  {{ venta.metodo_pago }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-right font-black text-gray-800 text-lg">
-                {{ moneda() }} {{ (+venta.monto_total_venta).toFixed(2) }}
-              </td>
-            </tr>
-          </tbody>
-          <tfoot class="bg-gray-50">
-            <tr>
-              <td colspan="4" class="px-4 py-4 font-black text-gray-800 text-right text-lg">TOTAL DEL DÍA:</td>
-              <td class="px-4 py-4 text-right font-black text-green-600 text-3xl">
-                {{ moneda() }} {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
-
-    <!-- ═══ SECCIÓN ARQUEO / CIERRE (solo cajeros) ═══ -->
-    <ng-container *ngIf="!esAdmin">
-
-      <!-- A) Caja ABIERTA → botón para hacer arqueo y cerrar -->
-      <div *ngIf="arqueo.turno_activo?.estado_turno === 'Abierto'"
-           class="bg-white rounded-xl shadow-sm border border-red-200 p-6">
-        <div class="flex flex-wrap justify-between items-center gap-4">
+        <div class="grid sm:grid-cols-3 gap-px resultado">
+          <div><p class="inf-etiqueta">Esperado en caja</p><p class="inf-valor">{{ moneda() }} {{ cifra(tr.efectivo_esperado) }}</p></div>
           <div>
-            <h3 class="font-bold text-gray-800 text-lg">Hacer Arqueo y Cerrar Caja</h3>
-            <p class="text-sm text-gray-500 mt-1">
-              Al confirmar, se cerrará tu turno actual y no podrás vender más hasta que el
-              <span class="font-bold">administrador</span> reabra tu caja.<br>
-              Mañana podrás iniciar caja normalmente con un nuevo monto inicial.
+            <p class="inf-etiqueta">Efectivo contado</p>
+            <p class="inf-valor">{{ turno.efectivo_contado !== null ? moneda() + ' ' + cifra(turno.efectivo_contado) : '—' }}</p>
+          </div>
+          <div>
+            <p class="inf-etiqueta">Diferencia</p>
+            <p class="inf-valor">
+              @if (turno.diferencia !== null) {
+                <span class="inf-estado text-sm!" [ngClass]="claseDiferencia(turno.diferencia)">{{ textoDiferencia(turno.diferencia) }}</span>
+              } @else { <span class="inf-tenue">No se contó</span> }
             </p>
           </div>
-          <button (click)="confirmarCierre()"
-                  class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition-colors shadow-sm whitespace-nowrap inline-flex items-center gap-2">
-            <lucide-icon [img]="icons.receipt" class="w-5 h-5"></lucide-icon>
-            Realizar Arqueo y Cerrar
-          </button>
+        </div>
+        @if (!esAdmin) {
+          <p class="inf-sub mt-4">Si necesitas volver a vender hoy, pide al administrador que reabra tu caja.</p>
+        }
+      </section>
+    }
+
+    <!-- Sin caja -->
+    @if (!turno) {
+      <section class="inf-hoja p-6 flex items-start gap-4">
+        <span class="inf-estado aviso mt-1"></span>
+        <div>
+          <p class="inf-tinta font-semibold text-[14px]">No abriste caja hoy</p>
+          <p class="text-[13px] inf-tenue mt-1">Ve a <b class="inf-tinta">Punto de Venta</b> e ingresa tu fondo inicial para empezar a vender.</p>
+        </div>
+      </section>
+    }
+
+    <!-- Hoy -->
+    <section class="inf-hoja inf-tira overflow-hidden">
+      <div>
+        <p class="inf-etiqueta">Ventas de hoy</p>
+        <p class="inf-valor">{{ entero(hoy.total_ventas) }}</p>
+        <p class="inf-sub">registradas por ti</p>
+      </div>
+      <div>
+        <p class="inf-etiqueta">Ingresos de hoy</p>
+        <p class="inf-valor">{{ moneda() }} {{ cifra(hoy.ingresos_totales) }}</p>
+        <p class="inf-sub">ticket promedio {{ moneda() }} {{ cifra(hoy.total_ventas ? hoy.ingresos_totales / hoy.total_ventas : 0) }}</p>
+      </div>
+      @for (m of metodosHoy; track m.metodo) {
+        <div>
+          <p class="inf-etiqueta">{{ m.metodo }}</p>
+          <p class="inf-valor">{{ moneda() }} {{ cifra(m.total) }}</p>
+          <p class="inf-sub">{{ m.ventas }} {{ m.ventas === 1 ? 'venta' : 'ventas' }}</p>
+        </div>
+      }
+    </section>
+
+    <!-- Ventas del día -->
+    <section class="inf-hoja overflow-hidden">
+      <div class="px-5 pt-5">
+        <div class="inf-seccion mb-1!">
+          <h2>Ventas del día</h2>
+          <span class="inf-nota">{{ arqueo.ventas?.length || 0 }} registros</span>
         </div>
       </div>
-
-      <div *ngIf="arqueo.turno_activo?.estado_turno === 'Cerrado'"
-           class="bg-red-50 rounded-xl border border-red-200 p-5 text-center">
-        <div class="w-12 h-12 rounded-full bg-red-100 border border-red-200 flex items-center justify-center mx-auto mb-2">
-          <lucide-icon [img]="icons.shieldAlert" class="w-6 h-6 text-red-500"></lucide-icon>
+      @if (arqueo.ventas?.length) {
+        <div class="overflow-x-auto">
+          <table class="inf-tabla">
+            <thead><tr><th>Hora</th><th>Venta</th><th class="num">Ítems</th><th>Método</th><th class="num">Total</th></tr></thead>
+            <tbody>
+              @for (v of arqueo.ventas; track v.id_venta) {
+                <tr>
+                  <td class="inf-tenue">{{ hora(v.fecha_venta) }}</td>
+                  <td class="fuerte">#{{ v.id_venta }}</td>
+                  <td class="num">{{ v.num_items }}</td>
+                  <td><span class="inf-ficha">{{ v.metodo_pago }}</span></td>
+                  <td class="num fuerte">{{ moneda() }} {{ cifra(v.monto_total_venta) }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr><td colspan="4">Total del día</td><td class="num">{{ moneda() }} {{ cifra(hoy.ingresos_totales) }}</td></tr>
+            </tfoot>
+          </table>
         </div>
-        <p class="text-sm text-red-700 font-bold mb-1">Caja CERRADA</p>
-        <p class="text-xs text-red-600">
-          Tu caja del día ya fue cerrada. Solicita al
-          <span class="font-bold">administrador</span> que la reabra si necesitas vender nuevamente.
-        </p>
-      </div>
-
-      <div *ngIf="!arqueo.turno_activo"
-           class="bg-amber-50 rounded-xl border border-amber-200 p-5 text-center">
-        <div class="w-12 h-12 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center mx-auto mb-2">
-          <lucide-icon [img]="icons.landmark" class="w-6 h-6 text-amber-600"></lucide-icon>
-        </div>
-        <p class="text-sm text-amber-700 font-bold mb-1">Sin Caja Abierta Hoy</p>
-        <p class="text-xs text-amber-600">
-          Aún no has abierto tu caja del día. Ve a
-          <span class="font-bold">Punto de Venta</span> e ingresa tu monto inicial para empezar a vender.
-        </p>
-      </div>
-
-    </ng-container>
-
-  </ng-container>
+      } @else {
+        <p class="inf-vacio">Sin ventas registradas hoy.</p>
+      }
+    </section>
+  }
 </div>
 
-
-<!-- MODAL CONFIRMACIÓN ARQUEO + CIERRE -->
-<div *ngIf="mostrarConfirmCierre"
-     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-    <div class="bg-red-600 p-5 text-white text-center">
-      <div class="w-14 h-14 rounded-full bg-white/15 border border-white/30 flex items-center justify-center mx-auto mb-2">
-        <lucide-icon [img]="icons.receipt" class="w-7 h-7"></lucide-icon>
+<!-- Confirmación del cierre -->
+@if (mostrarConfirmCierre) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="mostrarConfirmCierre = false">
+    <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[15px]">¿Cerrar la caja?</h3>
+        <button class="inf-tenue" (click)="mostrarConfirmCierre = false" aria-label="Cancelar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
       </div>
-      <h3 class="font-black text-xl">Arqueo y Cierre de Caja</h3>
-    </div>
-    <div class="p-6 text-center">
-      <p class="text-gray-700 font-medium mb-2">Resumen del día — ¿confirmas el cierre?</p>
-      <div class="bg-gray-50 rounded-xl p-4 my-4 text-left space-y-1">
-        <div class="flex justify-between text-sm">
-          <span class="text-gray-500">Ventas del día:</span>
-          <span class="font-bold">{{ arqueo.resumen?.total_ventas || 0 }}</span>
-        </div>
-        <div class="flex justify-between text-sm">
-          <span class="text-gray-500">💵 Efectivo:</span>
-          <span class="font-bold text-blue-600">{{ moneda() }} {{ (+arqueo.resumen?.total_efectivo || 0).toFixed(2) }}</span>
-        </div>
-        <div class="flex justify-between text-sm">
-          <span class="text-gray-500">📱 QR:</span>
-          <span class="font-bold text-purple-600">{{ moneda() }} {{ (+arqueo.resumen?.total_qr || 0).toFixed(2) }}</span>
-        </div>
-        <div class="flex justify-between text-sm pt-2 mt-2 border-t border-gray-200">
-          <span class="text-gray-700 font-bold">TOTAL:</span>
-          <span class="font-black text-green-600">{{ moneda() }} {{ (+arqueo.resumen?.ingresos_totales || 0).toFixed(2) }}</span>
-        </div>
+      <dl class="inf-pares p-5">
+        <div><dt>Ventas del turno</dt><dd>{{ entero(tr.ventas) }}</dd></div>
+        <div><dt>Total cobrado</dt><dd>{{ moneda() }} {{ cifra(tr.total) }}</dd></div>
+        <div><dt>Esperado en caja</dt><dd>{{ moneda() }} {{ cifra(tr.efectivo_esperado) }}</dd></div>
+        <div><dt>Efectivo contado</dt><dd>{{ diferencia !== null ? moneda() + ' ' + cifra(efectivoContado) : 'No se registró' }}</dd></div>
+        @if (diferencia !== null) {
+          <div class="total"><dt>Resultado</dt><dd><span class="inf-estado" [ngClass]="claseDiferencia(diferencia)">{{ textoDiferencia(diferencia) }}</span></dd></div>
+        }
+      </dl>
+      <p class="px-5 text-xs inf-tenue">Solo el administrador podrá reabrir tu caja durante las próximas 24 horas.</p>
+      <div class="flex gap-2 p-5">
+        <button class="inf-boton flex-1 justify-center py-2!" (click)="mostrarConfirmCierre = false">Cancelar</button>
+        <button class="boton-cerrar flex-1" [disabled]="cerrando" (click)="ejecutarCierreCaja()">
+          {{ cerrando ? 'Cerrando…' : 'Confirmar cierre' }}
+        </button>
       </div>
-      <p class="text-xs text-red-500 font-medium">
-        Tu caja se cerrará. Solo el administrador podrá reabrirla durante las próximas 24 horas.
-      </p>
-    </div>
-    <div class="px-6 pb-6 flex gap-3">
-      <button (click)="cancelarCierre()"
-              class="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">
-        Cancelar
-      </button>
-      <button (click)="ejecutarCierreCaja()" [disabled]="cerrando"
-              class="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-black rounded-xl transition-colors">
-        {{ cerrando ? 'Cerrando...' : 'Confirmar Arqueo' }}
-      </button>
     </div>
   </div>
-</div>
+}

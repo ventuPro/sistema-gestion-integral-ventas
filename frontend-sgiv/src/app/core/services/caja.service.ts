@@ -68,7 +68,7 @@ export class CajaService {
   abrirTurno(datos: { id_sucursal: number; monto_inicial: number }): Observable<any> {
     return this.http.post(`${this.apiUrl}/caja/turnos/abrir`, datos, { headers: this.h() });
   }
-  cerrarCaja(datos: { id_sucursal: number }): Observable<any> {
+  cerrarCaja(datos: { id_sucursal: number; efectivo_contado?: number | null }): Observable<any> {
     return this.http.post(`${this.apiUrl}/caja/cerrar`, datos, { headers: this.h() });
   }
 

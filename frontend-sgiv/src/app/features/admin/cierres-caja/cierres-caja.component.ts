@@ -1,79 +1,77 @@
 import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { LucideAngularModule, RotateCw } from 'lucide-angular';
 import { CajaService } from '../../../core/services/caja.service';
-import { environment } from '../../../../environments/environment';
+import { SucursalService } from '../../../core/services/sucursal.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
+import { cifra, entero, fechaHora, hora } from '../../../core/utils/informe';
 
 @Component({
   selector: 'app-cierres-caja',
   standalone: true,
-  imports: [CommonModule, SelectorSucursalComponent],
-  templateUrl: './cierres-caja.component.html'
+  imports: [CommonModule, LucideAngularModule, SelectorSucursalComponent],
+  templateUrl: './cierres-caja.component.html',
+  styleUrls: ['../../shared/informe/informe.css']
 })
 export class CierresCajaComponent implements OnInit {
-  private cajaService = inject(CajaService);
-  private cdr         = inject(ChangeDetectorRef);
-  readonly moneda      = inject(AjustesService).moneda;
-  private http        = inject(HttpClient);
-  private apiUrl      = environment.apiUrl;
+  private cajaService     = inject(CajaService);
+  private sucursalService = inject(SucursalService);
+  private cdr             = inject(ChangeDetectorRef);
+  readonly moneda         = inject(AjustesService).moneda;
 
-  cierres:           any[] = [];
-  cierresFiltrados:  any[] = [];
-  sucursales:        any[] = [];
-  sucursalFiltro:    any   = null;  // null = todas
-  cargando           = true;
+  readonly icons = { actualizar: RotateCw };
+  readonly cifra = cifra;
+  readonly entero = entero;
+  readonly fechaHora = fechaHora;
+  readonly hora = hora;
 
-  private h(): HttpHeaders {
-    return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
-  }
+  cierres:          any[] = [];
+  cierresFiltrados: any[] = [];
+  sucursales:       any[] = [];
+  sucursalFiltro:   any   = null;  // null = todas
+  cargando          = true;
 
   ngOnInit() {
-    this.cargarSucursales();
+    this.sucursalService.listarSucursales().subscribe({
+      next: (s: any[]) => { this.sucursales = s || []; this.cdr.detectChanges(); }
+    });
     this.cargar();
   }
 
-  cargarSucursales() {
-    this.http.get<any[]>(`${this.apiUrl}/sucursales`, { headers: this.h() }).subscribe({
-      next: (s) => { this.sucursales = s; this.cdr.detectChanges(); }
-    });
-  }
-
   cargar() {
-    this.cargando = true;
+    this.cargando = !this.cierres.length;
     this.cajaService.obtenerCierres().subscribe({
-      next: (data) => {
-        this.cierres = data;
-        this.aplicarFiltro();
-        this.cargando = false;
-        this.cdr.detectChanges();
-      },
+      next: (data) => { this.cierres = data || []; this.aplicarFiltro(); this.cargando = false; this.cdr.detectChanges(); },
       error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
   }
 
-  seleccionarSucursal(suc: any | null) {
-    this.sucursalFiltro = suc;
+  cambiarSucursal(id: number | null) {
+    this.sucursalFiltro = this.sucursales.find(s => s.id_sucursal === id) || null;
     this.aplicarFiltro();
   }
 
-  cambiarSucursal(id: number | null) {
-    this.seleccionarSucursal(this.sucursales.find(s => s.id_sucursal === id) || null);
-  }
-
   aplicarFiltro() {
-    if (!this.sucursalFiltro) {
-      this.cierresFiltrados = [...this.cierres];
-    } else {
-      this.cierresFiltrados = this.cierres.filter(
-        c => c.nombre_sucursal === this.sucursalFiltro.nombre_sucursal
-      );
-    }
+    this.cierresFiltrados = this.sucursalFiltro
+      ? this.cierres.filter(c => c.id_sucursal === this.sucursalFiltro.id_sucursal)
+      : [...this.cierres];
     this.cdr.detectChanges();
   }
 
-  getTotalGeneral(): number {
-    return this.cierresFiltrados.reduce((s, c) => s + Number(c.total_recaudado), 0);
+  mismoDia(c: any): boolean {
+    return new Date(c.fecha_hora_apertura).toDateString() === new Date(c.fecha_hora_cierre).toDateString();
+  }
+
+  get totales() {
+    const t = { ventas: 0, total: 0, efectivo: 0, qr: 0, diferencia: 0, contados: 0 };
+    for (const c of this.cierresFiltrados) {
+      t.ventas   += Number(c.total_ventas);
+      t.total    += Number(c.total_recaudado);
+      t.efectivo += Number(c.total_efectivo);
+      t.qr       += Number(c.total_qr);
+      if (c.diferencia !== null) { t.diferencia += Number(c.diferencia); t.contados++; }
+    }
+    return t;
   }
 }

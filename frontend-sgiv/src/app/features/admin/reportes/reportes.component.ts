@@ -274,6 +274,27 @@ export class ReportesComponent implements OnInit, OnDestroy {
     return this.verTodosTurnos ? t : t.slice(0, 8);
   }
 
+  /** Productos sin ventas agrupados por categoría */
+  get sinVentasPorCategoria(): { categoria: string; productos: any[] }[] {
+    const grupos = new Map<string, any[]>();
+    for (const p of this.datos?.sin_ventas || []) {
+      if (!grupos.has(p.nombre_categoria)) grupos.set(p.nombre_categoria, []);
+      grupos.get(p.nombre_categoria)!.push(p);
+    }
+    return [...grupos].map(([categoria, productos]) => ({ categoria, productos }));
+  }
+
+  get resumenSinVentas() {
+    const l = this.datos?.sin_ventas || [];
+    const conStock = l.filter((p: any) => p.stock > 0);
+    return {
+      conStock: conStock.length,
+      unidades: conStock.reduce((s: number, p: any) => s + p.stock, 0),
+      valor:    conStock.reduce((s: number, p: any) => s + p.stock * p.precio, 0),
+      agotados: l.length - conStock.length
+    };
+  }
+
   get totalTurnos(): number { return (this.datos?.cierres || []).reduce((s: number, t: any) => s + t.total, 0); }
   get maxCategoria(): number { return Math.max(1, ...(this.datos?.por_categoria || []).map((c: any) => c.ingresos)); }
   get tasaCancelacion(): number { return porcentaje(this.datos?.pedidos_qr?.cancelados, this.datos?.pedidos_qr?.total); }
@@ -474,13 +495,14 @@ export class ReportesComponent implements OnInit, OnDestroy {
       d.ventas_diarias.map((x: any) => [x.dia, x.ventas, m(x.ingresos)]), [1, 2]);
     if (d.cierres?.length) {
       seccion('Turnos de caja cerrados');
-      tabla(['Cajero', 'Sucursal', 'Cierre', 'Ventas', 'Efectivo', 'Total'],
-        d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal, fechaHora(c.fecha_hora_cierre), c.ventas, m(c.efectivo), m(c.total)]), [3, 4, 5]);
+      tabla(['Cajero', 'Sucursal', 'Cierre', 'Ventas', 'Efectivo', 'Total', 'Diferencia'],
+        d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal, fechaHora(c.fecha_hora_cierre), c.ventas, m(c.efectivo), m(c.total),
+          c.diferencia === null ? 'sin conteo' : m(c.diferencia)]), [3, 4, 5, 6]);
     }
     if (d.sin_ventas?.length) {
       seccion('Productos activos sin ventas en el período');
-      tabla(['Producto', 'Categoría', 'Stock actual'],
-        d.sin_ventas.map((p: any) => [p.nombre_producto, p.nombre_categoria, p.stock]), [2]);
+      tabla(['Producto', 'Categoría', 'Stock actual', 'Valor en stock'],
+        d.sin_ventas.map((p: any) => [p.nombre_producto, p.nombre_categoria, p.stock, m(p.stock * p.precio)]), [2, 3]);
     }
 
     const total = doc.getNumberOfPages();
@@ -541,9 +563,11 @@ export class ReportesComponent implements OnInit, OnDestroy {
     hoja('Categorías', [['Categoría', 'Unidades', `Ingresos (${mon})`, '%'], ...d.por_categoria.map((c: any) => [c.nombre_categoria, c.unidades, c.ingresos, pct(c.ingresos)])], [24, 10, 16, 8]);
     hoja('Productos', [['#', 'Producto', 'Categoría', 'Unidades', `Ingresos (${mon})`, '%'],
       ...d.productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, p.unidades, p.ingresos, pct(p.ingresos)])], [5, 30, 20, 10, 16, 8]);
-    hoja('Sin ventas', [['Producto', 'Categoría', 'Stock actual'], ...d.sin_ventas.map((p: any) => [p.nombre_producto, p.nombre_categoria, p.stock])], [30, 20, 12]);
-    hoja('Turnos de caja', [['Cajero', 'Sucursal', 'Apertura', 'Cierre', `Fondo inicial (${mon})`, 'Ventas', `Efectivo (${mon})`, `Total (${mon})`],
-      ...d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal, fechaHora(c.fecha_hora_apertura), fechaHora(c.fecha_hora_cierre), c.monto_inicial, c.ventas, c.efectivo, c.total])], [24, 18, 20, 20, 16, 8, 14, 14]);
+    hoja('Sin ventas', [['Producto', 'Categoría', 'Stock actual', `Precio (${mon})`, `Valor en stock (${mon})`],
+      ...d.sin_ventas.map((p: any) => [p.nombre_producto, p.nombre_categoria, p.stock, p.precio, +(p.stock * p.precio).toFixed(2)])], [30, 20, 12, 12, 18]);
+    hoja('Turnos de caja', [['Cajero', 'Sucursal', 'Apertura', 'Cierre', `Fondo inicial (${mon})`, 'Ventas', `Efectivo (${mon})`, `Total (${mon})`, `Esperado en caja (${mon})`, `Contado (${mon})`, `Diferencia (${mon})`],
+      ...d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal, fechaHora(c.fecha_hora_apertura), fechaHora(c.fecha_hora_cierre), c.monto_inicial, c.ventas, c.efectivo, c.total,
+        c.efectivo_esperado ?? '', c.efectivo_contado ?? '', c.diferencia ?? ''])], [24, 18, 20, 20, 16, 8, 14, 14, 18, 14, 14]);
 
     XLSX.writeFile(wb, `Informe_${this.nombreArchivo}_${this.fechaInicio}_${this.fechaFin}.xlsx`);
   }

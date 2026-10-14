@@ -9,8 +9,12 @@ const { crearLogin } = require('../sesionPrueba');
 let bd, servidor, io, pool, URL_BASE, tAdmin, tCajero;
 let catA, catB, prodA, prodB, prodSinVenta, suc2;
 
-const api = async (ruta, token) => {
-    const r = await fetch(`${URL_BASE}/api${ruta}`, { headers: { Authorization: `Bearer ${token}` } });
+const api = async (ruta, token, metodo = 'GET', body) => {
+    const r = await fetch(`${URL_BASE}/api${ruta}`, {
+        method: metodo,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+    });
     return { status: r.status, body: await r.json() };
 };
 
@@ -159,5 +163,30 @@ describe('periodoAnterior', () => {
         const { periodoAnterior } = require('../../src/models/reporteModel');
         assert.deepEqual(periodoAnterior('2026-03-01', '2026-03-31'), ['2026-01-29', '2026-02-28']);
         assert.deepEqual(periodoAnterior('2026-03-10', '2026-03-10'), ['2026-03-09', '2026-03-09']);
+    });
+});
+
+describe('Arqueo y cierre de caja con efectivo contado', () => {
+    test('esperado = fondo + efectivo del turno; guarda contado y diferencia', async () => {
+        assert.equal((await api('/caja/turnos/abrir', tCajero, 'POST', { id_sucursal: 1, monto_inicial: 100 })).status, 201);
+        const cobro = (metodo_pago, cantidad) => api('/caja/cobrar', tCajero, 'POST',
+            { id_sucursal: 1, metodo_pago, monto_total_venta: cantidad * 10, detalles: [{ id_producto: prodB, cantidad }] });
+        assert.equal((await cobro('Efectivo', 2)).status, 201);
+        assert.equal((await cobro('QR', 1)).status, 201);
+
+        const arqueo = (await api('/caja/arqueo/1', tCajero)).body;
+        assert.equal(arqueo.turno_resumen.efectivo, 20);
+        assert.equal(arqueo.turno_resumen.efectivo_esperado, 120);
+        assert.equal(arqueo.turno_resumen.total, 30);
+
+        assert.equal((await api('/caja/cerrar', tCajero, 'POST', { id_sucursal: 1, efectivo_contado: -3 })).status, 400);
+        const cierre = (await api('/caja/cerrar', tCajero, 'POST', { id_sucursal: 1, efectivo_contado: 115 })).body;
+        assert.equal(cierre.efectivo_esperado, 120);
+        assert.equal(cierre.diferencia, -5);
+
+        const cierres = (await api('/caja/cierres', tAdmin)).body;
+        const c = cierres.find(x => x.id_turno === cierre.id_turno_cerrado);
+        assert.equal(c.efectivo_contado, 115);
+        assert.equal(c.diferencia, -5);
     });
 });
