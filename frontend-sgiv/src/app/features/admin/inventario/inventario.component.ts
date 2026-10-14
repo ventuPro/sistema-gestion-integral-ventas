@@ -8,11 +8,12 @@ import { LucideAngularModule,
          Pencil, Trash2, PackagePlus, Package, RotateCw,
          AlertTriangle, CheckCircle2, XCircle, Store } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent],
   templateUrl: './inventario.component.html'
 })
 export class InventarioComponent implements OnInit {
@@ -130,6 +131,11 @@ export class InventarioComponent implements OnInit {
     this.cargarProductos();
     this.cargarCategorias();
     this.cdr.detectChanges();
+  }
+
+  cambiarSucursal(id: number | null) {
+    const suc = this.sucursales.find(s => s.id_sucursal === id);
+    if (suc) this.seleccionarSucursal(suc);
   }
 
   get idSucursal(): number {

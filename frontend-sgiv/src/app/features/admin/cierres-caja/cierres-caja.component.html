@@ -12,26 +12,9 @@
     </button>
   </div>
 
-  <!-- Filtro por sucursal — MISMO estilo que reportes -->
-  <div class="flex flex-wrap gap-2">
-    <button (click)="seleccionarSucursal(null)"
-            class="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-            [class.bg-blue-600]="!sucursalFiltro"
-            [class.text-white]="!sucursalFiltro"
-            [class.bg-gray-100]="!!sucursalFiltro"
-            [class.text-gray-600]="!!sucursalFiltro">
-      Todas las sucursales
-    </button>
-    <button *ngFor="let suc of sucursales"
-            (click)="seleccionarSucursal(suc)"
-            class="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-            [class.bg-blue-600]="sucursalFiltro?.id_sucursal === suc.id_sucursal"
-            [class.text-white]="sucursalFiltro?.id_sucursal === suc.id_sucursal"
-            [class.bg-gray-100]="sucursalFiltro?.id_sucursal !== suc.id_sucursal"
-            [class.text-gray-600]="sucursalFiltro?.id_sucursal !== suc.id_sucursal">
-      {{ suc.nombre_sucursal }}
-    </button>
-  </div>
+  <app-selector-sucursal [sucursales]="sucursales" [todas]="true"
+                         [seleccionada]="sucursalFiltro?.id_sucursal ?? null"
+                         (cambio)="cambiarSucursal($event)" />
 
   <!-- Cargando -->
   <div *ngIf="cargando" class="flex justify-center py-16">

@@ -1,295 +1,393 @@
 const db = require('../config/db');
 
-const obtenerResumenDiario = async (id_sucursal) => {
-    const query = `
-        SELECT 
-            COUNT(id_venta)::int                              AS total_ventas,
-            COALESCE(SUM(monto_total_venta), 0)::numeric      AS ingresos_totales,
-            COALESCE(SUM(CASE WHEN metodo_pago = 'Efectivo' THEN monto_total_venta ELSE 0 END), 0)::numeric AS total_efectivo,
-            COALESCE(SUM(CASE WHEN metodo_pago = 'QR'       THEN monto_total_venta ELSE 0 END), 0)::numeric AS total_qr
+// id_sucursal = 0 → todas las sucursales (solo administrador, lo controla el controlador)
+const deSucursal = (columna) => `($1::int = 0 OR ${columna} = $1)`;
+
+const filas = (sql, params) => db.query(sql, params).then(r => r.rows);
+
+// ─── Panel del día ───
+const obtenerPanel = async (id_sucursal, id_categoria = null) => {
+    const p = [id_sucursal];
+
+    const totales = (desde, hasta) => filas(`
+        SELECT COUNT(*)::int AS ventas,
+               ROUND(COALESCE(SUM(monto_total_venta), 0), 2)::float8 AS ingresos
         FROM venta_caja
-        WHERE id_sucursal = $1 AND DATE(fecha_venta) = CURRENT_DATE;
-    `;
-    const result = await db.query(query, [id_sucursal]);
-    return result.rows[0];
-};
+        WHERE ${deSucursal('id_sucursal')} AND fecha_venta >= ${desde} AND fecha_venta < ${hasta}
+    `, p).then(r => r[0]);
 
-const obtenerTopProductos = async (id_sucursal) => {
-    const query = `
-        SELECT p.nombre_producto, SUM(dv.cantidad_vendida)::int AS total_vendido
-        FROM detalle_venta dv
-        JOIN venta_caja vc ON dv.id_venta = vc.id_venta
-        JOIN producto p    ON dv.id_producto = p.id_producto
-        WHERE vc.id_sucursal = $1
-        GROUP BY p.id_producto, p.nombre_producto
-        ORDER BY total_vendido DESC
-        LIMIT 5;
-    `;
-    const result = await db.query(query, [id_sucursal]);
-    return result.rows;
-};
-
-const obtenerAlertasStock = async (id_sucursal) => {
-    const query = `
-        SELECT p.nombre_producto, i.cantidad_actual, i.stock_minimo_alerta
-        FROM inventario_sucursal i
-        JOIN producto p ON i.id_producto = p.id_producto
-        WHERE i.id_sucursal = $1 AND i.cantidad_actual <= i.stock_minimo_alerta;
-    `;
-    const result = await db.query(query, [id_sucursal]);
-    return result.rows;
-};
-
-// Dashboard completo para resumen
-const obtenerDashboardCompleto = async (id_sucursal, id_categoria = null) => {
-    const queryResumen = `
-        SELECT 
-            COUNT(id_venta)::int                              AS total_ventas,
-            COALESCE(SUM(monto_total_venta), 0)::numeric      AS ingresos_totales,
-            COALESCE(SUM(CASE WHEN metodo_pago = 'Efectivo' THEN monto_total_venta ELSE 0 END), 0)::numeric AS total_efectivo,
-            COALESCE(SUM(CASE WHEN metodo_pago = 'QR'       THEN monto_total_venta ELSE 0 END), 0)::numeric AS total_qr
-        FROM venta_caja
-        WHERE id_sucursal = $1 AND DATE(fecha_venta) = CURRENT_DATE;
-    `;
-    const queryTurno = `
-        SELECT t.id_turno, t.estado_turno, t.monto_inicial::numeric, t.fecha_hora_apertura,
-               u.nombre_completo AS cajero
-        FROM turno_caja t
-        JOIN usuario u ON t.id_usuario_cajero = u.id_usuario
-        WHERE t.id_sucursal = $1 AND t.estado_turno = 'Abierto'
-        ORDER BY t.fecha_hora_apertura DESC LIMIT 1;
-    `;
-    const queryVentasDia = `
-        SELECT DATE(fecha_venta)::text AS fecha,
-               SUM(monto_total_venta)::numeric AS ingresos,
-               COUNT(*)::int                   AS ventas
-        FROM venta_caja
-        WHERE id_sucursal = $1 AND fecha_venta >= CURRENT_DATE - INTERVAL '6 days'
-        GROUP BY DATE(fecha_venta)
-        ORDER BY fecha ASC;
-    `;
-    const queryMetodos = `
-        SELECT metodo_pago,
-               COUNT(*)::int                AS cantidad,
-               SUM(monto_total_venta)::numeric AS total
-        FROM venta_caja
-        WHERE id_sucursal = $1 AND DATE(fecha_venta) = CURRENT_DATE
-        GROUP BY metodo_pago;
-    `;
-
-    let queryProductos, paramsProductos;
-    if (id_categoria) {
-        queryProductos = `
-            SELECT p.nombre_producto, c.nombre_categoria, SUM(dv.cantidad_vendida)::int AS total_vendido
-            FROM detalle_venta dv
-            JOIN producto p ON dv.id_producto = p.id_producto
-            JOIN categoria_producto c ON p.id_categoria = c.id_categoria
-            JOIN venta_caja vc ON dv.id_venta = vc.id_venta
-            WHERE vc.id_sucursal = $1 AND DATE(vc.fecha_venta) = CURRENT_DATE AND p.id_categoria = $2
-            GROUP BY p.id_producto, p.nombre_producto, c.nombre_categoria
-            ORDER BY total_vendido DESC LIMIT 8;
-        `;
-        paramsProductos = [id_sucursal, id_categoria];
-    } else {
-        queryProductos = `
-            SELECT p.nombre_producto, c.nombre_categoria, SUM(dv.cantidad_vendida)::int AS total_vendido
-            FROM detalle_venta dv
-            JOIN producto p ON dv.id_producto = p.id_producto
-            JOIN categoria_producto c ON p.id_categoria = c.id_categoria
-            JOIN venta_caja vc ON dv.id_venta = vc.id_venta
-            WHERE vc.id_sucursal = $1 AND DATE(vc.fecha_venta) = CURRENT_DATE
-            GROUP BY p.id_producto, p.nombre_producto, c.nombre_categoria
-            ORDER BY total_vendido DESC LIMIT 8;
-        `;
-        paramsProductos = [id_sucursal];
-    }
-
-    const [resumen, turno, ventasDia, metodos, productos] = await Promise.all([
-        db.query(queryResumen,    [id_sucursal]),
-        db.query(queryTurno,      [id_sucursal]),
-        db.query(queryVentasDia,  [id_sucursal]),
-        db.query(queryMetodos,    [id_sucursal]),
-        db.query(queryProductos,  paramsProductos)
-    ]);
-
-    return {
-        resumen_hoy:   resumen.rows[0],
-        turno_actual:  turno.rows[0] || null,
-        ventas_por_dia: ventasDia.rows,
-        metodos_pago:  metodos.rows,
-        top_productos: productos.rows
-    };
-};
-
-const obtenerReportePorPeriodo = async (id_sucursal, fecha_inicio, fecha_fin, categorias = null) => {
-    const filtra = Array.isArray(categorias) && categorias.length > 0;
-    const cats   = filtra ? categorias.map(Number).filter(n => Number.isFinite(n)) : null;
-
-    let queryResumen, queryVentasDiarias, paramsBase;
-
-    if (!filtra) {
-        paramsBase = [id_sucursal, fecha_inicio, fecha_fin];
-        queryResumen = `
-            SELECT
-                COUNT(id_venta)::int AS total_ventas,
-                COALESCE(SUM(monto_total_venta), 0)::numeric AS ingresos_totales,
-                COALESCE(AVG(monto_total_venta), 0)::numeric AS ticket_promedio
-            FROM venta_caja
-            WHERE id_sucursal = $1
-              AND fecha_venta >= $2::date
-              AND fecha_venta <  ($3::date + INTERVAL '1 day');
-        `;
-        queryVentasDiarias = `
-            SELECT DATE(fecha_venta)::text AS dia,
-                   COUNT(*)::int           AS ventas,
-                   SUM(monto_total_venta)::numeric AS ingresos
-            FROM venta_caja
-            WHERE id_sucursal = $1
-              AND fecha_venta >= $2::date
-              AND fecha_venta <  ($3::date + INTERVAL '1 day')
-            GROUP BY DATE(fecha_venta)
-            ORDER BY dia ASC;
-        `;
-    } else {
-        paramsBase = [id_sucursal, fecha_inicio, fecha_fin, cats];
-        queryResumen = `
-            WITH vf AS (
-                SELECT v.id_venta, SUM(dv.subtotal_venta)::numeric AS subtotal_filtrado
-                FROM venta_caja v
-                JOIN detalle_venta dv ON dv.id_venta = v.id_venta
-                JOIN producto p       ON p.id_producto = dv.id_producto
-                WHERE v.id_sucursal = $1
-                  AND v.fecha_venta >= $2::date
-                  AND v.fecha_venta <  ($3::date + INTERVAL '1 day')
-                  AND p.id_categoria = ANY($4::int[])
-                GROUP BY v.id_venta
-            )
-            SELECT
-                COUNT(*)::int                                       AS total_ventas,
-                COALESCE(SUM(subtotal_filtrado), 0)::numeric        AS ingresos_totales,
-                COALESCE(AVG(subtotal_filtrado), 0)::numeric        AS ticket_promedio
-            FROM vf;
-        `;
-        queryVentasDiarias = `
-            SELECT DATE(v.fecha_venta)::text                            AS dia,
-                   COUNT(DISTINCT v.id_venta)::int                       AS ventas,
-                   COALESCE(SUM(dv.subtotal_venta), 0)::numeric          AS ingresos
+    const [
+        hoy, ayerHora, ayerTotal, semanaHora, metodos, porHora, promedioHora, dias,
+        productos, turnos, mesas, pedidos, stock, stockCritico, ultimas, sucursales
+    ] = await Promise.all([
+        filas(`
+            SELECT COUNT(*)::int AS ventas,
+                   ROUND(COALESCE(SUM(v.monto_total_venta), 0), 2)::float8 AS ingresos,
+                   ROUND(COALESCE(AVG(v.monto_total_venta), 0), 2)::float8 AS ticket,
+                   ROUND(COALESCE(MAX(v.monto_total_venta), 0), 2)::float8 AS venta_maxima,
+                   COALESCE((SELECT SUM(dv.cantidad_vendida) FROM detalle_venta dv
+                             JOIN venta_caja v2 ON v2.id_venta = dv.id_venta
+                             WHERE ${deSucursal('v2.id_sucursal')} AND v2.fecha_venta >= CURRENT_DATE), 0)::int AS unidades,
+                   MIN(v.fecha_venta) AS primera_venta
             FROM venta_caja v
-            JOIN detalle_venta dv ON dv.id_venta = v.id_venta
-            JOIN producto p       ON p.id_producto = dv.id_producto
-            WHERE v.id_sucursal = $1
-              AND v.fecha_venta >= $2::date
-              AND v.fecha_venta <  ($3::date + INTERVAL '1 day')
-              AND p.id_categoria = ANY($4::int[])
-            GROUP BY DATE(v.fecha_venta)
-            ORDER BY dia ASC;
-        `;
-    }
-
-    const filtroCat = filtra ? 'AND p.id_categoria = ANY($4::int[])' : '';
-
-    const queryCategorias = `
-        SELECT c.id_categoria,
-               c.nombre_categoria,
-               SUM(dv.subtotal_venta)::numeric  AS ingresos,
-               SUM(dv.cantidad_vendida)::int     AS unidades
-        FROM detalle_venta dv
-        JOIN producto p ON dv.id_producto = p.id_producto
-        JOIN categoria_producto c ON p.id_categoria = c.id_categoria
-        JOIN venta_caja v ON dv.id_venta = v.id_venta
-        WHERE v.id_sucursal = $1
-          AND v.fecha_venta >= $2::date
-          AND v.fecha_venta <  ($3::date + INTERVAL '1 day')
-          ${filtroCat}
-        GROUP BY c.id_categoria, c.nombre_categoria
-        ORDER BY ingresos DESC;
-    `;
-    const queryTopProductos = `
-        SELECT p.nombre_producto, c.nombre_categoria,
-               SUM(dv.cantidad_vendida)::int     AS unidades,
-               SUM(dv.subtotal_venta)::numeric   AS ingresos
-        FROM detalle_venta dv
-        JOIN producto p ON dv.id_producto = p.id_producto
-        JOIN categoria_producto c ON p.id_categoria = c.id_categoria
-        JOIN venta_caja v ON dv.id_venta = v.id_venta
-        WHERE v.id_sucursal = $1
-          AND v.fecha_venta >= $2::date
-          AND v.fecha_venta <  ($3::date + INTERVAL '1 day')
-          ${filtroCat}
-        GROUP BY p.id_producto, p.nombre_producto, c.nombre_categoria
-        ORDER BY ingresos DESC
-        LIMIT 10;
-    `;
-
-    const [resumen, ventasDiarias, categoriasRes, topProductos] = await Promise.all([
-        db.query(queryResumen,       paramsBase),
-        db.query(queryVentasDiarias, paramsBase),
-        db.query(queryCategorias,    paramsBase),
-        db.query(queryTopProductos,  paramsBase)
+            WHERE ${deSucursal('v.id_sucursal')} AND v.fecha_venta >= CURRENT_DATE
+        `, p).then(r => r[0]),
+        totales(`CURRENT_DATE - 1`, `LOCALTIMESTAMP - INTERVAL '1 day'`),
+        totales(`CURRENT_DATE - 1`, `CURRENT_DATE`),
+        totales(`CURRENT_DATE - 7`, `LOCALTIMESTAMP - INTERVAL '7 days'`),
+        filas(`
+            SELECT metodo_pago, COUNT(*)::int AS ventas,
+                   ROUND(SUM(monto_total_venta), 2)::float8 AS ingresos
+            FROM venta_caja
+            WHERE ${deSucursal('id_sucursal')} AND fecha_venta >= CURRENT_DATE
+            GROUP BY metodo_pago ORDER BY ingresos DESC
+        `, p),
+        filas(`
+            SELECT EXTRACT(HOUR FROM fecha_venta)::int AS hora, COUNT(*)::int AS ventas,
+                   ROUND(SUM(monto_total_venta), 2)::float8 AS ingresos
+            FROM venta_caja
+            WHERE ${deSucursal('id_sucursal')} AND fecha_venta >= CURRENT_DATE
+            GROUP BY 1 ORDER BY 1
+        `, p),
+        filas(`
+            SELECT EXTRACT(HOUR FROM fecha_venta)::int AS hora,
+                   ROUND(SUM(monto_total_venta) / 7, 2)::float8 AS ingresos
+            FROM venta_caja
+            WHERE ${deSucursal('id_sucursal')} AND fecha_venta >= CURRENT_DATE - 7 AND fecha_venta < CURRENT_DATE
+            GROUP BY 1 ORDER BY 1
+        `, p),
+        filas(`
+            SELECT d::date::text AS fecha, COUNT(v.id_venta)::int AS ventas,
+                   ROUND(COALESCE(SUM(v.monto_total_venta), 0), 2)::float8 AS ingresos
+            FROM generate_series((CURRENT_DATE - 13)::timestamp, CURRENT_DATE::timestamp, INTERVAL '1 day') d
+            LEFT JOIN venta_caja v ON v.fecha_venta >= d AND v.fecha_venta < d + INTERVAL '1 day'
+                                  AND ${deSucursal('v.id_sucursal')}
+            GROUP BY d ORDER BY d
+        `, p),
+        filas(`
+            SELECT p.nombre_producto, c.nombre_categoria,
+                   SUM(dv.cantidad_vendida)::int AS unidades,
+                   ROUND(SUM(dv.subtotal_venta), 2)::float8 AS ingresos
+            FROM detalle_venta dv
+            JOIN venta_caja v         ON v.id_venta = dv.id_venta
+            JOIN producto p           ON p.id_producto = dv.id_producto
+            JOIN categoria_producto c ON c.id_categoria = p.id_categoria
+            WHERE ${deSucursal('v.id_sucursal')} AND v.fecha_venta >= CURRENT_DATE
+              AND ($2::int IS NULL OR p.id_categoria = $2)
+            GROUP BY p.id_producto, p.nombre_producto, c.nombre_categoria
+            ORDER BY unidades DESC, ingresos DESC
+            LIMIT 8
+        `, [id_sucursal, id_categoria]),
+        filas(`
+            SELECT t.id_turno, s.nombre_sucursal, u.nombre_completo AS cajero,
+                   t.fecha_hora_apertura, t.monto_inicial::float8 AS monto_inicial,
+                   COUNT(v.id_venta)::int AS ventas,
+                   ROUND(COALESCE(SUM(v.monto_total_venta), 0), 2)::float8 AS total,
+                   ROUND(COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = 'Efectivo'), 0), 2)::float8 AS efectivo
+            FROM turno_caja t
+            JOIN usuario u  ON u.id_usuario = t.id_usuario_cajero
+            JOIN sucursal s ON s.id_sucursal = t.id_sucursal
+            LEFT JOIN venta_caja v ON v.id_turno = t.id_turno
+            WHERE t.estado_turno = 'Abierto' AND ${deSucursal('t.id_sucursal')}
+            GROUP BY t.id_turno, s.nombre_sucursal, u.nombre_completo
+            ORDER BY t.fecha_hora_apertura
+        `, p),
+        filas(`
+            SELECT COUNT(*)::int AS total, COUNT(c.id_cuenta)::int AS ocupadas,
+                   ROUND(COALESCE(SUM(c.total_acumulado), 0), 2)::float8 AS por_cobrar
+            FROM mesa_local m
+            LEFT JOIN cuenta_mesa c ON c.id_mesa = m.id_mesa AND c.estado = 'Abierta'
+            WHERE ${deSucursal('m.id_sucursal')}
+        `, p).then(r => r[0]),
+        filas(`
+            SELECT COUNT(*) FILTER (WHERE pm.estado_pedido = 'Pendiente_Cajero')::int AS pendientes,
+                   COUNT(*) FILTER (WHERE pm.estado_pedido = 'Confirmado')::int       AS por_entregar,
+                   COUNT(*) FILTER (WHERE pm.fecha_pedido >= CURRENT_DATE)::int       AS hoy
+            FROM pedido_mesa pm
+            LEFT JOIN mesa_local m ON m.id_mesa = pm.id_mesa
+            WHERE ${deSucursal('COALESCE(pm.id_sucursal, m.id_sucursal)')}
+        `, p).then(r => r[0]),
+        filas(`
+            SELECT COUNT(*)::int AS productos,
+                   COUNT(*) FILTER (WHERE i.cantidad_actual <= 0)::int AS agotados,
+                   COUNT(*) FILTER (WHERE i.cantidad_actual > 0 AND i.cantidad_actual <= i.stock_minimo_alerta)::int AS bajos
+            FROM inventario_sucursal i
+            JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo
+            WHERE ${deSucursal('i.id_sucursal')}
+        `, p).then(r => r[0]),
+        filas(`
+            SELECT p.nombre_producto, s.nombre_sucursal, i.cantidad_actual, i.stock_minimo_alerta
+            FROM inventario_sucursal i
+            JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo
+            JOIN sucursal s ON s.id_sucursal = i.id_sucursal
+            WHERE ${deSucursal('i.id_sucursal')} AND i.cantidad_actual <= i.stock_minimo_alerta
+            ORDER BY (i.cantidad_actual > 0), i.cantidad_actual::numeric / GREATEST(i.stock_minimo_alerta, 1)
+            LIMIT 8
+        `, p),
+        filas(`
+            SELECT v.id_venta, v.fecha_venta, v.metodo_pago, s.nombre_sucursal,
+                   v.monto_total_venta::float8 AS monto, u.nombre_completo AS cajero,
+                   (SELECT COALESCE(SUM(cantidad_vendida), 0) FROM detalle_venta WHERE id_venta = v.id_venta)::int AS unidades
+            FROM venta_caja v
+            JOIN sucursal s     ON s.id_sucursal = v.id_sucursal
+            LEFT JOIN usuario u ON u.id_usuario = v.id_usuario_cajero
+            WHERE ${deSucursal('v.id_sucursal')} AND v.fecha_venta >= CURRENT_DATE
+            ORDER BY v.fecha_venta DESC
+            LIMIT 8
+        `, p),
+        id_sucursal !== 0 ? [] : filas(`
+            SELECT s.id_sucursal, s.nombre_sucursal, s.estado_activo,
+                   COUNT(v.id_venta)::int AS ventas,
+                   ROUND(COALESCE(SUM(v.monto_total_venta), 0), 2)::float8 AS ingresos,
+                   EXISTS (SELECT 1 FROM turno_caja t
+                           WHERE t.id_sucursal = s.id_sucursal AND t.estado_turno = 'Abierto') AS caja_abierta
+            FROM sucursal s
+            LEFT JOIN venta_caja v ON v.id_sucursal = s.id_sucursal AND v.fecha_venta >= CURRENT_DATE
+            GROUP BY s.id_sucursal
+            ORDER BY ingresos DESC, s.nombre_sucursal
+        `)
     ]);
 
     return {
-        resumen:         resumen.rows[0],
-        ventas_diarias:  ventasDiarias.rows,
-        por_categoria:   categoriasRes.rows,
-        top_productos:   topProductos.rows,
-        filtro_categorias: filtra ? cats : []
+        hoy,
+        comparativo: { ayer_misma_hora: ayerHora, ayer_total: ayerTotal, semana_pasada_misma_hora: semanaHora },
+        metodos_pago: metodos,
+        por_hora: porHora,
+        por_hora_promedio: promedioHora,
+        ultimos_dias: dias,
+        top_productos: productos,
+        turnos_abiertos: turnos,
+        mesas, pedidos_qr: pedidos,
+        stock, stock_critico: stockCritico,
+        ultimas_ventas: ultimas,
+        sucursales
     };
 };
 
-const obtenerDesgloseDia = async (id_sucursal, fecha) => {
-    const query = `
-        SELECT c.id_categoria,
-               c.nombre_categoria,
-               SUM(dv.cantidad_vendida)::int    AS unidades,
-               SUM(dv.subtotal_venta)::numeric  AS ingresos
-        FROM detalle_venta dv
-        JOIN producto p           ON dv.id_producto  = p.id_producto
-        JOIN categoria_producto c ON p.id_categoria  = c.id_categoria
-        JOIN venta_caja v         ON dv.id_venta     = v.id_venta
-        WHERE v.id_sucursal = $1
-          AND DATE(v.fecha_venta) = $2::date
-        GROUP BY c.id_categoria, c.nombre_categoria
-        ORDER BY ingresos DESC;
-    `;
-    const totalQ = `
-        SELECT COALESCE(SUM(dv.subtotal_venta), 0)::numeric AS total_dia,
-               COUNT(DISTINCT v.id_venta)::int               AS ventas_dia
-        FROM detalle_venta dv
-        JOIN venta_caja v ON dv.id_venta = v.id_venta
-        WHERE v.id_sucursal = $1
-          AND DATE(v.fecha_venta) = $2::date;
-    `;
-    const [filas, tot] = await Promise.all([
-        db.query(query,  [id_sucursal, fecha]),
-        db.query(totalQ, [id_sucursal, fecha])
+// ─── Informe por período ───
+// Las ventas del período se arman una vez (CTE "v"); con filtro de categorías el monto
+// de cada venta es solo la parte de esas categorías.
+const ventasDelPeriodo = (filtra) => `
+    v AS (
+        SELECT vc.id_venta, vc.id_sucursal, vc.fecha_venta, vc.metodo_pago, vc.id_usuario_cajero,
+               ${filtra ? 'f.monto' : 'vc.monto_total_venta'} AS monto
+        FROM venta_caja vc
+        ${filtra ? `JOIN (SELECT dv.id_venta, SUM(dv.subtotal_venta) AS monto
+                          FROM detalle_venta dv JOIN producto p ON p.id_producto = dv.id_producto
+                          WHERE p.id_categoria = ANY($4::int[])
+                          GROUP BY dv.id_venta) f ON f.id_venta = vc.id_venta` : ''}
+        WHERE ${deSucursal('vc.id_sucursal')}
+          AND vc.fecha_venta >= $2::date AND vc.fecha_venta < $3::date + 1
+    )`;
+
+// Período anterior de igual duración (fechas YYYY-MM-DD)
+const periodoAnterior = (inicio, fin) => {
+    const dia = 86400000;
+    const a = Date.parse(inicio + 'T00:00:00Z');
+    const b = Date.parse(fin + 'T00:00:00Z');
+    const n = Math.round((b - a) / dia) + 1;
+    const iso = (t) => new Date(t).toISOString().slice(0, 10);
+    return [iso(a - n * dia), iso(a - dia)];
+};
+
+const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
+    const filtra = Array.isArray(categorias) && categorias.length > 0;
+    const cte    = `WITH ${ventasDelPeriodo(filtra)}`;
+    const conCat = (params) => filtra ? [...params, categorias] : params;
+    const params = conCat([id_sucursal, inicio, fin]);
+    const soloCat = filtra ? 'AND p.id_categoria = ANY($4::int[])' : '';
+    const dias = `generate_series($2::date::timestamp, $3::date::timestamp, INTERVAL '1 day')`;
+
+    const resumenSql = `
+        ${cte}
+        SELECT COUNT(*)::int AS total_ventas,
+               ROUND(COALESCE(SUM(monto), 0), 2)::float8 AS ingresos_totales,
+               ROUND(COALESCE(AVG(monto), 0), 2)::float8 AS ticket_promedio,
+               ROUND(COALESCE(MAX(monto), 0), 2)::float8 AS venta_maxima,
+               COUNT(DISTINCT fecha_venta::date)::int    AS dias_con_venta,
+               COALESCE((SELECT SUM(dv.cantidad_vendida) FROM v v2
+                         JOIN detalle_venta dv ON dv.id_venta = v2.id_venta
+                         JOIN producto p ON p.id_producto = dv.id_producto
+                         WHERE TRUE ${soloCat}), 0)::int AS unidades
+        FROM v`;
+
+    const porProducto = `
+        ${cte}
+        SELECT p.id_producto, p.nombre_producto, c.nombre_categoria,
+               SUM(dv.cantidad_vendida)::int AS unidades,
+               ROUND(SUM(dv.subtotal_venta), 2)::float8 AS ingresos
+        FROM v
+        JOIN detalle_venta dv     ON dv.id_venta = v.id_venta
+        JOIN producto p           ON p.id_producto = dv.id_producto
+        JOIN categoria_producto c ON c.id_categoria = p.id_categoria
+        WHERE TRUE ${soloCat}
+        GROUP BY p.id_producto, p.nombre_producto, c.nombre_categoria
+        ORDER BY ingresos DESC, unidades DESC`;
+
+    const [
+        resumen, anterior, diario, metodos, cajeros, horas, semana, porCategoria, productos,
+        sinVentas, cierres, inventario, pedidos, sucursales
+    ] = await Promise.all([
+        filas(resumenSql, params).then(r => r[0]),
+        filas(resumenSql, conCat([id_sucursal, ...periodoAnterior(inicio, fin)])).then(r => r[0]),
+        filas(`
+            ${cte}
+            SELECT d::date::text AS dia, COUNT(v.id_venta)::int AS ventas,
+                   ROUND(COALESCE(SUM(v.monto), 0), 2)::float8 AS ingresos
+            FROM ${dias} d
+            LEFT JOIN v ON v.fecha_venta >= d AND v.fecha_venta < d + INTERVAL '1 day'
+            GROUP BY d ORDER BY d
+        `, params),
+        filas(`
+            ${cte}
+            SELECT metodo_pago, COUNT(*)::int AS ventas, ROUND(SUM(monto), 2)::float8 AS ingresos
+            FROM v GROUP BY metodo_pago ORDER BY ingresos DESC
+        `, params),
+        filas(`
+            ${cte}
+            SELECT COALESCE(u.nombre_completo, 'Sin registro') AS cajero, COUNT(*)::int AS ventas,
+                   ROUND(SUM(v.monto), 2)::float8 AS ingresos, ROUND(AVG(v.monto), 2)::float8 AS ticket
+            FROM v LEFT JOIN usuario u ON u.id_usuario = v.id_usuario_cajero
+            GROUP BY u.id_usuario, u.nombre_completo ORDER BY ingresos DESC
+        `, params),
+        filas(`
+            ${cte}
+            SELECT EXTRACT(HOUR FROM fecha_venta)::int AS hora, COUNT(*)::int AS ventas,
+                   ROUND(SUM(monto), 2)::float8 AS ingresos
+            FROM v GROUP BY 1 ORDER BY 1
+        `, params),
+        filas(`
+            ${cte}, dias AS (SELECT d::date AS d FROM ${dias} d)
+            SELECT EXTRACT(ISODOW FROM dias.d)::int AS dia_semana,
+                   COUNT(DISTINCT dias.d)::int AS dias,
+                   COUNT(v.id_venta)::int AS ventas,
+                   ROUND(COALESCE(SUM(v.monto), 0), 2)::float8 AS ingresos
+            FROM dias LEFT JOIN v ON v.fecha_venta::date = dias.d
+            GROUP BY 1 ORDER BY 1
+        `, params),
+        filas(`
+            ${cte}
+            SELECT c.id_categoria, c.nombre_categoria,
+                   SUM(dv.cantidad_vendida)::int AS unidades,
+                   ROUND(SUM(dv.subtotal_venta), 2)::float8 AS ingresos
+            FROM v
+            JOIN detalle_venta dv     ON dv.id_venta = v.id_venta
+            JOIN producto p           ON p.id_producto = dv.id_producto
+            JOIN categoria_producto c ON c.id_categoria = p.id_categoria
+            WHERE TRUE ${soloCat}
+            GROUP BY c.id_categoria, c.nombre_categoria ORDER BY ingresos DESC
+        `, params),
+        filas(porProducto, params),
+        filas(`
+            SELECT p.nombre_producto, c.nombre_categoria, COALESCE(SUM(i.cantidad_actual), 0)::int AS stock
+            FROM producto p
+            JOIN categoria_producto c  ON c.id_categoria = p.id_categoria
+            JOIN inventario_sucursal i ON i.id_producto = p.id_producto AND ${deSucursal('i.id_sucursal')}
+            WHERE p.estado_activo ${soloCat}
+              AND NOT EXISTS (
+                  SELECT 1 FROM detalle_venta dv JOIN venta_caja vc ON vc.id_venta = dv.id_venta
+                  WHERE dv.id_producto = p.id_producto AND ${deSucursal('vc.id_sucursal')}
+                    AND vc.fecha_venta >= $2::date AND vc.fecha_venta < $3::date + 1)
+            GROUP BY p.id_producto, p.nombre_producto, c.nombre_categoria
+            ORDER BY c.nombre_categoria, p.nombre_producto
+        `, params),
+        filas(`
+            SELECT t.id_turno, u.nombre_completo AS cajero, s.nombre_sucursal,
+                   t.fecha_hora_apertura, t.fecha_hora_cierre, t.monto_inicial::float8 AS monto_inicial,
+                   COUNT(v.id_venta)::int AS ventas,
+                   ROUND(COALESCE(SUM(v.monto_total_venta), 0), 2)::float8 AS total,
+                   ROUND(COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = 'Efectivo'), 0), 2)::float8 AS efectivo
+            FROM turno_caja t
+            JOIN usuario u  ON u.id_usuario = t.id_usuario_cajero
+            JOIN sucursal s ON s.id_sucursal = t.id_sucursal
+            LEFT JOIN venta_caja v ON v.id_turno = t.id_turno
+            WHERE t.estado_turno = 'Cerrado' AND ${deSucursal('t.id_sucursal')}
+              AND t.fecha_hora_cierre >= $2::date AND t.fecha_hora_cierre < $3::date + 1
+            GROUP BY t.id_turno, u.nombre_completo, s.nombre_sucursal
+            ORDER BY t.fecha_hora_cierre DESC
+        `, [id_sucursal, inicio, fin]),
+        filas(`
+            SELECT COUNT(*)::int AS productos,
+                   COALESCE(SUM(GREATEST(i.cantidad_actual, 0)), 0)::int AS unidades,
+                   ROUND(COALESCE(SUM(GREATEST(i.cantidad_actual, 0) * p.precio_unitario), 0), 2)::float8 AS valor_venta,
+                   COUNT(*) FILTER (WHERE i.cantidad_actual <= 0)::int AS agotados,
+                   COUNT(*) FILTER (WHERE i.cantidad_actual > 0 AND i.cantidad_actual <= i.stock_minimo_alerta)::int AS bajos
+            FROM inventario_sucursal i
+            JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo
+            WHERE ${deSucursal('i.id_sucursal')}
+        `, [id_sucursal]).then(r => r[0]),
+        filas(`
+            SELECT COUNT(*)::int AS total,
+                   COUNT(*) FILTER (WHERE pm.estado_pedido IN ('Confirmado', 'Entregado', 'Pagado'))::int AS atendidos,
+                   COUNT(*) FILTER (WHERE pm.estado_pedido = 'Cancelado')::int AS cancelados,
+                   ROUND(COALESCE(SUM(pm.monto_total) FILTER (WHERE pm.estado_pedido <> 'Cancelado'), 0), 2)::float8 AS monto
+            FROM pedido_mesa pm
+            LEFT JOIN mesa_local m ON m.id_mesa = pm.id_mesa
+            WHERE ${deSucursal('COALESCE(pm.id_sucursal, m.id_sucursal)')}
+              AND pm.fecha_pedido >= $2::date AND pm.fecha_pedido < $3::date + 1
+        `, [id_sucursal, inicio, fin]).then(r => r[0]),
+        id_sucursal !== 0 ? [] : filas(`
+            ${cte}
+            SELECT s.nombre_sucursal, COUNT(*)::int AS ventas,
+                   ROUND(SUM(v.monto), 2)::float8 AS ingresos, ROUND(AVG(v.monto), 2)::float8 AS ticket
+            FROM v JOIN sucursal s ON s.id_sucursal = v.id_sucursal
+            GROUP BY s.id_sucursal, s.nombre_sucursal ORDER BY ingresos DESC
+        `, params)
     ]);
 
-    const totalDia = parseFloat(tot.rows[0]?.total_dia || 0);
-    const desglose = filas.rows.map(r => {
-        const ingresos = parseFloat(r.ingresos || 0);
-        return {
-            id_categoria:    r.id_categoria,
-            nombre_categoria: r.nombre_categoria,
-            unidades:        parseInt(r.unidades || 0),
-            ingresos,
-            porcentaje_dia:  totalDia > 0 ? +(ingresos / totalDia * 100).toFixed(2) : 0
-        };
-    });
+    return {
+        resumen, anterior,
+        periodo_anterior: periodoAnterior(inicio, fin),
+        ventas_diarias: diario,
+        metodos_pago: metodos,
+        por_cajero: cajeros,
+        por_hora: horas,
+        por_dia_semana: semana,
+        por_categoria: porCategoria,
+        productos,
+        sin_ventas: sinVentas,
+        cierres, inventario,
+        pedidos_qr: pedidos,
+        por_sucursal: sucursales,
+        filtro_categorias: filtra ? categorias : []
+    };
+};
 
+// ─── Desglose de un día por categoría ───
+const obtenerDesgloseDia = async (id_sucursal, fecha) => {
+    const [desglose, [tot]] = await Promise.all([
+        filas(`
+            SELECT c.id_categoria, c.nombre_categoria,
+                   SUM(dv.cantidad_vendida)::int AS unidades,
+                   ROUND(SUM(dv.subtotal_venta), 2)::float8 AS ingresos
+            FROM detalle_venta dv
+            JOIN producto p           ON dv.id_producto = p.id_producto
+            JOIN categoria_producto c ON p.id_categoria = c.id_categoria
+            JOIN venta_caja v         ON dv.id_venta    = v.id_venta
+            WHERE ${deSucursal('v.id_sucursal')}
+              AND v.fecha_venta >= $2::date AND v.fecha_venta < $2::date + 1
+            GROUP BY c.id_categoria, c.nombre_categoria
+            ORDER BY ingresos DESC
+        `, [id_sucursal, fecha]),
+        filas(`
+            SELECT ROUND(COALESCE(SUM(monto_total_venta), 0), 2)::float8 AS total_dia,
+                   COUNT(*)::int AS ventas_dia
+            FROM venta_caja v
+            WHERE ${deSucursal('v.id_sucursal')}
+              AND v.fecha_venta >= $2::date AND v.fecha_venta < $2::date + 1
+        `, [id_sucursal, fecha])
+    ]);
+
+    const total = tot?.total_dia || 0;
     return {
         fecha,
-        total_dia:  totalDia,
-        ventas_dia: parseInt(tot.rows[0]?.ventas_dia || 0),
-        desglose
+        total_dia:  total,
+        ventas_dia: tot?.ventas_dia || 0,
+        desglose: desglose.map(r => ({
+            ...r,
+            porcentaje_dia: total > 0 ? +(r.ingresos / total * 100).toFixed(1) : 0
+        }))
     };
 };
 
-module.exports = {
-    obtenerResumenDiario,
-    obtenerTopProductos,
-    obtenerAlertasStock,
-    obtenerDashboardCompleto,
-    obtenerReportePorPeriodo,
-    obtenerDesgloseDia
-};
+module.exports = { obtenerPanel, obtenerInforme, obtenerDesgloseDia, periodoAnterior };

@@ -1,201 +1,310 @@
-<div class="space-y-6">
+<div class="space-y-5">
 
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-4 flex flex-wrap justify-between items-center gap-3">
-
-    <div *ngIf="esAdmin" class="flex items-center gap-3 flex-wrap">
-      <label class="text-sm font-semibold text-gray-600 flex items-center gap-1.5">
-        <lucide-icon [img]="icons.store" class="w-4 h-4 text-blue-600"></lucide-icon>
-        Sucursal:
-      </label>
-
-      <div *ngIf="sucursales.length > 0" class="flex flex-wrap gap-2">
-        <button *ngFor="let suc of sucursales"
-                (click)="cambiarSucursal(suc.id_sucursal)"
-                class="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-                [class.bg-blue-600]="sucursalActual === suc.id_sucursal"
-                [class.text-white]="sucursalActual === suc.id_sucursal"
-                [class.bg-gray-100]="sucursalActual !== suc.id_sucursal"
-                [class.text-gray-600]="sucursalActual !== suc.id_sucursal">
-          {{ suc.nombre_sucursal }}
-        </button>
-      </div>
-
-      <button (click)="abrirModalSucursal()"
-              class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 ml-2">
-        <lucide-icon [img]="icons.plus" class="w-4 h-4"></lucide-icon>
-        Nueva Sucursal
-      </button>
+  <!-- Encabezado -->
+  <header class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="inf-antetitulo">
+        <span>{{ hoyTexto }}</span>
+        @if (actualizado) {
+          <span class="inf-vivo">En vivo · {{ hora(actualizado) }}</span>
+        }
+      </p>
+      <h1 class="inf-titulo">Panel del día</h1>
     </div>
+    <app-selector-sucursal [sucursales]="sucursales" [seleccionada]="sucursalActual"
+                           [todas]="esAdmin" [soloLectura]="!esAdmin"
+                           [estados]="esAdmin ? cajasAbiertas : null"
+                           (cambio)="cambiarSucursal($event)" />
+  </header>
 
-    <div *ngIf="!esAdmin"
-         class="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg px-4 py-2">
-      <div class="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
-        <lucide-icon [img]="icons.store" class="w-5 h-5"></lucide-icon>
-      </div>
-      <div class="leading-tight">
-        <p class="text-sm font-bold text-gray-800">{{ nombreSucursalActual }}</p>
-        <p class="text-xs text-gray-500">Panel de control de tu sucursal</p>
-      </div>
-    </div>
-
-    <span *ngIf="cargando" class="text-sm text-gray-400 flex items-center gap-2">
-      <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      Actualizando...
-    </span>
-    <span *ngIf="!cargando" class="text-xs text-gray-400 flex items-center gap-1.5">
-      <lucide-icon [img]="icons.pulse" class="w-3.5 h-3.5"></lucide-icon>
-      Datos de hoy · Auto-refresco 60s
-    </span>
-  </div>
-
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-4" *ngIf="!cargando && datosAdmin">
-
-    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-      <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Ventas de Hoy</p>
-      <p class="text-4xl font-black text-gray-800 mt-2">{{ resumen.total_ventas || 0 }}</p>
-      <p class="text-xs text-gray-400 mt-1">transacciones</p>
-    </div>
-
-    <div class="bg-green-50 p-5 rounded-xl shadow-sm border border-green-100">
-      <p class="text-xs font-bold text-green-600 uppercase tracking-wide">Efectivo</p>
-      <p class="text-3xl font-black text-green-700 mt-2">{{ moneda() }} {{ totalEfectivo.toFixed(2) }}</p>
-      <p class="text-xs text-green-500 mt-1">pagos en efectivo</p>
-    </div>
-
-    <div class="bg-purple-50 p-5 rounded-xl shadow-sm border border-purple-100">
-      <p class="text-xs font-bold text-purple-600 uppercase tracking-wide">QR</p>
-      <p class="text-3xl font-black text-purple-700 mt-2">{{ moneda() }} {{ totalQr.toFixed(2) }}</p>
-      <p class="text-xs text-purple-500 mt-1">pagos por QR</p>
-    </div>
-
-    <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-      <p class="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Estado de Caja</p>
-      <div class="flex items-center gap-2">
-        <div class="w-3 h-3 rounded-full"
-             [class.bg-green-400]="cajasAbiertas[sucursalActual]"
-             [class.animate-pulse]="cajasAbiertas[sucursalActual]"
-             [class.bg-red-400]="!cajasAbiertas[sucursalActual]">
+  @if (cargando) {
+    <div class="space-y-5">
+      <div class="inf-hoja p-6 grid lg:grid-cols-2 gap-6">
+        <div class="space-y-3">
+          <div class="inf-esqueleto h-4 w-32"></div>
+          <div class="inf-esqueleto h-12 w-64"></div>
+          <div class="inf-esqueleto h-4 w-48"></div>
         </div>
-        <p class="text-2xl font-black"
-           [class.text-green-600]="cajasAbiertas[sucursalActual]"
-           [class.text-red-500]="!cajasAbiertas[sucursalActual]">
-          {{ cajasAbiertas[sucursalActual] ? 'ABIERTA' : 'CERRADA' }}
+        <div class="inf-esqueleto h-44"></div>
+      </div>
+      <div class="inf-esqueleto h-24"></div>
+      <div class="grid lg:grid-cols-3 gap-5">
+        <div class="inf-esqueleto h-48"></div><div class="inf-esqueleto h-48"></div><div class="inf-esqueleto h-48"></div>
+      </div>
+    </div>
+  }
+
+  @if (!cargando && datos) {
+  <div class="space-y-5">
+
+    <!-- Cifra principal y ritmo por hora -->
+    <section class="inf-hoja grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div class="p-6 lg:border-r panel-linea">
+        <p class="inf-etiqueta">Ingresos de hoy</p>
+        <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(hoy.ingresos) }}</p>
+
+        <div class="mt-4 space-y-1.5">
+          <p class="inf-comparacion">
+            <span class="inf-delta" [ngClass]="claseDelta(vsAyer)">
+              <lucide-icon [img]="iconoDelta(vsAyer)" class="w-3 h-3"></lucide-icon>
+              {{ textoDelta(vsAyer) }}
+            </span>
+            vs. ayer a esta hora ({{ moneda() }} {{ cifra(comp.ayer_misma_hora?.ingresos) }})
+          </p>
+          <p class="inf-comparacion">
+            <span class="inf-delta" [ngClass]="claseDelta(vsSemana)">
+              <lucide-icon [img]="iconoDelta(vsSemana)" class="w-3 h-3"></lucide-icon>
+              {{ textoDelta(vsSemana) }}
+            </span>
+            vs. el {{ diaSemanaPasada }} pasado a esta hora
+          </p>
+        </div>
+
+        <dl class="inf-pares mt-6 pt-5 panel-separador">
+          <div><dt>Ayer cerró en</dt><dd>{{ moneda() }} {{ cifra(comp.ayer_total?.ingresos) }}</dd></div>
+          <div><dt>Venta más alta de hoy</dt><dd>{{ moneda() }} {{ cifra(hoy.venta_maxima) }}</dd></div>
+          <div><dt>Primera venta</dt><dd>{{ hoy.primera_venta ? hora(hoy.primera_venta) : '—' }}</dd></div>
+        </dl>
+      </div>
+
+      <div class="p-6 flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <p class="inf-etiqueta">Ritmo de ventas por hora</p>
+          <div class="inf-leyenda">
+            <span><i class="inf-muestra" style="background: var(--i-acento)"></i>Hoy</span>
+            <span><i class="leyenda-linea"></i>Promedio últimos 7 días</span>
+          </div>
+        </div>
+        <div class="relative flex-1 min-h-[190px]">
+          <canvas #graficoHoras></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Indicadores -->
+    <section class="inf-hoja inf-tira overflow-hidden">
+      <div>
+        <p class="inf-etiqueta">Ventas</p>
+        <p class="inf-valor">{{ entero(hoy.ventas) }}</p>
+        <p class="inf-sub">{{ entero(hoy.unidades) }} unidades</p>
+      </div>
+      <div>
+        <p class="inf-etiqueta">Ticket promedio</p>
+        <p class="inf-valor">{{ moneda() }} {{ cifra(hoy.ticket) }}</p>
+        <p class="inf-sub">por venta</p>
+      </div>
+      <div>
+        <p class="inf-etiqueta">Por cobrar en mesas</p>
+        <p class="inf-valor">{{ moneda() }} {{ cifra(datos.mesas?.por_cobrar) }}</p>
+        <p class="inf-sub">{{ datos.mesas?.ocupadas || 0 }} de {{ datos.mesas?.total || 0 }} mesas ocupadas</p>
+      </div>
+      <div>
+        <p class="inf-etiqueta">Pedidos del menú QR</p>
+        <p class="inf-valor" [class.inf-aviso]="datos.pedidos_qr?.pendientes > 0">{{ datos.pedidos_qr?.pendientes || 0 }} por confirmar</p>
+        <p class="inf-sub">{{ datos.pedidos_qr?.por_entregar || 0 }} por entregar · {{ datos.pedidos_qr?.hoy || 0 }} hoy</p>
+      </div>
+      <div>
+        <p class="inf-etiqueta">Alertas de stock</p>
+        <p class="inf-valor" [class.inf-baja]="datos.stock?.agotados > 0">{{ alertasStock }}</p>
+        <p class="inf-sub">{{ datos.stock?.agotados || 0 }} agotados · {{ datos.stock?.bajos || 0 }} bajo mínimo</p>
+      </div>
+    </section>
+
+    <!-- Comparativo de sucursales -->
+    @if (todas && datos.sucursales?.length) {
+      <section class="inf-hoja overflow-hidden">
+        <div class="px-5 pt-5"><div class="inf-seccion"><h2>Sucursales hoy</h2></div></div>
+        <div class="overflow-x-auto">
+          <table class="inf-tabla">
+            <thead>
+              <tr><th>Sucursal</th><th>Caja</th><th class="num">Ventas</th><th class="num">Ingresos</th><th class="w-1/3">Participación</th></tr>
+            </thead>
+            <tbody>
+              @for (s of datos.sucursales; track s.id_sucursal) {
+                <tr>
+                  <td class="fuerte">{{ s.nombre_sucursal }} @if (!s.estado_activo) { <span class="inf-ficha ml-1">inactiva</span> }</td>
+                  <td><span class="inf-estado" [ngClass]="s.caja_abierta ? 'ok' : 'neutro'">{{ s.caja_abierta ? 'Abierta' : 'Cerrada' }}</span></td>
+                  <td class="num">{{ entero(s.ventas) }}</td>
+                  <td class="num fuerte">{{ moneda() }} {{ cifra(s.ingresos) }}</td>
+                  <td>
+                    <div class="flex items-center gap-3">
+                      <div class="inf-barra flex-1"><span [style.width.%]="porcentaje(s.ingresos, totalSucursales)"></span></div>
+                      <span class="inf-tenue text-xs w-12 text-right">{{ porcentaje(s.ingresos, totalSucursales).toFixed(1) }} %</span>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <div class="grid lg:grid-cols-3 gap-5">
+
+      <!-- Cobros por método -->
+      <section class="inf-hoja p-5">
+        <div class="inf-seccion"><h2>Cobros por método</h2></div>
+        @if (datos.metodos_pago?.length) {
+          <div class="inf-apilada mb-4">
+            @for (m of datos.metodos_pago; track m.metodo_pago; let i = $index) {
+              <span [style.width.%]="porcentaje(m.ingresos, totalMetodos)" [style.background]="colorMetodo(i)"></span>
+            }
+          </div>
+          <table class="inf-tabla">
+            <tbody>
+              @for (m of datos.metodos_pago; track m.metodo_pago; let i = $index) {
+                <tr>
+                  <td class="pl-0!"><span class="flex items-center gap-2"><i class="inf-muestra" [style.background]="colorMetodo(i)"></i>{{ m.metodo_pago }}</span></td>
+                  <td class="num inf-tenue">{{ m.ventas }} vta.</td>
+                  <td class="num fuerte">{{ moneda() }} {{ cifra(m.ingresos) }}</td>
+                  <td class="num inf-tenue pr-0!">{{ porcentaje(m.ingresos, totalMetodos).toFixed(0) }} %</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <p class="inf-vacio">Todavía no hay cobros hoy.</p>
+        }
+      </section>
+
+      <!-- Caja -->
+      <section class="inf-hoja p-5">
+        <div class="inf-seccion">
+          <h2>Caja</h2>
+          <span class="inf-nota">
+            <span class="inf-estado" [ngClass]="datos.turnos_abiertos?.length ? 'ok' : 'neutro'">
+              {{ datos.turnos_abiertos?.length ? (datos.turnos_abiertos.length + (datos.turnos_abiertos.length === 1 ? ' turno abierto' : ' turnos abiertos')) : 'Cerrada' }}
+            </span>
+          </span>
+        </div>
+        @for (t of datos.turnos_abiertos; track t.id_turno) {
+          <div class="turno">
+            <div class="flex items-baseline justify-between gap-2">
+              <p class="inf-tinta font-semibold text-[13.5px] truncate">{{ t.cajero }}</p>
+              <p class="inf-tenue text-xs whitespace-nowrap">desde {{ desde(t.fecha_hora_apertura) }}</p>
+            </div>
+            @if (todas) { <p class="inf-sub mt-0!">{{ t.nombre_sucursal }}</p> }
+            <dl class="inf-pares mt-2.5">
+              <div><dt>Fondo inicial</dt><dd>{{ moneda() }} {{ cifra(t.monto_inicial) }}</dd></div>
+              <div><dt>Cobrado en efectivo</dt><dd>{{ moneda() }} {{ cifra(t.efectivo) }}</dd></div>
+              <div><dt>Total del turno · {{ t.ventas }} vta.</dt><dd>{{ moneda() }} {{ cifra(t.total) }}</dd></div>
+            </dl>
+          </div>
+        } @empty {
+          <p class="inf-vacio">No hay turnos abiertos.<br>Para vender, un cajero debe abrir caja.</p>
+        }
+        @if (datos.turnos_abiertos?.length) {
+          <div class="flex items-baseline justify-between mt-3 pt-3 panel-separador">
+            <span class="inf-etiqueta">Efectivo que debería haber en caja</span>
+            <span class="inf-tinta font-semibold">{{ moneda() }} {{ cifra(efectivoEsperado) }}</span>
+          </div>
+        }
+      </section>
+
+      <!-- Stock crítico -->
+      <section class="inf-hoja p-5">
+        <div class="inf-seccion">
+          <h2>Stock por reponer</h2>
+          <a routerLink="/dashboard/inventario" class="inf-nota inf-enlace">Ver inventario</a>
+        </div>
+        @for (p of datos.stock_critico; track $index) {
+          <div class="flex items-center gap-3 py-2 fila-stock">
+            <div class="min-w-0 flex-1">
+              <p class="text-[13px] inf-tinta truncate">{{ p.nombre_producto }}</p>
+              @if (todas) { <p class="inf-sub mt-0!">{{ p.nombre_sucursal }}</p> }
+            </div>
+            @if (p.cantidad_actual <= 0) {
+              <span class="inf-estado mal">Agotado</span>
+            } @else {
+              <span class="text-xs inf-tenue whitespace-nowrap">
+                <b class="inf-aviso">{{ p.cantidad_actual }}</b> / mín. {{ p.stock_minimo_alerta }}
+              </span>
+            }
+          </div>
+        } @empty {
+          <p class="inf-vacio">Todo el stock está sobre el mínimo.</p>
+        }
+      </section>
+    </div>
+
+    <div class="grid lg:grid-cols-5 gap-5">
+
+      <!-- Productos del día -->
+      <section class="inf-hoja lg:col-span-3 min-w-0">
+        <div class="px-5 pt-5">
+          <div class="inf-seccion mb-2!"><h2>Lo más vendido hoy</h2></div>
+          <nav class="inf-pestanas">
+            <button [class.activa]="categoriaFiltro === null" (click)="filtrarCategoria(null)">Todas</button>
+            @for (c of categorias; track c.id_categoria) {
+              <button [class.activa]="categoriaFiltro === c.id_categoria" (click)="filtrarCategoria(c.id_categoria)">{{ c.nombre_categoria }}</button>
+            }
+          </nav>
+        </div>
+        <div class="overflow-x-auto" [class.inf-refrescando]="refrescando">
+          @if (datos.top_productos?.length) {
+            <table class="inf-tabla">
+              <thead><tr><th class="rango">#</th><th>Producto</th><th class="num">Unidades</th><th class="num">Ingresos</th><th class="w-1/4"></th></tr></thead>
+              <tbody>
+                @for (p of datos.top_productos; track p.nombre_producto; let i = $index) {
+                  <tr>
+                    <td class="rango">{{ i + 1 }}</td>
+                    <td><span class="fuerte">{{ p.nombre_producto }}</span><span class="inf-secundario">{{ p.nombre_categoria }}</span></td>
+                    <td class="num">{{ entero(p.unidades) }}</td>
+                    <td class="num fuerte">{{ moneda() }} {{ cifra(p.ingresos) }}</td>
+                    <td><div class="inf-barra"><span [style.width.%]="p.unidades / maxProducto * 100"></span></div></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <p class="inf-vacio">{{ categoriaFiltro ? 'Sin ventas hoy en esta categoría.' : 'Sin ventas hoy.' }}</p>
+          }
+        </div>
+      </section>
+
+      <!-- Últimas ventas -->
+      <section class="inf-hoja lg:col-span-2 min-w-0">
+        <div class="px-5 pt-5"><div class="inf-seccion mb-1!"><h2>Últimas ventas</h2></div></div>
+        @if (datos.ultimas_ventas?.length) {
+          <ul class="px-5 pb-3">
+            @for (v of datos.ultimas_ventas; track v.id_venta) {
+              <li class="venta">
+                <span class="venta-hora">{{ hora(v.fecha_venta) }}</span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[13px] inf-tinta truncate">{{ v.cajero || 'Sin cajero' }}</p>
+                  <p class="inf-sub mt-0! truncate">{{ v.unidades }} uds. · {{ v.metodo_pago }}@if (todas) { · {{ v.nombre_sucursal }} }</p>
+                </div>
+                <span class="inf-tinta font-semibold text-[13.5px] whitespace-nowrap">{{ moneda() }} {{ cifra(v.monto) }}</span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="inf-vacio">Aún no hay ventas hoy.</p>
+        }
+      </section>
+    </div>
+
+    <!-- Últimos 14 días -->
+    <section class="inf-hoja p-5">
+      <div class="inf-seccion">
+        <h2>Últimos 14 días</h2>
+        <span class="inf-nota">Últimos 7 días contra los 7 anteriores</span>
+      </div>
+      <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 mb-4">
+        <p class="inf-valor mt-0!">{{ moneda() }} {{ cifra(semanas.actual) }}</p>
+        <p class="inf-comparacion">
+          <span class="inf-delta" [ngClass]="claseDelta(semanas.delta)">{{ textoDelta(semanas.delta) }}</span>
+          frente a {{ moneda() }} {{ cifra(semanas.previa) }} la semana anterior
         </p>
       </div>
-      <p class="text-xs text-gray-400 mt-1">
-        {{ cajerosTurnos[sucursalActual] || 0 }} cajero(s) con turno activo
-      </p>
-    </div>
+      <div class="relative h-52"><canvas #graficoDias></canvas></div>
+    </section>
+
   </div>
+  }
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6" *ngIf="!cargando && datosAdmin">
-
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-      <h3 class="font-bold text-gray-800 mb-4">Ventas por Método de Pago</h3>
-      <div class="relative h-52">
-        <canvas id="graficoPie"></canvas>
-        <div *ngIf="!datosAdmin.metodos_pago?.length"
-             class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-          Sin ventas hoy
-        </div>
-      </div>
-    </div>
-
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-      <h3 class="font-bold text-gray-800 mb-4">Ingresos Últimos 7 Días</h3>
-      <div class="relative h-52">
-        <canvas id="graficoBarras"></canvas>
-        <div *ngIf="!datosAdmin.ventas_por_dia?.length"
-             class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-          Sin datos en este período
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100" *ngIf="!cargando && datosAdmin">
-    <div class="flex flex-wrap justify-between items-center mb-4 gap-3">
-      <h3 class="font-bold text-gray-800">Productos Más Vendidos Hoy</h3>
-      <div class="flex gap-2 flex-wrap">
-        <button (click)="filtrarCategoria(null)"
-                [class.bg-blue-600]="categoriaFiltroChart === null"
-                [class.text-white]="categoriaFiltroChart === null"
-                [class.bg-gray-100]="categoriaFiltroChart !== null"
-                [class.text-gray-600]="categoriaFiltroChart !== null"
-                class="px-3 py-1 rounded-full text-xs font-medium transition-colors">
-          Todas
-        </button>
-        <button *ngFor="let cat of listaCategorias"
-                (click)="filtrarCategoria(cat.id_categoria)"
-                [class.bg-blue-600]="categoriaFiltroChart === cat.id_categoria"
-                [class.text-white]="categoriaFiltroChart === cat.id_categoria"
-                [class.bg-gray-100]="categoriaFiltroChart !== cat.id_categoria"
-                [class.text-gray-600]="categoriaFiltroChart !== cat.id_categoria"
-                class="px-3 py-1 rounded-full text-xs font-medium transition-colors">
-          {{ cat.nombre_categoria }}
-        </button>
-      </div>
-    </div>
-    <div class="relative h-52">
-      <canvas id="graficoProductos"></canvas>
-      <div *ngIf="!datosAdmin.top_productos?.length"
-           class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-        Sin ventas hoy con este filtro
-      </div>
-    </div>
-  </div>
-
-  <div *ngIf="cargando" class="bg-white rounded-xl p-12 text-center border border-gray-100">
-    <div class="flex flex-col items-center gap-3">
-      <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      <p class="text-gray-400">Cargando datos del panel...</p>
-    </div>
-  </div>
-
-</div>
-
-
-<div *ngIf="mostrarModalSucursal"
-     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-    <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-      <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-        <lucide-icon [img]="icons.store" class="w-5 h-5 text-blue-600"></lucide-icon>
-        Nueva Sucursal
-      </h3>
-      <button (click)="cerrarModalSucursal()" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors">
-        <lucide-icon [img]="icons.close" class="w-5 h-5"></lucide-icon>
-      </button>
-    </div>
-    <div class="p-6 space-y-4">
-      <div *ngIf="errorSucursal" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
-        {{ errorSucursal }}
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-        <input type="text" [(ngModel)]="nuevaSucursal.nombre_sucursal"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-               placeholder="Ej: Sucursal Norte">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-        <input type="text" [(ngModel)]="nuevaSucursal.direccion_fisica"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-               placeholder="Av. Principal #123">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-        <input type="text" [(ngModel)]="nuevaSucursal.telefono_contacto"
-               class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-               placeholder="70000000">
-      </div>
-    </div>
-    <div class="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
-      <button (click)="cerrarModalSucursal()" class="px-4 py-2 bg-white border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100">Cancelar</button>
-      <button (click)="guardarSucursal()" [disabled]="cargandoSucursal"
-              class="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium">
-        {{ cargandoSucursal ? 'Guardando...' : 'Crear Sucursal' }}
-      </button>
-    </div>
-  </div>
+  @if (!cargando && !datos) {
+    <div class="inf-hoja inf-vacio">No se pudo cargar el panel. Revisa la conexión con el servidor.</div>
+  }
 </div>

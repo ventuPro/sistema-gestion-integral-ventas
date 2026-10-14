@@ -1,0 +1,413 @@
+/* ─── Estilo de Panel e Informes ───
+   Hojas con borde fino, cifras tabulares, etiquetas en tipo oración y separadores
+   de línea en lugar de tarjetas sueltas. Sigue el color primario y el modo oscuro. */
+:host {
+  --i-tinta: #0f172a;
+  --i-texto: #334155;
+  --i-tenue: #64748b;
+  --i-sutil: #94a3b8;
+  --i-linea: #e2e8f0;
+  --i-linea-suave: #f1f5f9;
+  --i-papel: #ffffff;
+  --i-fondo: #f8fafc;
+  --i-acento: var(--color-blue-600, #2563eb);
+  --i-acento-suave: color-mix(in oklab, var(--i-acento) 10%, transparent);
+  --i-sube: #047857;
+  --i-baja: #b42318;
+  --i-aviso: #b45309;
+  display: block;
+  color: var(--i-texto);
+  font-variant-numeric: tabular-nums;
+}
+
+@media screen {
+  :host-context(html.tema-oscuro) {
+    --i-tinta: #f1f5f9;
+    --i-texto: #d5dde8;
+    --i-tenue: #94a3b8;
+    --i-sutil: #7b8aa0;
+    --i-linea: #2f3d52;
+    --i-linea-suave: #263449;
+    --i-papel: #1e293b;
+    --i-fondo: #172033;
+    --i-acento: color-mix(in oklab, var(--color-blue-500, #3b82f6) 80%, white);
+    --i-sube: #34d399;
+    --i-baja: #f87171;
+    --i-aviso: #fbbf24;
+  }
+}
+
+/* Encabezado de pantalla */
+.inf-antetitulo {
+  font-size: 12.5px;
+  color: var(--i-tenue);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.inf-titulo {
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--i-tinta);
+  margin-top: 2px;
+}
+.inf-vivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--i-sube);
+  font-weight: 500;
+}
+.inf-vivo::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: inf-latido 2s ease-in-out infinite;
+}
+@keyframes inf-latido { 50% { opacity: 0.3; } }
+
+/* Hoja (contenedor) */
+.inf-hoja {
+  background: var(--i-papel);
+  border: 1px solid var(--i-linea);
+  border-radius: 8px;
+  min-width: 0;
+}
+.inf-pie-hoja {
+  border-top: 1px solid var(--i-linea);
+  padding: 10px 20px;
+  font-size: 12px;
+  color: var(--i-tenue);
+}
+
+/* Títulos de sección con regla */
+.inf-seccion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.inf-seccion h2 {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--i-tinta);
+  white-space: nowrap;
+}
+.inf-seccion::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--i-linea);
+  order: 2;
+}
+.inf-seccion .inf-nota { order: 3; }
+.inf-indice {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--i-acento);
+  letter-spacing: 0.04em;
+}
+.inf-nota {
+  font-size: 12px;
+  color: var(--i-tenue);
+  white-space: nowrap;
+}
+
+/* Cifras */
+.inf-etiqueta {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--i-tenue);
+}
+.inf-cifra-xl {
+  font-size: 44px;
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--i-tinta);
+  margin-top: 6px;
+}
+.inf-moneda {
+  font-size: 0.42em;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--i-tenue);
+  margin-right: 6px;
+  vertical-align: 0.65em;
+}
+.inf-valor {
+  font-size: 21px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--i-tinta);
+  margin-top: 4px;
+}
+.inf-sub {
+  font-size: 12px;
+  color: var(--i-sutil);
+  margin-top: 3px;
+}
+
+/* Variación */
+.inf-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.inf-delta.sube { color: var(--i-sube); background: color-mix(in oklab, var(--i-sube) 12%, transparent); }
+.inf-delta.baja { color: var(--i-baja); background: color-mix(in oklab, var(--i-baja) 12%, transparent); }
+.inf-delta.igual { color: var(--i-tenue); background: var(--i-linea-suave); }
+.inf-comparacion {
+  font-size: 12.5px;
+  color: var(--i-tenue);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tira de indicadores con separadores verticales */
+.inf-tira {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+.inf-tira > * {
+  padding: 16px 20px;
+  border-left: 1px solid var(--i-linea);
+  margin-left: -1px;
+  border-top: 1px solid var(--i-linea);
+  margin-top: -1px;
+}
+
+/* Lista de pares etiqueta / valor */
+.inf-pares { display: grid; gap: 10px; }
+.inf-pares > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+.inf-pares dt { color: var(--i-tenue); }
+.inf-pares dd { color: var(--i-tinta); font-weight: 600; text-align: right; }
+
+/* Tablas */
+.inf-tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.inf-tabla th {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--i-tenue);
+  text-align: left;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--i-linea);
+  white-space: nowrap;
+}
+.inf-tabla td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--i-linea-suave);
+  color: var(--i-texto);
+  vertical-align: middle;
+}
+.inf-tabla tbody tr:last-child td { border-bottom: none; }
+.inf-tabla tbody tr { transition: background-color 120ms ease; }
+.inf-tabla tbody tr:hover { background: var(--i-fondo); }
+.inf-tabla tfoot td {
+  border-top: 1px solid var(--i-linea);
+  border-bottom: none;
+  font-weight: 600;
+  color: var(--i-tinta);
+}
+.inf-tabla .num { text-align: right; white-space: nowrap; }
+.inf-tabla .fuerte { color: var(--i-tinta); font-weight: 600; }
+.inf-tabla .rango { color: var(--i-sutil); font-size: 12px; width: 36px; }
+.inf-secundario { display: block; font-size: 12px; color: var(--i-sutil); margin-top: 1px; }
+
+/* Barras de proporción */
+.inf-barra {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--i-linea-suave);
+  overflow: hidden;
+  min-width: 60px;
+}
+.inf-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--i-acento);
+  transition: width 250ms ease;
+}
+.inf-apilada {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--i-linea-suave);
+  gap: 2px;
+}
+.inf-apilada > span { height: 100%; transition: width 250ms ease; }
+.inf-muestra {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Pestañas subrayadas */
+.inf-pestanas {
+  display: flex;
+  gap: 18px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.inf-pestanas::-webkit-scrollbar { display: none; }
+.inf-pestanas button {
+  padding: 4px 0 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--i-tenue);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.inf-pestanas button:hover { color: var(--i-tinta); }
+.inf-pestanas button.activa { color: var(--i-tinta); border-bottom-color: var(--i-acento); }
+
+/* Control segmentado (período) */
+.inf-segmentos {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--i-linea-suave);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.inf-segmentos::-webkit-scrollbar { display: none; }
+.inf-segmentos button {
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--i-tenue);
+  white-space: nowrap;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+.inf-segmentos button:hover { color: var(--i-tinta); }
+.inf-segmentos button.activa {
+  background: var(--i-papel);
+  color: var(--i-tinta);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+/* Botones */
+.inf-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--i-linea);
+  background: var(--i-papel);
+  color: var(--i-texto);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.inf-boton:hover { background: var(--i-fondo); border-color: var(--i-sutil); }
+.inf-boton.activo { border-color: var(--i-acento); color: var(--i-acento); background: var(--i-acento-suave); }
+.inf-enlace {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--i-acento);
+}
+.inf-enlace:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.inf-campo {
+  padding: 5px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--i-linea);
+  background: var(--i-papel);
+  color: var(--i-tinta);
+  font-size: 12.5px;
+  outline: none;
+}
+.inf-campo:focus { border-color: var(--i-acento); box-shadow: 0 0 0 3px var(--i-acento-suave); }
+
+/* Etiquetas de estado */
+.inf-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.inf-estado::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.inf-estado.ok { color: var(--i-sube); }
+.inf-estado.mal { color: var(--i-baja); }
+.inf-estado.aviso { color: var(--i-aviso); }
+.inf-estado.neutro { color: var(--i-tenue); }
+
+.inf-ficha {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--i-texto);
+  background: var(--i-linea-suave);
+  white-space: nowrap;
+}
+
+.inf-vacio {
+  padding: 22px 8px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--i-sutil);
+}
+
+.inf-leyenda {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11.5px;
+  color: var(--i-tenue);
+}
+.inf-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+
+.inf-tenue { color: var(--i-tenue); }
+.inf-tinta { color: var(--i-tinta); }
+.inf-sube { color: var(--i-sube); }
+.inf-baja { color: var(--i-baja); }
+.inf-aviso { color: var(--i-aviso); }
+
+/* Carga: bloques que laten en lugar de un spinner */
+.inf-esqueleto {
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--i-linea-suave) 25%, var(--i-linea) 50%, var(--i-linea-suave) 75%);
+  background-size: 200% 100%;
+  animation: inf-brillo 1.4s ease-in-out infinite;
+}
+@keyframes inf-brillo { to { background-position: -200% 0; } }
+
+.inf-refrescando { opacity: 0.55; transition: opacity 150ms ease; pointer-events: none; }

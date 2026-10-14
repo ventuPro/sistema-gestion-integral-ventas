@@ -1,84 +1,67 @@
 const reporteModel = require('../models/reporteModel');
 
-// Dashboard antiguo (mantener compatibilidad)
-const obtenerDashboard = async (req, res) => {
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_DIAS = 366;
+
+// El cajero solo ve su sucursal; el administrador puede pedir 0 = todas
+const sucursalPermitida = (req) => {
+    if (Number(req.usuario.id_rol) !== 1) return Number(req.usuario.id_sucursal);
+    const id = Number(req.params.id_sucursal);
+    return Number.isInteger(id) && id >= 0 ? id : null;
+};
+
+const fechaValida = (f) => FECHA.test(f || '') && !Number.isNaN(Date.parse(f + 'T00:00:00Z'));
+
+// ─── Panel del día ───
+const obtenerPanel = async (req, res) => {
     try {
-        const { id_sucursal } = req.params;
-        const [resumenDiario, topProductos, alertasStock] = await Promise.all([
-            reporteModel.obtenerResumenDiario(id_sucursal),
-            reporteModel.obtenerTopProductos(id_sucursal),
-            reporteModel.obtenerAlertasStock(id_sucursal)
-        ]);
-        res.json({
-            resumen_diario: {
-                total_ventas:     parseInt(resumenDiario.total_ventas),
-                ingresos_totales: parseFloat(resumenDiario.ingresos_totales)
-            },
-            top_productos: topProductos,
-            alertas_stock: alertasStock
-        });
+        const id_sucursal = sucursalPermitida(req);
+        if (id_sucursal === null) return res.status(400).json({ error: 'Sucursal inválida' });
+        const cat = Number(req.query.categoria);
+        const id_categoria = Number.isInteger(cat) && cat > 0 ? cat : null;
+        res.json(await reporteModel.obtenerPanel(id_sucursal, id_categoria));
     } catch (error) {
-        console.error('Error en obtenerDashboard:', error);
-        res.status(500).json({ error: 'Error al generar los reportes del dashboard' });
+        console.error('Error en obtenerPanel:', error);
+        res.status(500).json({ error: 'Error al generar el panel' });
     }
 };
 
-// Dashboard completo (nuevo)
-const obtenerDashboardCompleto = async (req, res) => {
+// ─── Informe por período ───
+const obtenerInforme = async (req, res) => {
     try {
-        const id_sucursal  = req.params.id_sucursal || 1;
-        const id_categoria = req.query.categoria || null;
-        const datos = await reporteModel.obtenerDashboardCompleto(id_sucursal, id_categoria);
-        res.json(datos);
-    } catch (error) {
-        console.error('Error en obtenerDashboardCompleto:', error);
-        res.status(500).json({ error: 'Error al generar el dashboard' });
-    }
-};
+        const id_sucursal = sucursalPermitida(req);
+        if (id_sucursal === null) return res.status(400).json({ error: 'Sucursal inválida' });
 
-// Reporte por período — FIX fechas
-const obtenerReportePeriodo = async (req, res) => {
-    try {
-        const { id_sucursal = 1 } = req.params;
         const { fecha_inicio, fecha_fin, categorias } = req.query;
+        if (!fechaValida(fecha_inicio) || !fechaValida(fecha_fin))
+            return res.status(400).json({ error: 'Fechas requeridas en formato YYYY-MM-DD' });
+        if (fecha_inicio > fecha_fin)
+            return res.status(400).json({ error: 'La fecha de inicio no puede ser mayor a la final' });
+        const dias = (Date.parse(fecha_fin) - Date.parse(fecha_inicio)) / 86400000 + 1;
+        if (dias > MAX_DIAS)
+            return res.status(400).json({ error: `El período admite hasta ${MAX_DIAS} días` });
 
-        const ahora = new Date();
-        // FIX: construir fechas correctas con timezone local
-        const inicio = fecha_inicio
-            ? new Date(fecha_inicio + 'T00:00:00')
-            : new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        const fin = fecha_fin
-            ? new Date(fecha_fin + 'T23:59:59')
-            : ahora;
+        const cats = String(categorias || '').split(',')
+            .map(v => parseInt(v.trim(), 10)).filter(n => Number.isInteger(n) && n > 0);
 
-        const cats = (() => {
-            if (!categorias) return null;
-            const raw = Array.isArray(categorias) ? categorias : String(categorias).split(',');
-            const ids = raw.map(v => parseInt(String(v).trim(), 10)).filter(n => Number.isFinite(n) && n > 0);
-            return ids.length > 0 ? ids : null;
-        })();
-
-        const datos = await reporteModel.obtenerReportePorPeriodo(id_sucursal, inicio, fin, cats);
-        res.json(datos);
+        res.json(await reporteModel.obtenerInforme(id_sucursal, fecha_inicio, fecha_fin, cats.length ? cats : null));
     } catch (error) {
-        console.error('Error en obtenerReportePeriodo:', error);
-        res.status(500).json({ error: 'Error al generar el reporte' });
+        console.error('Error en obtenerInforme:', error);
+        res.status(500).json({ error: 'Error al generar el informe' });
     }
 };
 
 const obtenerDesgloseDia = async (req, res) => {
     try {
-        const { id_sucursal = 1 } = req.params;
+        const id_sucursal = sucursalPermitida(req);
+        if (id_sucursal === null) return res.status(400).json({ error: 'Sucursal inválida' });
         const { fecha } = req.query;
-        if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-            return res.status(400).json({ error: 'Fecha requerida en formato YYYY-MM-DD' });
-        }
-        const datos = await reporteModel.obtenerDesgloseDia(id_sucursal, fecha);
-        res.json(datos);
+        if (!fechaValida(fecha)) return res.status(400).json({ error: 'Fecha requerida en formato YYYY-MM-DD' });
+        res.json(await reporteModel.obtenerDesgloseDia(id_sucursal, fecha));
     } catch (error) {
         console.error('Error en obtenerDesgloseDia:', error);
         res.status(500).json({ error: 'Error al obtener el desglose del día' });
     }
 };
 
-module.exports = { obtenerDashboard, obtenerDashboardCompleto, obtenerReportePeriodo, obtenerDesgloseDia };
+module.exports = { obtenerPanel, obtenerInforme, obtenerDesgloseDia };

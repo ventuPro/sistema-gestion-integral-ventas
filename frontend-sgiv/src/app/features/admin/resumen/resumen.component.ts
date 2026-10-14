@@ -1,278 +1,259 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, effect, untracked, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
+import { Chart, registerables } from 'chart.js';
+import { LucideAngularModule, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-angular';
 import { ReporteService } from '../../../core/services/reporte.service';
 import { SucursalService } from '../../../core/services/sucursal.service';
+import { ProductoService } from '../../../core/services/producto.service';
 import { CajaService } from '../../../core/services/caja.service';
-import { Chart, registerables } from 'chart.js';
-import { LucideAngularModule,
-         Store, Plus, X,
-         Wallet, QrCode, ShoppingCart,
-         Activity } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
+import { cifra, entero, variacion, porcentaje, fechaLarga, fechaCorta, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-resumen',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, RouterLink, LucideAngularModule, SelectorSucursalComponent],
   templateUrl: './resumen.component.html',
-  styleUrl: './resumen.component.css'
+  styleUrls: ['../../shared/informe/informe.css', './resumen.component.css']
 })
 export class ResumenComponent implements OnInit, OnDestroy {
   private reporteService  = inject(ReporteService);
   private sucursalService = inject(SucursalService);
+  private productoService = inject(ProductoService);
   private cajaService     = inject(CajaService);
+  private ajustes         = inject(AjustesService);
   private cdr             = inject(ChangeDetectorRef);
-  readonly moneda          = inject(AjustesService).moneda;
-  private router          = inject(Router);
+  readonly moneda         = this.ajustes.moneda;
 
-  readonly icons = {
-    store: Store,
-    plus:  Plus,
-    close: X,
-    cash:  Wallet,
-    qr:    QrCode,
-    cart:  ShoppingCart,
-    pulse: Activity
-  };
+  @ViewChild('graficoHoras') graficoHorasRef?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('graficoDias')  graficoDiasRef?:  ElementRef<HTMLCanvasElement>;
 
-  get nombreSucursalActual(): string {
-    const s = this.sucursales.find(x => x.id_sucursal === this.sucursalActual);
-    return s?.nombre_sucursal || 'Tu sucursal';
-  }
+  readonly icons = { sube: ArrowUpRight, baja: ArrowDownRight, igual: Minus };
+  readonly cifra = cifra;
+  readonly entero = entero;
+  readonly hora = hora;
+  readonly porcentaje = porcentaje;
 
-  cargando       = true;
-  esAdmin        = false;
-  datosAdmin: any = null;
+  cargando    = true;
+  refrescando = false;
+  esAdmin     = false;
+  datos: any  = null;
+  actualizado: Date | null = null;
+  readonly hoyTexto = fechaLarga(new Date());
 
-  // Sucursales
-  sucursales:        any[]   = [];
-  sucursalActual:    number  = 1;
-  mostrarModalSucursal = false;
-  nuevaSucursal    = { nombre_sucursal: '', direccion_fisica: '', telefono_contacto: '' };
-  errorSucursal    = '';
-  cargandoSucursal = false;
-  cajasAbiertas:     Record<number, boolean> = {};
-  cajerosTurnos:     Record<number, number>  = {};
+  sucursales: any[] = [];
+  sucursalActual: number | null = 1;   // null = todas
+  cajasAbiertas: Record<number, boolean> = {};
 
-  // Categorías para filtro de gráfico de productos
-  listaCategorias:      any[]        = [];
-  categoriaFiltroChart: number | null = null;
+  categorias: any[] = [];
+  categoriaFiltro: number | null = null;
 
-  // Charts
-  graficoPie:      any;
-  graficoBarras:   any;
-  graficoProductos: any;
+  private graficos: Chart[] = [];
+  private intervalo: any;
 
-  // Intervalo de refresco automático
-  private refreshInterval: any;
-
-  ngOnInit() {
-    const raw = localStorage.getItem('usuario_sgiv');
-    if (raw) {
-      const u = JSON.parse(raw);
-      this.esAdmin        = u.id_rol === 1;
-      this.sucursalActual = u.id_sucursal || 1;
-    }
-
-    this.cargarSucursales();
-    this.cargarCategorias();
-    this.cargarDatos();
-    this.cargarEstadoCajas();
-
-    this.refreshInterval = setInterval(() => {
-      this.cargarDatos();
-      this.cargarEstadoCajas();
-    }, 30000);
-  }
-
-  ngOnDestroy() {
-    if (this.refreshInterval) clearInterval(this.refreshInterval);
-    this.destruirGraficos();
-  }
-
-  cargarSucursales() {
-    this.sucursalService.listarSucursales().subscribe({
-      next: (s) => {
-        this.sucursales = s;
-        // Una vez cargadas las sucursales, consultar el estado de caja de cada una
-        this.cargarEstadoCajas();
-        this.cdr.detectChanges();
-      }
+  constructor() {
+    // Redibuja los gráficos al cambiar color o modo oscuro en Ajustes
+    effect(() => {
+      this.ajustes.oscuro();
+      this.ajustes.config();
+      untracked(() => this.renderizarGraficos());
     });
   }
 
-  cargarCategorias() {
-    // Reutilizamos el endpoint del backend
-    const token = localStorage.getItem('token_sgiv');
-    const url   = (window as any).__env?.apiUrl || 'http://localhost:3000/api';
-    // Usamos fetch simple para no añadir dependencias
-    fetch(`http://localhost:3000/api/catalogo/categorias`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(r => r.json())
-      .then(data => { this.listaCategorias = data; this.cdr.detectChanges(); })
-      .catch(() => {});
+  ngOnInit() {
+    try {
+      const u = JSON.parse(localStorage.getItem('usuario_sgiv') || 'null');
+      this.esAdmin        = u?.id_rol === 1;
+      this.sucursalActual = u?.id_sucursal || 1;
+    } catch { }
+
+    this.sucursalService.listarSucursales().subscribe({
+      next: (s: any[]) => { this.sucursales = s || []; this.cargarEstadoCajas(); this.cdr.detectChanges(); }
+    });
+    this.productoService.obtenerCategorias().subscribe({
+      next: (c) => { this.categorias = c || []; this.cdr.detectChanges(); }
+    });
+    this.cargarDatos();
+    this.intervalo = setInterval(() => { this.cargarDatos(true); this.cargarEstadoCajas(); }, 30000);
   }
 
-  cargarDatos() {
-    this.reporteService.obtenerDashboardCompleto(this.sucursalActual, this.categoriaFiltroChart).subscribe({
-      next: (datos) => {
-        this.datosAdmin = datos;
-        this.cargando   = false;
+  ngOnDestroy() {
+    clearInterval(this.intervalo);
+    this.destruirGraficos();
+  }
+
+  cargarDatos(silencioso = false) {
+    if (silencioso && this.datos) this.refrescando = true;
+    this.reporteService.obtenerDashboardCompleto(this.sucursalActual ?? 0, this.categoriaFiltro).subscribe({
+      next: (d) => {
+        this.datos = d;
+        this.cargando = this.refrescando = false;
+        this.actualizado = new Date();
         this.cdr.detectChanges();
-        setTimeout(() => this.renderizarGraficos(), 150);
+        setTimeout(() => this.renderizarGraficos());
       },
-      error: () => { this.cargando = false; this.cdr.detectChanges(); }
+      error: () => { this.cargando = this.refrescando = false; this.cdr.detectChanges(); }
     });
   }
 
   cargarEstadoCajas() {
-    // Garantizar que SIEMPRE pidamos al menos el estado de la sucursal actual,
-    // aunque la lista de sucursales aún no haya cargado.
-    const lista = this.esAdmin && this.sucursales.length > 0
-      ? this.sucursales
-      : [{ id_sucursal: this.sucursalActual }];
-
-    lista.forEach((s: any) => {
-      if (!s?.id_sucursal) return;
+    if (!this.esAdmin) return;
+    this.sucursales.forEach(s => {
       this.cajaService.obtenerEstadoCajaSucursal(s.id_sucursal).subscribe({
         next: (r: any) => {
-          this.cajasAbiertas[s.id_sucursal] = r?.hay_caja_abierta === true;
-          this.cajerosTurnos[s.id_sucursal] = Number(r?.cajeros_con_turno) || 0;
-          this.cdr.detectChanges();
-        },
-        error: () => {
-          this.cajasAbiertas[s.id_sucursal] = false;
-          this.cajerosTurnos[s.id_sucursal] = 0;
+          this.cajasAbiertas = { ...this.cajasAbiertas, [s.id_sucursal]: r?.hay_caja_abierta === true };
           this.cdr.detectChanges();
         }
       });
     });
   }
 
-  cambiarSucursal(id_sucursal: number) {
-    this.sucursalActual = id_sucursal;
+  cambiarSucursal(id: number | null) {
+    this.sucursalActual = id;
     this.cargando = true;
     this.destruirGraficos();
     this.cargarDatos();
-    this.cargarEstadoCajas();
   }
 
-  filtrarCategoria(idCat: number | null) {
-    this.categoriaFiltroChart = idCat;
-    this.cargarDatos();
+  filtrarCategoria(id: number | null) {
+    this.categoriaFiltro = id;
+    this.cargarDatos(true);
   }
 
-  destruirGraficos() {
-    if (this.graficoPie)       { this.graficoPie.destroy();       this.graficoPie = null; }
-    if (this.graficoBarras)    { this.graficoBarras.destroy();    this.graficoBarras = null; }
-    if (this.graficoProductos) { this.graficoProductos.destroy(); this.graficoProductos = null; }
+  // ─── Datos derivados ───
+  get hoy()    { return this.datos?.hoy || {}; }
+  get comp()   { return this.datos?.comparativo || {}; }
+  get todas()  { return this.sucursalActual === null; }
+
+  get vsAyer()    { return variacion(this.hoy.ingresos, this.comp.ayer_misma_hora?.ingresos); }
+  get vsSemana()  { return variacion(this.hoy.ingresos, this.comp.semana_pasada_misma_hora?.ingresos); }
+  get diaSemanaPasada(): string {
+    return DIAS_SEMANA[(new Date().getDay() + 6) % 7].toLowerCase();
   }
 
-  renderizarGraficos() {
-    if (!this.datosAdmin) return;
+  get totalMetodos(): number {
+    return (this.datos?.metodos_pago || []).reduce((s: number, m: any) => s + m.ingresos, 0);
+  }
+
+  get alertasStock(): number {
+    return (this.datos?.stock?.agotados || 0) + (this.datos?.stock?.bajos || 0);
+  }
+
+  get efectivoEsperado(): number {
+    return (this.datos?.turnos_abiertos || []).reduce((s: number, t: any) => s + t.monto_inicial + t.efectivo, 0);
+  }
+
+  get maxProducto(): number {
+    return Math.max(1, ...(this.datos?.top_productos || []).map((p: any) => p.unidades));
+  }
+
+  get totalSucursales(): number {
+    return (this.datos?.sucursales || []).reduce((s: number, x: any) => s + x.ingresos, 0);
+  }
+
+  /** Últimos 7 días contra los 7 anteriores */
+  get semanas() {
+    const d = this.datos?.ultimos_dias || [];
+    const suma = (a: any[]) => a.reduce((s, x) => s + x.ingresos, 0);
+    const actual = suma(d.slice(7)), previa = suma(d.slice(0, 7));
+    return { actual, previa, delta: variacion(actual, previa) };
+  }
+
+  /** "desde 17:36", o con fecha si el turno se abrió otro día */
+  desde(f: string): string {
+    const d = new Date(f);
+    return d.toDateString() === new Date().toDateString() ? hora(d) : fechaHora(f);
+  }
+
+  colorMetodo(i: number): string {
+    return temaGrafico(this.ajustes).serie[i % 6];
+  }
+
+  claseDelta(v: number | null): string {
+    if (v === null || Math.abs(v) < 0.5) return 'igual';
+    return v > 0 ? 'sube' : 'baja';
+  }
+
+  iconoDelta(v: number | null) {
+    const c = this.claseDelta(v);
+    return c === 'sube' ? this.icons.sube : c === 'baja' ? this.icons.baja : this.icons.igual;
+  }
+
+  textoDelta(v: number | null): string {
+    if (v === null) return 'sin base';
+    return `${Math.abs(v).toFixed(1)} %`;
+  }
+
+  // ─── Gráficos ───
+  private destruirGraficos() {
+    this.graficos.forEach(g => g.destroy());
+    this.graficos = [];
+  }
+
+  private renderizarGraficos() {
+    if (!this.datos) return;
     this.destruirGraficos();
+    const t = temaGrafico(this.ajustes);
+    const fmt = (v: number) => cifra(v, 0);
 
-    // 1. Pie: métodos de pago
-    const ctxPie = document.getElementById('graficoPie') as HTMLCanvasElement;
-    if (ctxPie && this.datosAdmin.metodos_pago?.length > 0) {
-      const labels = this.datosAdmin.metodos_pago.map((m: any) => m.metodo_pago);
-      const data   = this.datosAdmin.metodos_pago.map((m: any) => parseFloat(m.total));
-      this.graficoPie = new Chart(ctxPie, {
-        type: 'pie',
-        data: {
-          labels,
-          datasets: [{
-            data,
-            backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(139, 92, 246, 0.8)', 'rgba(59, 130, 246, 0.8)'],
-            borderWidth: 2, borderColor: '#fff'
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
-        }
-      });
-    }
-
-    // 2. Barras: ingresos últimos 7 días
-    const ctxBarras = document.getElementById('graficoBarras') as HTMLCanvasElement;
-    if (ctxBarras && this.datosAdmin.ventas_por_dia?.length > 0) {
-      this.graficoBarras = new Chart(ctxBarras, {
+    const lienzoHoras = this.graficoHorasRef?.nativeElement;
+    if (lienzoHoras) {
+      const hoy  = new Map<number, number>(this.datos.por_hora.map((h: any) => [h.hora, h.ingresos]));
+      const prom = new Map<number, number>(this.datos.por_hora_promedio.map((h: any) => [h.hora, h.ingresos]));
+      const horas = [...hoy.keys(), ...prom.keys()];
+      const desde = Math.min(7, ...horas), hasta = Math.max(21, ...horas);
+      const etiquetas = Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i);
+      const ahora = new Date().getHours();
+      const base = opcionesBase(t, fmt);
+      base.plugins.tooltip.callbacks = {
+        title: (i: any) => `${String(i[0].label).padStart(2, '0')}:00 – ${String(+i[0].label + 1).padStart(2, '0')}:00`,
+        label: (i: any) => `${i.datasetIndex ? 'Promedio 7 días' : 'Hoy'}: ${this.moneda()} ${cifra(i.raw)}`
+      };
+      base.scales.x.ticks.callback = function (this: any, v: any) { return `${this.getLabelForValue(v)}h`; };
+      this.graficos.push(new Chart(lienzoHoras, {
         type: 'bar',
         data: {
-          labels: this.datosAdmin.ventas_por_dia.map((d: any) => d.fecha),
-          datasets: [{
-            label: `Ingresos ${this.moneda()}`,
-            data:  this.datosAdmin.ventas_por_dia.map((d: any) => parseFloat(d.ingresos)),
-            backgroundColor: 'rgba(59, 130, 246, 0.7)',
-            borderColor:     'rgba(59, 130, 246, 1)',
-            borderWidth: 1, borderRadius: 4
-          }]
+          labels: etiquetas,
+          datasets: [
+            {
+              data: etiquetas.map(h => hoy.get(h) || 0),
+              backgroundColor: etiquetas.map(h => h === ahora ? t.acento : t.acentoMedio),
+              borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.9, order: 2
+            },
+            {
+              type: 'line', data: etiquetas.map(h => prom.get(h) || 0),
+              borderColor: t.texto, borderWidth: 1.5, borderDash: [4, 4],
+              pointRadius: 0, tension: 0.35, order: 1
+            } as any
+          ]
         },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true } },
-          plugins: { legend: { display: false } }
-        }
-      });
+        options: base
+      }));
     }
 
-    // 3. Barras: top productos
-    const ctxProd = document.getElementById('graficoProductos') as HTMLCanvasElement;
-    if (ctxProd && this.datosAdmin.top_productos?.length > 0) {
-      this.graficoProductos = new Chart(ctxProd, {
+    const lienzoDias = this.graficoDiasRef?.nativeElement;
+    if (lienzoDias && this.datos.ultimos_dias?.length) {
+      const dias = this.datos.ultimos_dias;
+      const base = opcionesBase(t, fmt);
+      base.plugins.tooltip.callbacks = {
+        title: (i: any) => fechaLarga(dias[i[0].dataIndex].fecha),
+        label: (i: any) => `${this.moneda()} ${cifra(i.raw)} · ${dias[i.dataIndex].ventas} ventas`
+      };
+      this.graficos.push(new Chart(lienzoDias, {
         type: 'bar',
         data: {
-          labels: this.datosAdmin.top_productos.map((p: any) => p.nombre_producto),
+          labels: dias.map((d: any) => fechaCorta(d.fecha)),
           datasets: [{
-            label: 'Unidades vendidas',
-            data:  this.datosAdmin.top_productos.map((p: any) => p.total_vendido),
-            backgroundColor: 'rgba(16, 185, 129, 0.7)',
-            borderColor:     'rgba(16, 185, 129, 1)',
-            borderWidth: 1, borderRadius: 4
+            data: dias.map((d: any) => d.ingresos),
+            backgroundColor: dias.map((_: any, i: number) => i === dias.length - 1 ? t.acento : i >= 7 ? t.acentoMedio : t.fantasma),
+            borderRadius: 3, barPercentage: 0.75
           }]
         },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          indexAxis: 'y',
-          scales: { x: { beginAtZero: true } },
-          plugins: { legend: { display: false } }
-        }
-      });
+        options: base
+      }));
     }
   }
-
-  // ─── Modal sucursal ───
-  abrirModalSucursal() {
-    this.nuevaSucursal = { nombre_sucursal: '', direccion_fisica: '', telefono_contacto: '' };
-    this.errorSucursal = '';
-    this.mostrarModalSucursal = true;
-  }
-
-  cerrarModalSucursal() { this.mostrarModalSucursal = false; }
-
-  guardarSucursal() {
-    if (!this.nuevaSucursal.nombre_sucursal.trim()) {
-      this.errorSucursal = 'El nombre es obligatorio.'; return;
-    }
-    this.cargandoSucursal = true;
-    this.sucursalService.crearSucursal(this.nuevaSucursal).subscribe({
-      next: () => {
-        this.cargandoSucursal = false;
-        this.cerrarModalSucursal();
-        this.cargarSucursales();
-      },
-      error: (e) => { this.errorSucursal = e?.error?.error || 'Error al crear la sucursal.'; this.cargandoSucursal = false; this.cdr.detectChanges(); }
-    });
-  }
-
-  get resumen()     { return this.datosAdmin?.resumen_hoy   || {}; }
-  get turno()       { return this.datosAdmin?.turno_actual  || null; }
-  get totalEfectivo() { return parseFloat(this.resumen.total_efectivo || 0); }
-  get totalQr()       { return parseFloat(this.resumen.total_qr       || 0); }
-  get totalGeneral()  { return parseFloat(this.resumen.ingresos_totales || 0); }
 }

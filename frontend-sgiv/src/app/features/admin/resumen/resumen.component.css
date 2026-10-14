@@ -1,0 +1,34 @@
+.panel-linea { border-color: var(--i-linea); border-bottom: 1px solid var(--i-linea); }
+@media (min-width: 1024px) { .panel-linea { border-bottom: none; } }
+
+.panel-separador { border-top: 1px solid var(--i-linea); }
+
+.leyenda-linea {
+  display: inline-block;
+  width: 14px;
+  border-top: 1.5px dashed var(--i-tenue);
+}
+
+.turno + .turno {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--i-linea);
+}
+
+.fila-stock + .fila-stock { border-top: 1px solid var(--i-linea-suave); }
+
+.venta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+}
+.venta + .venta { border-top: 1px solid var(--i-linea-suave); }
+
+.venta-hora {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--i-tenue);
+  width: 38px;
+  flex-shrink: 0;
+}

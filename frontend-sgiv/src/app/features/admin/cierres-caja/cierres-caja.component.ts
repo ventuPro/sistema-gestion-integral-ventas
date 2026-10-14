@@ -4,11 +4,12 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { CajaService } from '../../../core/services/caja.service';
 import { environment } from '../../../../environments/environment';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 
 @Component({
   selector: 'app-cierres-caja',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, SelectorSucursalComponent],
   templateUrl: './cierres-caja.component.html'
 })
 export class CierresCajaComponent implements OnInit {
@@ -55,6 +56,10 @@ export class CierresCajaComponent implements OnInit {
   seleccionarSucursal(suc: any | null) {
     this.sucursalFiltro = suc;
     this.aplicarFiltro();
+  }
+
+  cambiarSucursal(id: number | null) {
+    this.seleccionarSucursal(this.sucursales.find(s => s.id_sucursal === id) || null);
   }
 
   aplicarFiltro() {

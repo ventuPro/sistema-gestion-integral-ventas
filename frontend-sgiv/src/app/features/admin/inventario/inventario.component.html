@@ -1,29 +1,10 @@
 <div class="space-y-5">
 
-  <!-- ═══ SELECTOR DE SUCURSAL (solo admin) ═══ -->
-<!-- Selector sucursal admin — igual que reportes -->
-<div *ngIf="sucursales.length > 0" class="flex flex-wrap gap-2 mb-6">
-  <button *ngFor="let suc of sucursales"
-          (click)="seleccionarSucursal(suc)"
-          class="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-          [class.bg-blue-600]="sucursalSeleccionada?.id_sucursal === suc.id_sucursal"
-          [class.text-white]="sucursalSeleccionada?.id_sucursal === suc.id_sucursal"
-          [class.bg-gray-100]="sucursalSeleccionada?.id_sucursal !== suc.id_sucursal"
-          [class.text-gray-600]="sucursalSeleccionada?.id_sucursal !== suc.id_sucursal">
-    {{ suc.nombre_sucursal }}
-  </button>
-</div>
-
-  <div *ngIf="sucursales.length === 0 && sucursalSeleccionada"
-       class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl px-5 py-3 flex items-center gap-3">
-    <div class="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
-      <lucide-icon [img]="icons.store" class="w-5 h-5"></lucide-icon>
-    </div>
-    <div>
-      <p class="text-sm font-bold text-blue-700">{{ sucursalSeleccionada?.nombre_sucursal }}</p>
-      <p class="text-xs text-blue-500">Inventario</p>
-    </div>
-  </div>
+  <app-selector-sucursal *ngIf="sucursalSeleccionada"
+                         [sucursales]="sucursales.length ? sucursales : [sucursalSeleccionada]"
+                         [seleccionada]="sucursalSeleccionada.id_sucursal"
+                         [soloLectura]="sucursales.length <= 1"
+                         (cambio)="cambiarSucursal($event)" />
 
   <!-- ═══ PANEL PRINCIPAL ═══ -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

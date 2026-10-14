@@ -1,0 +1,112 @@
+:host {
+  --s-tinta: #0f172a;
+  --s-tenue: #64748b;
+  --s-linea: #e2e8f0;
+  --s-riel: #f1f5f9;
+  --s-papel: #ffffff;
+  --s-acento: var(--color-blue-600, #2563eb);
+  display: inline-block;
+  max-width: 100%;
+}
+
+@media screen {
+  :host-context(html.tema-oscuro) {
+    --s-tinta: #f1f5f9;
+    --s-tenue: #94a3b8;
+    --s-linea: #2f3d52;
+    --s-riel: #0f172a;
+    --s-papel: #263449;
+    --s-acento: color-mix(in oklab, var(--color-blue-500, #3b82f6) 80%, white);
+  }
+}
+
+.selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--s-tenue);
+}
+
+.riel {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--s-riel);
+  border: 1px solid var(--s-linea);
+  border-radius: 9px;
+}
+.riel::-webkit-scrollbar { display: none; }
+
+.opcion {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 6px 13px 7px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--s-tenue);
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+.opcion:hover { color: var(--s-tinta); }
+.opcion:focus-visible { outline: 2px solid var(--s-acento); outline-offset: 1px; }
+
+/* Línea de acento que crece desde el centro en la opción activa */
+.opcion::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--s-acento);
+  transform: scaleX(0);
+  transition: transform 200ms ease;
+}
+
+.opcion.activa {
+  color: var(--s-tinta);
+  font-weight: 600;
+  background: var(--s-papel);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 0 0 1px var(--s-linea);
+}
+.opcion.activa::after { transform: scaleX(1); }
+
+.opcion.inactiva { opacity: 0.6; }
+
+.marca {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--s-tenue);
+}
+
+.punto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+.punto.abierta {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.solo-lectura .opcion { cursor: default; }

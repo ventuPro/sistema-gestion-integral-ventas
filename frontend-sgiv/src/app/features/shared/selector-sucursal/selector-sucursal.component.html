@@ -1,0 +1,32 @@
+<div class="selector" [class.solo-lectura]="soloLectura()">
+  <span class="rotulo">
+    <lucide-icon [img]="soloLectura() ? icons.lock : icons.store" class="w-3.5 h-3.5"></lucide-icon>
+    {{ soloLectura() ? 'Tu sucursal' : 'Sucursal' }}
+  </span>
+
+  <div class="riel" role="radiogroup" aria-label="Sucursal">
+    @if (todas() && !soloLectura()) {
+      <button type="button" role="radio" class="opcion"
+              [class.activa]="seleccionada() === null" [attr.aria-checked]="seleccionada() === null"
+              (click)="elegir(null)">
+        <lucide-icon [img]="icons.todas" class="w-3.5 h-3.5"></lucide-icon>
+        Todas
+      </button>
+    }
+    @for (s of opciones(); track s.id_sucursal) {
+      <button type="button" role="radio" class="opcion"
+              [class.activa]="seleccionada() === s.id_sucursal"
+              [class.inactiva]="s.estado_activo === false"
+              [attr.aria-checked]="seleccionada() === s.id_sucursal"
+              [title]="estado(s.id_sucursal) === null ? s.nombre_sucursal
+                       : s.nombre_sucursal + (estado(s.id_sucursal) ? ' · caja abierta' : ' · caja cerrada')"
+              (click)="elegir(s.id_sucursal)">
+        @if (estado(s.id_sucursal) !== null) {
+          <span class="punto" [class.abierta]="estado(s.id_sucursal)"></span>
+        }
+        {{ s.nombre_sucursal }}
+        @if (s.estado_activo === false) { <span class="marca">inactiva</span> }
+      </button>
+    }
+  </div>
+</div>
