@@ -10,6 +10,7 @@ import { AjustesService } from '../../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../../core/services/impresion.service';
 import { cifra } from '../../../../core/utils/informe';
 import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download } from 'lucide-angular';
+import { DialogoService } from '../../../../core/services/dialogo.service';
 
 @Component({
   selector: 'app-mesa-modal',
@@ -24,6 +25,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   @Output() mesaActualizada   = new EventEmitter<void>();
 
   private cuentaService = inject(CuentaService);
+  private dialogo = inject(DialogoService);
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
   readonly ajustes       = inject(AjustesService);
@@ -123,9 +125,14 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     });
   }
 
-  forzarReset() {
-    if (!confirm(`¿Resetear la Mesa ${this.mesa.numero_mesa}?\nEsto cancelará la cuenta actual y liberará la mesa.`)) return;
-    if (!this.esAdmin) { alert('Solo el administrador puede hacer esto.'); return; }
+  async forzarReset() {
+    if (!this.esAdmin) { this.dialogo.error('Solo el administrador puede resetear una mesa.'); return; }
+    const si = await this.dialogo.confirmar({
+      titulo: `¿Resetear la Mesa ${this.mesa.numero_mesa}?`,
+      mensaje: 'Se cancela la cuenta actual, el stock reservado vuelve al inventario y la mesa queda libre.',
+      textoConfirmar: 'Resetear', peligro: true
+    });
+    if (!si) return;
 
     this.cargando = true;
     this.cuentaService.resetMesa(this.mesa.id_mesa).subscribe({
@@ -134,7 +141,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         this.mesaActualizada.emit();
         this.cerrarModal();
       },
-      error: () => { this.cargando = false; alert('Error al resetear.'); }
+      error: (e: any) => { this.cargando = false; this.dialogo.error(e?.error?.error || 'No se pudo resetear la mesa.'); this.cdr.detectChanges(); }
     });
   }
 
@@ -176,8 +183,9 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (e: any) => {
-        alert(e?.error?.error || 'Error al abrir la mesa');
+        this.dialogo.error(e?.error?.error || 'No se pudo abrir la mesa.');
         this.cargando = false;
+        this.cdr.detectChanges();
       }
     });
   }
@@ -187,7 +195,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
     const stockDisponible = Number(producto.stock_actual) || 0;
     if (stockDisponible <= 0) {
-      alert(`Sin stock para: ${producto.nombre_producto}`);
+      this.dialogo.error(`Sin stock: ${producto.nombre_producto}`);
       return;
     }
 
@@ -228,7 +236,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         this.notaProducto = '';
         this.cdr.detectChanges();
       },
-      error: (e: any) => alert(e?.error?.error || 'Error al agregar producto')
+      error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo agregar el producto.')
     });
   }
 
@@ -251,7 +259,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         this.cuentaActiva.total_acumulado = res.total ?? this.calcularTotalLocal();
         this.cdr.detectChanges();
       },
-      error: (e: any) => alert(e?.error?.error || 'Error al quitar producto')
+      error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo quitar el producto.')
     });
   }
 
@@ -302,8 +310,9 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (e: any) => {
-        alert(e?.error?.error || 'Error al cerrar la cuenta');
+        this.dialogo.error(e?.error?.error || 'No se pudo cerrar la cuenta.');
         this.cargando = false;
+        this.cdr.detectChanges();
       }
     });
   }

@@ -1,11 +1,13 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { AuthService } from './auth.service';
 
 // ─── Socket compartido del personal; solo se desconecta al cerrar sesión ───
 @Injectable({ providedIn: 'root' })
 export class SocketService {
+  private auth = inject(AuthService);
   private socket: Socket | null = null;
   private salas = new Set<string>();
   private readonly URL = environment.apiUrl.replace('/api', '');
@@ -19,7 +21,7 @@ export class SocketService {
   }
 
   private unirse(sala: string) {
-    this.socket?.emit('unirse_sala', sala, localStorage.getItem('token_sgiv'));
+    this.socket?.emit('unirse_sala', sala, this.auth.token());
   }
 
   conectar(sala: string) {

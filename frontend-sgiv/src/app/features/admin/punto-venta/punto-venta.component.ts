@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ProductoService } from '../../../core/services/producto.service';
 import { CajaService, EstadoCajaCompleto } from '../../../core/services/caja.service';
 import { SocketService } from '../../../core/services/socket.service';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { Subscription } from 'rxjs';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
@@ -16,6 +16,7 @@ import { AjustesService } from '../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../core/services/impresion.service';
 import { sondeo } from '../../../core/utils/sondeo';
 import { cifra, fechaLarga } from '../../../core/utils/informe';
+import { DialogoService } from '../../../core/services/dialogo.service';
 
 @Component({
   selector: 'app-punto-venta',
@@ -26,6 +27,7 @@ import { cifra, fechaLarga } from '../../../core/utils/informe';
 })
 export class PuntoVentaComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
+  private dialogo = inject(DialogoService);
   private cajaService     = inject(CajaService);
   private socketService   = inject(SocketService);
   private cdr             = inject(ChangeDetectorRef);
@@ -129,10 +131,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     const totales = new Map<string, number>();
     for (const v of this.ventasHoy) totales.set(v.metodo_pago, (totales.get(v.metodo_pago) || 0) + v.monto_total_venta);
     return [...totales].map(([metodo, total]) => ({ metodo, total }));
-  }
-
-  private headers(): HttpHeaders {
-    return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
   }
 
   ngOnInit() {
@@ -301,7 +299,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     const stockDisponible = Number(producto.stock_actual)    || 0;
 
     if (stockDisponible <= 0) {
-      alert(`Sin stock para: ${producto.nombre_producto}`); return;
+      this.dialogo.error(`Sin stock: ${producto.nombre_producto}`); return;
     }
 
     const existe = this.carrito.find(i => i.id_producto === producto.id_producto);
@@ -345,7 +343,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   abrirModalCobro() {
     if (!this.carrito.length) return;
     if (!this.puedeVender) {
-      alert('La caja está cerrada. No puedes registrar ventas.');
+      this.dialogo.error('La caja está cerrada. No puedes registrar ventas.');
       return;
     }
     this.metodoPago  = this.ajustes.config().pago_efectivo ? 'Efectivo' : 'QR';
@@ -386,8 +384,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
     this.http.post<any>(
       `${this.apiUrl}/caja/cobrar`,
-      datosVenta,
-      { headers: this.headers() }
+      datosVenta
     ).subscribe({
       next: (res) => {
         this.datosTicket = {
@@ -408,7 +405,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       error: (e: any) => {
         // CAJA_CERRADA → reverificar estado y bloquear
         if (e?.error?.error === 'CAJA_CERRADA') {
-          alert('La caja fue cerrada. Pide al administrador que la reabra.');
+          this.dialogo.error('La caja fue cerrada. Pide al administrador que la reabra.');
           this.verificarAccesoCaja();
           this.cargando = false;
           this.cdr.detectChanges();
@@ -423,15 +420,14 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
             const precio = precios.get(Number(i.id_producto)) ?? Number(i.precio_unitario);
             return { ...i, precio_unitario: precio, subtotal: precio * Number(i.cantidad) };
           });
-          alert(`Los precios cambiaron. Nuevo total: ${this.moneda()} ${Number(e.error.total).toFixed(2)}. Revise el carrito y vuelva a cobrar.`);
+          this.dialogo.error(`Los precios cambiaron. Nuevo total: ${this.moneda()} ${Number(e.error.total).toFixed(2)}. Revisa el carrito y vuelve a cobrar.`);
           this.cargarCatalogo();
           this.cargando = false;
           this.cdr.detectChanges();
           return;
         }
         const msg = e?.error?.detalle || e?.error?.error || 'Error desconocido al registrar la venta.';
-        console.error('Error venta:', msg);
-        alert(`Error al registrar: ${msg}`);
+        this.dialogo.error(`No se pudo registrar la venta: ${msg}`);
         this.cargando = false;
         this.cdr.detectChanges();
       }
@@ -466,7 +462,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.mostrarHistorial = !this.mostrarHistorial;
     if (this.mostrarHistorial) this.cargarVentasHoy();
   }
-
 
   cerrarTicket() {
     this.mostrarTicket = false;

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { sondeo } from '../utils/sondeo';
@@ -31,10 +31,6 @@ export class PermisoService {
 
   constructor(private http: HttpClient) {}
 
-  private h(): HttpHeaders {
-    return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
-  }
-
   private getRolActual(): number {
     try {
       const raw = localStorage.getItem('usuario_sgiv');
@@ -48,7 +44,7 @@ export class PermisoService {
 
   cargarMisPermisos(): Observable<Record<string, boolean>> {
     return new Observable(observer => {
-      this.http.get<any>(`${this.apiUrl}/permisos/mis-permisos`, { headers: this.h() }).subscribe({
+      this.http.get<any>(`${this.apiUrl}/permisos/mis-permisos`).subscribe({
         next: (res) => {
           const permisos: Record<string, boolean> = res?.permisos || this.getDefaults();
           this.permisosSubject.next(permisos);
@@ -93,14 +89,13 @@ export class PermisoService {
   }
 
   obtenerPermisosUsuario(id_usuario: number): Observable<any> {
-    return this.http.get(`${this.apiUrl}/permisos/usuario/${id_usuario}`, { headers: this.h() });
+    return this.http.get(`${this.apiUrl}/permisos/usuario/${id_usuario}`);
   }
 
   guardarPermisosUsuario(id_usuario: number, permisos: Record<string, boolean>): Observable<any> {
     return this.http.put(
       `${this.apiUrl}/permisos/usuario/${id_usuario}`,
-      { permisos },
-      { headers: this.h() }
+      { permisos }
     );
   }
 
@@ -133,7 +128,7 @@ export class PermisoService {
    */
   recargarPermisos(): Observable<Record<string, boolean>> {
     return new Observable(observer => {
-      this.http.get<any>(`${this.apiUrl}/permisos/mis-permisos`, { headers: this.h() }).subscribe({
+      this.http.get<any>(`${this.apiUrl}/permisos/mis-permisos`).subscribe({
         next: (res) => {
           const nuevos: Record<string, boolean> = res?.permisos || this.getDefaults();
           const previo = localStorage.getItem('permisos_sgiv') || '{}';

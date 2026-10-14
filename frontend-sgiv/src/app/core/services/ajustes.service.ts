@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable, firstValueFrom, tap, timeout } from 'rxjs';
 import { io } from 'socket.io-client';
 import { environment } from '../../../environments/environment';
@@ -123,44 +123,40 @@ export class AjustesService {
     } catch { /* se queda con la copia local o los valores originales */ }
   }
 
-  private h(): HttpHeaders {
-    return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
-  }
-
   obtenerCompleto(): Observable<Configuracion> {
-    return this.http.get<Configuracion>(this.api, { headers: this.h() });
+    return this.http.get<Configuracion>(this.api);
   }
 
   guardarEmpresa(datos: Partial<Configuracion>): Observable<any> {
-    return this.http.put(`${this.api}/empresa`, datos, { headers: this.h() })
+    return this.http.put(`${this.api}/empresa`, datos)
       .pipe(tap((r: any) => this.establecer(r.configuracion)));
   }
 
   /** logo/favicon: data URI para cambiarlo, null para quitarlo, sin enviar para dejarlo igual */
   guardarApariencia(datos: Partial<Configuracion> & { logo?: string | null; favicon?: string | null }): Observable<any> {
-    return this.http.put(`${this.api}/apariencia`, datos, { headers: this.h() })
+    return this.http.put(`${this.api}/apariencia`, datos)
       .pipe(tap((r: any) => this.establecer(r.configuracion)));
   }
 
   /** qr_cobro: data URI para cambiarlo, null para quitarlo, sin enviar para dejarlo igual */
   guardarParametros(datos: Partial<Configuracion> & { qr_cobro?: string | null }): Observable<any> {
-    return this.http.put(`${this.api}/parametros`, datos, { headers: this.h() })
+    return this.http.put(`${this.api}/parametros`, datos)
       .pipe(tap((r: any) => this.establecer(r.configuracion)));
   }
 
   // ─── Propietarios (solo administrador) ───
   listarPropietarios(): Observable<Propietario[]> {
-    return this.http.get<Propietario[]>(`${this.api}/propietarios`, { headers: this.h() });
+    return this.http.get<Propietario[]>(`${this.api}/propietarios`);
   }
 
   guardarPropietario(p: Propietario): Observable<any> {
     return p.id_propietario
-      ? this.http.put(`${this.api}/propietarios/${p.id_propietario}`, p, { headers: this.h() })
-      : this.http.post(`${this.api}/propietarios`, p, { headers: this.h() });
+      ? this.http.put(`${this.api}/propietarios/${p.id_propietario}`, p)
+      : this.http.post(`${this.api}/propietarios`, p);
   }
 
   eliminarPropietario(id: number): Observable<any> {
-    return this.http.delete(`${this.api}/propietarios/${id}`, { headers: this.h() });
+    return this.http.delete(`${this.api}/propietarios/${id}`);
   }
 
   /** Vista previa sin guardar (pantalla de Ajustes) */

@@ -3,6 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
+const CLAVE_TOKEN = 'token_sgiv';
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private apiUrl = environment.apiUrl;
@@ -17,21 +19,25 @@ export class AuthService {
   }
 
   guardarToken(token: string): void {
-    localStorage.setItem('token_sgiv', token);
+    localStorage.setItem(CLAVE_TOKEN, token);
+  }
+
+  /** Único lugar que lee el token (lo usan el interceptor y el socket) */
+  token(): string | null {
+    return localStorage.getItem(CLAVE_TOKEN);
   }
 
   estaLogueado(): boolean {
-    return !!localStorage.getItem('token_sgiv');
+    return !!this.token();
   }
 
   /** avisarServidor: deja constancia del cierre en la auditoría (no aplica a sesiones vencidas). */
   cerrarSesion(avisarServidor = false): void {
-    const token = localStorage.getItem('token_sgiv');
-    if (avisarServidor && token) {
-      this.http.post(`${this.apiUrl}/usuarios/logout`, {}, { headers: { Authorization: `Bearer ${token}` } })
-        .subscribe({ error: () => {} });
+    // El interceptor agrega el token: la petición sale antes de borrarlo
+    if (avisarServidor && this.token()) {
+      this.http.post(`${this.apiUrl}/usuarios/logout`, {}).subscribe({ error: () => {} });
     }
-    localStorage.removeItem('token_sgiv');
+    localStorage.removeItem(CLAVE_TOKEN);
     localStorage.removeItem('usuario_sgiv');
     localStorage.removeItem('permisos_sgiv');
   }

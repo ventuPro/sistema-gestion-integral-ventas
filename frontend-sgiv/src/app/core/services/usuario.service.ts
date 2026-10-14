@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
@@ -8,35 +8,31 @@ export class UsuarioService {
   private apiUrl = environment.apiUrl;
   constructor(private http: HttpClient) {}
 
-  private h(): HttpHeaders {
-    return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
-  }
-
   listarUsuarios(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/usuarios`, { headers: this.h() });
+    return this.http.get<any[]>(`${this.apiUrl}/usuarios`);
   }
 
   obtenerDatosFormulario(): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/usuarios/form-data`, { headers: this.h() });
+    return this.http.get<any>(`${this.apiUrl}/usuarios/form-data`);
   }
 
   crearUsuario(datos: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/usuarios/registro`, datos, { headers: this.h() });
+    return this.http.post(`${this.apiUrl}/usuarios/registro`, datos);
   }
 
   actualizarUsuario(id: number, datos: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/usuarios/${id}`, datos, { headers: this.h() });
+    return this.http.put(`${this.apiUrl}/usuarios/${id}`, datos);
   }
 
   desactivarUsuario(id: number): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/usuarios/${id}/desactivar`, {}, { headers: this.h() });
+    return this.http.patch(`${this.apiUrl}/usuarios/${id}/desactivar`, {});
   }
 
   reactivarUsuario(id: number): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/usuarios/${id}/reactivar`, {}, { headers: this.h() });
+    return this.http.patch(`${this.apiUrl}/usuarios/${id}/reactivar`, {});
   }
 
   cambiarContrasena(id: number, nueva_contrasena: string): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/usuarios/${id}/contrasena`, { nueva_contrasena }, { headers: this.h() });
+    return this.http.patch(`${this.apiUrl}/usuarios/${id}/contrasena`, { nueva_contrasena });
   }
 }

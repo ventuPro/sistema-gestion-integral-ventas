@@ -13,6 +13,7 @@ import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, QrCode, Printer, Download, Plus, Trash2, X } from 'lucide-angular';
 import { sondeo } from '../../../core/utils/sondeo';
 import { cifra, fechaLarga } from '../../../core/utils/informe';
+import { DialogoService } from '../../../core/services/dialogo.service';
 
 @Component({
   selector: 'app-mesas',
@@ -23,6 +24,7 @@ import { cifra, fechaLarga } from '../../../core/utils/informe';
 })
 export class MesasComponent implements OnInit, OnDestroy {
   private cuentaService = inject(CuentaService);
+  private dialogo = inject(DialogoService);
   private cajaService   = inject(CajaService);
   private mesaService   = inject(MesaService);
   private socketService = inject(SocketService);
@@ -208,24 +210,27 @@ export class MesasComponent implements OnInit, OnDestroy {
     });
   }
 
-  eliminarMesa(mesa: any, event: Event) {
+  async eliminarMesa(mesa: any, event: Event) {
     event.stopPropagation(); // Evitar que abra el modal
 
     if (mesa.id_cuenta) {
-      alert('No se puede eliminar: la mesa tiene una cuenta abierta.');
+      this.dialogo.error('No se puede eliminar: la mesa tiene una cuenta abierta.');
       return;
     }
 
-    if (!confirm(`¿Eliminar definitivamente la Mesa ${mesa.numero_mesa}?\nEsta acción no se puede deshacer.`)) return;
+    const si = await this.dialogo.confirmar({
+      titulo: `¿Eliminar la Mesa ${mesa.numero_mesa}?`,
+      mensaje: 'Esta acción no se puede deshacer. Su código QR impreso dejará de funcionar.',
+      textoConfirmar: 'Eliminar', peligro: true
+    });
+    if (!si) return;
 
     this.mesaService.eliminarMesa(mesa.id_mesa).subscribe({
       next: () => {
         this.mostrarToast(`Mesa ${mesa.numero_mesa} eliminada`);
         this.cargarMesas();
       },
-      error: (e: any) => {
-        alert(e?.error?.error || 'Error al eliminar la mesa.');
-      }
+      error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo eliminar la mesa.')
     });
   }
 
@@ -285,12 +290,16 @@ export class MesasComponent implements OnInit, OnDestroy {
     a.click();
   }
 
-  regenerarQR(c: { id_mesa: number; numero_mesa: number }) {
-    if (!confirm(`¿Generar un QR nuevo para la Mesa ${c.numero_mesa}?\n\n` +
-                 `El QR impreso actual dejará de funcionar y deberás imprimir y pegar el nuevo.`)) return;
+  async regenerarQR(c: { id_mesa: number; numero_mesa: number }) {
+    const si = await this.dialogo.confirmar({
+      titulo: `¿Generar un QR nuevo para la Mesa ${c.numero_mesa}?`,
+      mensaje: 'El QR impreso actual dejará de funcionar y deberás imprimir y pegar el nuevo.',
+      textoConfirmar: 'Generar nuevo QR', peligro: true
+    });
+    if (!si) return;
     this.mesaService.regenerarQR(c.id_mesa).subscribe({
       next: (r: any) => { this.mostrarToast(r.mensaje); this.generarCodigosQR(); },
-      error: (e: any) => alert(e?.error?.error || 'No se pudo regenerar el QR')
+      error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo regenerar el QR')
     });
   }
 
@@ -308,7 +317,7 @@ export class MesasComponent implements OnInit, OnDestroy {
       </div>`).join('');
 
     const ventana = window.open('', '_blank');
-    if (!ventana) { alert('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes.'); return; }
+    if (!ventana) { this.dialogo.error('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes.'); return; }
     ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Códigos QR de mesas</title>
       <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 12mm; }

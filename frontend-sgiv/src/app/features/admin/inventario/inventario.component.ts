@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { ProductoService } from '../../../core/services/producto.service';
 import { SocketService } from '../../../core/services/socket.service';
@@ -106,10 +106,6 @@ export class InventarioComponent implements OnInit, OnDestroy {
   errorBorrarCat          = '';
   cargandoBorrarCat       = false;
 
-  private h(): HttpHeaders {
-    return new HttpHeaders().set('Authorization', `Bearer ${localStorage.getItem('token_sgiv')}`);
-  }
-
   ngOnInit() {
     const raw = localStorage.getItem('usuario_sgiv');
     this.usuarioActual = raw ? JSON.parse(raw) : null;
@@ -135,7 +131,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
   // ─── SUCURSALES ───
   cargarSucursales() {
-    this.http.get<any[]>(`${this.apiUrl}/sucursales`, { headers: this.h() }).subscribe({
+    this.http.get<any[]>(`${this.apiUrl}/sucursales`).subscribe({
       next: (suc) => {
         this.sucursales = suc || [];
         if (this.sucursales.length > 0 && !this.sucursalSeleccionada) {

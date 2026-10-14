@@ -5,6 +5,7 @@ import { LucideAngularModule, Bell, X, Check, Minus, Plus, Trash2, Volume2, Volu
 import { PedidoService } from '../../../core/services/pedido.service';
 import { SocketService } from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { DialogoService } from '../../../core/services/dialogo.service';
 import { sondeo } from '../../../core/utils/sondeo';
 
 type Pestana = 'pendientes' | 'entregar';
@@ -18,6 +19,7 @@ type Pestana = 'pendientes' | 'entregar';
 })
 export class BandejaPedidosComponent implements OnInit, OnDestroy {
   private pedidoService = inject(PedidoService);
+  private dialogo        = inject(DialogoService);
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
   readonly moneda        = inject(AjustesService).moneda;
@@ -143,8 +145,13 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
                   `✓ Pedido de la Mesa ${pedido.numero_mesa} confirmado y cargado a su cuenta`);
   }
 
-  rechazar(pedido: any) {
-    if (!confirm(`¿Rechazar el pedido de la Mesa ${pedido.numero_mesa}?`)) return;
+  async rechazar(pedido: any) {
+    const si = await this.dialogo.confirmar({
+      titulo: `¿Rechazar el pedido de la Mesa ${pedido.numero_mesa}?`,
+      mensaje: 'Los productos vuelven al stock y el cliente verá el pedido como no atendido.',
+      textoConfirmar: 'Rechazar', peligro: true
+    });
+    if (!si) return;
     this.ejecutar(pedido, this.pedidoService.rechazar(pedido.id_pedido),
                   `Pedido de la Mesa ${pedido.numero_mesa} rechazado`);
   }
