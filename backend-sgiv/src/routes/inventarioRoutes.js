@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const inventarioController = require('../controllers/inventarioController');
+const ctrl = require('../controllers/inventarioController');
 const { verificarToken, verificarPermiso } = require('../middlewares/authMiddleware');
 
-// Ruta para hacer un ingreso o salida de stock
-router.post('/movimiento', verificarToken, verificarPermiso('inventario'), inventarioController.agregarMovimiento);
+const inventario = [verificarToken, verificarPermiso('inventario')];
 
-// Ruta para ver el inventario (Nota que usamos :id_sucursal como variable en la URL)
-router.get('/:id_sucursal', verificarToken, inventarioController.consultarInventario);
+router.get ('/motivos',     inventario, ctrl.listarMotivos);
+router.get ('/movimientos', inventario, ctrl.listarMovimientos);
+router.post('/movimientos', inventario, ctrl.registrarMovimiento);
 
 module.exports = router;

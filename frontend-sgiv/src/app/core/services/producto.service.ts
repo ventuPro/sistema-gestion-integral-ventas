@@ -60,11 +60,4 @@ export class ProductoService {
   reactivarProducto(id: number): Observable<any> {
     return this.http.patch(`${this.apiUrl}/catalogo/productos/${id}/reactivar`, {});
   }
-
-  agregarStock(id_producto: number, cantidad: number, id_sucursal = 1): Observable<any> {
-    return this.http.patch(
-      `${this.apiUrl}/catalogo/productos/${id_producto}/stock`,
-      { cantidad, id_sucursal }
-    );
-  }
 }

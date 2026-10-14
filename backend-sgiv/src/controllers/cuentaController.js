@@ -45,7 +45,7 @@ const agregarProducto = async (req, res) => {
         const { id_producto, cantidad, precio_unitario, nota } = req.body;
 
         const resultado = await cuentaModel.agregarProductoCuenta(
-            id_cuenta, id_producto, cantidad, precio_unitario, nota, 'cajero'
+            id_cuenta, id_producto, cantidad, precio_unitario, nota, 'cajero', req.usuario.id_usuario
         );
 
         const cuentaActualizada = await cuentaModel.obtenerCuentaActiva(resultado.id_mesa);
@@ -83,7 +83,7 @@ const agregarProducto = async (req, res) => {
 // DELETE /api/cuentas/detalle/:id_detalle
 const quitarProducto = async (req, res) => {
     try {
-        const resultado = await cuentaModel.quitarProductoCuenta(req.params.id_detalle);
+        const resultado = await cuentaModel.quitarProductoCuenta(req.params.id_detalle, req.usuario.id_usuario);
         const cuentaActualizada = await cuentaModel.obtenerCuentaActiva(resultado.id_mesa);
 
         io()?.to('cajeros').emit('cuenta:producto_agregado', {

@@ -1,6 +1,8 @@
 const m = require('../models/productoModel');
 const { guardarBase64ComoArchivo } = require('../middlewares/uploadMiddleware');
-const { emitirStock, emitirCatalogo } = require('../utils/tiempoReal');
+const { emitirCatalogo } = require('../utils/tiempoReal');
+const db = require('../config/db');
+const { registrarHistorial } = require('../models/inventarioModel');
 
 const agregarCategoria  = async (req, res) => {
     try {
@@ -85,8 +87,14 @@ const agregarProducto   = async (req, res) => {
         // 2. ASIGNAR el producto a la sucursal seleccionada con su stock inicial
         //    Sin este paso el producto NO aparece en ninguna sucursal
         const id_suc      = Number(id_sucursal) || 1;
-        const stock_ini   = Number(stock_inicial) || 0;
-        await m.asignarProductoASucursal(prod.id_producto, id_suc, stock_ini);
+        const stock_ini   = Math.max(Math.trunc(Number(stock_inicial)) || 0, 0);
+        const inv = await m.asignarProductoASucursal(prod.id_producto, id_suc, stock_ini);
+        if (stock_ini > 0) {
+            await registrarHistorial(db, {
+                id_inventario: inv.id_inventario, id_usuario: req.usuario?.id_usuario, tipo: 'INGRESO',
+                cantidad: stock_ini, motivo: 'Stock inicial', stock_resultante: stock_ini
+            });
+        }
 
         emitirCatalogo();
         res.status(201).json({ producto: prod });
@@ -133,18 +141,7 @@ const reactivarProducto = async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
-// Agregar stock a una sucursal específica
-const sumarStock = async (req, res) => {
-    try {
-        const id_sucursal = Number(req.body.id_sucursal) || 1;
-        const cantidad    = Number(req.body.cantidad)    || 0;
-        const r = await m.agregarStock(req.params.id, cantidad, id_sucursal);
-        emitirStock([{ id_producto: r.id_producto, id_sucursal: r.id_sucursal, nuevo_stock: r.cantidad_actual }]);
-        res.json({ mensaje: `Stock actualizado: ${r.cantidad_actual}`, inventario: r });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-};
-
 module.exports = {
     agregarCategoria, listarCategorias, eliminarCategoria, listarProductos,
-    agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto, sumarStock
+    agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto
 };

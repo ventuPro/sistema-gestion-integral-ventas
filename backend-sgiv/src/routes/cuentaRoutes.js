@@ -84,7 +84,7 @@ router.post('/reset-mesa', mesas, async (req, res) => {
         let cambiosStock = [];
         for (const row of rC.rows) {
             cambiosStock = cambiosStock.concat(
-                await cuentaModel.devolverStockCuenta(client, row.id_cuenta)
+                await cuentaModel.devolverStockCuenta(client, row.id_cuenta, req.usuario.id_usuario)
             );
             await pedidoModel.finalizarPedidosDeCuenta(client, row.id_cuenta, 'Cancelado');
             await client.query(`

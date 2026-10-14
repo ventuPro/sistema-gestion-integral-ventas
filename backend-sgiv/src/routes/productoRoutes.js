@@ -18,6 +18,5 @@ router.get('/productos', verificarToken, productoController.listarProductos);
 router.delete('/productos/:id',        editar, productoController.eliminarProducto);
 router.patch('/productos/:id/reactivar', editar, productoController.reactivarProducto);
 router.put('/productos/:id',        editar, productoController.actualizarProducto);
-router.patch('/productos/:id/stock',  editar, productoController.sumarStock);
 
 module.exports = router;

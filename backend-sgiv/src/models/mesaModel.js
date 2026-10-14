@@ -96,7 +96,7 @@ const actualizarEstadoMesa = async (id_mesa, estado_mesa) => {
     return r.rows[0];
 };
 
-const eliminarMesa = async (id_mesa) => {
+const eliminarMesa = async (id_mesa, id_usuario = null) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
@@ -106,7 +106,7 @@ const eliminarMesa = async (id_mesa) => {
         const rCuentas = await client.query(
             `SELECT id_cuenta FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta'`, [id_mesa]);
         for (const { id_cuenta } of rCuentas.rows) {
-            cambiosStock = cambiosStock.concat(await cuentaModel.devolverStockCuenta(client, id_cuenta));
+            cambiosStock = cambiosStock.concat(await cuentaModel.devolverStockCuenta(client, id_cuenta, id_usuario));
             await pedidoModel.finalizarPedidosDeCuenta(client, id_cuenta, 'Cancelado');
             await client.query(
                 `UPDATE cuenta_mesa SET estado = 'Cancelada', fecha_cierre = NOW() WHERE id_cuenta = $1`, [id_cuenta]);

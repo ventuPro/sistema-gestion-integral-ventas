@@ -45,6 +45,12 @@
     </div>
   </section>
 
+  <nav class="inf-pestanas separador-inferior">
+    <button [class.activa]="vista === 'productos'" (click)="vista = 'productos'">Productos</button>
+    <button [class.activa]="vista === 'movimientos'" (click)="verMovimientos()">Movimientos</button>
+  </nav>
+
+  @if (vista === 'productos') {
   <section class="inf-hoja overflow-hidden">
     <div class="p-4 pb-3 separador-inferior space-y-3">
       <div class="flex flex-wrap items-center gap-3">
@@ -126,8 +132,11 @@
                 </td>
                 <td>
                   <div class="flex items-center justify-end gap-1">
-                    <button class="inf-boton" (click)="abrirModalStock(prod)" title="Agregar unidades al stock">
-                      <lucide-icon [img]="icons.addStock" class="w-3.5 h-3.5"></lucide-icon> Stock
+                    <button class="inf-boton" (click)="abrirMovimiento(prod)" title="Registrar una entrada o una merma">
+                      <lucide-icon [img]="icons.movimiento" class="w-3.5 h-3.5"></lucide-icon> Movimiento
+                    </button>
+                    <button class="accion" (click)="verMovimientos(prod)" title="Ver sus movimientos" aria-label="Ver movimientos">
+                      <lucide-icon [img]="icons.historial" class="w-4 h-4"></lucide-icon>
                     </button>
                     <button class="accion" (click)="abrirModalEditar(prod)" title="Editar producto" aria-label="Editar producto">
                       <lucide-icon [img]="icons.edit" class="w-4 h-4"></lucide-icon>
@@ -151,6 +160,78 @@
       <div class="inf-pie-hoja">{{ productosFiltrados.length }} de {{ productos.length }} producto(s)</div>
     }
   </section>
+  }
+
+  <!-- ═══ MOVIMIENTOS ═══ -->
+  @if (vista === 'movimientos') {
+    <section class="inf-hoja overflow-hidden">
+      <div class="p-4 separador-inferior flex flex-wrap items-center gap-3">
+        <div class="inf-segmentos">
+          <button [class.activa]="periodoMov === 'hoy'" (click)="periodoMov = 'hoy'; cargarMovimientos()">Hoy</button>
+          <button [class.activa]="periodoMov === '7'" (click)="periodoMov = '7'; cargarMovimientos()">7 días</button>
+          <button [class.activa]="periodoMov === '30'" (click)="periodoMov = '30'; cargarMovimientos()">30 días</button>
+        </div>
+        <div class="inf-segmentos">
+          <button [class.activa]="!tipoMov" (click)="tipoMov = null; cargarMovimientos()">Todos</button>
+          <button [class.activa]="tipoMov === 'INGRESO'" (click)="tipoMov = 'INGRESO'; cargarMovimientos()">Entradas</button>
+          <button [class.activa]="tipoMov === 'SALIDA'" (click)="tipoMov = 'SALIDA'; cargarMovimientos()">Salidas</button>
+        </div>
+        @if (productoFiltroMov) {
+          <span class="inf-ficha inline-flex items-center gap-1.5">
+            {{ productoFiltroMov.nombre_producto }}
+            <button class="quitar p-0.5!" (click)="productoFiltroMov = null; cargarMovimientos()" aria-label="Ver todos los productos">
+              <lucide-icon [img]="icons.cerrar" class="w-3 h-3"></lucide-icon>
+            </button>
+          </span>
+        }
+      </div>
+
+      @if (cargandoMov && !movimientos.length) {
+        <div class="p-4 space-y-2">
+          @for (n of [1,2,3,4]; track n) { <div class="inf-esqueleto h-11"></div> }
+        </div>
+      } @else if (!movimientos.length) {
+        <p class="inf-vacio">No hay movimientos en este período.</p>
+      } @else {
+        <div class="overflow-x-auto" [class.inf-refrescando]="cargandoMov">
+          <table class="inf-tabla">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Producto</th>
+                <th class="num">Cantidad</th>
+                <th>Motivo</th>
+                <th>Usuario</th>
+                <th class="num">Saldo</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of movimientos; track m.id_historial) {
+                <tr>
+                  <td class="whitespace-nowrap">{{ m.fecha_registro | date:'dd/MM HH:mm' }}</td>
+                  <td class="fuerte">{{ m.nombre_producto }}</td>
+                  <td class="num">
+                    <span class="font-semibold" [class.inf-sube]="m.tipo_movimiento === 'INGRESO'" [class.inf-baja]="m.tipo_movimiento === 'SALIDA'">
+                      {{ m.tipo_movimiento === 'INGRESO' ? '+' : '−' }}{{ m.cantidad_movida }}
+                    </span>
+                  </td>
+                  <td>
+                    {{ m.motivo_movimiento }}
+                    @if (m.detalle) { <span class="inf-secundario">{{ m.detalle }}</span> }
+                  </td>
+                  <td>{{ m.usuario || '—' }}</td>
+                  <td class="num">{{ m.stock_resultante ?? '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="inf-pie-hoja">
+          {{ movimientos.length }} movimiento(s){{ movimientos.length >= 200 ? ' · se muestran los 200 más recientes' : '' }}
+        </div>
+      }
+    </section>
+  }
 </div>
 
 <!-- ═══ NUEVO / EDITAR PRODUCTO ═══ -->
@@ -229,37 +310,71 @@
   </div>
 }
 
-<!-- ═══ AGREGAR STOCK ═══ -->
-@if (mostrarModalStock && productoStock) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalStock()">
-    <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
+<!-- ═══ MOVIMIENTO: ENTRADA O MERMA ═══ -->
+@if (productoMov) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarMovimiento()">
+    <div class="inf-hoja ventana w-full max-w-md max-h-[92vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
         <div class="min-w-0">
-          <h3 class="inf-tinta font-semibold text-[15px]">Agregar stock</h3>
-          <p class="inf-sub mt-0.5! truncate">{{ productoStock.nombre_producto }} · {{ sucursalSeleccionada?.nombre_sucursal }}</p>
+          <h3 class="inf-tinta font-semibold text-[15px]">Movimiento de inventario</h3>
+          <p class="inf-sub mt-0.5! truncate">{{ productoMov.nombre_producto }} · {{ sucursalSeleccionada?.nombre_sucursal }}</p>
         </div>
-        <button class="quitar" (click)="cerrarModalStock()" aria-label="Cerrar">
+        <button class="quitar" (click)="cerrarMovimiento()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
-      <div class="p-5 space-y-4">
-        <dl class="inf-pares">
-          <div><dt>Stock actual</dt><dd>{{ productoStock.stock_actual || 0 }}</dd></div>
-          <div><dt>Nuevo total</dt><dd class="inf-tinta">{{ (productoStock.stock_actual || 0) + (cantidadAgregar > 0 ? cantidadAgregar : 0) }}</dd></div>
-        </dl>
-        <div class="grupo">
-          <label class="inf-etiqueta">Unidades a agregar</label>
-          <div class="campo-monto">
-            <span>+</span>
-            <input type="number" min="1" [(ngModel)]="cantidadAgregar" placeholder="0" (keyup.enter)="agregarStock()">
+
+      <div class="flex-1 overflow-y-auto p-5 space-y-4">
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="eleccion flex-col! items-start! gap-0.5!" [class.activa]="mov.tipo === 'INGRESO'" (click)="cambiarTipoMov('INGRESO')">
+            <span class="font-semibold inf-tinta">Entrada</span>
+            <span class="text-xs inf-tenue">Suma al stock</span>
+          </button>
+          <button type="button" class="eleccion flex-col! items-start! gap-0.5!" [class.activa]="mov.tipo === 'SALIDA'" (click)="cambiarTipoMov('SALIDA')">
+            <span class="font-semibold inf-tinta">Merma o salida</span>
+            <span class="text-xs inf-tenue">Resta del stock</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="grupo">
+            <label class="inf-etiqueta" for="mov-cantidad">Cantidad</label>
+            <div class="campo-monto">
+              <span>{{ mov.tipo === 'INGRESO' ? '+' : '−' }}</span>
+              <input id="mov-cantidad" type="number" min="1" step="1" [(ngModel)]="mov.cantidad" placeholder="0">
+            </div>
+          </div>
+          <div class="grupo">
+            <label class="inf-etiqueta" for="mov-motivo">Motivo</label>
+            <select id="mov-motivo" class="campo h-[50px]" [(ngModel)]="mov.motivo">
+              @for (m of motivos[mov.tipo]; track m) { <option [value]="m">{{ m }}</option> }
+            </select>
           </div>
         </div>
-        @if (errorStock) { <p class="error-formulario">{{ errorStock }}</p> }
+
+        <div class="grupo">
+          <label class="inf-etiqueta" for="mov-detalle">
+            Observación <span class="inf-sutil">{{ mov.motivo === 'Otro' ? '(obligatoria)' : '(opcional)' }}</span>
+          </label>
+          <textarea id="mov-detalle" class="campo" rows="2" maxlength="200" [(ngModel)]="mov.detalle"
+                    placeholder="Ej.: hornada de la mañana, caja dañada en el transporte…"></textarea>
+        </div>
+
+        <dl class="inf-pares">
+          <div><dt>Stock actual</dt><dd>{{ productoMov.stock_actual || 0 }}</dd></div>
+          <div>
+            <dt>Queda en</dt>
+            <dd class="inf-tinta" [class.inf-baja]="stockTrasMovimiento < 0">{{ stockTrasMovimiento }}</dd>
+          </div>
+        </dl>
+        @if (errorMov) { <p class="error-formulario">{{ errorMov }}</p> }
       </div>
+
       <div class="inf-pie-hoja flex justify-end gap-2">
-        <button class="inf-boton" (click)="cerrarModalStock()">Cancelar</button>
-        <button class="boton-primario" (click)="agregarStock()" [disabled]="cantidadAgregar <= 0 || guardando">
-          {{ guardando ? 'Guardando…' : 'Agregar' }}
+        <button class="inf-boton" (click)="cerrarMovimiento()">Cancelar</button>
+        <button [class]="mov.tipo === 'SALIDA' ? 'boton-peligro' : 'boton-primario'" (click)="guardarMovimiento()"
+                [disabled]="guardando || !(mov.cantidad > 0) || stockTrasMovimiento < 0">
+          {{ guardando ? 'Guardando…' : (mov.tipo === 'INGRESO' ? 'Registrar entrada' : 'Registrar merma') }}
         </button>
       </div>
     </div>

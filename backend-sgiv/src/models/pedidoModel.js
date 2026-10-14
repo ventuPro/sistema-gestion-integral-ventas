@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { registrarHistorial } = require('./inventarioModel');
 
 // ─── Pedidos del cliente: Pendiente_Cajero → Confirmado → Entregado → Pagado / Cancelado ───
 
@@ -64,14 +65,15 @@ const normalizarItems = (items) => {
 };
 
 // ─── Stock (descuento atómico) ───
-const reservarStock = async (client, id_sucursal, items) => {
+// registro: { id_usuario, detalle } para el historial de inventario
+const reservarStock = async (client, id_sucursal, items, registro = {}) => {
     const cambios = [];
     for (const it of items) {
         const r = await client.query(`
             UPDATE inventario_sucursal
             SET cantidad_actual = cantidad_actual - $1
             WHERE id_sucursal = $2 AND id_producto = $3 AND cantidad_actual >= $1
-            RETURNING cantidad_actual
+            RETURNING id_inventario, cantidad_actual
         `, [it.cantidad, id_sucursal, it.id_producto]);
 
         if (r.rows.length === 0) {
@@ -86,22 +88,32 @@ const reservarStock = async (client, id_sucursal, items) => {
                 `Ya no hay suficiente "${info.nombre_producto || it.id_producto}" (disponible: ${info.disponible ?? 0})`,
                 { id_producto: it.id_producto, disponible: info.disponible ?? 0 });
         }
-        cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock: Number(r.rows[0].cantidad_actual) });
+        const nuevo_stock = Number(r.rows[0].cantidad_actual);
+        await registrarHistorial(client, {
+            id_inventario: r.rows[0].id_inventario, id_usuario: registro.id_usuario, tipo: 'SALIDA',
+            cantidad: it.cantidad, motivo: 'Pedido QR', detalle: registro.detalle, stock_resultante: nuevo_stock
+        });
+        cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock });
     }
     return cambios;
 };
 
-const devolverStock = async (client, id_sucursal, items) => {
+const devolverStock = async (client, id_sucursal, items, registro = {}) => {
     const cambios = [];
     for (const it of items) {
         const r = await client.query(`
             UPDATE inventario_sucursal
             SET cantidad_actual = cantidad_actual + $1
             WHERE id_sucursal = $2 AND id_producto = $3
-            RETURNING cantidad_actual
+            RETURNING id_inventario, cantidad_actual
         `, [it.cantidad, id_sucursal, it.id_producto]);
-        if (r.rows.length)
-            cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock: Number(r.rows[0].cantidad_actual) });
+        if (!r.rows.length) continue;
+        const nuevo_stock = Number(r.rows[0].cantidad_actual);
+        await registrarHistorial(client, {
+            id_inventario: r.rows[0].id_inventario, id_usuario: registro.id_usuario, tipo: 'INGRESO',
+            cantidad: it.cantidad, motivo: 'Pedido QR devuelto', detalle: registro.detalle, stock_resultante: nuevo_stock
+        });
+        cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock });
     }
     return cambios;
 };
@@ -198,7 +210,7 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
             throw errorCodigo('PRODUCTO_NO_DISPONIBLE', 'Un producto de tu pedido ya no está disponible. Revisa tu carrito.',
                               { id_producto: noDisponible.id_producto });
 
-        const cambios = await reservarStock(client, mesa.id_sucursal, lista);
+        const cambios = await reservarStock(client, mesa.id_sucursal, lista, { detalle: `Mesa ${mesa.numero_mesa}` });
 
         const totalCentavos = lista.reduce((s, i) => s + precios.get(i.id_producto) * i.cantidad, 0);
         const rPed = await client.query(`
@@ -253,7 +265,7 @@ const obtenerBandeja = async (id_sucursal, minutos_expiracion) => {
 };
 
 // ─── CAJERO: ajustar cantidad (0 = quitar) ───
-const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal }) => {
+const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal, id_usuario = null }) => {
     const nueva = Number(cantidad);
     if (!Number.isInteger(nueva) || nueva < 0 || nueva > MAX_CANTIDAD_ITEM)
         throw errorCodigo('PEDIDO_INVALIDO', 'Cantidad inválida');
@@ -271,6 +283,7 @@ const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal }) 
         const delta = nueva - Number(det.cantidad_solicitada);
 
         let cambios = [];
+        const registro = { id_usuario, detalle: `Pedido #${id_pedido} ajustado` };
         if (nueva === 0) {
             const rOtros = await client.query(
                 `SELECT COUNT(*)::int AS n FROM detalle_pedido WHERE id_pedido = $1 AND id_detalle_pedido <> $2`,
@@ -278,13 +291,13 @@ const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal }) 
             if (rOtros.rows[0].n === 0)
                 throw errorCodigo('ULTIMO_PRODUCTO', 'Es el único producto del pedido: recházalo en lugar de quitarlo');
             cambios = await devolverStock(client, pedido.id_sucursal,
-                                          [{ id_producto: det.id_producto, cantidad: det.cantidad_solicitada }]);
+                                          [{ id_producto: det.id_producto, cantidad: det.cantidad_solicitada }], registro);
             await client.query(`DELETE FROM detalle_pedido WHERE id_detalle_pedido = $1`, [id_detalle]);
         } else if (delta !== 0) {
             const mov = { id_producto: det.id_producto, cantidad: Math.abs(delta) };
             cambios = delta > 0
-                ? await reservarStock(client, pedido.id_sucursal, [mov])
-                : await devolverStock(client, pedido.id_sucursal, [mov]);
+                ? await reservarStock(client, pedido.id_sucursal, [mov], registro)
+                : await devolverStock(client, pedido.id_sucursal, [mov], registro);
             await client.query(`
                 UPDATE detalle_pedido
                 SET cantidad_solicitada = $1::int, subtotal_detalle = $1::int * precio_aplicado
@@ -345,7 +358,8 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
 
 // Pedido ya bloqueado
 const cancelarPendiente = async (client, pedido, id_usuario = null) => {
-    const cambios = await devolverStock(client, pedido.id_sucursal, await itemsDelPedido(client, pedido.id_pedido));
+    const cambios = await devolverStock(client, pedido.id_sucursal, await itemsDelPedido(client, pedido.id_pedido),
+                                        { id_usuario, detalle: `Pedido #${pedido.id_pedido} cancelado` });
     const r = await client.query(`
         UPDATE pedido_mesa SET estado_pedido = 'Cancelado', id_usuario_atencion = COALESCE($2, id_usuario_atencion)
         WHERE id_pedido = $1 RETURNING *

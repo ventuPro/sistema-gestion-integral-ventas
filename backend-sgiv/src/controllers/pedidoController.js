@@ -51,7 +51,8 @@ const ajustarDetalle = async (req, res) => {
             id_pedido:   Number(req.params.id_pedido),
             id_detalle:  Number(req.params.id_detalle),
             cantidad:    req.body?.cantidad,
-            id_sucursal: sucursalFiltro(req)
+            id_sucursal: sucursalFiltro(req),
+            id_usuario:  req.usuario.id_usuario
         });
         emitirStock(r.cambios);
         avisarCambio(r.pedido, { monto_total: r.monto_total });

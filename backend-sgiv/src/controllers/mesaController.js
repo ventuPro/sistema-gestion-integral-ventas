@@ -93,7 +93,7 @@ const eliminarMesa = async (req, res) => {
         const id_mesa = Number(req.params.id_mesa);
         if (!id_mesa) return res.status(400).json({ error: 'ID de mesa inválido' });
 
-        const { cambiosStock } = await m.eliminarMesa(id_mesa);
+        const { cambiosStock } = await m.eliminarMesa(id_mesa, req.usuario.id_usuario);
 
         // Notificar a cajeros que la mesa fue eliminada
         global.io?.to('cajeros').emit('mesa:actualizada', { id_mesa });

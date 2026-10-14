@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { registrarHistorial } = require('./inventarioModel');
 
 // Estado de caja basado en turno_caja.estado_turno.
 // caja_habilitada se sincroniza automáticamente con el estado del turno.
@@ -560,11 +561,10 @@ const registrarVenta = async ({
                     id_sucursal: Number(id_sucursal),
                     nuevo_stock: Number(rInv.rows[0].cantidad_actual)
                 });
-                await client.query(`
-                    INSERT INTO historial_inventario
-                        (id_inventario, id_usuario, tipo_movimiento, cantidad_movida, motivo_movimiento)
-                    VALUES ($1, $2, 'SALIDA', $3, 'Venta en Caja')
-                `, [rInv.rows[0].id_inventario, Number(id_usuario_cajero), cantidad]);
+                await registrarHistorial(client, {
+                    id_inventario: rInv.rows[0].id_inventario, id_usuario: Number(id_usuario_cajero), tipo: 'SALIDA',
+                    cantidad, motivo: 'Venta en Caja', stock_resultante: Number(rInv.rows[0].cantidad_actual)
+                });
             }
         }
 

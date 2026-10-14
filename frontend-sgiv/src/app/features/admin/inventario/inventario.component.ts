@@ -5,9 +5,10 @@ import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { ProductoService } from '../../../core/services/producto.service';
 import { SocketService } from '../../../core/services/socket.service';
+import { InventarioService, Movimiento, TipoMovimiento } from '../../../core/services/inventario.service';
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
-         Pencil, PackagePlus, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban } from 'lucide-angular';
+         Pencil, ArrowUpDown, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban, History } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
@@ -26,6 +27,7 @@ type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
 export class InventarioComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
   private socketService   = inject(SocketService);
+  private inventarioService = inject(InventarioService);
   private cdr             = inject(ChangeDetectorRef);
   readonly moneda          = inject(AjustesService).moneda;
   private http            = inject(HttpClient);
@@ -36,7 +38,8 @@ export class InventarioComponent implements OnInit, OnDestroy {
   // ─── Iconos ───
   readonly icons = {
     edit:       Pencil,
-    addStock:   PackagePlus,
+    movimiento: ArrowUpDown,
+    historial:  History,
     refresh:    RotateCw,
     mas:        Plus,
     etiqueta:   Tag,
@@ -86,11 +89,20 @@ export class InventarioComponent implements OnInit, OnDestroy {
     stock_inicial: 0
   };
 
-  // ─── Modal Stock ───
-  mostrarModalStock      = false;
-  productoStock:         any = null;
-  cantidadAgregar        = 0;
-  errorStock             = '';
+  // ─── Modal movimiento (entrada o merma) ───
+  productoMov:           any = null;
+  mov = { tipo: 'INGRESO' as TipoMovimiento, cantidad: 0, motivo: '', detalle: '' };
+  motivos: Record<TipoMovimiento, string[]> = { INGRESO: [], SALIDA: [] };
+  errorMov               = '';
+
+  // ─── Pestaña Movimientos ───
+  vista: 'productos' | 'movimientos' = 'productos';
+  movimientos:           Movimiento[] = [];
+  cargandoMov            = false;
+  periodoMov: 'hoy' | '7' | '30' = '7';
+  tipoMov:               TipoMovimiento | null = null;
+  productoFiltroMov:     { id_producto: number; nombre_producto: string } | null = null;
+  private recargaMov:    any;
 
   // ─── Modal Categoría ───
   mostrarModalCategoria  = false;
@@ -115,7 +127,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.suscribirStock();
   }
 
-  ngOnDestroy() { this.stockSub?.unsubscribe(); }
+  ngOnDestroy() { this.stockSub?.unsubscribe(); clearTimeout(this.recargaMov); }
 
   // Ventas de POS, mesas y menú QR actualizan el stock sin recargar
   private suscribirStock() {
@@ -126,11 +138,16 @@ export class InventarioComponent implements OnInit, OnDestroy {
       if (!prod) return;
       prod.stock_actual = Number(p.nueva_cantidad_disponible) || 0;
       this.aplicarFiltros();
+      if (this.vista === 'movimientos') {
+        clearTimeout(this.recargaMov);
+        this.recargaMov = setTimeout(() => this.cargarMovimientos(), 600);
+      }
     });
   }
 
   // ─── SUCURSALES ───
   cargarSucursales() {
+    if (!this.esAdmin) { this.usarSucursalPropia(); return; }
     this.http.get<any[]>(`${this.apiUrl}/sucursales`).subscribe({
       next: (suc) => {
         this.sucursales = suc || [];
@@ -158,8 +175,10 @@ export class InventarioComponent implements OnInit, OnDestroy {
   seleccionarSucursal(suc: any) {
     this.sucursalSeleccionada = suc;
     this.cargando             = true;
+    this.productoFiltroMov    = null;
     this.cargarProductos();
     this.cargarCategorias();
+    if (this.vista === 'movimientos') this.cargarMovimientos();
     this.cdr.detectChanges();
   }
 
@@ -326,29 +345,77 @@ export class InventarioComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ─── MODAL STOCK ───
-  abrirModalStock(prod: any) {
-    this.productoStock     = prod;
-    this.cantidadAgregar   = 0;
-    this.errorStock        = '';
-    this.mostrarModalStock = true;
+  // ─── MOVIMIENTO (entrada o merma) ───
+  abrirMovimiento(prod: any) {
+    this.productoMov = prod;
+    this.errorMov    = '';
+    this.guardando   = false;
+    this.mov         = { tipo: 'INGRESO', cantidad: 0, motivo: '', detalle: '' };
+    this.inventarioService.motivos$.subscribe({
+      next:  (m) => { this.motivos = m; this.cambiarTipoMov(this.mov.tipo); this.cdr.detectChanges(); },
+      error: () => { this.errorMov = 'No se pudieron cargar los motivos.'; this.cdr.detectChanges(); }
+    });
   }
 
-  cerrarModalStock() { this.mostrarModalStock = false; this.productoStock = null; this.guardando = false; }
+  cambiarTipoMov(tipo: TipoMovimiento) {
+    this.mov.tipo   = tipo;
+    this.mov.motivo = this.motivos[tipo]?.[0] || '';
+    this.errorMov   = '';
+  }
 
-  agregarStock() {
-    if (!this.cantidadAgregar || this.cantidadAgregar <= 0) {
-      this.errorStock = 'Ingresa una cantidad válida.'; return;
-    }
+  cerrarMovimiento() { this.productoMov = null; this.guardando = false; }
+
+  get stockTrasMovimiento(): number {
+    const n = Math.trunc(Number(this.mov.cantidad)) || 0;
+    return (Number(this.productoMov?.stock_actual) || 0) + (this.mov.tipo === 'SALIDA' ? -n : n);
+  }
+
+  guardarMovimiento() {
+    const cantidad = Number(this.mov.cantidad);
+    const detalle  = this.mov.detalle.trim();
+    if (!Number.isInteger(cantidad) || cantidad < 1) { this.errorMov = 'La cantidad debe ser un número entero mayor a 0.'; return; }
+    if (this.stockTrasMovimiento < 0) { this.errorMov = `Solo hay ${this.productoMov.stock_actual || 0} en stock.`; return; }
+    if (this.mov.motivo === 'Otro' && !detalle) { this.errorMov = 'Describe el motivo en la observación.'; return; }
+
+    const prod = this.productoMov;
     this.guardando = true;
-    const cantidad = this.cantidadAgregar;
-    this.productoService.agregarStock(this.productoStock.id_producto, cantidad, this.idSucursal).subscribe({
-      next:  () => { this.cerrarModalStock(); this.avisar(`Se agregaron ${cantidad} unidad(es)`); this.cargarProductos(); },
+    this.inventarioService.registrar({
+      id_producto: prod.id_producto, id_sucursal: this.idSucursal,
+      tipo: this.mov.tipo, cantidad, motivo: this.mov.motivo, detalle: detalle || undefined
+    }).subscribe({
+      next: (r) => {
+        prod.stock_actual = r.stock_actual;
+        this.cerrarMovimiento();
+        this.avisar(`${this.mov.tipo === 'INGRESO' ? 'Entrada' : 'Merma'} registrada: ${prod.nombre_producto} queda en ${r.stock_actual}`);
+        this.aplicarFiltros();
+        if (this.vista === 'movimientos') this.cargarMovimientos();
+      },
       error: (e: any) => {
-        this.errorStock = e?.error?.error || 'No se pudo agregar el stock.';
-        this.guardando  = false;
+        this.errorMov  = e?.error?.error || 'No se pudo registrar el movimiento.';
+        this.guardando = false;
         this.cdr.detectChanges();
       }
+    });
+  }
+
+  // ─── PESTAÑA MOVIMIENTOS ───
+  verMovimientos(prod?: any) {
+    this.productoFiltroMov = prod ? { id_producto: prod.id_producto, nombre_producto: prod.nombre_producto } : null;
+    this.vista = 'movimientos';
+    this.cargarMovimientos();
+  }
+
+  cargarMovimientos() {
+    const dias  = { hoy: 0, '7': 6, '30': 29 }[this.periodoMov];
+    const desde = new Date();
+    desde.setDate(desde.getDate() - dias);
+    this.cargandoMov = true;
+    this.inventarioService.listar({
+      id_sucursal: this.idSucursal, id_producto: this.productoFiltroMov?.id_producto,
+      tipo: this.tipoMov, desde: desde.toLocaleDateString('en-CA')   // AAAA-MM-DD en hora local
+    }).subscribe({
+      next:  (m) => { this.movimientos = m; this.cargandoMov = false; this.cdr.detectChanges(); },
+      error: () => { this.movimientos = []; this.cargandoMov = false; this.avisar('No se pudo cargar el historial.'); }
     });
   }
 

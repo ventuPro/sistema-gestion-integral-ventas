@@ -95,8 +95,14 @@ const MIGRACIONES = [
     CREATE INDEX IF NOT EXISTS idx_detalle_cuenta_cuenta     ON detalle_cuenta (id_cuenta);
     CREATE INDEX IF NOT EXISTS idx_detalle_pedido_pedido     ON detalle_pedido (id_pedido);
     CREATE INDEX IF NOT EXISTS idx_turno_sucursal_estado     ON turno_caja (id_sucursal, estado_turno);
-    CREATE INDEX IF NOT EXISTS idx_historial_inventario      ON historial_inventario (id_inventario);
-    CREATE INDEX IF NOT EXISTS idx_mesa_sucursal_numero      ON mesa_local (id_sucursal, numero_mesa);`
+    CREATE INDEX IF NOT EXISTS idx_historial_inv_fecha       ON historial_inventario (id_inventario, fecha_registro);
+    CREATE INDEX IF NOT EXISTS idx_mesa_sucursal_numero      ON mesa_local (id_sucursal, numero_mesa);`,
+
+    // Movimientos de inventario: saldo después de cada movimiento y observación libre
+    `ALTER TABLE historial_inventario
+        ADD COLUMN IF NOT EXISTS stock_resultante INT,
+        ADD COLUMN IF NOT EXISTS detalle          VARCHAR(200);
+    DROP INDEX IF EXISTS idx_historial_inventario;`
 ];
 
 const aplicarMigraciones = async () => {
