@@ -369,32 +369,13 @@
 <!-- ═══ TICKET ═══ -->
 <div *ngIf="mostrarTicket"
      class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
     <div class="bg-gray-100 p-4 border-b flex justify-between items-center">
       <h3 class="font-bold text-gray-700">Comprobante #{{ datosTicket?.id_venta }}</h3>
       <button (click)="cerrarTicket()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
     </div>
-    <div class="p-6 overflow-y-auto font-mono text-sm">
-      <div class="text-center mb-4">
-        <app-encabezado-ticket></app-encabezado-ticket>
-        <p class="text-xs text-gray-500">{{ fechaTicket | date:'dd/MM/yyyy HH:mm' }}</p>
-      </div>
-      <div class="border-t-2 border-dashed border-gray-300 my-3"></div>
-      <div *ngFor="let item of datosTicket?.items" class="flex justify-between text-xs mb-1">
-        <span>{{ item.nombre_producto }} ×{{ item.cantidad }}</span>
-        <span>{{ moneda() }} {{ item.subtotal }}</span>
-      </div>
-      <div class="border-t-2 border-dashed border-gray-300 my-3"></div>
-      <div class="flex justify-between font-black">
-        <span>TOTAL</span><span>{{ moneda() }} {{ datosTicket?.total }}</span>
-      </div>
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span>Método</span><span>{{ datosTicket?.metodo }}</span>
-      </div>
-      <div *ngIf="datosTicket?.metodo === 'Efectivo'" class="flex justify-between text-xs text-gray-500">
-        <span>Cambio</span><span>{{ moneda() }} {{ datosTicket?.cambio?.toFixed(2) }}</span>
-      </div>
-      <p class="text-center text-xs italic mt-6">{{ ajustes.config().ticket_mensaje_pie }}</p>
+    <div #zonaTicket class="overflow-y-auto bg-gray-100 p-4 flex justify-center">
+      @if (datosTicket) { <div class="shadow-sm"><app-ticket [datos]="datosTicket" [fecha]="fechaTicket" /></div> }
     </div>
     <div class="p-4 bg-gray-50 border-t flex gap-3">
       <button (click)="imprimirVenta()" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg">🖨 Imprimir</button>

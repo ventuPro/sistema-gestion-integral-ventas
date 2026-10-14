@@ -67,6 +67,28 @@
       </div>
 
       <div>
+        <p class="block text-sm font-medium text-gray-700 mb-2">Ancho del ticket</p>
+        <div class="grid grid-cols-3 gap-2">
+          <button *ngFor="let a of anchosTicket" type="button" (click)="p.ticket_ancho = a.valor"
+                  class="flex flex-col items-center gap-2 p-3 rounded-lg border text-center transition-colors"
+                  [class.border-blue-600]="p.ticket_ancho === a.valor" [class.bg-blue-50]="p.ticket_ancho === a.valor"
+                  [class.border-gray-200]="p.ticket_ancho !== a.valor" [attr.aria-pressed]="p.ticket_ancho === a.valor">
+            <span class="h-12 flex items-end">
+              <span class="block bg-white border border-gray-300 rounded-sm shadow-sm"
+                    [style.width.px]="40 * a.escala" [style.height.px]="a.valor === 'A4' ? 48 : 44">
+                <span class="block mx-auto mt-1.5 h-0.5 w-2/3 bg-gray-300"></span>
+                <span class="block mx-auto mt-1 h-0.5 w-1/2 bg-gray-200"></span>
+                <span class="block mx-auto mt-1 h-0.5 w-2/3 bg-gray-200"></span>
+              </span>
+            </span>
+            <span class="text-sm font-semibold" [class.text-blue-700]="p.ticket_ancho === a.valor" [class.text-gray-700]="p.ticket_ancho !== a.valor">{{ a.nombre }}</span>
+            <span class="text-[11px] text-gray-500 leading-tight">{{ a.detalle }}</span>
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">El comprobante se muestra e imprime con este ancho. En la ventana de impresión elige la impresora correspondiente.</p>
+      </div>
+
+      <div>
         <p class="block text-sm font-medium text-gray-700 mb-2">Métodos de pago habilitados</p>
         <div class="space-y-3">
           <button type="button" role="switch" [attr.aria-checked]="p.pago_efectivo" (click)="cambiarPago('pago_efectivo')">

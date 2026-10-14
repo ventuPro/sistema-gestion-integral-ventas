@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { sondeo } from '../utils/sondeo';
 
 export const MODULOS = [
   { key: 'dashboard',   label: 'Panel Principal' },
@@ -23,7 +24,7 @@ const DEFAULTS: Record<number, Record<string, boolean>> = {
 export class PermisoService {
   private apiUrl = environment.apiUrl;
   private permisosSubject = new BehaviorSubject<Record<string, boolean>>({});
-  private pollHandle: any = null;
+  private detenerPoll_: (() => void) | null = null;
 
   /** Observable que el dashboard puede consumir para re-renderizar el sidebar */
   public permisos$ = this.permisosSubject.asObservable();
@@ -117,11 +118,12 @@ export class PermisoService {
   iniciarPollPermisos(intervaloMs: number = 30000) {
     if (this.getRolActual() === 1) return;  // admin: skip
     this.detenerPoll();
-    this.pollHandle = setInterval(() => this.recargarPermisos().subscribe(), intervaloMs);
+    this.detenerPoll_ = sondeo(() => this.recargarPermisos().subscribe(), intervaloMs);
   }
 
   detenerPoll() {
-    if (this.pollHandle) { clearInterval(this.pollHandle); this.pollHandle = null; }
+    this.detenerPoll_?.();
+    this.detenerPoll_ = null;
   }
 
   /**

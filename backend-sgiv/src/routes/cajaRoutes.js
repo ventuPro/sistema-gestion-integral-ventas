@@ -1,7 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/cajaController');
-const { verificarToken, verificarPermiso } = require('../middlewares/authMiddleware');
+const { verificarToken, verificarPermiso, soloAdministrador } = require('../middlewares/authMiddleware');
 
 // Estado completo del cajero (fuente de verdad para front)
 router.get   ('/estado-completo/:id_usuario', verificarToken, ctrl.getEstadoCompleto);
@@ -23,7 +23,7 @@ router.post  ('/cerrar',                       verificarToken, ctrl.cerrarCaja);
 // Arqueo y ventas
 router.get   ('/arqueo/:id_sucursal',          verificarToken, ctrl.getArqueoHoy);
 router.get   ('/ventas-hoy/:id_sucursal',      verificarToken, ctrl.getVentasHoyPOS);
-router.get   ('/cierres',                      verificarToken, ctrl.getCierresCaja);
+router.get   ('/cierres',                      verificarToken, soloAdministrador, ctrl.getCierresCaja);
 router.post  ('/cobrar',                       verificarToken, verificarPermiso('punto_venta'), ctrl.cobrarVenta);
 router.get   ('/estado-sucursal/:id_sucursal', verificarToken, ctrl.getEstadoCajaSucursal);
 

@@ -240,18 +240,20 @@ test('parámetros: valores originales, validación y método de pago', async () 
     const pub = (await api('GET', '/ajustes/publico')).body;
     assert.equal(pub.moneda_simbolo, 'Bs.');
     assert.equal(pub.ticket_mensaje_pie, '¡Gracias por su compra!');
+    assert.equal(pub.ticket_ancho, '80');
     assert.equal(pub.login_max_intentos, undefined);   // los de seguridad no son públicos
 
     assert.equal((await api('PUT', '/ajustes/parametros', { token: tokenCajero, body: { pago_qr: false } })).status, 403);
     for (const body of [{ sesion_horas: 0 }, { login_max_intentos: 2.5 }, { menu_activo: 'si' },
-                        { moneda_simbolo: '' }, { pago_efectivo: false, pago_qr: false }]) {
+                        { moneda_simbolo: '' }, { pago_efectivo: false, pago_qr: false }, { ticket_ancho: '100' }]) {
         const r = await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body });
         assert.equal(r.status, 400, JSON.stringify(body));
     }
 
     const r = await api('PUT', '/ajustes/parametros', { token: tokenAdmin,
-        body: { pago_qr: false, moneda_simbolo: ' $ ', stock_minimo_defecto: 8, qr_cobro: PNG } });
+        body: { pago_qr: false, moneda_simbolo: ' $ ', stock_minimo_defecto: 8, qr_cobro: PNG, ticket_ancho: '58' } });
     assert.equal(r.status, 200);
+    assert.equal(r.body.configuracion.ticket_ancho, '58');
     assert.equal(r.body.configuracion.moneda_simbolo, '$');
     assert.match(r.body.configuracion.url_qr_cobro, /^\/uploads\/empresa\/qr-cobro_\d+\.png$/);
     fs.unlinkSync(path.join(__dirname, '..', '..', r.body.configuracion.url_qr_cobro));
@@ -263,7 +265,7 @@ test('parámetros: valores originales, validación y método de pago', async () 
     assert.equal((await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body: { pago_efectivo: false } })).status, 400);
 
     const vuelta = await api('PUT', '/ajustes/parametros', { token: tokenAdmin,
-        body: { pago_qr: true, moneda_simbolo: 'Bs.', stock_minimo_defecto: 5, qr_cobro: null } });
+        body: { pago_qr: true, moneda_simbolo: 'Bs.', stock_minimo_defecto: 5, qr_cobro: null, ticket_ancho: '80' } });
     assert.equal(vuelta.body.configuracion.url_qr_cobro, null);
 });
 

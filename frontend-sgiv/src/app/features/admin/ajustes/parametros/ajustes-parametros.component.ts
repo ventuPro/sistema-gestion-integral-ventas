@@ -11,6 +11,7 @@ interface Parametros {
   pago_efectivo: boolean;
   pago_qr: boolean;
   ticket_mensaje_pie: string;
+  ticket_ancho: '58' | '80' | 'A4';
   menu_activo: boolean;
   menu_mensaje_bienvenida: string;
   menu_minutos_expiracion: number;
@@ -25,7 +26,7 @@ interface Parametros {
 
 // Mismos valores por defecto que la tabla configuracion
 const ORIGINALES: Parametros = {
-  moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, ticket_mensaje_pie: '¡Gracias por su compra!',
+  moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80',
   menu_activo: true, menu_mensaje_bienvenida: '', menu_minutos_expiracion: 15, menu_max_pendientes_mesa: 3,
   menu_max_pedidos_ip: 10, stock_minimo_defecto: 5, captcha_activo: true, login_max_intentos: 5,
   login_minutos_bloqueo: 15, sesion_horas: 8
@@ -48,6 +49,12 @@ export class AjustesParametrosComponent implements OnInit {
                      guardar: Save, descartar: Undo2, original: RotateCcw, subir: Upload, quitar: Trash2, imagen: ImageIcon };
 
   readonly monedas = ['Bs.', '$us', '$', 'S/', '€'];
+
+  readonly anchosTicket: { valor: '58' | '80' | 'A4'; nombre: string; detalle: string; escala: number }[] = [
+    { valor: '58', nombre: '58 mm', detalle: 'Impresora térmica pequeña', escala: 0.48 },
+    { valor: '80', nombre: '80 mm', detalle: 'Impresora térmica estándar', escala: 0.66 },
+    { valor: 'A4', nombre: 'Hoja A4', detalle: 'Impresora común (carta/A4)', escala: 1 }
+  ];
 
   readonly camposMenu: CampoNumero[] = [
     { clave: 'menu_minutos_expiracion', etiqueta: 'Vencimiento de pedidos sin confirmar', unidad: 'min', min: 5, max: 120,

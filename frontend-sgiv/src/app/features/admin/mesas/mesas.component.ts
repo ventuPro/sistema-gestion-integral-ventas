@@ -10,6 +10,7 @@ import { AjustesService } from '../../../core/services/ajustes.service';
 import { MesaModalComponent } from './mesa-modal/mesa-modal.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, QrCode, Printer, Download } from 'lucide-angular';
+import { sondeo } from '../../../core/utils/sondeo';
 
 @Component({
   selector: 'app-mesas',
@@ -66,7 +67,7 @@ export class MesasComponent implements OnInit, OnDestroy {
   codigosQR: { id_mesa: number; numero_mesa: number; qr: string; url: string }[] = [];
 
   // ─── Auto-refresh ───
-  private refreshInterval: any;
+  private detenerSondeo?: () => void;
   private readonly REFRESH_INTERVAL_MS = 30000; // 30 segundos
   private subs: Subscription[] = [];
 
@@ -81,7 +82,7 @@ export class MesasComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     // El socket lo comparte todo el panel: aquí solo se dejan de escuchar los eventos
     this.subs.forEach(s => s.unsubscribe());
-    if (this.refreshInterval) clearInterval(this.refreshInterval);
+    this.detenerSondeo?.();
   }
 
   // ─── VERIFICAR ACCESO (usa el estado real del turno) ───
@@ -130,8 +131,8 @@ export class MesasComponent implements OnInit, OnDestroy {
 
   // ─── AUTO-REFRESH ───
   private iniciarAutoRefresh() {
-    if (this.refreshInterval) clearInterval(this.refreshInterval);
-    this.refreshInterval = setInterval(() => this.cargarMesas(), this.REFRESH_INTERVAL_MS);
+    this.detenerSondeo?.();
+    this.detenerSondeo = sondeo(() => this.cargarMesas(), this.REFRESH_INTERVAL_MS);
   }
 
   // ─── SOCKET ───

@@ -78,7 +78,21 @@ const MIGRACIONES = [
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'configuracion_metodo_pago_check') THEN
             ALTER TABLE configuracion ADD CONSTRAINT configuracion_metodo_pago_check CHECK (pago_efectivo OR pago_qr);
         END IF;
-    END $$;`
+    END $$;`,
+
+    // Ajustes → Parámetros: ancho del ticket (58 mm, 80 mm o A4)
+    `ALTER TABLE configuracion
+        ADD COLUMN IF NOT EXISTS ticket_ancho VARCHAR(3) NOT NULL DEFAULT '80' CHECK (ticket_ancho IN ('58', '80', 'A4'));`,
+
+    // Índices de las consultas frecuentes (panel, informes, arqueo, cuentas)
+    `CREATE INDEX IF NOT EXISTS idx_venta_caja_sucursal_fecha ON venta_caja (id_sucursal, fecha_venta);
+    CREATE INDEX IF NOT EXISTS idx_venta_caja_turno          ON venta_caja (id_turno);
+    CREATE INDEX IF NOT EXISTS idx_detalle_venta_venta       ON detalle_venta (id_venta);
+    CREATE INDEX IF NOT EXISTS idx_detalle_venta_producto    ON detalle_venta (id_producto);
+    CREATE INDEX IF NOT EXISTS idx_detalle_cuenta_cuenta     ON detalle_cuenta (id_cuenta);
+    CREATE INDEX IF NOT EXISTS idx_detalle_pedido_pedido     ON detalle_pedido (id_pedido);
+    CREATE INDEX IF NOT EXISTS idx_turno_sucursal_estado     ON turno_caja (id_sucursal, estado_turno);
+    CREATE INDEX IF NOT EXISTS idx_historial_inventario      ON historial_inventario (id_inventario);`
 ];
 
 const aplicarMigraciones = async () => {

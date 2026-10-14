@@ -2,10 +2,7 @@ import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, effect, untrac
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { Chart, registerables } from 'chart.js';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import { Chart } from '../../../core/utils/graficos';
 import { LucideAngularModule, ChevronDown, ChevronRight, X, Check, SlidersHorizontal, FileSpreadsheet, FileText, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-angular';
 import { ReporteService } from '../../../core/services/reporte.service';
 import { ProductoService } from '../../../core/services/producto.service';
@@ -13,7 +10,6 @@ import { SucursalService } from '../../../core/services/sucursal.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { cifra, entero, variacion, porcentaje, fechaCorta, fechaLarga, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
-Chart.register(...registerables);
 
 type Periodo = 'hoy' | 'ayer' | 'semana' | 'mes' | 'mes_anterior' | 'personalizado';
 
@@ -407,6 +403,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
   // ─── Exportar PDF ───
   async exportarPDF() {
     if (!this.datos) return;
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
     const d = this.datos;
     const doc = new jsPDF();
     const color = this.ajustes.colorPrimarioRgb();
@@ -516,8 +513,9 @@ export class ReportesComponent implements OnInit, OnDestroy {
   }
 
   // ─── Exportar Excel ───
-  exportarExcel() {
+  async exportarExcel() {
     if (!this.datos) return;
+    const XLSX = await import('xlsx');
     const d = this.datos;
     const mon = this.moneda();
     const wb = XLSX.utils.book_new();

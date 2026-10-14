@@ -99,8 +99,17 @@ const TEXTOS = {
     menu_mensaje_bienvenida: { max: 200, nombre: 'mensaje de bienvenida' }
 };
 
+const OPCIONES = {
+    ticket_ancho: { valores: ['58', '80', 'A4'], nombre: 'Ancho del ticket' }
+};
+
 const validarParametros = (body) => {
     const datos = {};
+    for (const [campo, r] of Object.entries(OPCIONES)) {
+        if (!(campo in body)) continue;
+        if (!r.valores.includes(body[campo])) throw new ErrorValidacion(`${r.nombre}: valor inválido`);
+        datos[campo] = body[campo];
+    }
     for (const [campo, r] of Object.entries(ENTEROS)) {
         if (!(campo in body)) continue;
         const n = Number(body[campo]);

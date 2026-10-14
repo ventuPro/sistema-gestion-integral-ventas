@@ -5,6 +5,7 @@ import { LucideAngularModule, Bell, X, Check, Minus, Plus, Trash2, Volume2, Volu
 import { PedidoService } from '../../../core/services/pedido.service';
 import { SocketService } from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { sondeo } from '../../../core/utils/sondeo';
 
 type Pestana = 'pendientes' | 'entregar';
 
@@ -41,6 +42,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   private idSucursal = 1;
   private subs: Subscription[] = [];
   private timers: any[] = [];
+  private detenerSondeo?: () => void;
   private recarga: any = null;
   private audio: AudioContext | null = null;
   private tituloOriginal = document.title;
@@ -65,7 +67,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
       if (this.esDeMiSucursal(d)) this.cargarPronto();
     }));
 
-    this.timers.push(setInterval(() => this.cargar(), this.RESPALDO_MS));
+    this.detenerSondeo = sondeo(() => this.cargar(), this.RESPALDO_MS);
     this.timers.push(setInterval(() => {
       if (this.pendientes.length > 0) this.sonar();
     }, this.RECORDATORIO_MS));
@@ -75,6 +77,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.subs.forEach(s => s.unsubscribe());
     this.timers.forEach(t => clearInterval(t));
+    this.detenerSondeo?.();
     if (this.recarga) clearTimeout(this.recarga);
     document.removeEventListener('click', this.desbloquearAudio);
     document.title = this.tituloOriginal;

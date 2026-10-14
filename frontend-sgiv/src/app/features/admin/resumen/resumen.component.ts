@@ -1,16 +1,15 @@
 import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, effect, untracked, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { Chart, registerables } from 'chart.js';
+import { Chart } from '../../../core/utils/graficos';
 import { LucideAngularModule, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-angular';
 import { ReporteService } from '../../../core/services/reporte.service';
 import { SucursalService } from '../../../core/services/sucursal.service';
 import { ProductoService } from '../../../core/services/producto.service';
-import { CajaService } from '../../../core/services/caja.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { cifra, entero, variacion, porcentaje, fechaLarga, fechaCorta, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
-Chart.register(...registerables);
+import { sondeo } from '../../../core/utils/sondeo';
 
 @Component({
   selector: 'app-resumen',
@@ -23,7 +22,6 @@ export class ResumenComponent implements OnInit, OnDestroy {
   private reporteService  = inject(ReporteService);
   private sucursalService = inject(SucursalService);
   private productoService = inject(ProductoService);
-  private cajaService     = inject(CajaService);
   private ajustes         = inject(AjustesService);
   private cdr             = inject(ChangeDetectorRef);
   readonly moneda         = this.ajustes.moneda;
@@ -46,13 +44,23 @@ export class ResumenComponent implements OnInit, OnDestroy {
 
   sucursales: any[] = [];
   sucursalActual: number | null = 1;   // null = todas
-  cajasAbiertas: Record<number, boolean> = {};
+  private cajasCache: { clave: any[]; valor: Record<number, boolean> } = { clave: [], valor: {} };
+
+  /** Sucursal → caja abierta (para los puntos del selector); se recalcula solo si cambian los datos */
+  get cajasAbiertas(): Record<number, boolean> {
+    const abiertas = this.datos?.cajas_abiertas;
+    if (this.cajasCache.clave[0] !== abiertas || this.cajasCache.clave[1] !== this.sucursales) {
+      const valor = Object.fromEntries(this.sucursales.map(s => [s.id_sucursal, !!abiertas?.includes(s.id_sucursal)]));
+      this.cajasCache = { clave: [abiertas, this.sucursales], valor };
+    }
+    return this.cajasCache.valor;
+  }
 
   categorias: any[] = [];
   categoriaFiltro: number | null = null;
 
   private graficos: Chart[] = [];
-  private intervalo: any;
+  private detenerSondeo?: () => void;
 
   constructor() {
     // Redibuja los gráficos al cambiar color o modo oscuro en Ajustes
@@ -71,17 +79,17 @@ export class ResumenComponent implements OnInit, OnDestroy {
     } catch { }
 
     this.sucursalService.listarSucursales().subscribe({
-      next: (s: any[]) => { this.sucursales = s || []; this.cargarEstadoCajas(); this.cdr.detectChanges(); }
+      next: (s: any[]) => { this.sucursales = s || []; this.cdr.detectChanges(); }
     });
     this.productoService.obtenerCategorias().subscribe({
       next: (c) => { this.categorias = c || []; this.cdr.detectChanges(); }
     });
     this.cargarDatos();
-    this.intervalo = setInterval(() => { this.cargarDatos(true); this.cargarEstadoCajas(); }, 30000);
+    this.detenerSondeo = sondeo(() => this.cargarDatos(true), 30000);
   }
 
   ngOnDestroy() {
-    clearInterval(this.intervalo);
+    this.detenerSondeo?.();
     this.destruirGraficos();
   }
 
@@ -96,18 +104,6 @@ export class ResumenComponent implements OnInit, OnDestroy {
         setTimeout(() => this.renderizarGraficos());
       },
       error: () => { this.cargando = this.refrescando = false; this.cdr.detectChanges(); }
-    });
-  }
-
-  cargarEstadoCajas() {
-    if (!this.esAdmin) return;
-    this.sucursales.forEach(s => {
-      this.cajaService.obtenerEstadoCajaSucursal(s.id_sucursal).subscribe({
-        next: (r: any) => {
-          this.cajasAbiertas = { ...this.cajasAbiertas, [s.id_sucursal]: r?.hay_caja_abierta === true };
-          this.cdr.detectChanges();
-        }
-      });
     });
   }
 

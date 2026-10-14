@@ -7,6 +7,7 @@ import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../../environments/environment';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { sondeo } from '../../../core/utils/sondeo';
 
 type Vista = 'menu' | 'carrito' | 'pedidos';
 
@@ -67,7 +68,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   aviso: string | null = null;
 
   private socket: Socket | null = null;
-  private timers: any[] = [];
+  private timers: (() => void)[] = [];
   private avisoTimer: any;
 
   // ─── Ciclo de vida ───
@@ -81,13 +82,13 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.conectarSocket();
 
     // Respaldo del socket
-    this.timers.push(setInterval(() => this.refrescarEstado(), 20_000));
-    this.timers.push(setInterval(() => { this.cargarInfo(); this.cargarCatalogo(); }, 60_000));
+    this.timers.push(sondeo(() => this.refrescarEstado(), 20_000));
+    this.timers.push(sondeo(() => { this.cargarInfo(); this.cargarCatalogo(); }, 60_000));
   }
 
   ngOnDestroy() {
     this.socket?.disconnect();
-    this.timers.forEach(t => clearInterval(t));
+    this.timers.forEach(detener => detener());
     clearTimeout(this.avisoTimer);
   }
 

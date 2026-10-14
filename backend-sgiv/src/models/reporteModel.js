@@ -6,7 +6,8 @@ const deSucursal = (columna) => `($1::int = 0 OR ${columna} = $1)`;
 const filas = (sql, params) => db.query(sql, params).then(r => r.rows);
 
 // ─── Panel del día ───
-const obtenerPanel = async (id_sucursal, id_categoria = null) => {
+// conCajas: id de las sucursales con caja abierta (para el selector del administrador)
+const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) => {
     const p = [id_sucursal];
 
     const totales = (desde, hasta) => filas(`
@@ -18,7 +19,7 @@ const obtenerPanel = async (id_sucursal, id_categoria = null) => {
 
     const [
         hoy, ayerHora, ayerTotal, semanaHora, metodos, porHora, promedioHora, dias,
-        productos, turnos, mesas, pedidos, stock, stockCritico, ultimas, sucursales
+        productos, turnos, mesas, pedidos, stock, stockCritico, ultimas, sucursales, cajas
     ] = await Promise.all([
         filas(`
             SELECT COUNT(*)::int AS ventas,
@@ -145,7 +146,9 @@ const obtenerPanel = async (id_sucursal, id_categoria = null) => {
             LEFT JOIN venta_caja v ON v.id_sucursal = s.id_sucursal AND v.fecha_venta >= CURRENT_DATE
             GROUP BY s.id_sucursal
             ORDER BY ingresos DESC, s.nombre_sucursal
-        `)
+        `),
+        !conCajas ? [] : filas(`SELECT DISTINCT id_sucursal FROM turno_caja WHERE estado_turno = 'Abierto'`)
+            .then(r => r.map(x => x.id_sucursal))
     ]);
 
     return {
@@ -160,7 +163,8 @@ const obtenerPanel = async (id_sucursal, id_categoria = null) => {
         mesas, pedidos_qr: pedidos,
         stock, stock_critico: stockCritico,
         ultimas_ventas: ultimas,
-        sucursales
+        sucursales,
+        cajas_abiertas: cajas
     };
 };
 

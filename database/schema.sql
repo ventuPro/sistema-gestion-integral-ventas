@@ -290,6 +290,7 @@ CREATE TABLE configuracion (
     pago_qr             BOOLEAN      NOT NULL DEFAULT TRUE,
     url_qr_cobro        TEXT,
     ticket_mensaje_pie  VARCHAR(150) NOT NULL DEFAULT '¡Gracias por su compra!',
+    ticket_ancho        VARCHAR(3)   NOT NULL DEFAULT '80' CHECK (ticket_ancho IN ('58', '80', 'A4')),
     -- Parámetros: menú QR
     menu_activo              BOOLEAN NOT NULL DEFAULT TRUE,
     menu_mensaje_bienvenida  VARCHAR(200),
@@ -342,3 +343,11 @@ CREATE UNIQUE INDEX uq_cuenta_abierta_mesa ON cuenta_mesa (id_mesa) WHERE estado
 CREATE INDEX idx_pedido_sucursal_estado   ON pedido_mesa (id_sucursal, estado_pedido);
 CREATE INDEX idx_pedido_mesa_estado       ON pedido_mesa (id_mesa, estado_pedido);
 CREATE INDEX idx_pedido_cuenta            ON pedido_mesa (id_cuenta);
+CREATE INDEX idx_venta_caja_sucursal_fecha ON venta_caja (id_sucursal, fecha_venta);
+CREATE INDEX idx_venta_caja_turno         ON venta_caja (id_turno);
+CREATE INDEX idx_detalle_venta_venta      ON detalle_venta (id_venta);
+CREATE INDEX idx_detalle_venta_producto   ON detalle_venta (id_producto);
+CREATE INDEX idx_detalle_cuenta_cuenta    ON detalle_cuenta (id_cuenta);
+CREATE INDEX idx_detalle_pedido_pedido    ON detalle_pedido (id_pedido);
+CREATE INDEX idx_turno_sucursal_estado    ON turno_caja (id_sucursal, estado_turno);
+CREATE INDEX idx_historial_inventario     ON historial_inventario (id_inventario);

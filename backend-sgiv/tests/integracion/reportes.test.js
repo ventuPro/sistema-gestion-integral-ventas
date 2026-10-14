@@ -144,6 +144,7 @@ describe('Permisos de informes', () => {
         assert.equal(propia.status, 200);
         assert.deepEqual(otra.body.stock, propia.body.stock);
         assert.deepEqual(todas.body.sucursales, []);
+        assert.deepEqual(propia.body.cajas_abiertas, []);
     });
 });
 
@@ -155,6 +156,7 @@ describe('Panel del día', () => {
             assert.ok(k in body, k);
         assert.equal(body.ultimos_dias.length, 14);
         assert.ok(body.stock.productos >= 3);
+        assert.ok(Array.isArray(body.cajas_abiertas));
     });
 });
 
@@ -184,6 +186,7 @@ describe('Arqueo y cierre de caja con efectivo contado', () => {
         assert.equal(cierre.efectivo_esperado, 120);
         assert.equal(cierre.diferencia, -5);
 
+        assert.equal((await api('/caja/cierres', tCajero)).status, 403);
         const cierres = (await api('/caja/cierres', tAdmin)).body;
         const c = cierres.find(x => x.id_turno === cierre.id_turno_cerrado);
         assert.equal(c.efectivo_contado, 115);

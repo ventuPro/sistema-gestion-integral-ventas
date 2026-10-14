@@ -19,7 +19,7 @@ const obtenerPanel = async (req, res) => {
         if (id_sucursal === null) return res.status(400).json({ error: 'Sucursal inválida' });
         const cat = Number(req.query.categoria);
         const id_categoria = Number.isInteger(cat) && cat > 0 ? cat : null;
-        res.json(await reporteModel.obtenerPanel(id_sucursal, id_categoria));
+        res.json(await reporteModel.obtenerPanel(id_sucursal, id_categoria, Number(req.usuario.id_rol) === 1));
     } catch (error) {
         console.error('Error en obtenerPanel:', error);
         res.status(500).json({ error: 'Error al generar el panel' });

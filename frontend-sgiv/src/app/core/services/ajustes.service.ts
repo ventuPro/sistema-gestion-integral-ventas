@@ -44,6 +44,7 @@ export interface Configuracion {
   pago_qr: boolean;
   url_qr_cobro: string | null;
   ticket_mensaje_pie: string;
+  ticket_ancho: '58' | '80' | 'A4';
   menu_activo: boolean;
   menu_mensaje_bienvenida: string | null;
   captcha_activo: boolean;
@@ -65,7 +66,7 @@ export const CONFIG_ORIGINAL: Configuracion = {
   ciudad: 'La Paz', pais: 'Bolivia', facebook: null, instagram: null, tiktok: null,
   url_logo: null, url_favicon: null, color_primario: null, color_secundario: null, tema: 'claro',
   moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, url_qr_cobro: null,
-  ticket_mensaje_pie: '¡Gracias por su compra!', menu_activo: true, menu_mensaje_bienvenida: null,
+  ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80', menu_activo: true, menu_mensaje_bienvenida: null,
   captcha_activo: true
 };
 

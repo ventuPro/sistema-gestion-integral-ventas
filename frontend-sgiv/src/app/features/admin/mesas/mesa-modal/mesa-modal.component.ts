@@ -5,13 +5,14 @@ import { CuentaService } from '../../../../core/services/cuenta.service';
 import { SocketService } from '../../../../core/services/socket.service';
 import { Subscription } from 'rxjs';
 import { ImagenUrlPipe } from '../../../../core/pipes/imagen-url.pipe';
-import { EncabezadoTicketComponent } from '../../../shared/encabezado-ticket/encabezado-ticket.component';
+import { TicketComponent } from '../../../shared/ticket/ticket.component';
 import { AjustesService } from '../../../../core/services/ajustes.service';
+import { ImpresionService } from '../../../../core/services/impresion.service';
 
 @Component({
   selector: 'app-mesa-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, ImagenUrlPipe, EncabezadoTicketComponent],
+  imports: [CommonModule, FormsModule, ImagenUrlPipe, TicketComponent],
   templateUrl: './mesa-modal.component.html'
 })
 export class MesaModalComponent implements OnInit, OnDestroy {
@@ -23,6 +24,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   private socketService = inject(SocketService);
   private cdr           = inject(ChangeDetectorRef);
   readonly ajustes       = inject(AjustesService);
+  private impresion = inject(ImpresionService);
   readonly moneda        = this.ajustes.moneda;
 
   esAdmin         = false;
@@ -38,6 +40,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   metodoPago      = 'Efectivo';
   montoPagado     = 0;
   @ViewChild('inputMontoMesa') inputMontoMesaRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('zonaTicket') zonaTicket?: ElementRef<HTMLElement>;
   get cambio(): number {
     return Math.max(0, this.montoPagado - Number(this.cuentaActiva?.total_acumulado || 0));
   }
@@ -313,7 +316,9 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     a.click();
   }
 
-  imprimirTicket() { window.print(); }
+  imprimirTicket() {
+    this.impresion.imprimirTicket(this.zonaTicket?.nativeElement, this.ajustes.config().ticket_ancho);
+  }
 
   cerrarModal() {
     const cuentaSinItems = this.cuentaActiva

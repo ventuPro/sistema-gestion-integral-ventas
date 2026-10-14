@@ -8,15 +8,17 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { Subscription } from 'rxjs';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
-import { EncabezadoTicketComponent } from '../../shared/encabezado-ticket/encabezado-ticket.component';
+import { TicketComponent } from '../../shared/ticket/ticket.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Inbox, Search, X } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { ImpresionService } from '../../../core/services/impresion.service';
+import { sondeo } from '../../../core/utils/sondeo';
 
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, EncabezadoTicketComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent],
   templateUrl: './punto-venta.component.html'
 })
 export class PuntoVentaComponent implements OnInit, OnDestroy {
@@ -25,6 +27,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   private socketService   = inject(SocketService);
   private cdr             = inject(ChangeDetectorRef);
   readonly ajustes         = inject(AjustesService);
+  private impresion = inject(ImpresionService);
   readonly moneda          = this.ajustes.moneda;
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
@@ -87,6 +90,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   metodoPago        = 'Efectivo';
   montoPagado       = 0;
   @ViewChild('inputMonto') inputMontoRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('zonaTicket') zonaTicket?: ElementRef<HTMLElement>;
   get cambio(): number { return Math.max(0, this.montoPagado - this.total); }
 
   // ─── Ticket ───
@@ -100,7 +104,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   mostrarHistorial = false;
 
   // ─── Poll periódico del estado de caja (por si el admin cierra mientras vendemos) ───
-  private pollEstado: any;
+  private detenerSondeo?: () => void;
 
   get totalVentasHoy(): number {
     return this.ventasHoy.reduce((s, v) => s + Number(v.monto_total_venta), 0);
@@ -118,7 +122,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.pollEstado) clearInterval(this.pollEstado);
+    this.detenerSondeo?.();
     this.stockSub?.unsubscribe();
   }
 
@@ -197,9 +201,9 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   }
 
   private iniciarPollEstado() {
-    if (this.pollEstado) clearInterval(this.pollEstado);
+    this.detenerSondeo?.();
     // Cada 30s reverificar — si el admin cierra desde Usuarios, bloqueamos rápido
-    this.pollEstado = setInterval(() => {
+    this.detenerSondeo = sondeo(() => {
       if (this.usuarioActual?.id_rol === 1) return;
       this.cajaService.obtenerEstadoCompleto().subscribe({
         next: (res) => {
@@ -449,6 +453,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   }
 
   imprimirVenta() {
-    window.print();
+    this.impresion.imprimirTicket(this.zonaTicket?.nativeElement, this.ajustes.config().ticket_ancho);
   }
 }

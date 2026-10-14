@@ -1,0 +1,35 @@
+<div class="tk" [class]="'tk-' + ancho()">
+  <div class="tk-cabecera">
+    @if (ajustes.logo()) { <img class="tk-logo" [src]="ajustes.logo()" alt=""> }
+    <p class="tk-nombre">{{ c().nombre_comercial }}</p>
+    @if (c().razon_social) { <p class="tk-dato">{{ c().razon_social }}</p> }
+    @if (c().nit) { <p class="tk-dato">NIT: {{ c().nit }}</p> }
+    @if (c().direccion) { <p class="tk-dato">{{ c().direccion }}</p> }
+    @if (c().telefono || c().whatsapp) { <p class="tk-dato">Tel.: {{ c().telefono || c().whatsapp }}</p> }
+  </div>
+
+  <hr class="tk-linea">
+  <div class="tk-fila"><span>Comprobante</span><span>#{{ datos().id_venta }}</span></div>
+  <div class="tk-fila"><span>Fecha</span><span>{{ textoFecha }}</span></div>
+  @if (datos().numero_mesa) { <div class="tk-fila"><span>Mesa</span><span>{{ datos().numero_mesa }}</span></div> }
+  <hr class="tk-linea">
+
+  @for (item of datos().items; track $index) {
+    <div class="tk-item">
+      <div>{{ item.nombre_producto }}</div>
+      <div class="tk-fila tk-detalle">
+        <span>{{ item.cantidad }} x {{ cifra(item.precio_unitario ?? item.subtotal / item.cantidad) }}</span>
+        <span>{{ cifra(item.subtotal) }}</span>
+      </div>
+    </div>
+  }
+
+  <hr class="tk-linea">
+  <div class="tk-fila tk-total"><span>TOTAL {{ c().moneda_simbolo }}</span><span>{{ cifra(datos().total) }}</span></div>
+  <div class="tk-fila"><span>Pago</span><span>{{ datos().metodo }}</span></div>
+  @if (datos().metodo === 'Efectivo' && datos().cambio) {
+    <div class="tk-fila"><span>Cambio</span><span>{{ cifra(datos().cambio) }}</span></div>
+  }
+
+  @if (c().ticket_mensaje_pie) { <p class="tk-pie">{{ c().ticket_mensaje_pie }}</p> }
+</div>
