@@ -7,6 +7,7 @@ const mesas = [verificarToken, verificarPermiso('mesas')];
 
 router.post   ('/',                    mesas, ctrl.agregarMesa);
 router.get    ('/sucursal/:id_sucursal', mesas, ctrl.listarMesas);
+router.get    ('/sucursal/:id_sucursal/qr', mesas, ctrl.obtenerQRSucursal);
 router.get    ('/:id_mesa/qr',         mesas, ctrl.obtenerQR);
 router.post   ('/:id_mesa/qr/regenerar', mesas, ctrl.regenerarQR);
 router.patch  ('/:id_mesa/estado',     mesas, ctrl.actualizarEstado);

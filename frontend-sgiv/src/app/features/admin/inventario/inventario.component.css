@@ -1,0 +1,20 @@
+/* ─── Inventario ─── */
+.miniatura {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid var(--i-linea-suave);
+  background: var(--i-fondo);
+  color: var(--i-sutil);
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.miniatura img { width: 100%; height: 100%; object-fit: cover; }
+
+tr.inactivo td, tr.inactivo .fuerte { color: var(--i-sutil); }
+tr.inactivo .miniatura { opacity: 0.5; }

@@ -93,6 +93,17 @@
 }
 .quitar:hover { color: var(--i-baja); background: color-mix(in oklab, var(--i-baja) 10%, transparent); }
 
+/* Botón de ícono en filas de tabla */
+.accion {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--i-tenue);
+  transition: color 120ms ease, background-color 120ms ease;
+}
+.accion:hover { color: var(--i-acento); background: var(--i-acento-suave); }
+.accion.peligro:hover { color: var(--i-baja); background: color-mix(in oklab, var(--i-baja) 10%, transparent); }
+
 .boton-primario {
   display: inline-flex;
   align-items: center;
@@ -164,3 +175,21 @@
 .ventana { box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.45); }
 
 .inf-sutil { color: var(--i-sutil); }
+
+/* Aviso temporal arriba a la derecha */
+.aviso-flotante {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 60;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  background: #0f172a;
+  box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.5);
+  animation: entrar 200ms ease;
+}
+@keyframes entrar { from { opacity: 0; transform: translateY(-6px); } }
+

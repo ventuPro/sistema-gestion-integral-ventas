@@ -1,271 +1,270 @@
-<!-- Toast éxito -->
-<div *ngIf="mensajeExito"
-     class="fixed top-6 right-6 z-50 bg-green-600 text-white px-6 py-4 rounded-xl shadow-2xl font-semibold text-sm flex items-center gap-2 transition-all">
-  {{ mensajeExito }}
-</div>
+@if (mensajeExito) { <div class="aviso-flotante">{{ mensajeExito }}</div> }
 
-<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+<div class="space-y-5">
 
-  <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
+  <header class="flex flex-wrap items-end justify-between gap-4">
     <div>
-      <h2 class="text-2xl font-bold text-gray-800">Gestión de Usuarios</h2>
-      <p class="text-sm text-gray-500 mt-1">Administra cajeros y administradores</p>
+      <p class="inf-antetitulo"><span>Cajeros y administradores</span></p>
+      <h1 class="inf-titulo">Usuarios</h1>
     </div>
-    <button (click)="abrirModalNuevo()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 text-sm transition-colors">
-      <lucide-icon [img]="icons.plus" class="w-4 h-4"></lucide-icon>
-      Nuevo Usuario
+    <button class="boton-primario py-1.5! text-[12.5px]!" (click)="abrirModalNuevo()">
+      <lucide-icon [img]="icons.plus" class="w-3.5 h-3.5"></lucide-icon> Nuevo usuario
     </button>
-  </div>
+  </header>
 
-  <!-- Filtro estado -->
-  <div class="flex gap-2 mb-5 flex-wrap">
-    <button (click)="filtroEstado = 'todos'"
-            [class.bg-blue-600]="filtroEstado === 'todos'" [class.text-white]="filtroEstado === 'todos'"
-            [class.bg-gray-100]="filtroEstado !== 'todos'" [class.text-gray-600]="filtroEstado !== 'todos'"
-            class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Todos</button>
-    <button (click)="filtroEstado = 'activos'"
-            [class.bg-blue-600]="filtroEstado === 'activos'" [class.text-white]="filtroEstado === 'activos'"
-            [class.bg-gray-100]="filtroEstado !== 'activos'" [class.text-gray-600]="filtroEstado !== 'activos'"
-            class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Activos</button>
-    <button (click)="filtroEstado = 'inactivos'"
-            [class.bg-blue-600]="filtroEstado === 'inactivos'" [class.text-white]="filtroEstado === 'inactivos'"
-            [class.bg-gray-100]="filtroEstado !== 'inactivos'" [class.text-gray-600]="filtroEstado !== 'inactivos'"
-            class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Inactivos</button>
-    <span class="ml-auto text-sm text-gray-400 self-center">{{ usuariosFiltrados.length }} usuario(s)</span>
-  </div>
+  <section class="inf-hoja inf-tira overflow-hidden">
+    <div>
+      <p class="inf-etiqueta">Usuarios activos</p>
+      <p class="inf-valor">{{ resumen.activos }} <span class="inf-tenue text-sm font-normal">de {{ listaUsuarios.length }}</span></p>
+    </div>
+    <div>
+      <p class="inf-etiqueta">Administradores</p>
+      <p class="inf-valor">{{ resumen.admins }}</p>
+    </div>
+    <div>
+      <p class="inf-etiqueta">Cajeros con caja habilitada</p>
+      <p class="inf-valor">{{ resumen.cajasAbiertas }} <span class="inf-tenue text-sm font-normal">de {{ resumen.cajeros }}</span></p>
+    </div>
+  </section>
 
-  <div class="overflow-x-auto">
-    <table class="w-full text-left border-collapse text-base">
-      <thead class="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b">
-        <tr>
-          <th class="px-4 py-3">Usuario</th>
-          <th class="px-4 py-3">Correo</th>
-          <th class="px-4 py-3">Rol</th>
-          <th class="px-4 py-3">Sucursal</th>
-          <th class="px-4 py-3">Estado</th>
-          <th class="px-4 py-3 font-medium">Caja</th>
-          <th class="px-4 py-3 text-center">Acciones</th>
-        </tr>
-      </thead>
-      <tbody class="text-gray-700">
-        <tr *ngIf="cargando"><td colspan="7" class="px-4 py-10 text-center"><div class="flex flex-col items-center gap-2 text-gray-400"><div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>Cargando...</div></td></tr>
-        <tr *ngIf="!cargando && usuariosFiltrados.length === 0"><td colspan="7" class="px-4 py-10 text-center text-gray-400">Sin usuarios con este filtro.</td></tr>
+  <section class="inf-hoja overflow-hidden">
+    <div class="p-4 separador-inferior flex flex-wrap items-center gap-3">
+      <div class="buscador flex-1 min-w-[220px]">
+        <lucide-icon [img]="icons.search" class="w-4 h-4 inf-tenue"></lucide-icon>
+        <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por nombre o correo">
+        @if (busqueda) {
+          <button class="quitar" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+            <lucide-icon [img]="icons.close" class="w-3.5 h-3.5"></lucide-icon>
+          </button>
+        }
+      </div>
+      <div class="inf-segmentos">
+        <button [class.activa]="filtroEstado === 'activos'" (click)="filtroEstado = 'activos'">Activos</button>
+        <button [class.activa]="filtroEstado === 'inactivos'" (click)="filtroEstado = 'inactivos'">Inactivos</button>
+        <button [class.activa]="filtroEstado === 'todos'" (click)="filtroEstado = 'todos'">Todos</button>
+      </div>
+    </div>
 
-        <tr *ngFor="let usr of usuariosFiltrados"
-            class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-            [class.opacity-60]="!usr.estado_activo">
-          <td class="px-4 py-3">
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                   [class.bg-blue-600]="usr.estado_activo" [class.bg-gray-400]="!usr.estado_activo">
-                {{ usr.nombre_completo?.charAt(0)?.toUpperCase() }}
-              </div>
-              <span class="font-medium text-gray-900">{{ usr.nombre_completo }}</span>
-            </div>
-          </td>
-          <td class="px-4 py-3 text-gray-500">{{ usr.correo_electronico }}</td>
-          <td class="px-4 py-3">
-            <span class="px-2 py-1 rounded-full text-xs font-bold" [ngClass]="getBadge(usr.nombre_rol)">{{ usr.nombre_rol }}</span>
-          </td>
-          <td class="px-4 py-3 text-gray-500">{{ usr.nombre_sucursal || '—' }}</td>
-          <td class="px-4 py-3">
-            <span *ngIf="usr.estado_activo"  class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">Activo</span>
-            <span *ngIf="!usr.estado_activo" class="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold">Inactivo</span>
-          </td>
-
-          <td class="px-4 py-3">
-            <ng-container *ngIf="+usr.id_rol === 2 && usr.estado_activo">
-              <span *ngIf="usr.caja_habilitada"
-                    class="inline-flex items-center gap-1.5 bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold">
-                <lucide-icon [img]="icons.wallet" class="w-3.5 h-3.5"></lucide-icon>
-                Caja Abierta
-              </span>
-              <span *ngIf="!usr.caja_habilitada"
-                    class="inline-flex items-center gap-1.5 bg-red-100 text-red-600 px-2.5 py-1 rounded-full text-xs font-bold">
-                <lucide-icon [img]="icons.walletOff" class="w-3.5 h-3.5"></lucide-icon>
-                Caja Cerrada
-              </span>
-            </ng-container>
-            <span *ngIf="+usr.id_rol !== 2" class="text-gray-300 text-xs">—</span>
-          </td>
-
-          <!-- ═══ COLUMNA ACCIONES (rediseñada) ═══ -->
-          <td class="px-4 py-3">
-            <div class="flex items-center justify-center gap-1.5 flex-wrap">
-
-              <button (click)="abrirModalEditar(usr)"
-                      title="Editar datos (nombre, correo, rol, sucursal)"
-                      class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 active:scale-95 transition-all">
-                <lucide-icon [img]="icons.edit" class="w-4 h-4"></lucide-icon>
-              </button>
-
-              <button *ngIf="usr.estado_activo"
-                      (click)="abrirModalContrasena(usr)"
-                      title="Cambiar la contraseña de este usuario"
-                      class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200 active:scale-95 transition-all">
-                <lucide-icon [img]="icons.password" class="w-4 h-4"></lucide-icon>
-              </button>
-
-              <button *ngIf="usr.estado_activo && +usr.id_rol === 2"
-                      (click)="abrirModalPermisos(usr)"
-                      title="Configurar a qué módulos del sistema tiene acceso"
-                      class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 active:scale-95 transition-all">
-                <lucide-icon [img]="icons.permissions" class="w-4 h-4"></lucide-icon>
-              </button>
-
-              <button *ngIf="+usr.id_rol === 2 && usr.estado_activo"
-                      (click)="toggleCaja(usr)"
-                      [title]="usr.caja_habilitada ? 'Cerrar la caja del cajero' : 'Reabrir la caja del cajero'"
-                      class="inline-flex items-center justify-center w-9 h-9 rounded-lg border active:scale-95 transition-all"
-                      [class.border-orange-200]="usr.caja_habilitada"
-                      [class.bg-orange-50]="usr.caja_habilitada"
-                      [class.text-orange-600]="usr.caja_habilitada"
-                      [class.hover:bg-orange-100]="usr.caja_habilitada"
-                      [class.border-emerald-200]="!usr.caja_habilitada"
-                      [class.bg-emerald-50]="!usr.caja_habilitada"
-                      [class.text-emerald-600]="!usr.caja_habilitada"
-                      [class.hover:bg-emerald-100]="!usr.caja_habilitada">
-                <lucide-icon [img]="usr.caja_habilitada ? icons.cajaClose : icons.cajaOpen" class="w-4 h-4"></lucide-icon>
-              </button>
-
-              <button *ngIf="usr.estado_activo"
-                      (click)="desactivarUsuario(usr.id_usuario, usr.nombre_completo)"
-                      title="Desactivar este usuario (no podrá iniciar sesión)"
-                      class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 active:scale-95 transition-all">
-                <lucide-icon [img]="icons.deactivate" class="w-4 h-4"></lucide-icon>
-              </button>
-              <button *ngIf="!usr.estado_activo"
-                      (click)="reactivarUsuario(usr.id_usuario, usr.nombre_completo)"
-                      title="Reactivar este usuario"
-                      class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:scale-95 transition-all">
-                <lucide-icon [img]="icons.activate" class="w-4 h-4"></lucide-icon>
-              </button>
-
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+    @if (cargando && !listaUsuarios.length) {
+      <div class="p-4 space-y-2">
+        @for (n of [1,2,3,4]; track n) { <div class="inf-esqueleto h-12"></div> }
+      </div>
+    } @else if (usuariosFiltrados.length === 0) {
+      <p class="inf-vacio">Ningún usuario coincide con los filtros.</p>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="inf-tabla">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Rol</th>
+              <th>Sucursal</th>
+              <th>Estado</th>
+              <th>Caja</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (usr of usuariosFiltrados; track usr.id_usuario) {
+              <tr [class.inactivo]="!usr.estado_activo">
+                <td>
+                  <div class="flex items-center gap-3 min-w-[220px]">
+                    <span class="avatar">{{ usr.nombre_completo?.charAt(0)?.toUpperCase() }}</span>
+                    <div class="min-w-0">
+                      <span class="fuerte block truncate">
+                        {{ usr.nombre_completo }}
+                        @if (esYo(usr)) { <span class="inf-ficha ml-1">Tú</span> }
+                      </span>
+                      <span class="inf-secundario truncate">{{ usr.correo_electronico }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td>{{ usr.nombre_rol }}</td>
+                <td>{{ usr.nombre_sucursal || '—' }}</td>
+                <td>
+                  @if (usr.estado_activo) { <span class="inf-estado ok">Activo</span> }
+                  @else { <span class="inf-estado neutro">Inactivo</span> }
+                </td>
+                <td>
+                  @if (+usr.id_rol === 2 && usr.estado_activo) {
+                    @if (usr.caja_habilitada) { <span class="inf-estado ok">Habilitada</span> }
+                    @else { <span class="inf-estado mal">Cerrada</span> }
+                  } @else { <span class="inf-sutil">—</span> }
+                </td>
+                <td>
+                  <div class="flex items-center justify-end gap-1">
+                    @if (+usr.id_rol === 2 && usr.estado_activo) {
+                      <button class="inf-boton" (click)="pedirToggleCaja(usr)"
+                              [title]="usr.caja_habilitada ? 'El cajero no podrá vender hasta que la reabras' : 'Si cerró caja hoy, se reabre su turno'">
+                        <lucide-icon [img]="usr.caja_habilitada ? icons.cajaClose : icons.cajaOpen" class="w-3.5 h-3.5"></lucide-icon>
+                        {{ usr.caja_habilitada ? 'Cerrar caja' : 'Reabrir caja' }}
+                      </button>
+                    }
+                    <button class="accion" (click)="abrirModalEditar(usr)" title="Editar datos" aria-label="Editar datos">
+                      <lucide-icon [img]="icons.edit" class="w-4 h-4"></lucide-icon>
+                    </button>
+                    @if (usr.estado_activo) {
+                      <button class="accion" (click)="abrirModalContrasena(usr)" title="Cambiar contraseña" aria-label="Cambiar contraseña">
+                        <lucide-icon [img]="icons.password" class="w-4 h-4"></lucide-icon>
+                      </button>
+                    }
+                    @if (usr.estado_activo && +usr.id_rol === 2) {
+                      <button class="accion" (click)="abrirModalPermisos(usr)" title="Módulos a los que tiene acceso" aria-label="Permisos">
+                        <lucide-icon [img]="icons.permissions" class="w-4 h-4"></lucide-icon>
+                      </button>
+                    }
+                    @if (usr.estado_activo && !esYo(usr)) {
+                      <button class="accion peligro" (click)="pedirCambioEstado(usr)" title="Desactivar (no podrá iniciar sesión)" aria-label="Desactivar usuario">
+                        <lucide-icon [img]="icons.deactivate" class="w-4 h-4"></lucide-icon>
+                      </button>
+                    } @else if (!usr.estado_activo) {
+                      <button class="accion" (click)="pedirCambioEstado(usr)" title="Reactivar usuario" aria-label="Reactivar usuario">
+                        <lucide-icon [img]="icons.activate" class="w-4 h-4"></lucide-icon>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="inf-pie-hoja">{{ usuariosFiltrados.length }} de {{ listaUsuarios.length }} usuario(s)</div>
+    }
+  </section>
 </div>
 
-
-<!-- ════════ MODAL CREAR / EDITAR ════════ -->
-<div *ngIf="mostrarModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-    <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-      <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-        <lucide-icon [img]="icons.users" class="w-5 h-5 text-blue-600"></lucide-icon>
-        {{ editandoId ? 'Editar' : 'Crear' }} Usuario
-      </h3>
-      <button (click)="cerrarModal()" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors">
-        <lucide-icon [img]="icons.close" class="w-5 h-5"></lucide-icon>
-      </button>
-    </div>
-    <div class="p-6 space-y-4">
-      <div *ngIf="mensajeError" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{{ mensajeError }}</div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
-        <input type="text" [(ngModel)]="formulario.nombre_completo" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="Juan Pérez">
+<!-- ═══ CREAR / EDITAR ═══ -->
+@if (mostrarModal) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModal()">
+    <div class="inf-hoja ventana w-full max-w-lg max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId ? 'Editar usuario' : 'Nuevo usuario' }}</h3>
+        <button class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
+        </button>
       </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Correo *</label>
-        <input type="email" [(ngModel)]="formulario.correo_electronico" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-      </div>
-      <div *ngIf="!editandoId">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña *</label>
-        <input type="password" [(ngModel)]="formulario.contrasena" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-      </div>
-      <div *ngIf="editandoId" class="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg text-xs">Para cambiar la contraseña usa el botón "Contraseña".</div>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Rol *</label>
-          <select [(ngModel)]="formulario.id_rol" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="" disabled>Seleccionar...</option>
-            <option *ngFor="let r of listaRoles" [value]="r.id_rol">{{ r.nombre_rol }}</option>
-          </select>
+      <div class="flex-1 overflow-y-auto p-5 space-y-4">
+        @if (mensajeError) { <p class="error-formulario">{{ mensajeError }}</p> }
+        <div class="grupo">
+          <label class="inf-etiqueta" for="usr-nombre">Nombre completo</label>
+          <input id="usr-nombre" type="text" class="campo" [(ngModel)]="formulario.nombre_completo" placeholder="Ej.: Juan Pérez">
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Sucursal *</label>
-          <select [(ngModel)]="formulario.id_sucursal" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="" disabled>Seleccionar...</option>
-            <option *ngFor="let s of listaSucursales" [value]="s.id_sucursal">{{ s.nombre_sucursal }}</option>
-          </select>
+        <div class="grupo">
+          <label class="inf-etiqueta" for="usr-correo">Correo</label>
+          <input id="usr-correo" type="email" class="campo" [(ngModel)]="formulario.correo_electronico" placeholder="nombre@correo.com" autocomplete="off">
+        </div>
+        @if (!editandoId) {
+          <div class="grupo">
+            <label class="inf-etiqueta" for="usr-contrasena">Contraseña</label>
+            <input id="usr-contrasena" type="password" class="campo" [(ngModel)]="formulario.contrasena" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          </div>
+        }
+        <div class="grid grid-cols-2 gap-4">
+          <div class="grupo">
+            <label class="inf-etiqueta" for="usr-rol">Rol</label>
+            <select id="usr-rol" class="campo" [(ngModel)]="formulario.id_rol">
+              <option value="" disabled>Elegir…</option>
+              @for (r of listaRoles; track r.id_rol) { <option [ngValue]="+r.id_rol">{{ r.nombre_rol }}</option> }
+            </select>
+          </div>
+          <div class="grupo">
+            <label class="inf-etiqueta" for="usr-sucursal">Sucursal</label>
+            <select id="usr-sucursal" class="campo" [(ngModel)]="formulario.id_sucursal">
+              <option value="" disabled>Elegir…</option>
+              @for (s of listaSucursales; track s.id_sucursal) { <option [ngValue]="+s.id_sucursal">{{ s.nombre_sucursal }}</option> }
+            </select>
+          </div>
+        </div>
+        @if (editandoId) { <p class="ayuda">La contraseña se cambia con el botón de la llave en la lista.</p> }
+      </div>
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button class="inf-boton" (click)="cerrarModal()">Cancelar</button>
+        <button class="boton-primario" (click)="guardarUsuario()" [disabled]="guardando">
+          {{ guardando ? 'Guardando…' : (editandoId ? 'Guardar cambios' : 'Crear usuario') }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ═══ CONTRASEÑA ═══ -->
+@if (mostrarModalContrasena) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalContrasena()">
+    <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
+      <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
+        <div class="min-w-0">
+          <h3 class="inf-tinta font-semibold text-[15px]">Cambiar contraseña</h3>
+          <p class="inf-sub mt-0.5! truncate">{{ usuarioContrasena?.nombre_completo }}</p>
+        </div>
+        <button class="quitar" (click)="cerrarModalContrasena()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        @if (errorContrasena) { <p class="error-formulario">{{ errorContrasena }}</p> }
+        <div class="grupo">
+          <label class="inf-etiqueta" for="nueva-contrasena">Nueva contraseña</label>
+          <input id="nueva-contrasena" type="password" class="campo" [(ngModel)]="cambioContrasena.nueva" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        </div>
+        <div class="grupo">
+          <label class="inf-etiqueta" for="confirmar-contrasena">Repetir contraseña</label>
+          <input id="confirmar-contrasena" type="password" class="campo" [(ngModel)]="cambioContrasena.confirmar"
+                 autocomplete="new-password" (keyup.enter)="confirmarCambioContrasena()">
         </div>
       </div>
-    </div>
-    <div class="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
-      <button (click)="cerrarModal()" class="px-4 py-2 bg-white border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100">Cancelar</button>
-      <button (click)="guardarUsuario()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">{{ editandoId ? 'Actualizar' : 'Crear' }}</button>
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button class="inf-boton" (click)="cerrarModalContrasena()">Cancelar</button>
+        <button class="boton-primario" (click)="confirmarCambioContrasena()" [disabled]="cargandoContrasena">
+          {{ cargandoContrasena ? 'Guardando…' : 'Cambiar' }}
+        </button>
+      </div>
     </div>
   </div>
-</div>
+}
 
-
-<!-- ════════ MODAL CONTRASEÑA ════════ -->
-<div *ngIf="mostrarModalContrasena" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
-    <div class="bg-amber-500 p-4 text-white">
-      <h3 class="font-bold">Cambiar Contraseña</h3>
-      <p class="text-xs opacity-90 mt-1">{{ usuarioContrasena?.nombre_completo }}</p>
-    </div>
-    <div class="p-6 space-y-4">
-      <div *ngIf="errorContrasena" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">{{ errorContrasena }}</div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Nueva Contraseña *</label>
-        <input type="password" [(ngModel)]="cambioContrasena.nueva" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-500" placeholder="Mínimo 6 caracteres">
+<!-- ═══ PERMISOS ═══ -->
+@if (mostrarModalPermisos) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalPermisos()">
+    <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
+      <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
+        <div class="min-w-0">
+          <h3 class="inf-tinta font-semibold text-[15px]">Permisos de acceso</h3>
+          <p class="inf-sub mt-0.5! truncate">{{ usuarioPermisos?.nombre_completo }} · {{ usuarioPermisos?.nombre_rol }}</p>
+        </div>
+        <button class="quitar" (click)="cerrarModalPermisos()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
+        </button>
       </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar *</label>
-        <input type="password" [(ngModel)]="cambioContrasena.confirmar" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-500">
+      <div class="p-5 space-y-3">
+        @if (cargandoPermisos && !modulosCargados) {
+          @for (n of [1,2,3,4,5]; track n) { <div class="inf-esqueleto h-9"></div> }
+        } @else {
+          <div class="opciones">
+            @for (mod of modulosSistema; track mod.key) {
+              <label class="opcion">
+                <input type="checkbox" [(ngModel)]="permisosEdicion[mod.key]" [name]="mod.key">
+                <span>{{ mod.label }}</span>
+              </label>
+            }
+          </div>
+          <p class="ayuda">Se aplican cuando el usuario recarga la página o vuelve a iniciar sesión.</p>
+        }
+        @if (errorPermisos) { <p class="error-formulario">{{ errorPermisos }}</p> }
       </div>
-    </div>
-    <div class="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
-      <button (click)="cerrarModalContrasena()" class="px-4 py-2 bg-white border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100">Cancelar</button>
-      <button (click)="confirmarCambioContrasena()" [disabled]="cargandoContrasena" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium">
-        {{ cargandoContrasena ? 'Guardando...' : 'Cambiar' }}
-      </button>
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button class="inf-boton" (click)="cerrarModalPermisos()">Cancelar</button>
+        <button class="boton-primario" (click)="guardarPermisos()" [disabled]="cargandoPermisos || !modulosCargados">
+          {{ cargandoPermisos && modulosCargados ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
     </div>
   </div>
-</div>
+}
 
-
-<div *ngIf="mostrarModalPermisos" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs overflow-hidden">
-    <div class="bg-indigo-600 px-4 py-3 text-white">
-      <h3 class="font-bold text-sm">Permisos de acceso</h3>
-      <p class="text-[11px] opacity-90 truncate">{{ usuarioPermisos?.nombre_completo }} · {{ usuarioPermisos?.nombre_rol }}</p>
-    </div>
-
-    <div class="px-4 py-3">
-      <div class="bg-blue-50 border border-blue-200 rounded-md px-2 py-1.5 mb-3 text-[11px] text-blue-700 leading-tight">
-        Se aplicará al volver a iniciar sesión o al pulsar "Recargar permisos".
-      </div>
-
-      <div *ngIf="cargandoPermisos" class="text-center py-4">
-        <div class="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-      </div>
-
-      <div *ngIf="!cargandoPermisos" class="space-y-1">
-        <label *ngFor="let mod of modulosSistema"
-               class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 cursor-pointer border border-gray-200 transition-colors"
-               [class.border-indigo-300]="permisosEdicion[mod.key]"
-               [class.bg-indigo-50]="permisosEdicion[mod.key]">
-          <input type="checkbox"
-                 [(ngModel)]="permisosEdicion[mod.key]"
-                 [name]="mod.key"
-                 class="w-3.5 h-3.5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer">
-          <span class="text-xs font-medium text-gray-700">{{ mod.label }}</span>
-        </label>
-      </div>
-    </div>
-
-    <div class="px-4 py-3 bg-gray-50 border-t flex justify-end gap-2">
-      <button (click)="cerrarModalPermisos()" class="px-3 py-1.5 bg-white border border-gray-300 text-gray-600 rounded-md text-xs font-medium hover:bg-gray-100">Cancelar</button>
-      <button (click)="guardarPermisos()" [disabled]="cargandoPermisos"
-              class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-md text-xs font-medium">
-        Guardar
-      </button>
-    </div>
-  </div>
-</div>
+<!-- ═══ CONFIRMACIONES ═══ -->
+@if (confirmacion; as c) {
+  <app-confirmacion [titulo]="c.titulo" [mensaje]="c.mensaje" [textoConfirmar]="c.boton" [peligro]="c.peligro"
+                    [ocupado]="confirmando" [error]="errorConfirmacion"
+                    (confirmar)="ejecutarConfirmacion()" (cancelar)="cerrarConfirmacion()" />
+}

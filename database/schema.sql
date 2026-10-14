@@ -343,6 +343,7 @@ CREATE UNIQUE INDEX uq_cuenta_abierta_mesa ON cuenta_mesa (id_mesa) WHERE estado
 CREATE INDEX idx_pedido_sucursal_estado   ON pedido_mesa (id_sucursal, estado_pedido);
 CREATE INDEX idx_pedido_mesa_estado       ON pedido_mesa (id_mesa, estado_pedido);
 CREATE INDEX idx_pedido_cuenta            ON pedido_mesa (id_cuenta);
+CREATE INDEX idx_mesa_sucursal_numero     ON mesa_local (id_sucursal, numero_mesa);
 CREATE INDEX idx_venta_caja_sucursal_fecha ON venta_caja (id_sucursal, fecha_venta);
 CREATE INDEX idx_venta_caja_turno         ON venta_caja (id_turno);
 CREATE INDEX idx_detalle_venta_venta      ON detalle_venta (id_venta);

@@ -2,7 +2,7 @@ import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angula
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Subscription, forkJoin, of, catchError } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { CuentaService }  from '../../../core/services/cuenta.service';
 import { CajaService, EstadoCajaCompleto }    from '../../../core/services/caja.service';
 import { MesaService }    from '../../../core/services/mesa.service';
@@ -264,15 +264,17 @@ export class MesasComponent implements OnInit, OnDestroy {
     if (!this.mesas.length) { this.codigosQR = []; return; }
     this.generandoQR = true;
     this.errorQR     = '';
-    forkJoin(this.mesas.map(m =>
-      this.mesaService.obtenerQR(m.id_mesa, base).pipe(catchError(() => of(null)))
-    )).subscribe(res => {
-      this.codigosQR = res
-        .map((r: any, i: number) => r && { id_mesa: this.mesas[i].id_mesa, numero_mesa: r.numero_mesa, qr: r.qr, url: r.url })
-        .filter(Boolean) as any[];
-      if (this.codigosQR.length < this.mesas.length) this.errorQR = 'No se pudieron generar algunos códigos.';
-      this.generandoQR = false;
-      this.cdr.detectChanges();
+    this.mesaService.obtenerQRSucursal(this.usuarioActual?.id_sucursal || 1, base).subscribe({
+      next: (codigos) => {
+        this.codigosQR   = codigos;
+        this.generandoQR = false;
+        this.cdr.detectChanges();
+      },
+      error: (e: any) => {
+        this.errorQR     = e?.error?.error || 'No se pudieron generar los códigos.';
+        this.generandoQR = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 

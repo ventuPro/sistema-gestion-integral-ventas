@@ -20,10 +20,10 @@ export class MesaService {
     return this.http.post(`${this.apiUrl}/mesas`, datos, { headers: this.h() });
   }
 
-  /** base_url: dirección del sistema que abrirá el celular del cliente al escanear */
-  obtenerQR(id_mesa: number, base_url = window.location.origin): Observable<any> {
+  /** Todos los QR de la sucursal en una sola petición */
+  obtenerQRSucursal(id_sucursal: number, base_url: string): Observable<{ id_mesa: number; numero_mesa: number; qr: string; url: string }[]> {
     const params = new HttpParams().set('base_url', base_url);
-    return this.http.get(`${this.apiUrl}/mesas/${id_mesa}/qr`, { headers: this.h(), params });
+    return this.http.get<any[]>(`${this.apiUrl}/mesas/sucursal/${id_sucursal}/qr`, { headers: this.h(), params });
   }
 
   /** Invalida el QR impreso anterior de la mesa */

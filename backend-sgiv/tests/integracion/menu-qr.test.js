@@ -487,3 +487,25 @@ describe('Sin módulo de cocina', () => {
         assert.equal((await api('GET', '/kds', { token: tAdmin })).status, 404);
     });
 });
+
+// ─── Hoja de códigos QR ───
+describe('Menú QR: códigos de todas las mesas', () => {
+    test('una sola respuesta con los QR de la sucursal; el cajero solo ve la suya', async () => {
+        await crearMesa(91);
+        await crearMesa(92, 2);
+        const base = 'http://192.168.1.10:4200';
+
+        const propias = await api('GET', `/mesas/sucursal/1/qr?base_url=${encodeURIComponent(base)}`, { token: tCajero });
+        assert.equal(propias.status, 200);
+        const m31 = propias.body.find(m => m.numero_mesa === 91);
+        assert.ok(m31.qr.startsWith('data:image/png;base64,'));
+        assert.match(m31.url, /^http:\/\/192\.168\.1\.10:4200\/menu\/[0-9a-f]+$/);
+
+        const ajena = await api('GET', `/mesas/sucursal/2/qr?base_url=${encodeURIComponent(base)}`, { token: tCajero });
+        assert.ok(!ajena.body.some(m => m.numero_mesa === 92));
+        const admin = await api('GET', `/mesas/sucursal/2/qr?base_url=${encodeURIComponent(base)}`, { token: tAdmin });
+        assert.ok(admin.body.some(m => m.numero_mesa === 92));
+
+        assert.equal((await api('GET', '/mesas/sucursal/1/qr?base_url=javascript:alert(1)', { token: tCajero })).status, 400);
+    });
+});

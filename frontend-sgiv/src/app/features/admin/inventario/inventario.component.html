@@ -1,4 +1,24 @@
+@if (notificacion) { <div class="aviso-flotante">{{ notificacion }}</div> }
+
 <div class="space-y-5">
+
+  <header class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="inf-antetitulo">
+        <span>{{ sucursalSeleccionada?.nombre_sucursal }}</span>
+        <span>{{ productos.length }} producto(s)</span>
+      </p>
+      <h1 class="inf-titulo">Inventario</h1>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button class="inf-boton" (click)="abrirModalCategoria()">
+        <lucide-icon [img]="icons.etiqueta" class="w-3.5 h-3.5"></lucide-icon> Nueva categoría
+      </button>
+      <button class="boton-primario py-1.5! text-[12.5px]!" (click)="abrirModalNuevo()">
+        <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon> Nuevo producto
+      </button>
+    </div>
+  </header>
 
   <app-selector-sucursal *ngIf="sucursalSeleccionada"
                          [sucursales]="sucursales.length ? sucursales : [sucursalSeleccionada]"
@@ -6,468 +26,318 @@
                          [soloLectura]="sucursales.length <= 1"
                          (cambio)="cambiarSucursal($event)" />
 
-  <!-- ═══ PANEL PRINCIPAL ═══ -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-
-    <!-- Header -->
-    <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
-      <div>
-        <h2 class="text-2xl font-bold text-gray-800">Inventario de Productos</h2>
-        <p class="text-sm text-gray-500 mt-1">
-          {{ productosFiltrados.length }} producto(s) en
-          <strong>{{ sucursalSeleccionada?.nombre_sucursal }}</strong>
-        </p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <button (click)="abrirModalCategoria()"
-                class="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-          + Categoría
-        </button>
-        <button (click)="abrirModalNuevo()"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition-colors">
-          + Nuevo Producto
-        </button>
-      </div>
+  <section class="inf-hoja inf-tira overflow-hidden">
+    <div>
+      <p class="inf-etiqueta">Productos activos</p>
+      <p class="inf-valor">{{ resumen.activos }}</p>
     </div>
-
-    <!-- Filtro por estado -->
-    <div class="flex flex-wrap gap-2 mb-3">
-      <button (click)="filtroEstado = 'activos'; aplicarFiltros()"
-              [class.bg-blue-600]="filtroEstado === 'activos'"
-              [class.text-white]="filtroEstado === 'activos'"
-              [class.bg-gray-100]="filtroEstado !== 'activos'"
-              [class.text-gray-600]="filtroEstado !== 'activos'"
-              class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Activos</button>
-      <button (click)="filtroEstado = 'inactivos'; aplicarFiltros()"
-              [class.bg-blue-600]="filtroEstado === 'inactivos'"
-              [class.text-white]="filtroEstado === 'inactivos'"
-              [class.bg-gray-100]="filtroEstado !== 'inactivos'"
-              [class.text-gray-600]="filtroEstado !== 'inactivos'"
-              class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Inactivos</button>
-      <button (click)="filtroEstado = 'todos'; aplicarFiltros()"
-              [class.bg-blue-600]="filtroEstado === 'todos'"
-              [class.text-white]="filtroEstado === 'todos'"
-              [class.bg-gray-100]="filtroEstado !== 'todos'"
-              [class.text-gray-600]="filtroEstado !== 'todos'"
-              class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">Todos</button>
+    <div>
+      <p class="inf-etiqueta">Stock bajo</p>
+      <p class="inf-valor" [class.inf-aviso]="resumen.bajos > 0">{{ resumen.bajos }}</p>
     </div>
-
-    <!-- Filtros -->
-    <div class="flex flex-wrap gap-2 mb-4">
-      <!-- Buscador -->
-      <input type="text" [(ngModel)]="filtroBusqueda" (input)="aplicarFiltros()"
-             placeholder="🔍 Buscar producto..."
-             class="flex-1 min-w-48 px-4 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-400">
-
-      <!-- Categorías -->
-      <div class="flex gap-2 flex-wrap">
-        <button (click)="seleccionarCategoria(null)"
-                class="px-3 py-2 rounded-lg border text-xs font-semibold transition-colors"
-                [class.bg-blue-600]="!filtroCategoria" [class.text-white]="!filtroCategoria"
-                [class.bg-gray-100]="!!filtroCategoria" [class.text-gray-600]="!!filtroCategoria">
-          Todos
-        </button>
-        <span *ngFor="let cat of categorias"
-              class="inline-flex items-stretch rounded-lg border overflow-hidden transition-colors"
-              [class.border-blue-600]="filtroCategoria === cat.id_categoria"
-              [class.border-gray-200]="filtroCategoria !== cat.id_categoria">
-          <button (click)="seleccionarCategoria(cat.id_categoria)"
-                  class="px-3 py-2 text-xs font-semibold transition-colors"
-                  [class.bg-blue-600]="filtroCategoria === cat.id_categoria"
-                  [class.text-white]="filtroCategoria === cat.id_categoria"
-                  [class.bg-gray-100]="filtroCategoria !== cat.id_categoria"
-                  [class.text-gray-600]="filtroCategoria !== cat.id_categoria">
-            {{ cat.nombre_categoria }}
-          </button>
-          <button (click)="abrirModalBorrarCategoria(cat)"
-                  title="Eliminar categoría"
-                  class="px-2 flex items-center justify-center border-l text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                  [class.border-blue-500]="filtroCategoria === cat.id_categoria"
-                  [class.bg-blue-500]="filtroCategoria === cat.id_categoria"
-                  [class.text-blue-100]="filtroCategoria === cat.id_categoria"
-                  [class.border-gray-200]="filtroCategoria !== cat.id_categoria">
-            <lucide-icon [img]="icons.delete" class="w-3.5 h-3.5"></lucide-icon>
-          </button>
-        </span>
-      </div>
+    <div>
+      <p class="inf-etiqueta">Sin stock</p>
+      <p class="inf-valor" [class.inf-baja]="resumen.agotados > 0">{{ resumen.agotados }}</p>
     </div>
-
-    <!-- Cargando -->
-    <div *ngIf="cargando" class="flex justify-center py-12">
-      <div class="flex flex-col items-center gap-3">
-        <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-gray-400 text-sm">Cargando inventario...</p>
-      </div>
+    <div>
+      <p class="inf-etiqueta">Valor en stock</p>
+      <p class="inf-valor">{{ moneda() }} {{ cifra(resumen.valor) }}</p>
     </div>
+  </section>
 
-    <!-- Sin productos -->
-    <div *ngIf="!cargando && productosFiltrados.length === 0"
-         class="text-center py-16 text-gray-400">
-      <div class="text-5xl mb-3">📦</div>
-      <p class="font-medium">No hay productos en este inventario</p>
-      <p class="text-sm mt-1">Agrega el primer producto con el botón "+ Nuevo Producto"</p>
-    </div>
-
-    <!-- Grid de productos -->
-    <!-- Grid de productos — más compacto -->
-<div *ngIf="!cargando && productosFiltrados.length > 0"
-     class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-
-  <div *ngFor="let prod of productosFiltrados"
-       class="group border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all bg-white flex flex-col"
-       [class.opacity-60]="!prod.estado_activo">
-
-    <!-- Imagen + categoría (cuadrado perfecto) -->
-    <div class="relative w-full aspect-square bg-gradient-to-br from-gray-50 to-gray-100">
-      <img *ngIf="prod.url_imagen"
-           [src]="getImageUrl(prod.url_imagen)"
-           [alt]="prod.nombre_producto"
-           class="w-full h-full object-cover">
-      <div *ngIf="!prod.url_imagen"
-           class="w-full h-full flex items-center justify-center">
-        <lucide-icon [img]="icons.package" class="w-14 h-14 text-gray-300"></lucide-icon>
-      </div>
-
-      <!-- Tag categoría -->
-      <span class="absolute top-2 left-2 text-xs px-2.5 py-0.5 rounded-full font-semibold text-gray-700 bg-white/95 shadow-sm">
-        {{ prod.nombre_categoria }}
-      </span>
-
-      <!-- Badge estado (solo si inactivo) -->
-      <span *ngIf="!prod.estado_activo"
-            class="absolute top-2 right-2 text-xs px-2.5 py-0.5 rounded-full font-bold text-red-700 bg-red-100 shadow-sm">
-        Inactivo
-      </span>
-    </div>
-
-    <!-- Info -->
-    <div class="p-4 flex-1 flex flex-col">
-      <h3 class="font-bold text-gray-800 text-lg leading-tight line-clamp-2 mb-1 min-h-[2.4em]">
-        {{ prod.nombre_producto }}
-      </h3>
-      <p class="text-blue-700 font-black text-xl mb-3">{{ moneda() }} {{ prod.precio_unitario }}</p>
-
-      <!-- ═══ INDICADOR DE STOCK (alerta si <= 3) ═══ -->
-      <div class="mb-3">
-        <!-- Sin stock -->
-        <div *ngIf="(prod.stock_actual || 0) <= 0"
-             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100">
-          <lucide-icon [img]="icons.out" class="w-5 h-5 text-red-500 flex-shrink-0"></lucide-icon>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-red-600 font-bold leading-tight">Sin stock</p>
-            <p class="text-2xl font-black text-red-500 leading-tight">0</p>
-          </div>
+  <section class="inf-hoja overflow-hidden">
+    <div class="p-4 pb-3 separador-inferior space-y-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="buscador flex-1 min-w-[220px]">
+          <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
+          <input type="text" [(ngModel)]="filtroBusqueda" (input)="aplicarFiltros()" placeholder="Buscar producto">
+          @if (filtroBusqueda) {
+            <button class="quitar" (click)="filtroBusqueda = ''; aplicarFiltros()" aria-label="Limpiar búsqueda">
+              <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
+            </button>
+          }
         </div>
-        <!-- Stock bajo (1-3) -->
-        <div *ngIf="(prod.stock_actual || 0) > 0 && (prod.stock_actual || 0) <= 3"
-             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50 border border-orange-100">
-          <lucide-icon [img]="icons.warning" class="w-5 h-5 text-orange-500 flex-shrink-0"></lucide-icon>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-orange-700 font-bold leading-tight">Stock bajo</p>
-            <p class="text-2xl font-black text-orange-600 leading-tight">{{ prod.stock_actual }} <span class="text-xs font-semibold">uds</span></p>
-          </div>
-        </div>
-        <!-- Stock normal (> 3) -->
-        <div *ngIf="(prod.stock_actual || 0) > 3"
-             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-100">
-          <lucide-icon [img]="icons.ok" class="w-5 h-5 text-emerald-600 flex-shrink-0"></lucide-icon>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-emerald-700 font-bold leading-tight">En stock</p>
-            <p class="text-2xl font-black text-emerald-600 leading-tight">{{ prod.stock_actual }} <span class="text-xs font-semibold">uds</span></p>
-          </div>
+        <div class="inf-segmentos">
+          @for (f of filtrosEstado; track f.valor) {
+            <button [class.activa]="filtroEstado === f.valor" (click)="filtroEstado = f.valor; aplicarFiltros()">{{ f.texto }}</button>
+          }
         </div>
       </div>
-
-      <!-- ═══ ACCIONES con iconos profesionales + tooltips ═══ -->
-      <div class="flex gap-1.5 mt-auto">
-        <!-- Agregar stock (principal) -->
-        <button (click)="abrirModalStock(prod)"
-                title="Agregar más unidades al stock"
-                class="flex-1 inline-flex items-center justify-center gap-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-lg transition-all shadow-sm">
-          <lucide-icon [img]="icons.addStock" class="w-4 h-4"></lucide-icon>
-          <span>Stock</span>
-        </button>
-
-        <!-- Editar producto -->
-        <button (click)="abrirModalEditar(prod)"
-                title="Editar este producto (nombre, precio, foto, categoría)"
-                class="inline-flex items-center justify-center w-9 h-9 border border-gray-200 bg-white text-gray-500 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 active:scale-95 rounded-lg transition-all">
-          <lucide-icon [img]="icons.edit" class="w-4 h-4"></lucide-icon>
-        </button>
-
-        <!-- Toggle activar/desactivar -->
-        <button *ngIf="prod.estado_activo"
-                (click)="toggleEstadoProducto(prod)"
-                title="Desactivar producto (deja de aparecer en ventas)"
-                class="inline-flex items-center justify-center w-9 h-9 border border-gray-200 bg-white text-gray-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 active:scale-95 rounded-lg transition-all">
-          <lucide-icon [img]="icons.delete" class="w-4 h-4"></lucide-icon>
-        </button>
-        <button *ngIf="!prod.estado_activo"
-                (click)="toggleEstadoProducto(prod)"
-                title="Reactivar producto"
-                class="inline-flex items-center justify-center w-9 h-9 border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 active:scale-95 rounded-lg transition-all">
-          <lucide-icon [img]="icons.refresh" class="w-4 h-4"></lucide-icon>
-        </button>
+      <div class="flex items-center gap-4">
+        <nav class="inf-pestanas flex-1 min-w-0">
+          <button [class.activa]="!filtroCategoria" (click)="seleccionarCategoria(null)">Todas</button>
+          @for (cat of categorias; track cat.id_categoria) {
+            <button [class.activa]="filtroCategoria === cat.id_categoria" (click)="seleccionarCategoria(cat.id_categoria)">{{ cat.nombre_categoria }}</button>
+          }
+        </nav>
+        @if (categoriaActual) {
+          <button class="inf-enlace inf-baja flex-shrink-0" (click)="abrirModalBorrarCategoria(categoriaActual)">Eliminar categoría</button>
+        }
       </div>
     </div>
-  </div>
-</div>
-  </div>
+
+    @if (cargando) {
+      <div class="p-4 space-y-2">
+        @for (n of [1,2,3,4,5]; track n) { <div class="inf-esqueleto h-12"></div> }
+      </div>
+    } @else if (productos.length === 0) {
+      <p class="inf-vacio">No hay productos en esta sucursal. Crea el primero con «Nuevo producto».</p>
+    } @else if (productosFiltrados.length === 0) {
+      <p class="inf-vacio">Ningún producto coincide con los filtros.</p>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="inf-tabla">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Categoría</th>
+              <th class="num">Precio</th>
+              <th class="num">Stock</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (prod of productosFiltrados; track prod.id_producto) {
+              <tr [class.inactivo]="!prod.estado_activo">
+                <td>
+                  <div class="flex items-center gap-3 min-w-[200px]">
+                    <div class="miniatura">
+                      @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
+                      @else { {{ prod.nombre_producto?.charAt(0) }} }
+                    </div>
+                    <div class="min-w-0">
+                      <span class="fuerte block truncate">{{ prod.nombre_producto }}</span>
+                      @if (prod.descripcion_producto) { <span class="inf-secundario truncate max-w-[260px]">{{ prod.descripcion_producto }}</span> }
+                    </div>
+                  </div>
+                </td>
+                <td>{{ prod.nombre_categoria }}</td>
+                <td class="num">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</td>
+                <td class="num">
+                  <span class="fuerte">{{ prod.stock_actual || 0 }}</span>
+                  <span class="inf-secundario">mín. {{ prod.stock_minimo_alerta }}</span>
+                </td>
+                <td>
+                  @if (!prod.estado_activo) { <span class="inf-estado neutro">Inactivo</span> }
+                  @else if (estadoStock(prod) === 'sin') { <span class="inf-estado mal">Sin stock</span> }
+                  @else if (estadoStock(prod) === 'bajo') { <span class="inf-estado aviso">Stock bajo</span> }
+                  @else { <span class="inf-estado ok">Disponible</span> }
+                </td>
+                <td>
+                  <div class="flex items-center justify-end gap-1">
+                    <button class="inf-boton" (click)="abrirModalStock(prod)" title="Agregar unidades al stock">
+                      <lucide-icon [img]="icons.addStock" class="w-3.5 h-3.5"></lucide-icon> Stock
+                    </button>
+                    <button class="accion" (click)="abrirModalEditar(prod)" title="Editar producto" aria-label="Editar producto">
+                      <lucide-icon [img]="icons.edit" class="w-4 h-4"></lucide-icon>
+                    </button>
+                    @if (prod.estado_activo) {
+                      <button class="accion peligro" (click)="toggleEstadoProducto(prod)" title="Desactivar (deja de aparecer en ventas)" aria-label="Desactivar producto">
+                        <lucide-icon [img]="icons.desactivar" class="w-4 h-4"></lucide-icon>
+                      </button>
+                    } @else {
+                      <button class="accion" (click)="toggleEstadoProducto(prod)" title="Reactivar producto" aria-label="Reactivar producto">
+                        <lucide-icon [img]="icons.refresh" class="w-4 h-4"></lucide-icon>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="inf-pie-hoja">{{ productosFiltrados.length }} de {{ productos.length }} producto(s)</div>
+    }
+  </section>
 </div>
 
-<!-- ═══ MODAL NUEVO / EDITAR PRODUCTO ═══ -->
-<div *ngIf="mostrarModal"
-     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
-    <div class="bg-blue-600 px-6 py-4 text-white flex justify-between items-center">
-      <div>
-        <h3 class="text-lg font-bold">{{ editandoId ? 'Editar' : 'Nuevo' }} Producto</h3>
-        <p class="text-xs text-blue-200">{{ sucursalSeleccionada?.nombre_sucursal }}</p>
-      </div>
-      <button (click)="cerrarModal()" class="text-white opacity-80 hover:opacity-100 text-xl">✕</button>
-    </div>
-
-    <div class="overflow-y-auto flex-1 p-6 space-y-4">
-      <div *ngIf="errorModal" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-        {{ errorModal }}
+<!-- ═══ NUEVO / EDITAR PRODUCTO ═══ -->
+@if (mostrarModal) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModal()">
+    <div class="inf-hoja ventana w-full max-w-lg max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+      <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
+        <div>
+          <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId ? 'Editar producto' : 'Nuevo producto' }}</h3>
+          <p class="inf-sub mt-0.5!">{{ sucursalSeleccionada?.nombre_sucursal }}</p>
+        </div>
+        <button class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
       </div>
 
-      <!-- Imagen -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Foto del producto</label>
+      <div class="flex-1 overflow-y-auto p-5 space-y-4">
+        @if (errorModal) { <p class="error-formulario">{{ errorModal }}</p> }
+
         <div class="flex items-center gap-4">
-          <div class="w-20 h-20 rounded-xl overflow-hidden bg-blue-50 flex-shrink-0 border-2 border-dashed border-blue-200">
-            <img *ngIf="previewImagen" [src]="previewImagen" class="w-full h-full object-cover">
-            <div *ngIf="!previewImagen" class="w-full h-full flex items-center justify-center text-blue-300 text-3xl">📷</div>
+          <div class="foto-campo">
+            @if (previewImagen) { <img [src]="previewImagen | imagenUrl" alt="Foto del producto"> }
+            @else { <lucide-icon [img]="icons.imagen" class="w-6 h-6"></lucide-icon> }
           </div>
-          <div class="flex-1">
-            <label class="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-2 px-4 rounded-lg text-sm inline-block transition-colors">
-              Seleccionar imagen
-              <input type="file" accept="image/jpeg,image/png,image/webp"
-                     (change)="onArchivoSeleccionado($event)" class="hidden">
+          <div>
+            <label class="inf-boton cursor-pointer">
+              {{ previewImagen ? 'Cambiar foto' : 'Elegir foto' }}
+              <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onArchivoSeleccionado($event)" class="hidden">
             </label>
-            <p class="text-xs text-gray-400 mt-1">JPG, PNG o WEBP. Máximo 2MB.</p>
+            <p class="ayuda mt-1.5">JPG, PNG o WEBP. Máximo 2 MB.</p>
           </div>
         </div>
-      </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-        <input type="text" [(ngModel)]="formulario.nombre_producto"
-               class="w-full px-4 py-2 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-               placeholder="Ej: Torta de Chocolate">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-        <textarea [(ngModel)]="formulario.descripcion_producto" rows="2"
-                  class="w-full px-4 py-2 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  placeholder="Descripción del producto..."></textarea>
-      </div>
-
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Precio ({{ moneda() }}) *</label>
-          <input type="number" [(ngModel)]="formulario.precio_unitario" min="0" step="0.50"
-                 class="w-full px-4 py-2 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                 placeholder="0.00">
+        <div class="grupo">
+          <label class="inf-etiqueta" for="nombre-producto">Nombre</label>
+          <input id="nombre-producto" type="text" class="campo" [(ngModel)]="formulario.nombre_producto" placeholder="Ej.: Torta de chocolate">
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
-          <select [(ngModel)]="formulario.id_categoria"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-sm outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="" disabled>Seleccionar...</option>
-            <option *ngFor="let cat of categorias" [value]="cat.id_categoria">{{ cat.nombre_categoria }}</option>
-          </select>
+
+        <div class="grupo">
+          <label class="inf-etiqueta" for="descripcion-producto">Descripción <span class="inf-sutil">(opcional)</span></label>
+          <textarea id="descripcion-producto" rows="2" class="campo" [(ngModel)]="formulario.descripcion_producto"></textarea>
         </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="grupo">
+            <label class="inf-etiqueta" for="precio-producto">Precio ({{ moneda() }})</label>
+            <input id="precio-producto" type="number" min="0" step="0.50" class="campo" [(ngModel)]="formulario.precio_unitario" placeholder="0.00">
+          </div>
+          <div class="grupo">
+            <label class="inf-etiqueta" for="categoria-producto">Categoría</label>
+            <select id="categoria-producto" class="campo" [(ngModel)]="formulario.id_categoria">
+              <option value="" disabled>Elegir…</option>
+              @for (cat of categorias; track cat.id_categoria) {
+                <option [ngValue]="cat.id_categoria">{{ cat.nombre_categoria }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        @if (!editandoId) {
+          <div class="grupo">
+            <label class="inf-etiqueta" for="stock-inicial">Stock inicial</label>
+            <input id="stock-inicial" type="number" min="0" class="campo" [(ngModel)]="formulario.stock_inicial" placeholder="0">
+            <p class="ayuda">Luego puedes sumar unidades con el botón «Stock».</p>
+          </div>
+        }
       </div>
 
-      <!-- Stock inicial (solo al crear) -->
-      <div *ngIf="!editandoId">
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          Stock inicial en {{ sucursalSeleccionada?.nombre_sucursal }}
-        </label>
-        <input type="number" [(ngModel)]="formulario.stock_inicial" min="0"
-               class="w-full px-4 py-2 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
-               placeholder="0">
-        <p class="text-xs text-blue-500 mt-1">💡 Puedes agregar más stock después desde el botón "+ Stock"</p>
-      </div>
-    </div>
-
-    <div class="px-6 py-4 bg-gray-50 border-t flex gap-3">
-      <button (click)="cerrarModal()"
-              class="flex-1 py-2 bg-white border border-gray-300 text-gray-600 rounded-xl font-medium hover:bg-gray-100 text-sm">
-        Cancelar
-      </button>
-      <button (click)="guardarProducto()" [disabled]="cargando"
-              class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl font-bold text-sm">
-        {{ editandoId ? 'Actualizar' : 'Crear Producto' }}
-      </button>
-    </div>
-  </div>
-</div>
-
-
-<!-- ═══ MODAL AGREGAR STOCK ═══ -->
-<div *ngIf="mostrarModalStock && productoStock"
-     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-    <div class="bg-green-600 px-6 py-4 text-white">
-      <h3 class="font-bold text-lg">Agregar Stock</h3>
-      <p class="text-xs text-green-200 mt-0.5">
-        {{ productoStock.nombre_producto }} — {{ sucursalSeleccionada?.nombre_sucursal }}
-      </p>
-    </div>
-    <div class="p-6 space-y-4">
-      <div *ngIf="errorStock" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-        {{ errorStock }}
-      </div>
-
-      <div class="bg-gray-50 rounded-xl p-4 text-center">
-        <p class="text-xs text-gray-500 mb-1">Stock actual</p>
-        <p class="text-4xl font-black text-gray-800">{{ productoStock.stock_actual || 0 }}</p>
-        <p class="text-xs text-gray-400">unidades</p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad a agregar</label>
-        <input type="number" [(ngModel)]="cantidadAgregar" min="1"
-               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-2xl text-center font-black outline-none focus:border-green-500"
-               placeholder="0">
-      </div>
-
-      <div *ngIf="cantidadAgregar > 0"
-           class="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-        <p class="text-xs text-green-600">Nuevo total</p>
-        <p class="text-2xl font-black text-green-700">
-          {{ (productoStock.stock_actual || 0) + cantidadAgregar }} unidades
-        </p>
-      </div>
-    </div>
-    <div class="px-6 pb-6 flex gap-3">
-      <button (click)="cerrarModalStock()"
-              class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200">
-        Cancelar
-      </button>
-      <button (click)="agregarStock()" [disabled]="cantidadAgregar <= 0 || cargando"
-              class="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-xl font-bold">
-        + Agregar
-      </button>
-    </div>
-  </div>
-</div>
-
-
-<!-- ═══ MODAL NUEVA CATEGORÍA ═══ -->
-<div *ngIf="mostrarModalCategoria"
-     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-    <div class="bg-purple-600 px-6 py-4 text-white flex justify-between items-center">
-      <h3 class="font-bold">Nueva Categoría</h3>
-      <button (click)="cerrarModalCategoria()" class="text-white opacity-80 hover:opacity-100">✕</button>
-    </div>
-    <div class="p-6 space-y-4">
-      <div *ngIf="errorCategoria" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">
-        {{ errorCategoria }}
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la categoría *</label>
-        <input type="text" [(ngModel)]="nombreCategoria"
-               class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500"
-               placeholder="Ej: Tortas, Pasteles, Bebidas...">
-      </div>
-    </div>
-    <div class="px-6 pb-6 flex gap-3">
-      <button (click)="cerrarModalCategoria()"
-              class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium">Cancelar</button>
-      <button (click)="crearCategoria()"
-              class="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold">
-        Crear
-      </button>
-    </div>
-  </div>
-</div>
-
-
-<!-- ═══ MODAL BORRAR CATEGORÍA (doble confirmación) ═══ -->
-<div *ngIf="mostrarModalBorrarCat && catABorrar"
-     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-
-    <div class="bg-red-600 px-6 py-4 text-white flex justify-between items-center">
-      <div class="flex items-center gap-2">
-        <lucide-icon [img]="icons.warning" class="w-5 h-5"></lucide-icon>
-        <h3 class="font-bold">Eliminar categoría</h3>
-      </div>
-      <button (click)="cerrarModalBorrarCategoria()" class="text-white opacity-80 hover:opacity-100 text-lg">✕</button>
-    </div>
-
-    <!-- Paso 1 -->
-    <div *ngIf="pasoBorradoCat === 1" class="p-6 space-y-4">
-      <p class="text-sm text-gray-700">
-        Vas a eliminar la categoría
-        <strong class="text-red-700">"{{ catABorrar.nombre_categoria }}"</strong>.
-      </p>
-
-      <div *ngIf="productosBloqueantes.length > 0"
-           class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
-        <p class="text-xs font-bold text-amber-700">
-          No se puede borrar — hay {{ productosBloqueantes.length }} producto(s) activo(s):
-        </p>
-        <ul class="text-xs text-amber-800 space-y-1 max-h-32 overflow-y-auto pl-4 list-disc">
-          <li *ngFor="let p of productosBloqueantes">{{ p.nombre_producto }}</li>
-        </ul>
-        <p class="text-xs text-amber-600">
-          Elimina o reasigna estos productos antes de borrar la categoría.
-        </p>
-      </div>
-
-      <div *ngIf="productosBloqueantes.length === 0"
-           class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
-        La categoría está vacía. Se borrará permanentemente. Esta acción no afecta ventas históricas.
-      </div>
-
-      <div class="flex gap-3 pt-2">
-        <button (click)="cerrarModalBorrarCategoria()"
-                class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200">
-          Cancelar
-        </button>
-        <button (click)="avanzarBorradoCat()"
-                [disabled]="productosBloqueantes.length > 0"
-                class="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white rounded-xl font-bold">
-          Continuar
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button class="inf-boton" (click)="cerrarModal()">Cancelar</button>
+        <button class="boton-primario" (click)="guardarProducto()" [disabled]="guardando">
+          {{ guardando ? 'Guardando…' : (editandoId ? 'Guardar cambios' : 'Crear producto') }}
         </button>
       </div>
     </div>
+  </div>
+}
 
-    <!-- Paso 2 -->
-    <div *ngIf="pasoBorradoCat === 2" class="p-6 space-y-4">
-      <p class="text-sm text-gray-700">
-        Para confirmar, escribe el nombre exacto de la categoría:
-      </p>
-      <p class="text-center font-black text-red-700 text-lg">{{ catABorrar.nombre_categoria }}</p>
-
-      <input type="text" [(ngModel)]="inputConfirmacionCat"
-             [placeholder]="catABorrar.nombre_categoria"
-             class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm outline-none focus:border-red-500">
-
-      <div *ngIf="errorBorrarCat" class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-xs">
-        {{ errorBorrarCat }}
-      </div>
-
-      <div class="flex gap-3 pt-2">
-        <button (click)="cerrarModalBorrarCategoria()"
-                [disabled]="cargandoBorrarCat"
-                class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 disabled:opacity-50">
-          Cancelar
+<!-- ═══ AGREGAR STOCK ═══ -->
+@if (mostrarModalStock && productoStock) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalStock()">
+    <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
+      <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
+        <div class="min-w-0">
+          <h3 class="inf-tinta font-semibold text-[15px]">Agregar stock</h3>
+          <p class="inf-sub mt-0.5! truncate">{{ productoStock.nombre_producto }} · {{ sucursalSeleccionada?.nombre_sucursal }}</p>
+        </div>
+        <button class="quitar" (click)="cerrarModalStock()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
-        <button (click)="confirmarBorradoCategoria()"
-                [disabled]="cargandoBorrarCat || inputConfirmacionCat.trim() !== catABorrar.nombre_categoria"
-                class="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white rounded-xl font-bold">
-          {{ cargandoBorrarCat ? 'Eliminando...' : 'Eliminar definitivamente' }}
+      </div>
+      <div class="p-5 space-y-4">
+        <dl class="inf-pares">
+          <div><dt>Stock actual</dt><dd>{{ productoStock.stock_actual || 0 }}</dd></div>
+          <div><dt>Nuevo total</dt><dd class="inf-tinta">{{ (productoStock.stock_actual || 0) + (cantidadAgregar > 0 ? cantidadAgregar : 0) }}</dd></div>
+        </dl>
+        <div class="grupo">
+          <label class="inf-etiqueta">Unidades a agregar</label>
+          <div class="campo-monto">
+            <span>+</span>
+            <input type="number" min="1" [(ngModel)]="cantidadAgregar" placeholder="0" (keyup.enter)="agregarStock()">
+          </div>
+        </div>
+        @if (errorStock) { <p class="error-formulario">{{ errorStock }}</p> }
+      </div>
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button class="inf-boton" (click)="cerrarModalStock()">Cancelar</button>
+        <button class="boton-primario" (click)="agregarStock()" [disabled]="cantidadAgregar <= 0 || guardando">
+          {{ guardando ? 'Guardando…' : 'Agregar' }}
         </button>
       </div>
     </div>
-
   </div>
-</div>
+}
+
+<!-- ═══ NUEVA CATEGORÍA ═══ -->
+@if (mostrarModalCategoria) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalCategoria()">
+    <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[15px]">Nueva categoría</h3>
+        <button class="quitar" (click)="cerrarModalCategoria()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+      <div class="p-5 space-y-3">
+        <div class="grupo">
+          <label class="inf-etiqueta" for="nombre-categoria">Nombre</label>
+          <input id="nombre-categoria" type="text" class="campo" [(ngModel)]="nombreCategoria"
+                 placeholder="Ej.: Tortas, Bebidas" (keyup.enter)="crearCategoria()">
+        </div>
+        @if (errorCategoria) { <p class="error-formulario">{{ errorCategoria }}</p> }
+      </div>
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button class="inf-boton" (click)="cerrarModalCategoria()">Cancelar</button>
+        <button class="boton-primario" (click)="crearCategoria()">Crear</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ═══ ELIMINAR CATEGORÍA (doble confirmación) ═══ -->
+@if (mostrarModalBorrarCat && catABorrar) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalBorrarCategoria()">
+    <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[15px]">Eliminar categoría «{{ catABorrar.nombre_categoria }}»</h3>
+        <button class="quitar" (click)="cerrarModalBorrarCategoria()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+
+      @if (pasoBorradoCat === 1) {
+        <div class="p-5 space-y-3">
+          @if (productosBloqueantes.length > 0) {
+            <p class="error-formulario">
+              No se puede eliminar: tiene {{ productosBloqueantes.length }} producto(s). Cámbialos de categoría primero.
+            </p>
+            <ul class="text-[13px] space-y-1 max-h-36 overflow-y-auto pl-4 list-disc">
+              @for (p of productosBloqueantes; track p.id_producto) { <li>{{ p.nombre_producto }}</li> }
+            </ul>
+          } @else {
+            <p class="text-[13.5px]">La categoría está vacía y se eliminará de forma permanente. Las ventas registradas no cambian.</p>
+          }
+        </div>
+        <div class="inf-pie-hoja flex justify-end gap-2">
+          <button class="inf-boton" (click)="cerrarModalBorrarCategoria()">Cancelar</button>
+          <button class="boton-peligro" (click)="avanzarBorradoCat()" [disabled]="productosBloqueantes.length > 0">Continuar</button>
+        </div>
+      }
+
+      @if (pasoBorradoCat === 2) {
+        <div class="p-5 space-y-3">
+          <div class="grupo">
+            <label class="inf-etiqueta" for="confirmar-categoria">Escribe <b class="inf-tinta">{{ catABorrar.nombre_categoria }}</b> para confirmar</label>
+            <input id="confirmar-categoria" type="text" class="campo" [(ngModel)]="inputConfirmacionCat" [placeholder]="catABorrar.nombre_categoria">
+          </div>
+          @if (errorBorrarCat) { <p class="error-formulario">{{ errorBorrarCat }}</p> }
+        </div>
+        <div class="inf-pie-hoja flex justify-end gap-2">
+          <button class="inf-boton" (click)="cerrarModalBorrarCategoria()" [disabled]="cargandoBorrarCat">Cancelar</button>
+          <button class="boton-peligro" (click)="confirmarBorradoCategoria()"
+                  [disabled]="cargandoBorrarCat || inputConfirmacionCat.trim() !== catABorrar.nombre_categoria">
+            {{ cargandoBorrarCat ? 'Eliminando…' : 'Eliminar' }}
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+}

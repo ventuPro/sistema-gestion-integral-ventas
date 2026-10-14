@@ -40,6 +40,15 @@ const obtenerMesasPorSucursal = async (id_sucursal) => {
     return r.rows;
 };
 
+const imagenQR = (url) => QRCode.toDataURL(url, {
+    errorCorrectionLevel: 'H',
+    type:    'image/png',
+    quality: 0.92,
+    margin:  2,
+    width:   400,
+    color:   { dark: '#000000', light: '#FFFFFF' }
+});
+
 const generarQR = async (id_mesa, base_url) => {
     const r = await db.query(
         `SELECT m.*, s.nombre_sucursal FROM mesa_local m
@@ -51,18 +60,22 @@ const generarQR = async (id_mesa, base_url) => {
 
     const mesa = r.rows[0];
     const url  = `${base_url}/menu/${mesa.codigo_qr}`;
-
-    // Generar QR de alta calidad
-    const qr = await QRCode.toDataURL(url, {
-        errorCorrectionLevel: 'H',
-        type:    'image/png',
-        quality: 0.92,
-        margin:  2,
-        width:   400,
-        color:   { dark: '#000000', light: '#FFFFFF' }
-    });
+    const qr   = await imagenQR(url);
 
     return { url, qr, numero_mesa: mesa.numero_mesa, id_sucursal: mesa.id_sucursal };
+};
+
+// Todos los QR de una sucursal en una sola respuesta (hoja para imprimir)
+const generarQRSucursal = async (id_sucursal, base_url) => {
+    const r = await db.query(
+        `SELECT id_mesa, numero_mesa, codigo_qr FROM mesa_local
+         WHERE id_sucursal=$1 ORDER BY numero_mesa`,
+        [id_sucursal]
+    );
+    return Promise.all(r.rows.map(async (mesa) => {
+        const url = `${base_url}/menu/${mesa.codigo_qr}`;
+        return { id_mesa: mesa.id_mesa, numero_mesa: mesa.numero_mesa, url, qr: await imagenQR(url) };
+    }));
 };
 
 // Invalida el QR anterior (por ejemplo, si alguien lo fotografió y hace pedidos falsos)
@@ -131,4 +144,4 @@ const eliminarMesa = async (id_mesa) => {
     }
 };
 
-module.exports = { crearMesa, obtenerMesasPorSucursal, generarQR, regenerarCodigoQR, actualizarEstadoMesa, eliminarMesa };
+module.exports = { crearMesa, obtenerMesasPorSucursal, generarQR, generarQRSucursal, regenerarCodigoQR, actualizarEstadoMesa, eliminarMesa };

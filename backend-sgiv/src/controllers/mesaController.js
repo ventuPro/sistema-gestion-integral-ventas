@@ -49,6 +49,21 @@ const obtenerQR = async (req, res) => {
     }
 };
 
+// GET /api/mesas/sucursal/:id_sucursal/qr — todos los QR de la sucursal (el cajero solo la suya)
+const obtenerQRSucursal = async (req, res) => {
+    try {
+        const id_sucursal = req.usuario.id_rol === 1 ? Number(req.params.id_sucursal) : Number(req.usuario.id_sucursal);
+        const base_url    = normalizarBaseUrl(req.query.base_url || 'http://localhost:4200');
+        if (!id_sucursal) return res.status(400).json({ error: 'Sucursal inválida' });
+        if (!base_url)    return res.status(400).json({ error: 'La dirección del menú no es válida (use http:// o https://)' });
+
+        res.json(await m.generarQRSucursal(id_sucursal, base_url));
+    } catch(e) {
+        console.error('obtenerQRSucursal:', e);
+        res.status(500).json({ error: e.message });
+    }
+};
+
 // POST /api/mesas/:id_mesa/qr/regenerar — el QR impreso anterior deja de funcionar
 const regenerarQR = async (req, res) => {
     try {
@@ -93,4 +108,4 @@ const eliminarMesa = async (req, res) => {
     }
 };
 
-module.exports = { agregarMesa, listarMesas, obtenerQR, regenerarQR, actualizarEstado, eliminarMesa };
+module.exports = { agregarMesa, listarMesas, obtenerQR, obtenerQRSucursal, regenerarQR, actualizarEstado, eliminarMesa };

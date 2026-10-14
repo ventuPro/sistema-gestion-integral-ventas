@@ -1,40 +1,58 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Subscription } from 'rxjs';
 import { ProductoService } from '../../../core/services/producto.service';
+import { SocketService } from '../../../core/services/socket.service';
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
-         Pencil, Trash2, PackagePlus, Package, RotateCw,
-         AlertTriangle, CheckCircle2, XCircle, Store } from 'lucide-angular';
+         Pencil, PackagePlus, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
+import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
+import { cifra } from '../../../core/utils/informe';
+
+type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent],
-  templateUrl: './inventario.component.html'
+  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe],
+  templateUrl: './inventario.component.html',
+  styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
+              '../../shared/formulario/formulario.css', './inventario.component.css']
 })
-export class InventarioComponent implements OnInit {
+export class InventarioComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
+  private socketService   = inject(SocketService);
   private cdr             = inject(ChangeDetectorRef);
   readonly moneda          = inject(AjustesService).moneda;
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
+  private stockSub?:      Subscription;
+  readonly cifra          = cifra;
 
   // ─── Iconos ───
   readonly icons = {
-    edit:     Pencil,
-    delete:   Trash2,
-    addStock: PackagePlus,
-    package:  Package,
-    warning:  AlertTriangle,
-    ok:       CheckCircle2,
-    out:      XCircle,
-    store:    Store,
-    refresh:  RotateCw
+    edit:       Pencil,
+    addStock:   PackagePlus,
+    refresh:    RotateCw,
+    mas:        Plus,
+    etiqueta:   Tag,
+    buscar:     Search,
+    cerrar:     X,
+    imagen:     ImagePlus,
+    desactivar: Ban
   };
+
+  readonly filtrosEstado: { valor: FiltroEstado; texto: string }[] = [
+    { valor: 'activos',   texto: 'Activos' },
+    { valor: 'bajo',      texto: 'Stock bajo' },
+    { valor: 'sin',       texto: 'Sin stock' },
+    { valor: 'inactivos', texto: 'Inactivos' },
+    { valor: 'todos',     texto: 'Todos' }
+  ];
 
   // ─── Usuario y sucursales ───
   usuarioActual:         any   = null;
@@ -47,11 +65,14 @@ export class InventarioComponent implements OnInit {
   productosFiltrados:    any[] = [];
   categorias:            any[] = [];
   cargando               = true;
+  guardando              = false;
+  notificacion:          string | null = null;
+  resumen = { activos: 0, bajos: 0, agotados: 0, valor: 0 };
 
   // ─── Filtros ───
   filtroCategoria:       number | null = null;
   filtroBusqueda         = '';
-  filtroEstado: 'todos' | 'activos' | 'inactivos' = 'activos';
+  filtroEstado:          FiltroEstado = 'activos';
 
   // ─── Modal Producto ───
   mostrarModal           = false;
@@ -94,9 +115,22 @@ export class InventarioComponent implements OnInit {
     this.usuarioActual = raw ? JSON.parse(raw) : null;
     this.esAdmin       = this.usuarioActual?.id_rol === 1;
 
-    // Todo usuario con acceso al módulo tiene control total.
-    // Se carga el selector de sucursales para cualquier rol.
     this.cargarSucursales();
+    this.suscribirStock();
+  }
+
+  ngOnDestroy() { this.stockSub?.unsubscribe(); }
+
+  // Ventas de POS, mesas y menú QR actualizan el stock sin recargar
+  private suscribirStock() {
+    this.socketService.conectar('cajeros');
+    this.stockSub = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(p => {
+      if (!p || Number(p.id_sucursal) !== this.idSucursal) return;
+      const prod = this.productos.find(x => Number(x.id_producto) === Number(p.id_producto));
+      if (!prod) return;
+      prod.stock_actual = Number(p.nueva_cantidad_disponible) || 0;
+      this.aplicarFiltros();
+    });
   }
 
   // ─── SUCURSALES ───
@@ -144,14 +178,11 @@ export class InventarioComponent implements OnInit {
 
   // ─── PRODUCTOS ───
   cargarProductos() {
-    this.cargando = true;
     this.productoService.obtenerInventario(this.idSucursal, true).subscribe({
       next: (datos) => {
-        this.productos          = datos;
-        this.productosFiltrados = datos;
+        this.productos = datos;
+        this.cargando  = false;
         this.aplicarFiltros();
-        this.cargando = false;
-        this.cdr.detectChanges();
       },
       error: () => { this.cargando = false; this.cdr.detectChanges(); }
     });
@@ -165,16 +196,39 @@ export class InventarioComponent implements OnInit {
 
   // ─── FILTROS ───
   aplicarFiltros() {
+    const texto = this.filtroBusqueda.toLowerCase();
+    const f     = this.filtroEstado;
     this.productosFiltrados = this.productos.filter(p => {
       const porCat    = !this.filtroCategoria || p.id_categoria === this.filtroCategoria;
-      const porNomb   = !this.filtroBusqueda ||
-                        p.nombre_producto.toLowerCase().includes(this.filtroBusqueda.toLowerCase());
-      const porEstado = this.filtroEstado === 'todos'
-                        || (this.filtroEstado === 'activos'  &&  p.estado_activo)
-                        || (this.filtroEstado === 'inactivos' && !p.estado_activo);
+      const porNomb   = !texto || p.nombre_producto.toLowerCase().includes(texto);
+      const porEstado = f === 'todos'
+                        || (f === 'inactivos' && !p.estado_activo)
+                        || (p.estado_activo && (f === 'activos' || this.estadoStock(p) === f));
       return porCat && porNomb && porEstado;
     });
+    this.calcularResumen();
     this.cdr.detectChanges();
+  }
+
+  private calcularResumen() {
+    const activos = this.productos.filter(p => p.estado_activo);
+    this.resumen = {
+      activos:  activos.length,
+      bajos:    activos.filter(p => this.estadoStock(p) === 'bajo').length,
+      agotados: activos.filter(p => this.estadoStock(p) === 'sin').length,
+      valor:    activos.reduce((t, p) => t + Number(p.precio_unitario) * Math.max(Number(p.stock_actual) || 0, 0), 0)
+    };
+  }
+
+  // Mismo criterio que el Panel: bajo = hasta el mínimo de alerta de la sucursal
+  estadoStock(p: any): 'sin' | 'bajo' | 'ok' {
+    const stock = Number(p.stock_actual) || 0;
+    if (stock <= 0) return 'sin';
+    return stock <= Number(p.stock_minimo_alerta ?? 0) ? 'bajo' : 'ok';
+  }
+
+  get categoriaActual(): any {
+    return this.categorias.find(c => c.id_categoria === this.filtroCategoria) || null;
   }
 
   seleccionarCategoria(id: number | null) {
@@ -190,7 +244,7 @@ export class InventarioComponent implements OnInit {
     this.previewImagen  = null;
     this.formulario     = {
       nombre_producto: '', descripcion_producto: '',
-      precio_unitario: '', id_categoria: '',
+      precio_unitario: '', id_categoria: this.filtroCategoria || '',
       stock_inicial: 0
     };
     this.mostrarModal = true;
@@ -200,25 +254,25 @@ export class InventarioComponent implements OnInit {
     this.editandoId    = prod.id_producto;
     this.errorModal    = '';
     this.archivoImagen = null;
-    this.previewImagen = prod.url_imagen ? this.getImageUrl(prod.url_imagen) : null;
+    this.previewImagen = prod.url_imagen || null;
     this.formulario    = {
-      nombre_producto:     prod.nombre_producto,
+      nombre_producto:      prod.nombre_producto,
       descripcion_producto: prod.descripcion_producto || '',
-      precio_unitario:     prod.precio_unitario,
-      id_categoria:        prod.id_categoria,
-      stock_inicial:       0
+      precio_unitario:      prod.precio_unitario,
+      id_categoria:         prod.id_categoria,
+      stock_inicial:        0
     };
     this.mostrarModal = true;
   }
 
-  cerrarModal() { this.mostrarModal = false; this.editandoId = null; this.errorModal = ''; }
+  cerrarModal() { this.mostrarModal = false; this.editandoId = null; this.errorModal = ''; this.guardando = false; }
 
   onArchivoSeleccionado(event: any) {
     const file: File = event.target.files[0];
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      this.errorModal = 'La imagen no debe superar 2MB.'; return;
+      this.errorModal = 'La imagen no debe superar 2 MB.'; this.cdr.detectChanges(); return;
     }
 
     this.archivoImagen = file;
@@ -230,82 +284,75 @@ export class InventarioComponent implements OnInit {
     reader.readAsDataURL(file);
   }
 
-guardarProducto() {
-  if (!this.formulario.nombre_producto || !this.formulario.precio_unitario || !this.formulario.id_categoria) {
-    this.errorModal = 'Completa todos los campos obligatorios.'; return;
-  }
+  guardarProducto() {
+    if (!this.formulario.nombre_producto || !this.formulario.precio_unitario || !this.formulario.id_categoria) {
+      this.errorModal = 'Completa nombre, precio y categoría.'; return;
+    }
 
-  this.cargando   = true;
-  this.errorModal = '';
-
-  if (this.editandoId) {
-    // ─── EDITAR: actualiza solo los datos del producto (no el inventario) ───
+    this.guardando  = true;
+    this.errorModal = '';
     const datos = {
       nombre_producto:      this.formulario.nombre_producto,
       descripcion_producto: this.formulario.descripcion_producto || '',
       precio_unitario:      this.formulario.precio_unitario,
       id_categoria:         this.formulario.id_categoria
     };
-    this.productoService.actualizarProducto(this.editandoId, datos, this.archivoImagen || undefined).subscribe({
-      next: () => { this.cerrarModal(); this.cargarProductos(); },
-      error: () => { this.errorModal = 'Error al actualizar.'; this.cargando = false; }
-    });
-  } else {
-    // ─── CREAR: incluye id_sucursal y stock_inicial para asignar a esta sucursal ───
-    const datos = {
-      nombre_producto:      this.formulario.nombre_producto,
-      descripcion_producto: this.formulario.descripcion_producto || '',
-      precio_unitario:      this.formulario.precio_unitario,
-      id_categoria:         this.formulario.id_categoria,
-      id_sucursal:          this.idSucursal,              // ← CLAVE: sucursal seleccionada
-      stock_inicial:        this.formulario.stock_inicial || 0   // ← stock inicial
+    const fallo = (e: any, msg: string) => {
+      this.errorModal = e?.error?.error || msg;
+      this.guardando  = false;
+      this.cdr.detectChanges();
     };
-    this.productoService.crearProducto(datos, this.archivoImagen || undefined).subscribe({
-      next: () => { this.cerrarModal(); this.cargarProductos(); },
-      error: (e: any) => {
-        this.errorModal = e?.error?.error || 'Error al crear el producto.';
-        this.cargando = false;
-      }
-    });
-  }
-}
 
-  toggleEstadoProducto(prod: any) {
-    if (prod.estado_activo) {
-      this.productoService.desactivarProducto(prod.id_producto).subscribe({
-        next: () => this.cargarProductos(),
-        error: () => alert('Error al desactivar el producto.')
+    if (this.editandoId) {
+      // Editar: solo datos del producto, no el inventario
+      this.productoService.actualizarProducto(this.editandoId, datos, this.archivoImagen || undefined).subscribe({
+        next:  () => { this.cerrarModal(); this.avisar('Producto actualizado'); this.cargarProductos(); },
+        error: (e: any) => fallo(e, 'No se pudo actualizar el producto.')
       });
     } else {
-      this.productoService.reactivarProducto(prod.id_producto).subscribe({
-        next: () => this.cargarProductos(),
-        error: () => alert('Error al reactivar el producto.')
+      // Crear: queda asignado a la sucursal elegida con su stock inicial
+      const nuevo = { ...datos, id_sucursal: this.idSucursal, stock_inicial: this.formulario.stock_inicial || 0 };
+      this.productoService.crearProducto(nuevo, this.archivoImagen || undefined).subscribe({
+        next:  () => { this.cerrarModal(); this.avisar('Producto creado'); this.cargarProductos(); },
+        error: (e: any) => fallo(e, 'No se pudo crear el producto.')
       });
     }
   }
 
+  toggleEstadoProducto(prod: any) {
+    const accion = prod.estado_activo
+      ? this.productoService.desactivarProducto(prod.id_producto)
+      : this.productoService.reactivarProducto(prod.id_producto);
+    const texto  = prod.estado_activo ? 'desactivado' : 'reactivado';
+    accion.subscribe({
+      next:  () => { this.avisar(`«${prod.nombre_producto}» ${texto}`); this.cargarProductos(); },
+      error: () => this.avisar(`No se pudo dejar el producto ${texto}.`)
+    });
+  }
+
   // ─── MODAL STOCK ───
   abrirModalStock(prod: any) {
-    this.productoStock  = prod;
-    this.cantidadAgregar = 0;
-    this.errorStock      = '';
+    this.productoStock     = prod;
+    this.cantidadAgregar   = 0;
+    this.errorStock        = '';
     this.mostrarModalStock = true;
   }
 
-  cerrarModalStock() { this.mostrarModalStock = false; this.productoStock = null; }
+  cerrarModalStock() { this.mostrarModalStock = false; this.productoStock = null; this.guardando = false; }
 
   agregarStock() {
     if (!this.cantidadAgregar || this.cantidadAgregar <= 0) {
       this.errorStock = 'Ingresa una cantidad válida.'; return;
     }
-    this.cargando = true;
-    this.productoService.agregarStock(
-      this.productoStock.id_producto,
-      this.cantidadAgregar,
-      this.idSucursal
-    ).subscribe({
-      next: () => { this.cerrarModalStock(); this.cargarProductos(); },
-      error: () => { this.errorStock = 'Error al agregar stock.'; this.cargando = false; }
+    this.guardando = true;
+    const cantidad = this.cantidadAgregar;
+    this.productoService.agregarStock(this.productoStock.id_producto, cantidad, this.idSucursal).subscribe({
+      next:  () => { this.cerrarModalStock(); this.avisar(`Se agregaron ${cantidad} unidad(es)`); this.cargarProductos(); },
+      error: (e: any) => {
+        this.errorStock = e?.error?.error || 'No se pudo agregar el stock.';
+        this.guardando  = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -316,21 +363,19 @@ guardarProducto() {
   crearCategoria() {
     if (!this.nombreCategoria.trim()) { this.errorCategoria = 'Escribe el nombre.'; return; }
     this.productoService.crearCategoria({ nombre_categoria: this.nombreCategoria, descripcion_categoria: '' }).subscribe({
-      next: () => { this.cerrarModalCategoria(); this.cargarCategorias(); },
-      error: () => { this.errorCategoria = 'Error al crear.'; }
+      next:  () => { this.cerrarModalCategoria(); this.avisar('Categoría creada'); this.cargarCategorias(); },
+      error: (e: any) => { this.errorCategoria = e?.error?.error || 'No se pudo crear la categoría.'; this.cdr.detectChanges(); }
     });
   }
 
   // ─── BORRAR CATEGORÍA ───
   abrirModalBorrarCategoria(cat: any) {
-    this.catABorrar          = cat;
-    this.productosBloqueantes = this.productos.filter(
-      p => p.id_categoria === cat.id_categoria
-    );
-    this.pasoBorradoCat       = 1;
-    this.inputConfirmacionCat = '';
-    this.errorBorrarCat       = '';
-    this.cargandoBorrarCat    = false;
+    this.catABorrar            = cat;
+    this.productosBloqueantes  = this.productos.filter(p => p.id_categoria === cat.id_categoria);
+    this.pasoBorradoCat        = 1;
+    this.inputConfirmacionCat  = '';
+    this.errorBorrarCat        = '';
+    this.cargandoBorrarCat     = false;
     this.mostrarModalBorrarCat = true;
   }
 
@@ -360,28 +405,21 @@ guardarProducto() {
       next: () => {
         if (this.filtroCategoria === this.catABorrar.id_categoria) this.filtroCategoria = null;
         this.cerrarModalBorrarCategoria();
+        this.avisar('Categoría eliminada');
         this.cargarCategorias();
         this.aplicarFiltros();
       },
       error: (e: any) => {
         this.cargandoBorrarCat = false;
-        this.errorBorrarCat    = e?.error?.error || 'Error al eliminar la categoría.';
+        this.errorBorrarCat    = e?.error?.error || 'No se pudo eliminar la categoría.';
         this.cdr.detectChanges();
       }
     });
   }
 
-  // ─── UTILIDADES ───
-  getImageUrl(url: string): string {
-    if (!url) return '';
-    if (url.startsWith('data:') || url.startsWith('http')) return url;
-    const host = environment.apiUrl.replace('/api', '');
-    return `${host}${url}`;
-  }
-
-  getStockColor(stock: number): string {
-    if (stock <= 0) return 'bg-red-100 text-red-700';
-    if (stock <= 3) return 'bg-orange-100 text-orange-700';
-    return 'bg-emerald-100 text-emerald-700';
+  private avisar(msg: string) {
+    this.notificacion = msg;
+    this.cdr.detectChanges();
+    setTimeout(() => { this.notificacion = null; this.cdr.detectChanges(); }, 3500);
   }
 }
