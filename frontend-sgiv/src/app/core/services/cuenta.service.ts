@@ -28,8 +28,10 @@ export class CuentaService {
     return this.http.delete(`${this.apiUrl}/cuentas/detalle/${id_detalle}`);
   }
 
-  cerrarCuenta(id_cuenta: number, metodo_pago: string, id_sucursal: number): Observable<any> {
-    return this.http.post(`${this.apiUrl}/cuentas/${id_cuenta}/cerrar`, { metodo_pago, id_sucursal });
+  /** cliente_mesa: sin enviar = toda la cuenta; código o null = solo la parte de ese cliente */
+  cerrarCuenta(id_cuenta: number, metodo_pago: string, cliente_mesa?: string | null): Observable<any> {
+    const body = cliente_mesa === undefined ? { metodo_pago } : { metodo_pago, cliente_mesa };
+    return this.http.post(`${this.apiUrl}/cuentas/${id_cuenta}/cerrar`, body);
   }
 
 getProductos(id_sucursal: number = 1): Observable<any[]> {

@@ -1,5 +1,6 @@
 const ajusteModel = require('../models/ajusteModel');
 const { guardarImagen } = require('../middlewares/uploadMiddleware');
+const groq = require('../ia/groq');
 
 // ─── Reglas de validación ───
 const TELEFONO = /^[0-9+()\s-]{6,20}$/;
@@ -153,6 +154,19 @@ const validarParametrosCompletos = async (body) => {
     return datos;
 };
 
+// ─── Chatbot ───
+const MAX_INFO_IA = 3000;
+
+const validarIa = (body) => {
+    const datos = {};
+    if ('ia_info_negocio' in body) {
+        const valor = body.ia_info_negocio == null ? '' : String(body.ia_info_negocio).trim();
+        if (valor.length > MAX_INFO_IA) throw new ErrorValidacion(`La información para el chatbot admite hasta ${MAX_INFO_IA} caracteres`);
+        datos.ia_info_negocio = valor || null;
+    }
+    return datos;
+};
+
 const avisarCambio = async () => {
     global.io?.emit('ajustes:actualizados', await ajusteModel.obtenerPublico());
 };
@@ -192,5 +206,17 @@ const obtener = async (req, res) => {
 const guardarEmpresa    = guardar(validarEmpresa,    ajusteModel.CAMPOS_EMPRESA);
 const guardarApariencia = guardar(validarApariencia, ajusteModel.CAMPOS_APARIENCIA);
 const guardarParametros = guardar(validarParametrosCompletos, ajusteModel.CAMPOS_PARAMETROS);
+const guardarIa         = guardar(validarIa, ajusteModel.CAMPOS_IA);
 
-module.exports = { obtenerPublico, obtener, guardarEmpresa, guardarApariencia, guardarParametros };
+// POST /api/ajustes/ia/probar → responde cada asistente con el modelo que le tocó
+const probarIa = async (req, res) => {
+    if (!groq.disponible()) return res.status(503).json({ error: 'Falta la clave de Groq (GROQ_API_KEY) en el archivo .env del servidor.', codigo: 'SIN_CLAVE' });
+    try {
+        res.json(await groq.probar());
+    } catch (e) {
+        groq.responderError(res, e, 'probarIa');
+    }
+};
+
+module.exports = { obtenerPublico, obtener, guardarEmpresa, guardarApariencia, guardarParametros,
+                   guardarIa, probarIa };

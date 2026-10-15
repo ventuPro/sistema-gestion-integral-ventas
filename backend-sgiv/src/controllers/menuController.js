@@ -42,6 +42,12 @@ const responderError = (res, e, contexto) => {
     res.status(500).json({ error: 'No se pudo procesar tu solicitud. Intenta de nuevo.' });
 };
 
+// Código del celular (lo genera el navegador del cliente) y nombre opcional
+const CLIENTE_MESA = /^[0-9a-f]{32}$/;
+const clienteMesa  = (valor) => CLIENTE_MESA.test(String(valor || '')) ? String(valor) : null;
+const nombreCliente = (valor) =>
+    String(valor ?? '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) || null;
+
 // Middleware
 const cargarMesa = async (req, res, next) => {
     try {
@@ -88,7 +94,9 @@ const crearPedido = async (req, res) => {
             mesa:                req.mesa,
             items:               req.body?.items,
             observacion_general: req.body?.observacion_general,
-            maxPendientes:       p.menu_max_pendientes_mesa
+            maxPendientes:       p.menu_max_pendientes_mesa,
+            cliente_mesa:        clienteMesa(req.body?.cliente_mesa),
+            nombre_cliente:      nombreCliente(req.body?.nombre_cliente)
         });
 
         emitirStock(cambios);
@@ -97,6 +105,7 @@ const crearPedido = async (req, res) => {
             id_sucursal: pedido.id_sucursal,
             id_mesa:     pedido.id_mesa,
             numero_mesa: req.mesa.numero_mesa,
+            nombre_cliente: pedido.nombre_cliente,
             monto_total: pedido.monto_total
         });
 
@@ -115,7 +124,8 @@ const cancelarPedido = async (req, res) => {
     try {
         const { pedido, cambios } = await pedidoModel.cancelarPorCliente({
             id_pedido: Number(req.params.id_pedido),
-            id_mesa:   req.mesa.id_mesa
+            id_mesa:   req.mesa.id_mesa,
+            cliente_mesa: clienteMesa(req.body?.cliente_mesa)
         });
         emitirStock(cambios);
         emitirCajeros('pedido:actualizado', {
@@ -129,15 +139,10 @@ const cancelarPedido = async (req, res) => {
     }
 };
 
-// GET /api/menu/m/:codigo/estado?ids=1,2,3
+// GET /api/menu/m/:codigo/estado?cliente=<código del celular>
 const obtenerEstado = async (req, res) => {
     try {
-        const ids = String(req.query.ids || '')
-            .split(',')
-            .map(Number)
-            .filter(n => Number.isInteger(n) && n > 0)
-            .slice(0, 30);
-        res.json(await pedidoModel.obtenerEstadoMesa(req.mesa.id_mesa, ids));
+        res.json(await pedidoModel.obtenerEstadoMesa(req.mesa.id_mesa, clienteMesa(req.query.cliente)));
     } catch (e) {
         responderError(res, e, 'obtenerEstado');
     }

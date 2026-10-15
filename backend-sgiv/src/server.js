@@ -23,6 +23,7 @@ const permisoRoutes   = require('./routes/permisoRoutes');
 const menuRoutes      = require('./routes/menuRoutes');
 const mesaRoutes      = require('./routes/mesaRoutes');
 const ajusteRoutes    = require('./routes/ajusteRoutes');
+const asistenteRoutes = require('./routes/asistenteRoutes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -75,6 +76,7 @@ app.use('/api/menu',       menuRoutes);    // Público (sin auth)
 app.use('/api/mesas',      mesaRoutes);
 app.use('/api/cuentas', require('./routes/cuentaRoutes'));
 app.use('/api/ajustes',    ajusteRoutes);
+app.use('/api/asistente',  asistenteRoutes);
 
 // Socket.IO eventos
 io.on('connection', (socket) => {

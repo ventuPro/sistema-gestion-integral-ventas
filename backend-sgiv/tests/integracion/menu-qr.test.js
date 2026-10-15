@@ -309,7 +309,9 @@ describe('Menú QR: confirmar, entregar y cobrar', () => {
 
     test('flujo completo del cliente: pedir, confirmar, pedir más, entregar y pagar todo al final', async () => {
         // 1. Primer pedido
-        const p1 = await pedir(mesa.codigo_qr, [{ id_producto: torta, cantidad: 2, nota_cliente: 'en trozos' }]);
+        const celular = 'd'.repeat(32);
+        const p1 = await pedir(mesa.codigo_qr, [{ id_producto: torta, cantidad: 2, nota_cliente: 'en trozos' }],
+                               { cliente_mesa: celular, nombre_cliente: '  Ana  ' });
         assert.equal(await stock(torta), 8);
 
         // 2. El cajero confirma: se abre la cuenta con los productos, sin descontar otra vez
@@ -322,23 +324,28 @@ describe('Menú QR: confirmar, entregar y cobrar', () => {
         assert.equal(items.length, 1);
         assert.equal(items[0].origen, 'qr');
         assert.equal(items[0].nota, 'en trozos');
+        assert.equal(items[0].cliente_mesa, celular);
+        assert.equal(items[0].nombre_cliente, 'Ana');
         const [m] = await bd.sql(`SELECT estado_mesa FROM mesa_local WHERE id_mesa = $1`, [mesa.id_mesa]);
         assert.equal(m.estado_mesa, 'Ocupada');
         assert.equal((await api('POST', `/pedidos/${p1.body.id_pedido}/confirmar`, { token: tCajero })).status, 409);
 
         // 3. El cliente pide más: se suma a la misma cuenta
-        const p2 = await pedir(mesa.codigo_qr, [{ id_producto: cafe, cantidad: 3 }]);
+        const p2 = await pedir(mesa.codigo_qr, [{ id_producto: cafe, cantidad: 3 }], { cliente_mesa: celular });
         await api('POST', `/pedidos/${p2.body.id_pedido}/confirmar`, { token: tCajero });
         const [cuenta] = await bd.sql(`SELECT * FROM cuenta_mesa WHERE id_cuenta = $1`, [id_cuenta]);
         assert.equal(Number(cuenta.total_acumulado), 55);
         assert.equal((await bd.sql(`SELECT 1 FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta'`, [mesa.id_mesa])).length, 1);
 
-        // 4. El cliente ve sus pedidos y el consumo de la mesa
-        const est = await api('GET', `/menu/m/${mesa.codigo_qr}/estado?ids=${p1.body.id_pedido},${p2.body.id_pedido}`);
+        // 4. El cliente ve sus pedidos y su consumo (por el código de su celular)
+        const est = await api('GET', `/menu/m/${mesa.codigo_qr}/estado?cliente=${celular}`);
         assert.equal(est.status, 200);
         assert.deepEqual(est.body.pedidos.map(p => p.estado_pedido), ['Confirmado', 'Confirmado']);
-        assert.equal(Number(est.body.cuenta.total_acumulado), 55);
+        assert.equal(Number(est.body.cuenta.total_mesa), 55);
+        assert.equal(Number(est.body.cuenta.mi_pendiente), 55);
         assert.equal(est.body.cuenta.items.length, 2);
+        // Sin código no se ve nada
+        assert.deepEqual((await api('GET', `/menu/m/${mesa.codigo_qr}/estado`)).body, { pedidos: [], cuenta: null });
 
         // 5. Entregado
         assert.equal((await api('POST', `/pedidos/${p1.body.id_pedido}/entregado`, { token: tCajero })).status, 200);
@@ -356,21 +363,87 @@ describe('Menú QR: confirmar, entregar y cobrar', () => {
         assert.equal(await stock(torta), 8);
         assert.equal(await stock(cafe), 7);
 
-        const fin = await api('GET', `/menu/m/${mesa.codigo_qr}/estado?ids=${p1.body.id_pedido}`);
+        const fin = await api('GET', `/menu/m/${mesa.codigo_qr}/estado?cliente=${celular}`);
         assert.equal(fin.body.cuenta, null);
+    });
+
+    test('pagar por separado: cada celular ve lo suyo y el cajero cobra cada parte', async () => {
+        const mesaGrupo = await crearMesa(32);
+        const [ana, beto] = ['1'.repeat(32), '2'.repeat(32)];
+        const pa = await pedir(mesaGrupo.codigo_qr, [{ id_producto: torta, cantidad: 1 }], { cliente_mesa: ana, nombre_cliente: 'Ana' });
+        const pb = await pedir(mesaGrupo.codigo_qr, [{ id_producto: cafe, cantidad: 2 }], { cliente_mesa: beto });
+        const { id_cuenta } = (await api('POST', `/pedidos/${pa.body.id_pedido}/confirmar`, { token: tCajero })).body;
+        await api('POST', `/pedidos/${pb.body.id_pedido}/confirmar`, { token: tCajero });
+        // El cajero agrega algo para toda la mesa
+        await api('POST', `/cuentas/${id_cuenta}/producto`, { token: tCajero, body: { id_producto: cafe, cantidad: 1 } });
+
+        const verAna = (await api('GET', `/menu/m/${mesaGrupo.codigo_qr}/estado?cliente=${ana}`)).body;
+        assert.deepEqual(verAna.pedidos.map(p => p.id_pedido), [pa.body.id_pedido]);
+        assert.deepEqual(verAna.cuenta.items.map(i => i.nombre_producto), ['Torta flujo']);
+        assert.equal(Number(verAna.cuenta.total_mesa), 35);
+
+        // Beto no puede cancelar ni ver el pedido de Ana
+        assert.equal((await api('POST', `/menu/m/${mesaGrupo.codigo_qr}/pedidos/${pa.body.id_pedido}/cancelar`,
+                                { body: { cliente_mesa: beto } })).status, 404);
+
+        // Cobro de la parte de Ana
+        const cobroAna = await api('POST', `/cuentas/${id_cuenta}/cerrar`,
+            { token: tCajero, body: { metodo_pago: 'QR', cliente_mesa: ana } });
+        assert.equal(cobroAna.status, 200);
+        assert.equal(cobroAna.body.total, 20);
+        assert.equal(cobroAna.body.cuenta_cerrada, false);
+        assert.equal((await estadoPedido(pa.body.id_pedido)).estado_pedido, 'Pagado');
+        assert.equal((await estadoPedido(pb.body.id_pedido)).estado_pedido, 'Confirmado');
+        const cuenta = (await api('GET', `/cuentas/mesa/${mesaGrupo.id_mesa}`, { token: tCajero })).body.cuenta;
+        assert.equal(Number(cuenta.total_acumulado), 15);
+        assert.equal(cuenta.items.filter(i => i.pagado).length, 1);
+
+        const anaDespues = (await api('GET', `/menu/m/${mesaGrupo.codigo_qr}/estado?cliente=${ana}`)).body.cuenta;
+        assert.equal(Number(anaDespues.mi_pendiente), 0);
+        assert.equal(Number(anaDespues.mi_pagado), 20);
+
+        // Lo pagado no se puede quitar ni volver a cobrar
+        const pagado = cuenta.items.find(i => i.pagado);
+        assert.equal((await api('DELETE', `/cuentas/detalle/${pagado.id_detalle_cuenta}`, { token: tCajero })).status, 409);
+        assert.equal((await api('POST', `/cuentas/${id_cuenta}/cerrar`,
+            { token: tCajero, body: { metodo_pago: 'QR', cliente_mesa: ana } })).status, 409);
+        assert.equal((await api('POST', `/cuentas/${id_cuenta}/cerrar`,
+            { token: tCajero, body: { metodo_pago: 'QR', cliente_mesa: 'no-valido' } })).status, 400);
+
+        // Lo cargado por el cajero (sin celular) y luego lo de Beto: con eso se cierra la mesa
+        const cobroMesa = await api('POST', `/cuentas/${id_cuenta}/cerrar`,
+            { token: tCajero, body: { metodo_pago: 'Efectivo', cliente_mesa: null } });
+        assert.equal(cobroMesa.body.total, 5);
+        const cobroBeto = await api('POST', `/cuentas/${id_cuenta}/cerrar`,
+            { token: tCajero, body: { metodo_pago: 'Efectivo', cliente_mesa: beto } });
+        assert.equal(cobroBeto.body.total, 10);
+        assert.equal(cobroBeto.body.cuenta_cerrada, true);
+        assert.equal((await estadoPedido(pb.body.id_pedido)).estado_pedido, 'Pagado');
+
+        const [cerrada] = await bd.sql(`SELECT estado, total_acumulado FROM cuenta_mesa WHERE id_cuenta = $1`, [id_cuenta]);
+        assert.equal(cerrada.estado, 'Pagada');
+        assert.equal(Number(cerrada.total_acumulado), 35);
+        const [m] = await bd.sql(`SELECT estado_mesa FROM mesa_local WHERE id_mesa = $1`, [mesaGrupo.id_mesa]);
+        assert.equal(m.estado_mesa, 'Libre');
+        const ventas = await bd.sql(`SELECT SUM(monto_total_venta)::float8 AS t, COUNT(*)::int AS n FROM venta_caja
+                                     WHERE id_venta = ANY($1::int[])`,
+                                    [[cobroAna.body.id_venta, cobroMesa.body.id_venta, cobroBeto.body.id_venta]]);
+        assert.deepEqual(ventas[0], { t: 35, n: 3 });
     });
 
     test('el cliente puede cancelar su pedido solo antes de que lo confirmen, y solo desde su mesa', async () => {
         const otraMesa = await crearMesa(31);
-        const p = await pedir(mesa.codigo_qr, [{ id_producto: cafe, cantidad: 2 }]);
+        const celular = 'e'.repeat(32);
+        const p = await pedir(mesa.codigo_qr, [{ id_producto: cafe, cantidad: 2 }], { cliente_mesa: celular });
         const antes = await stock(cafe);
 
         assert.equal((await api('POST', `/menu/m/${otraMesa.codigo_qr}/pedidos/${p.body.id_pedido}/cancelar`)).status, 404);
         // La otra mesa tampoco puede ver el pedido
-        const ajeno = await api('GET', `/menu/m/${otraMesa.codigo_qr}/estado?ids=${p.body.id_pedido}`);
+        const ajeno = await api('GET', `/menu/m/${otraMesa.codigo_qr}/estado?cliente=${celular}`);
         assert.equal(ajeno.body.pedidos.length, 0);
 
-        const c = await api('POST', `/menu/m/${mesa.codigo_qr}/pedidos/${p.body.id_pedido}/cancelar`);
+        const c = await api('POST', `/menu/m/${mesa.codigo_qr}/pedidos/${p.body.id_pedido}/cancelar`,
+                            { body: { cliente_mesa: celular } });
         assert.equal(c.status, 200);
         assert.equal(await stock(cafe), antes + 2);
 

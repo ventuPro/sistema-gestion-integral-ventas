@@ -9,8 +9,10 @@ import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { sondeo } from '../../../core/utils/sondeo';
 import { ConfirmacionComponent } from '../../shared/confirmacion/confirmacion.component';
+import type { MensajeChat } from '../../shared/asistente/asistente-chat.component';
+import { componenteDiferido } from '../../../core/utils/diferido';
 import { LucideAngularModule, UtensilsCrossed, ShoppingBag, ReceiptText, Search, X, Minus, Plus, Check,
-         SearchX, WifiOff, PartyPopper } from 'lucide-angular';
+         SearchX, WifiOff, PartyPopper, Pencil } from 'lucide-angular';
 
 type Vista = 'menu' | 'carrito' | 'pedidos';
 
@@ -22,7 +24,32 @@ interface ItemCarrito {
   cantidad:        number;
 }
 
-interface PedidoGuardado { id: number; t: number; }
+interface MiConsumo {
+  total_mesa:   number;
+  mi_pendiente: number;
+  mi_pagado:    number;
+  items: { nombre_producto: string; cantidad: number; subtotal: number; pagado: boolean }[];
+}
+
+const CLAVE_CELULAR = 'sgiv_cliente_mesa';
+const CLAVE_NOMBRE  = 'sgiv_cliente_nombre';
+
+// Los navegadores no dan la MAC ni el IMEI del celular: se genera un código
+// aleatorio una sola vez y queda guardado en este navegador.
+const codigoCelular = (): string => {
+  try {
+    const guardado = localStorage.getItem(CLAVE_CELULAR);
+    if (guardado && /^[0-9a-f]{32}$/.test(guardado)) return guardado;
+  } catch { }
+  const bytes = crypto.getRandomValues(new Uint8Array(16));   // funciona también sin https
+  const nuevo = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  try { localStorage.setItem(CLAVE_CELULAR, nuevo); } catch { }
+  return nuevo;
+};
+
+const leerNombre = (): string => {
+  try { return localStorage.getItem(CLAVE_NOMBRE) || ''; } catch { return ''; }
+};
 
 // ─── Menú digital del cliente: /menu/<codigo QR> ───
 @Component({
@@ -37,7 +64,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly Number = Number;
   readonly icons  = { menu: UtensilsCrossed, carrito: ShoppingBag, mesa: ReceiptText, buscar: Search, cerrar: X,
                       menos: Minus, mas: Plus, listo: Check, sinResultados: SearchX, sinConexion: WifiOff,
-                      qrInvalido: SearchX, gracias: PartyPopper };
+                      qrInvalido: SearchX, gracias: PartyPopper, editar: Pencil };
 
   private route = inject(ActivatedRoute);
   private http  = inject(HttpClient);
@@ -47,7 +74,13 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   private readonly api       = `${environment.apiUrl}/menu/m`;
   private readonly socketUrl = environment.apiUrl.replace('/api', '');
-  private readonly VIGENCIA_PEDIDOS_MS = 6 * 60 * 60 * 1000;   // se olvidan tras 6 h
+
+  // ─── Cada celular: código propio y nombre opcional ───
+  readonly celular = codigoCelular();
+  nombreCliente  = leerNombre();
+  nombreEditado  = '';
+  editandoNombre = false;
+  bienvenida     = false;
 
   codigo = '';
   estadoCarga: 'cargando' | 'invalido' | 'error' | 'listo' = 'cargando';
@@ -66,14 +99,21 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   enviando   = false;
   errorEnvio = '';
 
-  // ─── Mis pedidos y cuenta de la mesa ───
+  // ─── Mis pedidos y mi consumo en la cuenta de la mesa ───
   pedidos: any[] = [];
-  cuenta: { total_acumulado: number; items: any[] } | null = null;
+  cuenta: MiConsumo | null = null;
   cancelando: Record<number, boolean> = {};
   pedidoACancelar: any = null;
   gracias = false;
 
   aviso: string | null = null;
+
+  // ─── Asistente con IA (se descarga solo si está disponible) ───
+  readonly chatAsistente = componenteDiferido(() => this.ajustes.config().ia_cliente_disponible,
+    () => import('../../shared/asistente/asistente-chat.component').then(m => m.AsistenteChatComponent));
+  readonly sugerenciasAsistente = ['¿Qué me recomiendas?', '¿Qué hay para compartir entre 4?', '¿Qué bebidas tienen?', '¿Cómo hago mi pedido?'];
+  readonly preguntarAsistente = (mensajes: MensajeChat[]) =>
+    this.http.post<{ respuesta: string }>(`${this.api}/${this.codigo}/asistente`, { mensajes, cliente_mesa: this.celular });
 
   private socket: Socket | null = null;
   private timers: (() => void)[] = [];
@@ -106,7 +146,12 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.http.get<any>(`${this.api}/${this.codigo}`).subscribe({
       next: (info) => {
         this.info = info;
-        this.cargarCatalogo(() => { this.estadoCarga = 'listo'; this.cdr.detectChanges(); });
+        this.cargarCatalogo(() => {
+          this.estadoCarga = 'listo';
+          this.bienvenida  = !this.yaSeDioBienvenida();
+          this.nombreEditado = this.nombreCliente;
+          this.cdr.detectChanges();
+        });
         this.refrescarEstado();
       },
       error: (e) => {
@@ -169,7 +214,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.socket.on('catalogo:actualizado', () => this.cargarCatalogo());
 
     this.socket.on('pedido:estado', (d: any) => {
-      if (!this.idsGuardados().includes(Number(d?.id_pedido))) return;
+      if (!this.pedidos.some(p => p.id_pedido === Number(d?.id_pedido))) return;
       if (d.estado === 'Confirmado') this.notificar('✅ ¡Tu pedido fue confirmado! Ya lo estamos preparando.');
       if (d.estado === 'Entregado')  this.notificar('🍰 Tu pedido fue entregado. ¡Buen provecho!');
       if (d.estado === 'Cancelado')  this.notificar('Tu pedido no pudo ser atendido. Consulta en caja.');
@@ -274,13 +319,14 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.errorEnvio = '';
 
     const body = {
+      cliente_mesa:        this.celular,
+      nombre_cliente:      this.nombreCliente.trim() || null,
       observacion_general: this.observacionGeneral.trim() || null,
       items: this.carrito.map(i => ({ id_producto: i.id_producto, cantidad: i.cantidad }))
     };
 
     this.http.post<any>(`${this.api}/${this.codigo}/pedidos`, body).subscribe({
-      next: (res) => {
-        this.guardarId(res.id_pedido);
+      next: () => {
         this.carrito            = [];
         this.observacionGeneral = '';
         this.enviando           = false;
@@ -305,51 +351,49 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ─── Mis pedidos ───
-  private claveStorage(): string { return `sgiv_menu_${this.codigo}`; }
-
-  private leerGuardados(): PedidoGuardado[] {
-    try {
-      const lista = JSON.parse(localStorage.getItem(this.claveStorage()) || '[]');
-      return Array.isArray(lista) ? lista.filter(p => Date.now() - p.t < this.VIGENCIA_PEDIDOS_MS) : [];
-    } catch { return []; }
+  // ─── Bienvenida y nombre del cliente ───
+  private yaSeDioBienvenida(): boolean {
+    try { return sessionStorage.getItem(`sgiv_bienvenida_${this.codigo}`) === '1'; } catch { return false; }
   }
 
-  private escribirGuardados(lista: PedidoGuardado[]) {
-    try { localStorage.setItem(this.claveStorage(), JSON.stringify(lista)); } catch { }
+  entrar() {
+    this.guardarNombre();
+    this.bienvenida = false;
+    try { sessionStorage.setItem(`sgiv_bienvenida_${this.codigo}`, '1'); } catch { }
   }
 
-  private idsGuardados(): number[] { return this.leerGuardados().map(p => p.id); }
-
-  private guardarId(id: number) {
-    this.escribirGuardados([...this.leerGuardados(), { id, t: Date.now() }]);
+  guardarNombre() {
+    this.nombreCliente  = this.nombreEditado.replace(/\s+/g, ' ').trim().slice(0, 40);
+    this.nombreEditado  = this.nombreCliente;
+    this.editandoNombre = false;
+    try { localStorage.setItem(CLAVE_NOMBRE, this.nombreCliente); } catch { }
   }
 
+  // ─── Mis pedidos y mi consumo (por el código de este celular) ───
   refrescarEstado(cuentaCerrada = false) {
-    const ids = this.idsGuardados();
-    this.http.get<any>(`${this.api}/${this.codigo}/estado`, { params: { ids: ids.join(',') } }).subscribe({
+    this.http.get<{ pedidos: any[]; cuenta: MiConsumo | null }>(`${this.api}/${this.codigo}/estado`,
+                                                                 { params: { cliente: this.celular } }).subscribe({
       next: (res) => {
-        const pedidos = (res.pedidos || []) as any[];
-        this.cuenta   = res.cuenta;
+        const antes = this.cuenta;
+        const yaConsumia = !!antes?.items.length;
+        if (cuentaCerrada && yaConsumia && !res.cuenta) this.gracias = true;
+        // Pagó su parte y la mesa sigue abierta
+        if (Number(antes?.mi_pendiente) > 0 && res.cuenta && Number(res.cuenta.mi_pendiente) === 0
+            && Number(res.cuenta.mi_pagado) > 0) this.notificar('✅ Tu parte ya está pagada. ¡Gracias!');
 
-        // Solo se olvidan ids de esta consulta (no perder un pedido recién enviado)
-        const pagados = pedidos.filter(p => p.estado_pedido === 'Pagado');
-        if (pagados.length && cuentaCerrada) this.gracias = true;
-        const vigentes = new Set(pedidos.filter(p => p.estado_pedido !== 'Pagado').map(p => p.id_pedido));
-        this.escribirGuardados(this.leerGuardados().filter(g => !ids.includes(g.id) || vigentes.has(g.id)));
-
-        this.pedidos = pedidos
-          .filter(p => p.estado_pedido !== 'Pagado')
-          .sort((a, b) => b.id_pedido - a.id_pedido);
+        this.cuenta  = res.cuenta;
+        this.pedidos = res.pedidos || [];
         this.cdr.detectChanges();
       }
     });
   }
 
+  get miConsumo() { return this.cuenta?.items ?? []; }
+
   cancelar(pedido: any) {
     this.pedidoACancelar = null;
     this.cancelando[pedido.id_pedido] = true;
-    this.http.post<any>(`${this.api}/${this.codigo}/pedidos/${pedido.id_pedido}/cancelar`, {}).subscribe({
+    this.http.post<any>(`${this.api}/${this.codigo}/pedidos/${pedido.id_pedido}/cancelar`, { cliente_mesa: this.celular }).subscribe({
       next: () => {
         delete this.cancelando[pedido.id_pedido];
         this.mostrarAviso('Pedido cancelado');

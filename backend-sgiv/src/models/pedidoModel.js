@@ -181,7 +181,9 @@ const obtenerCatalogoMenu = async (id_sucursal) => {
 };
 
 // ─── CLIENTE: crear pedido desde la mesa ───
-const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes = MAX_PENDIENTES_MESA }) => {
+// cliente_mesa: código del celular (menú QR); nombre_cliente: opcional, lo escribe el cliente
+const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes = MAX_PENDIENTES_MESA,
+                                 cliente_mesa = null, nombre_cliente = null }) => {
     const lista = normalizarItems(items);
 
     return enTransaccion(async (client) => {
@@ -214,10 +216,12 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
 
         const totalCentavos = lista.reduce((s, i) => s + precios.get(i.id_producto) * i.cantidad, 0);
         const rPed = await client.query(`
-            INSERT INTO pedido_mesa (tipo_pedido, id_sucursal, id_mesa, estado_pedido, monto_total, observacion_general)
-            VALUES ('Mesa', $1, $2, 'Pendiente_Cajero', $3, $4)
+            INSERT INTO pedido_mesa (tipo_pedido, id_sucursal, id_mesa, estado_pedido, monto_total, observacion_general,
+                                     cliente_mesa, nombre_cliente)
+            VALUES ('Mesa', $1, $2, 'Pendiente_Cajero', $3, $4, $5, $6)
             RETURNING *
-        `, [mesa.id_sucursal, mesa.id_mesa, totalCentavos / 100, texto(observacion_general, MAX_LARGO_NOTA)]);
+        `, [mesa.id_sucursal, mesa.id_mesa, totalCentavos / 100, texto(observacion_general, MAX_LARGO_NOTA),
+            cliente_mesa, nombre_cliente]);
         const pedido = rPed.rows[0];
 
         for (const it of lista) {
@@ -333,14 +337,15 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
 
         // Stock ya reservado: no se descuenta de nuevo
         await client.query(`
-            INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, subtotal, nota, origen)
-            SELECT $1, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente, 'qr'
+            INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, subtotal, nota, origen,
+                                        cliente_mesa, nombre_cliente)
+            SELECT $1, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente, 'qr', $3, $4
             FROM detalle_pedido WHERE id_pedido = $2
             ORDER BY id_detalle_pedido
-        `, [id_cuenta, id_pedido]);
+        `, [id_cuenta, id_pedido, pedido.cliente_mesa, pedido.nombre_cliente]);
         await client.query(`
             UPDATE cuenta_mesa
-            SET total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta = $1)
+            SET total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta = $1 AND id_venta IS NULL)
             WHERE id_cuenta = $1
         `, [id_cuenta]);
         await client.query(`UPDATE mesa_local SET estado_mesa = 'Ocupada' WHERE id_mesa = $1`, [pedido.id_mesa]);
@@ -376,10 +381,12 @@ const rechazarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
     });
 
 // ─── CLIENTE: cancelar ───
-const cancelarPorCliente = async ({ id_pedido, id_mesa }) =>
+// Solo el celular que hizo el pedido puede cancelarlo
+const cancelarPorCliente = async ({ id_pedido, id_mesa, cliente_mesa }) =>
     enTransaccion(async (client) => {
         const pedido = await bloquearPedido(client, id_pedido, null);
-        if (pedido.id_mesa !== id_mesa) throw errorCodigo('PEDIDO_NO_ENCONTRADO', 'Pedido no encontrado');
+        if (pedido.id_mesa !== id_mesa || (pedido.cliente_mesa && pedido.cliente_mesa !== cliente_mesa))
+            throw errorCodigo('PEDIDO_NO_ENCONTRADO', 'Pedido no encontrado');
         exigirEstado(pedido, 'Pendiente_Cajero');
         return cancelarPendiente(client, pedido);
     });
@@ -420,8 +427,11 @@ const cancelarPendientesMesa = async (client, id_mesa) => {
     return { cambios, ids: rPend.rows.map(p => p.id_pedido) };
 };
 
-// ─── CLIENTE: estado de sus pedidos y consumo de la mesa ───
-const obtenerEstadoMesa = async (id_mesa, ids) => {
+// ─── CLIENTE: sus pedidos y su consumo (por el código de su celular) ───
+const obtenerEstadoMesa = async (id_mesa, cliente_mesa) => {
+    if (!cliente_mesa) return { pedidos: [], cuenta: null };
+
+    // En curso, más los no atendidos de las últimas 2 horas
     const rPed = await db.query(`
         SELECT pm.id_pedido, pm.estado_pedido, pm.monto_total, pm.fecha_pedido,
                json_agg(json_build_object(
@@ -433,23 +443,29 @@ const obtenerEstadoMesa = async (id_mesa, ids) => {
         FROM pedido_mesa pm
         JOIN detalle_pedido dp ON dp.id_pedido = pm.id_pedido
         JOIN producto       p  ON p.id_producto = dp.id_producto
-        WHERE pm.id_mesa = $1 AND pm.id_pedido = ANY($2::int[])
+        WHERE pm.id_mesa = $1 AND pm.cliente_mesa = $2
+          AND (pm.estado_pedido IN ('Pendiente_Cajero', 'Confirmado', 'Entregado')
+               OR (pm.estado_pedido = 'Cancelado' AND pm.fecha_pedido > LOCALTIMESTAMP - INTERVAL '2 hours'))
         GROUP BY pm.id_pedido
-        ORDER BY pm.id_pedido
-    `, [id_mesa, ids]);
+        ORDER BY pm.id_pedido DESC
+        LIMIT 20
+    `, [id_mesa, cliente_mesa]);
 
+    // Lo consumido por este celular en la cuenta abierta (pagado o por pagar)
     const rCuenta = await db.query(`
-        SELECT c.id_cuenta, c.total_acumulado,
-               COALESCE((
-                   SELECT json_agg(x ORDER BY x.nombre_producto)
-                   FROM (SELECT p.nombre_producto, SUM(dc.cantidad)::int AS cantidad, SUM(dc.subtotal) AS subtotal
-                         FROM detalle_cuenta dc JOIN producto p ON p.id_producto = dc.id_producto
-                         WHERE dc.id_cuenta = c.id_cuenta
-                         GROUP BY p.nombre_producto) x
-               ), '[]'::json) AS items
+        SELECT c.total_acumulado AS total_mesa,
+               COALESCE(SUM(dc.subtotal) FILTER (WHERE dc.id_venta IS NULL), 0) AS mi_pendiente,
+               COALESCE(SUM(dc.subtotal) FILTER (WHERE dc.id_venta IS NOT NULL), 0) AS mi_pagado,
+               COALESCE(json_agg(json_build_object(
+                   'nombre_producto', p.nombre_producto, 'cantidad', dc.cantidad,
+                   'subtotal', dc.subtotal, 'pagado', dc.id_venta IS NOT NULL
+               ) ORDER BY dc.id_detalle_cuenta) FILTER (WHERE dc.id_detalle_cuenta IS NOT NULL), '[]'::json) AS items
         FROM cuenta_mesa c
+        LEFT JOIN detalle_cuenta dc ON dc.id_cuenta = c.id_cuenta AND dc.cliente_mesa = $2
+        LEFT JOIN producto       p  ON p.id_producto = dc.id_producto
         WHERE c.id_mesa = $1 AND c.estado = 'Abierta'
-    `, [id_mesa]);
+        GROUP BY c.id_cuenta
+    `, [id_mesa, cliente_mesa]);
 
     return { pedidos: rPed.rows, cuenta: rCuenta.rows[0] || null };
 };

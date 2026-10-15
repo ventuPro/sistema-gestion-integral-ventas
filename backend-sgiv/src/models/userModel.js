@@ -18,6 +18,17 @@ const obtenerUsuarioPorCorreo = async (correo) => {
     return result.rows[0];
 };
 
+/** Nombre y sucursal (sin datos de acceso) */
+const obtenerPerfil = async (id_usuario) => {
+    const result = await db.query(
+        `SELECT u.nombre_completo, s.nombre_sucursal
+         FROM usuario u LEFT JOIN sucursal s ON s.id_sucursal = u.id_sucursal
+         WHERE u.id_usuario = $1`,
+        [id_usuario]
+    );
+    return result.rows[0];
+};
+
 const listarUsuarios = async () => {
     const result = await db.query(`
         SELECT 
@@ -89,7 +100,7 @@ const obtenerSucursales = async () => {
 };
 
 module.exports = {
-    crearUsuario, obtenerUsuarioPorCorreo, listarUsuarios,
+    crearUsuario, obtenerUsuarioPorCorreo, obtenerPerfil, listarUsuarios,
     actualizarUsuario, desactivarUsuario, reactivarUsuario,
     cambiarContrasena, obtenerRoles, obtenerSucursales
 };

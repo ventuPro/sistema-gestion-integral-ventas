@@ -95,13 +95,74 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
 }
 .globo.aviso { color: #1f2937; background: #fbbf24; }
 
-.nota {
-  font-size: 13.5px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  color: var(--i-texto);
-  background: var(--i-acento-suave);
+/* En el celular, 16 px evita que el navegador haga zoom al escribir */
+.campo { font-size: 16px; padding: 10px 12px; }
+
+/* Bienvenida: pantalla completa al abrir el menú */
+.bienvenida {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow-y: auto;
+  color: #fff;
+  animation: aparecer 200ms ease;
 }
+.bienvenida-contenido {
+  min-height: 100%;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: calc(40px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+.bienvenida-logo {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 16px;
+  padding: 8px;
+  object-fit: contain;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.15);
+}
+.bienvenida-mesa {
+  display: inline-block;
+  align-self: center;
+  margin-top: 10px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.bienvenida-pasos {
+  margin: 24px 0 20px;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.bienvenida-pasos li { display: flex; align-items: center; gap: 10px; }
+.bienvenida-pasos span {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+}
+.bienvenida-tarjeta {
+  padding: 16px;
+  border-radius: 14px;
+  text-align: left;
+  background: var(--i-papel);
+  box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.45);
+}
+@keyframes aparecer { from { opacity: 0; } }
 
 /* Buscador y categorías */
 .filtros { padding: 12px 16px 8px; display: flex; flex-direction: column; gap: 10px; }

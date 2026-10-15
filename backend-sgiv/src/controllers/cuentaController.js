@@ -103,34 +103,54 @@ const quitarProducto = async (req, res) => {
 
         res.json({ mensaje: 'Producto eliminado', total: cuentaActualizada?.total_acumulado });
     } catch(e) {
+        if (e.message === 'DETALLE_NO_ENCONTRADO')
+            return res.status(404).json({ error: 'El producto ya no está en la cuenta' });
+        if (e.message === 'DETALLE_PAGADO')
+            return res.status(409).json({ error: 'Ese producto ya fue pagado: no se puede quitar' });
         console.error('quitarProducto:', e);
         res.status(500).json({ error: 'Error al quitar producto' });
     }
 };
 
-// POST /api/cuentas/:id_cuenta/cerrar
+const CLIENTE_MESA = /^[0-9a-f]{32}$/;
+
+// POST /api/cuentas/:id_cuenta/cerrar  { metodo_pago, cliente_mesa? }
+// Con cliente_mesa (código del celular, o null = lo cargado por el cajero) se cobra solo esa parte.
 const cerrarCuenta = async (req, res) => {
     try {
-        const id_cuenta       = Number(req.params.id_cuenta);
-        const { metodo_pago, id_sucursal } = req.body;
-        const id_usuario_cajero = req.usuario.id_usuario;
+        const id_cuenta = Number(req.params.id_cuenta);
+        const { metodo_pago } = req.body;
         const motivo = await ajusteModel.motivoMetodoPago(metodo_pago);
         if (motivo) return res.status(400).json({ error: motivo });
 
-        const resultado = await cuentaModel.cerrarCuenta(
-            id_cuenta, metodo_pago, id_usuario_cajero, id_sucursal
-        );
+        let parte = null;
+        if ('cliente_mesa' in (req.body || {})) {
+            const cliente_mesa = req.body.cliente_mesa ?? null;
+            if (cliente_mesa !== null && !CLIENTE_MESA.test(String(cliente_mesa)))
+                return res.status(400).json({ error: 'Cliente inválido' });
+            parte = { cliente_mesa };
+        }
 
-        io()?.to('cajeros').emit('cuenta:cerrada', { id_mesa: resultado.id_mesa });
-        io()?.to('cajeros').emit('mesa:actualizada', { id_mesa: resultado.id_mesa });
+        const resultado = await cuentaModel.cerrarCuenta(id_cuenta, metodo_pago, req.usuario.id_usuario, parte);
+        const { id_mesa } = resultado;
+
+        if (resultado.cuenta_cerrada) {
+            io()?.to('cajeros').emit('cuenta:cerrada', { id_mesa });
+            emitirMesa(id_mesa, 'cuenta:cerrada', {});
+        } else {
+            io()?.to('cajeros').emit('cuenta:producto_agregado', { id_cuenta, id_mesa });
+            emitirMesa(id_mesa, 'cuenta:actualizada', {});
+        }
+        io()?.to('cajeros').emit('mesa:actualizada', { id_mesa });
         if (resultado.pedidos_pagados.length)
-            io()?.to('cajeros').emit('pedido:actualizado', { id_mesa: resultado.id_mesa, estado: 'Pagado' });
-        emitirMesa(resultado.id_mesa, 'cuenta:cerrada', {});
+            io()?.to('cajeros').emit('pedido:actualizado', { id_mesa, estado: 'Pagado' });
 
-        res.json({ mensaje: 'Cuenta cerrada y mesa liberada', ...resultado });
+        res.json({ mensaje: resultado.cuenta_cerrada ? 'Cuenta cerrada y mesa liberada' : 'Cobro registrado', ...resultado });
     } catch(e) {
         if (e.message === 'CUENTA_NO_ACTIVA')
             return res.status(404).json({ error: 'No hay cuenta activa en esta mesa' });
+        if (e.message === 'NADA_POR_COBRAR')
+            return res.status(409).json({ error: 'No hay nada pendiente de cobro para ese cliente' });
         if (e.message === 'CAJA_CERRADA')
             return res.status(403).json({ error: 'Tu caja está cerrada. Abre un turno para cobrar.' });
         console.error('cerrarCuenta:', e);

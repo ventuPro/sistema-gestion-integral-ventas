@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, inject, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CuentaService } from '../../../../core/services/cuenta.service';
 import { SocketService } from '../../../../core/services/socket.service';
@@ -9,15 +9,26 @@ import { TicketComponent } from '../../../shared/ticket/ticket.component';
 import { AjustesService } from '../../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../../core/services/impresion.service';
 import { cifra } from '../../../../core/utils/informe';
-import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download } from 'lucide-angular';
+import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User } from 'lucide-angular';
 import { DialogoService } from '../../../../core/services/dialogo.service';
+
+/** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
+export interface GrupoCuenta {
+  clave: string | null;
+  nombre: string;
+  items: any[];
+  pendiente: number;
+  pagado: number;
+}
+
+const centavos = (n: any) => Math.round(Number(n || 0) * 100);
 
 @Component({
   selector: 'app-mesa-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule],
+  imports: [CommonModule, NgTemplateOutlet, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule],
   templateUrl: './mesa-modal.component.html',
-  styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css']
+  styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css', './mesa-modal.component.css']
 })
 export class MesaModalComponent implements OnInit, OnDestroy {
   @Input()  mesa:             any = null;
@@ -35,7 +46,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   readonly icons = {
     cerrar: X, buscar: Search, quitar: Trash2, carrito: ShoppingCart, efectivo: Banknote,
-    qr: QrCode, check: Check, imprimir: Printer, descargar: Download
+    qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User
   };
 
   esAdmin         = false;
@@ -53,10 +64,47 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   @ViewChild('inputMontoMesa') inputMontoMesaRef?: ElementRef<HTMLInputElement>;
   @ViewChild('zonaTicket') zonaTicket?: ElementRef<HTMLElement>;
   get cambio(): number {
-    return Math.max(0, this.montoPagado - Number(this.cuentaActiva?.total_acumulado || 0));
+    return Math.max(0, this.montoPagado - this.totalCobro);
   }
   get totalCuenta(): number {
     return Number(this.cuentaActiva?.total_acumulado || 0);
+  }
+
+  // ─── Cobro por separado ───
+  /** null = cobrar todo lo pendiente */
+  parteCobro: GrupoCuenta | null = null;
+
+  get totalCobro(): number {
+    return this.parteCobro ? this.parteCobro.pendiente : this.totalCuenta;
+  }
+
+  get itemsPendientes(): any[] {
+    return (this.cuentaActiva?.items || []).filter((i: any) => !i.pagado);
+  }
+
+  /** Agrupa por celular; los clientes sin nombre se numeran en orden de llegada */
+  get grupos(): GrupoCuenta[] {
+    const mapa = new Map<string | null, GrupoCuenta>();
+    let numero = 0;
+    for (const item of this.cuentaActiva?.items || []) {
+      const clave = item.cliente_mesa ?? null;
+      let g = mapa.get(clave);
+      if (!g) {
+        g = { clave, nombre: clave ? `Cliente ${++numero}` : 'Cargado por el cajero', items: [], pendiente: 0, pagado: 0 };
+        mapa.set(clave, g);
+      }
+      if (clave && item.nombre_cliente) g.nombre = item.nombre_cliente;
+      g.items.push(item);
+      if (item.pagado) g.pagado = (centavos(g.pagado) + centavos(item.subtotal)) / 100;
+      else g.pendiente = (centavos(g.pendiente) + centavos(item.subtotal)) / 100;
+    }
+    // Lo del cajero al final
+    return [...mapa.values()].sort((a, b) => Number(a.clave === null) - Number(b.clave === null));
+  }
+
+  /** Se agrupa cuando algún producto vino del celular de un cliente */
+  get porCliente(): boolean {
+    return (this.cuentaActiva?.items || []).some((i: any) => i.cliente_mesa);
   }
 
   datosTicket: any = null;
@@ -211,7 +259,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         if (!this.cuentaActiva.items) this.cuentaActiva.items = [];
 
         const itemExistente = this.cuentaActiva.items.find(
-          (i: any) => i.id_producto === producto.id_producto && i.origen === 'cajero'
+          (i: any) => i.id_producto === producto.id_producto && i.origen === 'cajero' && !i.pagado && !i.cliente_mesa
         );
 
         if (itemExistente) {
@@ -264,12 +312,11 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   private calcularTotalLocal(): number {
-    return this.cuentaActiva?.items?.reduce(
-      (s: number, i: any) => s + Number(i.subtotal), 0
-    ) || 0;
+    return this.itemsPendientes.reduce((s: number, i: any) => s + centavos(i.subtotal), 0) / 100;
   }
 
-  irAPago() {
+  irAPago(parte: GrupoCuenta | null = null) {
+    this.parteCobro  = parte;
     this.montoPagado = 0;
     this.metodoPago  = this.ajustes.config().pago_efectivo ? 'Efectivo' : 'QR';
     this.vista       = 'pago';
@@ -280,26 +327,22 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   confirmarPago() {
-    const totalReq = Number(this.cuentaActiva?.total_acumulado || 0);
+    const totalReq = this.totalCobro;
     if (this.metodoPago === 'Efectivo' && (!this.montoPagado || this.montoPagado < totalReq)) {
       this.montoPagado = totalReq;
     }
 
-    const usr         = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
-    const id_sucursal = usr.id_sucursal || 1;
-
+    const parte = this.parteCobro;
     this.cargando = true;
-    this.cuentaService.cerrarCuenta(
-      this.cuentaActiva.id_cuenta,
-      this.metodoPago,
-      id_sucursal
-    ).subscribe({
+    this.cuentaService.cerrarCuenta(this.cuentaActiva.id_cuenta, this.metodoPago, parte ? parte.clave : undefined).subscribe({
       next: (res: any) => {
+        this.cuentaCerrada = res.cuenta_cerrada !== false;
         this.datosTicket = {
           id_venta:     res.id_venta,
           numero_mesa:  this.mesa.numero_mesa,
-          items:        [...(this.cuentaActiva?.items || [])],
-          total:        this.cuentaActiva?.total_acumulado,
+          cliente:      parte?.clave ? parte.nombre : undefined,
+          items:        parte ? parte.items.filter(i => !i.pagado) : this.itemsPendientes,
+          total:        res.total ?? totalReq,
           metodo:       this.metodoPago,
           cambio:       this.cambio
         };
@@ -334,13 +377,25 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     a.click();
   }
 
+  /** false tras cobrar solo una parte: la mesa sigue abierta */
+  cuentaCerrada = true;
+
+  /** Después del comprobante de una parte se vuelve al consumo de la mesa */
+  cerrarTicket() {
+    if (this.cuentaCerrada) { this.cerrarModal(); return; }
+    this.datosTicket = null;
+    this.parteCobro  = null;
+    this.vista       = 'comanda';
+    this.cargarEstadoMesa();
+  }
+
   imprimirTicket() {
     this.impresion.imprimirTicket(this.zonaTicket?.nativeElement, this.ajustes.config().ticket_ancho);
   }
 
   cerrarModal() {
     const cuentaSinItems = this.cuentaActiva
-                        && (!this.cuentaActiva.items || this.cuentaActiva.items.length === 0)
+                        && this.itemsPendientes.length === 0
                         && this.vista !== 'ticket';
     if (cuentaSinItems) {
       this.cuentaService.cancelarSiVacia(this.cuentaActiva.id_cuenta).subscribe({

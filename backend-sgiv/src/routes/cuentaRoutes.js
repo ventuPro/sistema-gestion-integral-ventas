@@ -28,11 +28,14 @@ router.post('/:id_cuenta/cancelar-si-vacia', mesas, async (req, res) => {
             return res.status(400).json({ error: 'La cuenta no está abierta' });
 
         const items = await db.query(
-            `SELECT COUNT(*)::int AS n FROM detalle_cuenta WHERE id_cuenta=$1`,
+            `SELECT COUNT(*) FILTER (WHERE id_venta IS NULL)::int AS n, COUNT(id_venta)::int AS pagados
+             FROM detalle_cuenta WHERE id_cuenta=$1`,
             [id_cuenta]
         );
         if (items.rows[0].n > 0)
             return res.status(400).json({ error: 'CUENTA_NO_VACIA' });
+        // Si alguien ya pagó su parte, la cuenta queda como pagada
+        const estadoFinal = items.rows[0].pagados > 0 ? 'Pagada' : 'Cancelada';
 
         const id_mesa = c.rows[0].id_mesa;
         const client = await db.connect();
@@ -41,8 +44,8 @@ router.post('/:id_cuenta/cancelar-si-vacia', mesas, async (req, res) => {
             // Si el cajero quitó todos los productos de pedidos QR, esos pedidos quedan cancelados
             await pedidoModel.finalizarPedidosDeCuenta(client, id_cuenta, 'Cancelado');
             await client.query(
-                `UPDATE cuenta_mesa SET estado='Cancelada', fecha_cierre=NOW() WHERE id_cuenta=$1`,
-                [id_cuenta]
+                `UPDATE cuenta_mesa SET estado=$2, fecha_cierre=NOW() WHERE id_cuenta=$1`,
+                [id_cuenta, estadoFinal]
             );
             await client.query(
                 `UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`,

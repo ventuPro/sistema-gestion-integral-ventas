@@ -10,6 +10,8 @@ export interface DatosTicket {
   metodo: string;
   cambio?: number;
   numero_mesa?: number;
+  /** Cobro por separado: a nombre de quién */
+  cliente?: string;
 }
 
 // ─── Comprobante de venta (Punto de venta y Mesas) ───

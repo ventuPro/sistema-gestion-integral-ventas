@@ -29,6 +29,39 @@
 
   @if (estadoCarga === 'listo' && info) {
 
+    <!-- ═══ BIENVENIDA (una vez por visita) ═══ -->
+    @if (bienvenida) {
+      <div class="bienvenida bg-gradient-to-br from-blue-600 to-indigo-600" role="dialog" aria-modal="true" aria-labelledby="titulo-bienvenida">
+        <div class="bienvenida-contenido">
+          @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="bienvenida-logo"> }
+          <p class="text-white/80 text-sm">¡Bienvenido a</p>
+          <h1 id="titulo-bienvenida" class="text-2xl font-semibold leading-tight">{{ ajustes.nombre() }}!</h1>
+          <p class="bienvenida-mesa">Mesa {{ info.numero_mesa }} · {{ info.nombre_sucursal }}</p>
+          @if (ajustes.config().menu_mensaje_bienvenida) {
+            <p class="text-white/90 text-[15px] mt-4">{{ ajustes.config().menu_mensaje_bienvenida }}</p>
+          }
+
+          <ol class="bienvenida-pasos">
+            <li><span>1</span> Elige del menú y agrégalo al carrito</li>
+            <li><span>2</span> Envía tu pedido: el cajero lo confirma</li>
+            <li><span>3</span> En «Mi mesa» ves lo que consumiste y pagas en caja</li>
+          </ol>
+
+          <form class="bienvenida-tarjeta" (submit)="$event.preventDefault(); entrar()">
+            <label for="nombre-cliente" class="inf-tinta text-sm font-medium">¿Cómo te llamas? <span class="inf-sutil font-normal">(opcional)</span></label>
+            <input id="nombre-cliente" class="campo mt-1.5" [(ngModel)]="nombreEditado" name="nombre" maxlength="40"
+                   autocomplete="given-name" placeholder="Tu nombre">
+            <p class="ayuda mt-1.5">Si en la mesa pagan por separado, así el cajero sabe qué pidió cada uno.</p>
+            <button type="submit" class="boton-primario w-full py-3! text-base! mt-4">Ver el menú</button>
+          </form>
+
+          @if (!info.recibe_pedidos || !ajustes.config().menu_activo) {
+            <p class="text-white/85 text-[13px] mt-4">Ahora no recibimos pedidos desde el celular: puedes ver el menú y pedir en caja.</p>
+          }
+        </div>
+      </div>
+    }
+
     <!-- ═══ ENCABEZADO ═══ -->
     <header class="cabecera bg-gradient-to-br from-blue-600 to-indigo-600">
       <div class="flex items-center gap-3">
@@ -55,9 +88,6 @@
     </header>
 
     <div class="px-4 space-y-3 mt-3 empty:hidden">
-      @if (ajustes.config().menu_mensaje_bienvenida && vista === 'menu') {
-        <p class="nota">{{ ajustes.config().menu_mensaje_bienvenida }}</p>
-      }
       @if (!info.recibe_pedidos || !ajustes.config().menu_activo) {
         <p class="aviso-suave">
           {{ info.pedidos_desactivados || !ajustes.config().menu_activo
@@ -191,19 +221,43 @@
                     [disabled]="enviando || !info.recibe_pedidos || !ajustes.config().menu_activo">
               {{ enviando ? 'Enviando…' : 'Enviar pedido' }}
             </button>
-            <p class="text-center ayuda">El cajero confirmará tu pedido. Pagas todo al final en caja.</p>
+            <p class="text-center ayuda">
+              El cajero confirmará tu pedido. Pagas al final en caja.
+              @if (nombreCliente) { <br>A nombre de <b class="inf-tinta">{{ nombreCliente }}</b>. }
+            </p>
           </div>
         }
       </section>
     }
 
-    <!-- ════════ MI MESA: pedidos y consumo ════════ -->
+    <!-- ════════ MI MESA: lo de este celular ════════ -->
     @if (vista === 'pedidos') {
       <section class="pb-28 p-4 space-y-3">
-        @if (pedidos.length === 0 && !cuenta) {
+        <div class="inf-hoja px-4 py-3">
+          @if (!editandoNombre) {
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-[13.5px] inf-tenue min-w-0 truncate">
+                @if (nombreCliente) { Tus pedidos van a nombre de <b class="inf-tinta">{{ nombreCliente }}</b> }
+                @else { Agrega tu nombre si van a pagar por separado }
+              </p>
+              <button class="inf-enlace text-[13px] shrink-0 inline-flex items-center gap-1" (click)="editandoNombre = true; nombreEditado = nombreCliente">
+                <lucide-icon [img]="icons.editar" class="w-3.5 h-3.5"></lucide-icon> {{ nombreCliente ? 'Cambiar' : 'Agregar' }}
+              </button>
+            </div>
+          } @else {
+            <form class="flex gap-2" (submit)="$event.preventDefault(); guardarNombre()">
+              <input class="campo flex-1" [(ngModel)]="nombreEditado" name="nombre" maxlength="40" placeholder="Tu nombre"
+                     aria-label="Tu nombre" autocomplete="given-name">
+              <button type="submit" class="boton-primario py-2!">Listo</button>
+            </form>
+            <p class="ayuda mt-1.5">Se usa en tus próximos pedidos.</p>
+          }
+        </div>
+
+        @if (pedidos.length === 0 && miConsumo.length === 0) {
           <div class="estado-vacio">
             <lucide-icon [img]="icons.mesa" class="w-8 h-8 inf-sutil"></lucide-icon>
-            <p>Aún no hiciste pedidos</p>
+            <p>Aún no hiciste pedidos desde este celular</p>
             <button class="inf-enlace mt-2" (click)="vista = 'menu'">Ver el menú</button>
           </div>
         }
@@ -249,32 +303,52 @@
           </article>
         }
 
-        @if (cuenta) {
+        @if (cuenta && miConsumo.length) {
           <article class="inf-hoja p-4">
-            <h3 class="inf-tinta font-semibold mb-2">Consumo de la mesa</h3>
+            <h3 class="inf-tinta font-semibold mb-2">Tu consumo</h3>
             <ul class="text-[13.5px]">
-              @for (it of cuenta.items; track $index) {
-                <li class="flex justify-between gap-3 py-1.5 separador-inferior last:border-b-0">
-                  <span><b class="inf-tinta">{{ it.cantidad }}×</b> {{ it.nombre_producto }}</span>
+              @for (it of miConsumo; track $index) {
+                <li class="flex justify-between gap-3 py-1.5 separador-inferior last:border-b-0" [class.opacity-60]="it.pagado">
+                  <span>
+                    <b class="inf-tinta">{{ it.cantidad }}×</b> {{ it.nombre_producto }}
+                    @if (it.pagado) { <span class="inf-estado ok ml-1">Pagado</span> }
+                  </span>
                   <span class="inf-tenue whitespace-nowrap">{{ moneda() }} {{ Number(it.subtotal).toFixed(2) }}</span>
                 </li>
               }
             </ul>
             <div class="flex justify-between items-baseline pt-3 mt-2 separador">
-              <span class="inf-etiqueta">Total a pagar</span>
-              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ Number(cuenta.total_acumulado).toFixed(2) }}</span>
+              <span class="inf-etiqueta">Tu parte por pagar</span>
+              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ Number(cuenta.mi_pendiente).toFixed(2) }}</span>
             </div>
-            <p class="ayuda mt-1">Pagas todo al final en caja.</p>
+            @if (Number(cuenta.mi_pagado) > 0) {
+              <p class="flex justify-between text-[13px] inf-sube mt-1">
+                <span>Ya pagaste</span><span>{{ moneda() }} {{ Number(cuenta.mi_pagado).toFixed(2) }}</span>
+              </p>
+            }
+            <p class="flex justify-between text-[13px] inf-tenue mt-1">
+              <span>Total de la mesa por pagar</span><span>{{ moneda() }} {{ Number(cuenta.total_mesa).toFixed(2) }}</span>
+            </p>
+            <p class="ayuda mt-2">Pagas en caja. Si pagan por separado, te cobran solo lo tuyo.</p>
           </article>
         }
 
-        @if (pedidos.length > 0 || cuenta) {
+        @if (pedidos.length > 0 || miConsumo.length) {
           <button class="boton-primario w-full py-3.5!" (click)="vista = 'menu'">
             <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon> Pedir algo más
           </button>
         }
       </section>
     }
+  }
+
+  <!-- Asistente con IA -->
+  @if (estadoCarga === 'listo' && !bienvenida && ajustes.config().ia_cliente_disponible && chatAsistente() && vista !== 'carrito') {
+    <ng-container *ngComponentOutlet="chatAsistente(); inputs: {
+      titulo: 'Asistente virtual', subtitulo: ajustes.nombre() + ' · Mesa ' + info?.numero_mesa,
+      saludo: '¡Hola! Te ayudo a elegir: pregúntame por productos, precios o recomendaciones.',
+      etiqueta: '¿Qué pido?', sugerencias: sugerenciasAsistente, clave: 'menu_' + codigo,
+      elevado: vista === 'menu' && cantidadCarrito > 0, enviar: preguntarAsistente }" />
   }
 
   <!-- Botón flotante del carrito -->

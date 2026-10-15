@@ -1,0 +1,63 @@
+<ng-template #lineaTexto let-partes>@for (p of partes; track $index) {@if (p.negrita) {<strong>{{ p.texto }}</strong>} @else {{{ p.texto }}}}</ng-template>
+
+@if (!abierto()) {
+  <button type="button" class="chat-boton" [class.elevado]="elevado()" (click)="abrir()" [attr.aria-label]="'Abrir ' + titulo()">
+    <lucide-icon [img]="icons.chat" class="w-5 h-5"></lucide-icon>
+    <span>{{ etiqueta() }}</span>
+  </button>
+} @else {
+  <section class="chat-panel" role="dialog" [attr.aria-label]="titulo()">
+    <header class="chat-cabeza">
+      <span class="chat-avatar"><lucide-icon [img]="icons.chat" class="w-4 h-4"></lucide-icon></span>
+      <div class="min-w-0 flex-1">
+        <h2>{{ titulo() }}</h2>
+        @if (subtitulo()) { <p>{{ subtitulo() }}</p> }
+      </div>
+      @if (mensajes().length) {
+        <button type="button" class="chat-icono" (click)="limpiar()" title="Nueva conversación" aria-label="Nueva conversación">
+          <lucide-icon [img]="icons.limpiar" class="w-4 h-4"></lucide-icon>
+        </button>
+      }
+      <button type="button" class="chat-icono" (click)="cerrar()" aria-label="Cerrar">
+        <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+      </button>
+    </header>
+
+    <div class="chat-mensajes" #lista aria-live="polite">
+      <div class="burbuja asistente">{{ saludo() }}</div>
+      @for (m of mensajes(); track $index) {
+        @if (m.rol === 'usuario') { <div class="burbuja usuario">{{ m.texto }}</div> }
+        @else {
+          <div class="burbuja asistente" [class.error]="m.error">
+            @for (b of m.bloques; track $index) {
+              @if (b.lista) {
+                <ul>@for (item of b.items; track $index) { <li><ng-container *ngTemplateOutlet="lineaTexto; context: { $implicit: item }" /></li> }</ul>
+              } @else {
+                <p><ng-container *ngTemplateOutlet="lineaTexto; context: { $implicit: b.partes }" /></p>
+              }
+            }
+          </div>
+        }
+      }
+      @if (pensando()) {
+        <div class="burbuja asistente escribiendo" aria-label="Escribiendo"><span></span><span></span><span></span></div>
+      }
+      @if (!mensajes().length && sugerencias().length) {
+        <div class="chat-sugerencias">
+          @for (s of sugerencias(); track s) {
+            <button type="button" (click)="mandar(s)">{{ s }}</button>
+          }
+        </div>
+      }
+    </div>
+
+    <form class="chat-entrada" (submit)="$event.preventDefault(); mandar()">
+      <textarea #campo rows="1" maxlength="500" [value]="texto()" (input)="texto.set(campo.value)" (keydown)="teclear($event)"
+                placeholder="Escribe tu pregunta…" aria-label="Tu pregunta"></textarea>
+      <button type="submit" [disabled]="!texto().trim() || pensando()" aria-label="Enviar">
+        <lucide-icon [img]="icons.enviar" class="w-4 h-4"></lucide-icon>
+      </button>
+    </form>
+    <p class="chat-nota">Respuestas generadas con IA: pueden tener errores.</p>
+  </section>
+}

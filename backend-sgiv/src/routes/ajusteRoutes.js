@@ -14,6 +14,10 @@ router.put('/empresa',    admin, ctrl.guardarEmpresa);
 router.put('/apariencia', admin, ctrl.guardarApariencia);
 router.put('/parametros', admin, ctrl.guardarParametros);
 
+// Chatbot (Groq): información para el asistente del menú y prueba de conexión
+router.put ('/ia',        admin, ctrl.guardarIa);
+router.post('/ia/probar', admin, ctrl.probarIa);
+
 // Propietarios: datos privados, solo el administrador
 router.get   ('/propietarios',     admin, propietarios.listar);
 router.post  ('/propietarios',     admin, propietarios.crear);

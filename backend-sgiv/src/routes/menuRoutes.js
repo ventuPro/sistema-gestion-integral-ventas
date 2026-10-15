@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/menuController');
+const asistente = require('../controllers/asistenteController');
 
 // Menú digital del cliente (público). :codigo = código QR de la mesa
 router.get  ('/m/:codigo',                              ctrl.cargarMesa, ctrl.obtenerMesa);
@@ -8,5 +9,6 @@ router.get  ('/m/:codigo/catalogo',                     ctrl.cargarMesa, ctrl.ob
 router.get  ('/m/:codigo/estado',                       ctrl.cargarMesa, ctrl.obtenerEstado);
 router.post ('/m/:codigo/pedidos',                      ctrl.cargarMesa, ctrl.crearPedido);
 router.post ('/m/:codigo/pedidos/:id_pedido/cancelar',  ctrl.cargarMesa, ctrl.cancelarPedido);
+router.post ('/m/:codigo/asistente',                    ctrl.cargarMesa, asistente.cliente);
 
 module.exports = router;

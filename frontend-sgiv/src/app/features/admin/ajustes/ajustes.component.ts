@@ -3,15 +3,16 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule,
          Building2, Palette, Upload, RotateCcw, Save, Sun, Moon, MonitorSmartphone,
-         ImageIcon, Undo2, Crown, Store, SlidersHorizontal } from 'lucide-angular';
+         ImageIcon, Undo2, Crown, Store, SlidersHorizontal, Sparkles } from 'lucide-angular';
 import { AjustesService, Configuracion, Tema,
          COLOR_PRIMARIO_ORIGINAL, COLOR_SECUNDARIO_ORIGINAL } from '../../../core/services/ajustes.service';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { AjustesPropietariosComponent } from './propietarios/ajustes-propietarios.component';
 import { AjustesSucursalesComponent } from './sucursales/ajustes-sucursales.component';
 import { AjustesParametrosComponent } from './parametros/ajustes-parametros.component';
+import { AjustesIaComponent } from './ia/ajustes-ia.component';
 
-type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'parametros';
+type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'parametros' | 'ia';
 
 interface CampoEmpresa { clave: string; etiqueta: string; ejemplo: string; max: number; tipo?: string; ancho?: boolean }
 
@@ -28,7 +29,7 @@ const IMAGENES = {
   selector: 'app-ajustes',
   standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe,
-            AjustesPropietariosComponent, AjustesSucursalesComponent, AjustesParametrosComponent],
+            AjustesPropietariosComponent, AjustesSucursalesComponent, AjustesParametrosComponent, AjustesIaComponent],
   templateUrl: './ajustes.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './ajustes.css']
@@ -102,7 +103,8 @@ export class AjustesComponent implements OnInit, OnDestroy {
     { id: 'apariencia',   nombre: 'Apariencia',   icono: Palette },
     { id: 'propietarios', nombre: 'Propietarios', icono: Crown },
     { id: 'sucursales',   nombre: 'Sucursales',   icono: Store },
-    { id: 'parametros',   nombre: 'Parámetros',   icono: SlidersHorizontal }
+    { id: 'parametros',   nombre: 'Parámetros',   icono: SlidersHorizontal },
+    { id: 'ia',           nombre: 'Chatbot',      icono: Sparkles }
   ];
 
   pestana: Pestana = 'empresa';

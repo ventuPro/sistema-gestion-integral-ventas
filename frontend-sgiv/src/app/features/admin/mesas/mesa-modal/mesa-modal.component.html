@@ -1,3 +1,27 @@
+<!-- Una línea del consumo -->
+<ng-template #lineaConsumo let-item>
+  <div class="linea-carrito" [class.opacity-55]="item.pagado">
+    <div class="min-w-0">
+      <p class="inf-tinta text-[13.5px] font-medium truncate">
+        {{ item.nombre_producto }}
+        @if (item.origen === 'qr') { <span class="inf-ficha ml-1">QR</span> }
+        @if (item.pagado) { <span class="inf-estado ok ml-1">Pagado</span> }
+      </p>
+      <p class="inf-sub mt-0!">{{ moneda() }} {{ cifra(item.precio_unitario) }} c/u</p>
+      @if (item.nota) { <p class="text-[12px] inf-aviso">Nota: {{ item.nota }}</p> }
+    </div>
+    <span class="cantidad">×{{ item.cantidad }}</span>
+    <div class="flex items-center gap-1">
+      <span class="inf-tinta font-semibold text-[14px] whitespace-nowrap">{{ moneda() }} {{ cifra(item.subtotal) }}</span>
+      @if (!item.pagado) {
+        <button class="quitar" (click)="quitarProducto(item.id_detalle_cuenta)" title="Quitar" aria-label="Quitar producto">
+          <lucide-icon [img]="icons.quitar" class="w-4 h-4"></lucide-icon>
+        </button>
+      } @else { <span class="w-8"></span> }
+    </div>
+  </div>
+</ng-template>
+
 <div #bd class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal"
      (mousedown)="bd.setAttribute('data-md', $event.target === bd ? '1' : '0')"
      (mouseup)="bd.getAttribute('data-md') === '1' && $event.target === bd && cerrarModal(); bd.setAttribute('data-md','0')">
@@ -86,43 +110,52 @@
         <div class="flex flex-col min-h-0">
           <div class="flex items-center justify-between px-5 py-3 separador-inferior flex-shrink-0">
             <h3 class="inf-tinta font-semibold text-[14px]">Consumo actual</h3>
-            <span class="inf-nota">{{ cuentaActiva?.items?.length || 0 }} producto(s)</span>
+            <span class="inf-nota">{{ itemsPendientes.length }} por cobrar</span>
           </div>
 
           <div class="flex-1 overflow-y-auto">
-            @for (item of cuentaActiva?.items; track item.id_detalle_cuenta ?? $index) {
-              <div class="linea-carrito">
-                <div class="min-w-0">
-                  <p class="inf-tinta text-[13.5px] font-medium truncate">
-                    {{ item.nombre_producto }}
-                    @if (item.origen === 'qr') { <span class="inf-ficha ml-1">QR</span> }
-                  </p>
-                  <p class="inf-sub mt-0!">{{ moneda() }} {{ cifra(item.precio_unitario) }} c/u</p>
-                  @if (item.nota) { <p class="text-[12px] inf-aviso">Nota: {{ item.nota }}</p> }
-                </div>
-                <span class="cantidad">×{{ item.cantidad }}</span>
-                <div class="flex items-center gap-1">
-                  <span class="inf-tinta font-semibold text-[14px] whitespace-nowrap">{{ moneda() }} {{ cifra(item.subtotal) }}</span>
-                  <button class="quitar" (click)="quitarProducto(item.id_detalle_cuenta)" title="Quitar" aria-label="Quitar producto">
-                    <lucide-icon [img]="icons.quitar" class="w-4 h-4"></lucide-icon>
-                  </button>
-                </div>
-              </div>
-            } @empty {
+            @if (!cuentaActiva?.items?.length) {
               <div class="h-full flex flex-col items-center justify-center gap-2 py-12 inf-sutil">
                 <lucide-icon [img]="icons.carrito" class="w-7 h-7"></lucide-icon>
                 <p class="text-[13px]">Agrega productos del catálogo.</p>
               </div>
+            } @else if (porCliente) {
+              <!-- Por cliente: cada uno puede pagar lo suyo -->
+              @for (g of grupos; track g.clave) {
+                <div class="grupo-cliente">
+                  <div class="grupo-cliente-cabeza">
+                    <lucide-icon [img]="icons.cliente" class="w-4 h-4 inf-tenue shrink-0"></lucide-icon>
+                    <div class="min-w-0 flex-1">
+                      <p class="inf-tinta text-[13.5px] font-semibold truncate">{{ g.nombre }}</p>
+                      <p class="inf-sub mt-0!">
+                        @if (g.pendiente > 0) { Por cobrar {{ moneda() }} {{ cifra(g.pendiente) }} }
+                        @if (g.pendiente > 0 && g.pagado > 0) { · }
+                        @if (g.pagado > 0) { <span class="inf-sube">Pagado {{ moneda() }} {{ cifra(g.pagado) }}</span> }
+                      </p>
+                    </div>
+                    @if (g.pendiente > 0) {
+                      <button class="inf-boton py-1!" (click)="irAPago(g)">Cobrar</button>
+                    }
+                  </div>
+                  @for (item of g.items; track item.id_detalle_cuenta ?? $index) {
+                    <ng-container *ngTemplateOutlet="lineaConsumo; context: { $implicit: item }" />
+                  }
+                </div>
+              }
+            } @else {
+              @for (item of cuentaActiva?.items; track item.id_detalle_cuenta ?? $index) {
+                <ng-container *ngTemplateOutlet="lineaConsumo; context: { $implicit: item }" />
+              }
             }
           </div>
 
           <div class="p-5 separador flex-shrink-0">
             <div class="flex items-end justify-between gap-3 mb-4">
-              <span class="inf-etiqueta">Total</span>
+              <span class="inf-etiqueta">{{ porCliente ? 'Total por cobrar' : 'Total' }}</span>
               <span class="inf-valor mt-0! text-[28px]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCuenta) }}</span>
             </div>
-            <button class="boton-primario w-full py-3!" (click)="irAPago()" [disabled]="!cuentaActiva?.items?.length">
-              Cobrar y cerrar mesa
+            <button class="boton-primario w-full py-3!" (click)="irAPago()" [disabled]="!itemsPendientes.length">
+              {{ porCliente ? 'Cobrar todo y cerrar mesa' : 'Cobrar y cerrar mesa' }}
             </button>
           </div>
         </div>
@@ -134,7 +167,7 @@
       <div class="absolute inset-0 z-10 flex items-center justify-center p-4 fondo-modal" (click)="vista = 'comanda'">
         <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
           <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-            <h3 class="inf-tinta font-semibold text-[15px]">Cobrar · Mesa {{ mesa?.numero_mesa }}</h3>
+            <h3 class="inf-tinta font-semibold text-[15px]">Cobrar · {{ parteCobro ? parteCobro.nombre : 'Mesa ' + mesa?.numero_mesa }}</h3>
             <button class="quitar" (click)="vista = 'comanda'" aria-label="Cancelar">
               <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
             </button>
@@ -142,8 +175,9 @@
 
           <div class="p-5 space-y-5">
             <div>
-              <p class="inf-etiqueta">Total a cobrar</p>
-              <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCuenta) }}</p>
+              <p class="inf-etiqueta">{{ parteCobro ? 'Su parte' : 'Total a cobrar' }}</p>
+              <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCobro) }}</p>
+              @if (parteCobro) { <p class="inf-sub">La mesa sigue abierta para los demás.</p> }
             </div>
 
             <div>
@@ -172,10 +206,10 @@
                 </div>
                 @if (montoPagado > 0) {
                   <dl class="inf-pares mt-3">
-                    @if (montoPagado >= totalCuenta) {
+                    @if (montoPagado >= totalCobro) {
                       <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio) }}</dd></div>
                     } @else {
-                      <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(totalCuenta - montoPagado) }}</dd></div>
+                      <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(totalCobro - montoPagado) }}</dd></div>
                     }
                   </dl>
                 }
@@ -209,10 +243,10 @@
         <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[85vh]">
           <div class="flex items-center justify-between px-5 py-4 separador-inferior">
             <div>
-              <h3 class="inf-tinta font-semibold text-[15px]">Mesa cerrada</h3>
+              <h3 class="inf-tinta font-semibold text-[15px]">{{ cuentaCerrada ? 'Mesa cerrada' : 'Cobro registrado' }}</h3>
               <p class="inf-sub mt-0!">Comprobante #{{ datosTicket?.id_venta }}</p>
             </div>
-            <button class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
+            <button class="quitar" (click)="cerrarTicket()" aria-label="Cerrar">
               <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
             </button>
           </div>
@@ -220,7 +254,7 @@
             @if (datosTicket) { <div class="shadow-sm"><app-ticket [datos]="datosTicket" [fecha]="fechaTicket" /></div> }
           </div>
           <div class="inf-pie-hoja flex justify-end gap-2">
-            <button class="inf-boton" (click)="cerrarModal()">Cerrar</button>
+            <button class="inf-boton" (click)="cerrarTicket()">{{ cuentaCerrada ? 'Cerrar' : 'Volver a la mesa' }}</button>
             <button class="boton-primario" (click)="imprimirTicket()">
               <lucide-icon [img]="icons.imprimir" class="w-4 h-4"></lucide-icon> Imprimir
             </button>

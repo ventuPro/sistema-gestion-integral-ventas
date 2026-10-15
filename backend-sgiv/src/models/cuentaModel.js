@@ -2,6 +2,13 @@ const db = require('../config/db');
 const { finalizarPedidosDeCuenta } = require('./pedidoModel');
 const { registrarHistorial } = require('./inventarioModel');
 
+// total_acumulado = lo que falta cobrar (las partes ya pagadas tienen id_venta)
+const recalcularTotal = (client, id_cuenta) => client.query(`
+    UPDATE cuenta_mesa
+    SET total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta = $1 AND id_venta IS NULL)
+    WHERE id_cuenta = $1
+`, [id_cuenta]);
+
 // ─── ABRIR CUENTA / COMANDA ───
 const abrirCuenta = async (id_mesa, id_usuario) => {
     // Verificar que no haya cuenta abierta en esa mesa
@@ -49,12 +56,12 @@ const obtenerCuentaActiva = async (id_mesa) => {
 
     // Traer los productos de la comanda
     const rDetalle = await db.query(`
-        SELECT dc.*, p.nombre_producto, p.url_imagen, cat.nombre_categoria
+        SELECT dc.*, dc.id_venta IS NOT NULL AS pagado, p.nombre_producto, p.url_imagen, cat.nombre_categoria
         FROM detalle_cuenta dc
         JOIN producto          p   ON dc.id_producto = p.id_producto
         JOIN categoria_producto cat ON p.id_categoria  = cat.id_categoria
         WHERE dc.id_cuenta=$1
-        ORDER BY dc.fecha_agregado ASC
+        ORDER BY dc.fecha_agregado ASC, dc.id_detalle_cuenta ASC
     `, [cuenta.id_cuenta]);
 
     cuenta.items = rDetalle.rows;
@@ -117,7 +124,7 @@ const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_un
         const existe = await client.query(`
             SELECT id_detalle_cuenta, cantidad
             FROM detalle_cuenta
-            WHERE id_cuenta=$1 AND id_producto=$2 AND origen=$3
+            WHERE id_cuenta=$1 AND id_producto=$2 AND origen=$3 AND id_venta IS NULL AND cliente_mesa IS NULL
         `, [id_cuenta, id_producto, origen]);
 
         let detalle;
@@ -136,11 +143,7 @@ const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_un
         }
 
         // 5. Recalcular total_acumulado de la cuenta
-        await client.query(`
-            UPDATE cuenta_mesa
-            SET total_acumulado = (SELECT COALESCE(SUM(subtotal),0) FROM detalle_cuenta WHERE id_cuenta=$1)
-            WHERE id_cuenta=$1
-        `, [id_cuenta]);
+        await recalcularTotal(client, id_cuenta);
 
         await client.query('COMMIT');
         return { detalle, id_producto, nuevo_stock, id_sucursal, id_mesa };
@@ -160,13 +163,15 @@ const quitarProductoCuenta = async (id_detalle_cuenta, id_usuario = null) => {
 
         // 1. Obtener el detalle + id_sucursal
         const rDet = await client.query(`
-            SELECT dc.id_cuenta, dc.id_producto, dc.cantidad, ml.id_sucursal, cm.id_mesa, ml.numero_mesa
+            SELECT dc.id_cuenta, dc.id_producto, dc.cantidad, dc.id_venta, ml.id_sucursal, cm.id_mesa, ml.numero_mesa
             FROM detalle_cuenta dc
             JOIN cuenta_mesa cm ON dc.id_cuenta = cm.id_cuenta
             JOIN mesa_local  ml ON cm.id_mesa   = ml.id_mesa
-            WHERE dc.id_detalle_cuenta = $1
+            WHERE dc.id_detalle_cuenta = $1 AND cm.estado = 'Abierta'
+            FOR UPDATE OF dc
         `, [id_detalle_cuenta]);
         if (rDet.rows.length === 0) throw new Error('DETALLE_NO_ENCONTRADO');
+        if (rDet.rows[0].id_venta) throw new Error('DETALLE_PAGADO');
         const { id_cuenta, id_producto, cantidad, id_sucursal, id_mesa, numero_mesa } = rDet.rows[0];
 
         // 2. Devolver stock al inventario
@@ -191,11 +196,7 @@ const quitarProductoCuenta = async (id_detalle_cuenta, id_usuario = null) => {
         );
 
         // 4. Recalcular total
-        await client.query(`
-            UPDATE cuenta_mesa
-            SET total_acumulado = (SELECT COALESCE(SUM(subtotal),0) FROM detalle_cuenta WHERE id_cuenta=$1)
-            WHERE id_cuenta=$1
-        `, [id_cuenta]);
+        await recalcularTotal(client, id_cuenta);
 
         await client.query('COMMIT');
         return { id_cuenta, id_producto, nuevo_stock, id_sucursal, id_mesa };
@@ -214,7 +215,7 @@ const devolverStockCuenta = async (client, id_cuenta, id_usuario = null) => {
         FROM detalle_cuenta dc
         JOIN cuenta_mesa cm ON dc.id_cuenta = cm.id_cuenta
         JOIN mesa_local  ml ON cm.id_mesa   = ml.id_mesa
-        WHERE dc.id_cuenta = $1
+        WHERE dc.id_cuenta = $1 AND dc.id_venta IS NULL
     `, [id_cuenta]);
 
     const cambios = [];
@@ -241,16 +242,19 @@ const devolverStockCuenta = async (client, id_cuenta, id_usuario = null) => {
     return cambios;
 };
 
-// ─── CERRAR CUENTA Y REGISTRAR VENTA ───
-const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, id_sucursal) => {
+// ─── COBRAR: toda la cuenta o la parte de un cliente ───
+// parte = null → todo lo pendiente; { cliente_mesa } → lo pedido desde ese celular
+// (cliente_mesa null = lo que cargó el cajero). Si ya no queda nada pendiente se
+// cierra la cuenta y se libera la mesa.
+const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = null) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
 
-        // Obtener cuenta
-        const rCuenta = await client.query(
-            `SELECT * FROM cuenta_mesa WHERE id_cuenta=$1 AND estado='Abierta'`, [id_cuenta]
-        );
+        const rCuenta = await client.query(`
+            SELECT c.*, ml.id_sucursal FROM cuenta_mesa c JOIN mesa_local ml ON ml.id_mesa = c.id_mesa
+            WHERE c.id_cuenta=$1 AND c.estado='Abierta' FOR UPDATE OF c
+        `, [id_cuenta]);
         if (!rCuenta.rows.length) throw new Error('CUENTA_NO_ACTIVA');
         const cuenta = rCuenta.rows[0];
 
@@ -261,43 +265,59 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, id_sucurs
         if (rTurno.rows.length === 0) throw new Error('CAJA_CERRADA');
         const id_turno = rTurno.rows[0].id_turno;
 
-        // Crear registro de venta
+        const rItems = await client.query(`
+            SELECT * FROM detalle_cuenta
+            WHERE id_cuenta=$1 AND id_venta IS NULL
+              AND (NOT $2::boolean OR cliente_mesa IS NOT DISTINCT FROM $3)
+            ORDER BY id_detalle_cuenta
+        `, [id_cuenta, !!parte, parte?.cliente_mesa ?? null]);
+        if (!rItems.rows.length) throw new Error('NADA_POR_COBRAR');
+        const total = rItems.rows.reduce((suma, i) => suma + Math.round(Number(i.subtotal) * 100), 0) / 100;
+
         const rVenta = await client.query(`
             INSERT INTO venta_caja (id_sucursal,id_usuario_cajero,id_turno,monto_total_venta,metodo_pago)
             VALUES ($1,$2,$3,$4,$5) RETURNING id_venta
-        `, [id_sucursal, id_usuario_cajero, id_turno, cuenta.total_acumulado, metodo_pago]);
+        `, [cuenta.id_sucursal, id_usuario_cajero, id_turno, total, metodo_pago]);
         const id_venta = rVenta.rows[0].id_venta;
 
-        // Copiar items de comanda a detalle_venta.
-        // El stock YA fue descontado al agregar cada producto a la comanda,
-        // por lo tanto NO se vuelve a descontar aquí.
-        const rItems = await client.query(
-            `SELECT * FROM detalle_cuenta WHERE id_cuenta=$1`, [id_cuenta]
-        );
+        // El stock ya se descontó al agregar cada producto: aquí no se toca
         for (const item of rItems.rows) {
             await client.query(`
                 INSERT INTO detalle_venta (id_venta,id_producto,cantidad_vendida,precio_unitario,subtotal_venta)
                 VALUES ($1,$2,$3,$4,$5)
             `, [id_venta, item.id_producto, item.cantidad, item.precio_unitario, item.subtotal]);
         }
+        await client.query(`UPDATE detalle_cuenta SET id_venta=$1 WHERE id_detalle_cuenta = ANY($2::int[])`,
+                           [id_venta, rItems.rows.map(i => i.id_detalle_cuenta)]);
 
-        // Los pedidos QR de esta cuenta quedan pagados
-        const pedidos_pagados = await finalizarPedidosDeCuenta(client, id_cuenta, 'Pagado');
+        const rResto = await client.query(
+            `SELECT COUNT(*)::int AS n FROM detalle_cuenta WHERE id_cuenta=$1 AND id_venta IS NULL`, [id_cuenta]);
+        const cuenta_cerrada = rResto.rows[0].n === 0;
 
-        // Cerrar cuenta y liberar mesa
-        await client.query(`
-            UPDATE cuenta_mesa
-            SET estado='Pagada', metodo_pago=$1, fecha_cierre=NOW()
-            WHERE id_cuenta=$2
-        `, [metodo_pago, id_cuenta]);
-
-        await client.query(
-            `UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`,
-            [cuenta.id_mesa]
-        );
+        let pedidos_pagados = [];
+        if (cuenta_cerrada) {
+            pedidos_pagados = await finalizarPedidosDeCuenta(client, id_cuenta, 'Pagado');
+            // Cerrada: total_acumulado guarda todo lo consumido
+            await client.query(`
+                UPDATE cuenta_mesa
+                SET estado='Pagada', metodo_pago=$1, fecha_cierre=NOW(),
+                    total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta=$2)
+                WHERE id_cuenta=$2
+            `, [metodo_pago, id_cuenta]);
+            await client.query(`UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`, [cuenta.id_mesa]);
+        } else {
+            await recalcularTotal(client, id_cuenta);
+            if (parte?.cliente_mesa) {
+                pedidos_pagados = (await client.query(`
+                    UPDATE pedido_mesa SET estado_pedido = 'Pagado'
+                    WHERE id_cuenta = $1 AND cliente_mesa = $2 AND estado_pedido IN ('Confirmado', 'Entregado')
+                    RETURNING id_pedido
+                `, [id_cuenta, parte.cliente_mesa])).rows.map(r => r.id_pedido);
+            }
+        }
 
         await client.query('COMMIT');
-        return { id_venta, total: cuenta.total_acumulado, id_mesa: cuenta.id_mesa, pedidos_pagados };
+        return { id_venta, total, id_mesa: cuenta.id_mesa, pedidos_pagados, cuenta_cerrada };
     } catch(e) {
         await client.query('ROLLBACK');
         throw e;
@@ -321,7 +341,7 @@ const obtenerMesasConCuenta = async (id_sucursal) => {
             COUNT(dc.id_detalle_cuenta)::int AS num_items
         FROM mesa_local m
         LEFT JOIN cuenta_mesa    c  ON c.id_mesa  = m.id_mesa AND c.estado = 'Abierta'
-        LEFT JOIN detalle_cuenta dc ON dc.id_cuenta = c.id_cuenta
+        LEFT JOIN detalle_cuenta dc ON dc.id_cuenta = c.id_cuenta AND dc.id_venta IS NULL
         WHERE m.id_sucursal = $1
         GROUP BY m.id_mesa, m.numero_mesa, m.estado_mesa, m.codigo_qr, m.id_sucursal,
                  c.id_cuenta, c.total_acumulado, c.fecha_apertura

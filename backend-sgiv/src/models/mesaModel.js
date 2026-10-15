@@ -31,7 +31,7 @@ const obtenerMesasPorSucursal = async (id_sucursal) => {
         SELECT
             m.id_mesa, m.numero_mesa, m.estado_mesa, m.codigo_qr, m.id_sucursal,
             c.id_cuenta, c.total_acumulado, c.fecha_apertura,
-            (SELECT COUNT(*)::int FROM detalle_cuenta dc WHERE dc.id_cuenta=c.id_cuenta) AS num_items
+            (SELECT COUNT(*)::int FROM detalle_cuenta dc WHERE dc.id_cuenta=c.id_cuenta AND dc.id_venta IS NULL) AS num_items
         FROM mesa_local m
         LEFT JOIN cuenta_mesa c ON c.id_mesa=m.id_mesa AND c.estado='Abierta'
         WHERE m.id_sucursal=$1

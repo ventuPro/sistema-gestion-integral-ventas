@@ -49,6 +49,9 @@ export interface Configuracion {
   menu_activo: boolean;
   menu_mensaje_bienvenida: string | null;
   captcha_activo: boolean;
+  /** Chatbots siempre activos: true si el servidor tiene la clave de Groq */
+  ia_cliente_disponible: boolean;
+  ia_interno_disponible: boolean;
   // Solo con sesión de administrador
   menu_minutos_expiracion?: number;
   menu_max_pendientes_mesa?: number;
@@ -57,8 +60,11 @@ export interface Configuracion {
   login_max_intentos?: number;
   login_minutos_bloqueo?: number;
   sesion_horas?: number;
+  ia_info_negocio?: string | null;
   fecha_actualizacion?: string;
 }
+
+export interface PruebaChatbot { texto: string; modelo: string; ms: number }
 
 // Mismos valores por defecto que la tabla configuracion
 export const CONFIG_ORIGINAL: Configuracion = {
@@ -68,7 +74,7 @@ export const CONFIG_ORIGINAL: Configuracion = {
   url_logo: null, url_favicon: null, color_primario: null, color_secundario: null, tema: 'claro',
   moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, url_qr_cobro: null,
   ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80', menu_activo: true, menu_mensaje_bienvenida: null,
-  captcha_activo: true
+  captcha_activo: true, ia_cliente_disponible: false, ia_interno_disponible: false
 };
 
 // Tonos originales de Tailwind (blue-600 e indigo-600), para mostrar en el selector
@@ -85,7 +91,8 @@ const CLAVE_CACHE = 'ajustes_sgiv';
 
 // Llegan solo al administrador: no se guardan en la configuración compartida
 const PRIVADOS = ['menu_minutos_expiracion', 'menu_max_pendientes_mesa', 'menu_max_pedidos_ip', 'stock_minimo_defecto',
-                  'login_max_intentos', 'login_minutos_bloqueo', 'sesion_horas', 'id_configuracion', 'fecha_actualizacion'];
+                  'login_max_intentos', 'login_minutos_bloqueo', 'sesion_horas', 'id_configuracion', 'fecha_actualizacion',
+                  'ia_info_negocio'];
 
 // ─── Configuración del negocio: nombre, logo, colores y tema ───
 @Injectable({ providedIn: 'root' })
@@ -144,6 +151,15 @@ export class AjustesService {
       .pipe(tap((r: any) => this.establecer(r.configuracion)));
   }
 
+  // ─── Chatbot (solo administrador) ───
+  guardarIa(datos: Partial<Configuracion>): Observable<any> {
+    return this.http.put(`${this.api}/ia`, datos);
+  }
+
+  probarIa(): Observable<{ cliente: PruebaChatbot; interno: PruebaChatbot }> {
+    return this.http.post<{ cliente: PruebaChatbot; interno: PruebaChatbot }>(`${this.api}/ia/probar`, {});
+  }
+
   // ─── Propietarios (solo administrador) ───
   listarPropietarios(): Observable<Propietario[]> {
     return this.http.get<Propietario[]>(`${this.api}/propietarios`);
@@ -193,6 +209,11 @@ export class AjustesService {
   private establecer(c: Configuracion) {
     const publico: any = { ...CONFIG_ORIGINAL, ...c };
     PRIVADOS.forEach(k => delete publico[k]);
+    // La fila completa (respuesta al guardar) no trae la disponibilidad de la IA
+    if (!('ia_cliente_disponible' in c)) {
+      publico.ia_cliente_disponible = this.config().ia_cliente_disponible;
+      publico.ia_interno_disponible = this.config().ia_interno_disponible;
+    }
     this.config.set(publico);
     try { localStorage.setItem(CLAVE_CACHE, JSON.stringify(this.config())); } catch { }
     this.aplicar(this.config());

@@ -88,6 +88,15 @@
   <!-- Pedidos del menú QR: visibles en cualquier pantalla del cajero -->
   @if (esCajero && tiene('mesas')) { <app-bandeja-pedidos [flotante]="false" /> }
 
+  <!-- Asistente con IA: botón flotante en todas las pantallas -->
+  @if (ajustes.config().ia_interno_disponible && chatAsistente(); as chat) {
+    <ng-container *ngComponentOutlet="chat; inputs: {
+      titulo: 'Asistente', subtitulo: 'Ventas, stock, caja y ayuda del sistema',
+      saludo: '¡Hola' + (usuario?.nombre_completo ? ', ' + usuario.nombre_completo.split(' ')[0] : '') + '! Pregúntame por ventas, stock, pedidos o cómo hacer algo en el sistema.',
+      etiqueta: 'Asistente', sugerencias: sugerenciasAsistente, clave: 'panel_' + usuario?.id_usuario,
+      enviar: preguntarAsistente }" />
+  }
+
   <!-- ═══ CONTENIDO PRINCIPAL ═══ -->
   <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
 

@@ -11,17 +11,18 @@ const CAMPOS_PARAMETROS = ['moneda_simbolo', 'pago_efectivo', 'pago_qr', 'url_qr
                            'menu_activo', 'menu_mensaje_bienvenida', 'menu_minutos_expiracion',
                            'menu_max_pendientes_mesa', 'menu_max_pedidos_ip', 'stock_minimo_defecto',
                            'captcha_activo', 'login_max_intentos', 'login_minutos_bloqueo', 'sesion_horas'];
+const CAMPOS_IA = ['ia_info_negocio'];
 
 // No se envían sin sesión
 const PRIVADOS = ['id_configuracion', 'fecha_actualizacion', 'login_max_intentos', 'login_minutos_bloqueo',
                   'sesion_horas', 'menu_max_pedidos_ip', 'menu_max_pendientes_mesa', 'menu_minutos_expiracion',
-                  'stock_minimo_defecto'];
+                  'stock_minimo_defecto', ...CAMPOS_IA];
 
 // Valores del sistema original, por si la fila no existe
 const POR_DEFECTO = {
     moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80',
     menu_activo: true, menu_minutos_expiracion: 15, menu_max_pendientes_mesa: 3, menu_max_pedidos_ip: 10,
-    stock_minimo_defecto: 5, captcha_activo: true, login_max_intentos: 5, login_minutos_bloqueo: 15, sesion_horas: 8
+    stock_minimo_defecto: 5, captcha_activo: true, login_max_intentos: 5, login_minutos_bloqueo: 15, sesion_horas: 8, ia_info_negocio: null
 };
 
 const obtener = async () => {
@@ -35,6 +36,8 @@ const obtenerPublico = async () => {
     if (!c) return null;
     const publico = { ...c };
     for (const k of PRIVADOS) delete publico[k];
+    // Los chatbots están siempre activos; sin clave de Groq no se muestran
+    publico.ia_cliente_disponible = publico.ia_interno_disponible = !!process.env.GROQ_API_KEY;
     return publico;
 };
 
@@ -75,5 +78,5 @@ const actualizar = async (datos, permitidos) => {
 
 module.exports = {
     obtener, obtenerPublico, parametros, limpiarCache, motivoMetodoPago, actualizar,
-    CAMPOS_EMPRESA, CAMPOS_APARIENCIA, CAMPOS_PARAMETROS
+    CAMPOS_EMPRESA, CAMPOS_APARIENCIA, CAMPOS_PARAMETROS, CAMPOS_IA
 };

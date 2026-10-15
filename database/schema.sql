@@ -182,6 +182,8 @@ CREATE TABLE pedido_mesa (
     nombre_cliente VARCHAR(100),
     telefono_cliente VARCHAR(20),
     direccion_entrega TEXT,
+    -- Código del celular que hizo el pedido (menú QR): consumo y cobro por persona
+    cliente_mesa VARCHAR(32),
     CONSTRAINT pedido_mesa_estado_check
         CHECK (estado_pedido IN ('Pendiente_Cajero', 'Confirmado', 'Entregado', 'Pagado', 'Cancelado')),
     CONSTRAINT pedido_mesa_tipo_check
@@ -207,7 +209,12 @@ CREATE TABLE detalle_cuenta (
     subtotal DECIMAL(10, 2) NOT NULL,
     nota TEXT,
     origen VARCHAR(20) DEFAULT 'cajero',
-    fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Quién lo pidió desde el menú QR (NULL = cargado por el cajero)
+    cliente_mesa VARCHAR(32),
+    nombre_cliente VARCHAR(40),
+    -- Cobro por separado: venta en la que ya se pagó (NULL = por cobrar; FK más abajo)
+    id_venta INT
 );
 
 -- ==========================================
@@ -258,6 +265,9 @@ CREATE TABLE detalle_venta (
     subtotal_venta DECIMAL(10, 2) NOT NULL
 );
 
+ALTER TABLE detalle_cuenta
+    ADD CONSTRAINT detalle_cuenta_id_venta_fkey FOREIGN KEY (id_venta) REFERENCES venta_caja(id_venta);
+
 -- ==========================================
 -- 6b. CONFIGURACIÓN DEL NEGOCIO (módulo Ajustes)
 -- ==========================================
@@ -307,6 +317,8 @@ CREATE TABLE configuracion (
     login_max_intentos       INT NOT NULL DEFAULT 5  CHECK (login_max_intentos BETWEEN 3 AND 20),
     login_minutos_bloqueo    INT NOT NULL DEFAULT 15 CHECK (login_minutos_bloqueo BETWEEN 1 AND 1440),
     sesion_horas             INT NOT NULL DEFAULT 8  CHECK (sesion_horas BETWEEN 1 AND 24),
+    -- Inteligencia artificial (Groq)
+    ia_info_negocio     VARCHAR(3000),
     CONSTRAINT configuracion_metodo_pago_check CHECK (pago_efectivo OR pago_qr),
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

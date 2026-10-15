@@ -102,7 +102,24 @@ const MIGRACIONES = [
     `ALTER TABLE historial_inventario
         ADD COLUMN IF NOT EXISTS stock_resultante INT,
         ADD COLUMN IF NOT EXISTS detalle          VARCHAR(200);
-    DROP INDEX IF EXISTS idx_historial_inventario;`
+    DROP INDEX IF EXISTS idx_historial_inventario;`,
+
+    // Chatbots con Groq: siempre activos si hay clave; modelos y límites automáticos
+    `ALTER TABLE configuracion
+        ADD COLUMN IF NOT EXISTS ia_info_negocio VARCHAR(3000);
+    ALTER TABLE configuracion ALTER COLUMN ia_info_negocio TYPE VARCHAR(3000);
+    ALTER TABLE configuracion
+        DROP COLUMN IF EXISTS ia_cliente_activo, DROP COLUMN IF EXISTS ia_interno_activo,
+        DROP COLUMN IF EXISTS ia_modelo_cliente, DROP COLUMN IF EXISTS ia_modelo_interno,
+        DROP COLUMN IF EXISTS ia_limite_cliente, DROP COLUMN IF EXISTS ia_limite_interno;`,
+
+    // Menú QR: cada celular se identifica con un código propio (consumo y cobro por persona)
+    `ALTER TABLE pedido_mesa
+        ADD COLUMN IF NOT EXISTS cliente_mesa VARCHAR(32);
+    ALTER TABLE detalle_cuenta
+        ADD COLUMN IF NOT EXISTS cliente_mesa   VARCHAR(32),
+        ADD COLUMN IF NOT EXISTS nombre_cliente VARCHAR(40),
+        ADD COLUMN IF NOT EXISTS id_venta       INT REFERENCES venta_caja(id_venta);`
 ];
 
 const aplicarMigraciones = async () => {

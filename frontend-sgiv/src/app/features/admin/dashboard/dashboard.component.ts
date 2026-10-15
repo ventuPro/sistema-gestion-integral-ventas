@@ -11,7 +11,11 @@ import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { BandejaPedidosComponent } from '../bandeja-pedidos/bandeja-pedidos.component';
+import { HttpClient } from '@angular/common/http';
 import { Subscription, filter } from 'rxjs';
+import { environment } from '../../../../environments/environment';
+import { componenteDiferido } from '../../../core/utils/diferido';
+import type { MensajeChat } from '../../shared/asistente/asistente-chat.component';
 
 interface Enlace { ruta: string; texto: string; icono: any; modulo?: string }
 
@@ -29,6 +33,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private socketService  = inject(SocketService);
   private cdr            = inject(ChangeDetectorRef);
   readonly ajustes       = inject(AjustesService);
+  private http           = inject(HttpClient);
+
+  // ─── Asistente con IA (se descarga solo si está activado) ───
+  readonly chatAsistente = componenteDiferido(() => this.ajustes.config().ia_interno_disponible,
+    () => import('../../shared/asistente/asistente-chat.component').then(m => m.AsistenteChatComponent));
+  readonly preguntarAsistente = (mensajes: MensajeChat[]) =>
+    this.http.post<{ respuesta: string }>(`${environment.apiUrl}/asistente`, { mensajes });
 
   usuario:        any  = null;
   esAdmin         = false;
@@ -136,6 +147,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
       ]}
     ];
     return [];
+  }
+
+  /** Preguntas de ejemplo según lo que el usuario puede ver */
+  get sugerenciasAsistente(): string[] {
+    if (this.esAdmin) return ['¿Cómo van las ventas hoy?', '¿Qué productos tienen stock bajo?',
+                              '¿Cuánto vendimos este mes?', '¿Cómo registro una merma?'];
+    return [
+      this.tiene('dashboard') && '¿Cómo van las ventas hoy?',
+      this.tiene('mesas') && '¿Hay pedidos QR pendientes?',
+      (this.tiene('arqueo') || this.tiene('punto_venta')) && '¿Cuánto efectivo debería tener en caja?',
+      (this.tiene('inventario') || this.tiene('punto_venta')) && '¿Qué productos están por agotarse?',
+      this.tiene('mesas') ? '¿Cómo cobro una mesa?' : '¿Cómo cierro mi caja?'
+    ].filter((s): s is string => !!s).slice(0, 4);
   }
 
   abrirBandeja() {

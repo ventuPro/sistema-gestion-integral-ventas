@@ -12,6 +12,7 @@
   <div class="tk-fila"><span>Comprobante</span><span>#{{ datos().id_venta }}</span></div>
   <div class="tk-fila"><span>Fecha</span><span>{{ textoFecha }}</span></div>
   @if (datos().numero_mesa) { <div class="tk-fila"><span>Mesa</span><span>{{ datos().numero_mesa }}</span></div> }
+  @if (datos().cliente) { <div class="tk-fila"><span>Cliente</span><span>{{ datos().cliente }}</span></div> }
   <hr class="tk-linea">
 
   @for (item of datos().items; track $index) {

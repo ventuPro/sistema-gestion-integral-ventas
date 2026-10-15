@@ -1,0 +1,93 @@
+@if (mensaje(); as m) { <div class="aviso-flotante" [class.error]="m.tipo === 'error'" role="status">{{ m.texto }}</div> }
+
+<ng-template #resultado let-nombre="nombre" let-r="r">
+  <div class="flex flex-wrap items-baseline gap-x-2 text-[12.5px]">
+    <span class="inf-tinta font-medium">{{ nombre }}</span>
+    <span class="inf-sube">respondió en {{ (r.ms / 1000).toFixed(1) }} s</span>
+    <span class="inf-sutil">· {{ r.modelo }}</span>
+    <span class="inf-tenue basis-full">«{{ r.texto }}»</span>
+  </div>
+</ng-template>
+
+@if (cargando()) {
+  <div class="space-y-5">
+    <div class="inf-esqueleto h-32"></div>
+    <div class="inf-esqueleto h-72"></div>
+  </div>
+} @else {
+  <div class="space-y-5">
+
+    <!-- ═══ ESTADO ═══ -->
+    <section class="inf-hoja">
+      <div class="bloque-cabeza">
+        <h2>Chatbots</h2>
+        <p>Asistente del menú QR para los clientes y asistente del panel para cajeros y administrador. Solo consultan datos: nunca guardan ni modifican nada.</p>
+      </div>
+      <div class="bloque-cuerpo space-y-3">
+        @if (conClave()) {
+          <span class="inf-estado ok">Activos en el menú QR y en el panel</span>
+        } @else {
+          <span class="inf-estado mal">Sin clave de Groq</span>
+          <p class="aviso-suave">
+            Crea una clave gratuita en console.groq.com → API Keys y agrégala en el archivo
+            <code>backend-sgiv/.env</code> como <code>GROQ_API_KEY=…</code>. Luego reinicia el servidor.
+          </p>
+        }
+        <p class="ayuda">
+          El sistema elige el modelo de IA y, si uno llega a su límite gratuito, pasa solo a otro. También limita las preguntas
+          por celular y por usuario para que el cupo alcance para todos.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 pt-1">
+          <button type="button" class="inf-boton" (click)="probar()" [disabled]="!conClave() || probando()">
+            <lucide-icon [img]="icons.probar" class="w-3.5 h-3.5"></lucide-icon>
+            {{ probando() ? 'Probando…' : 'Probar conexión' }}
+          </button>
+          @if (errorPrueba()) { <span class="text-[12.5px] inf-baja">{{ errorPrueba() }}</span> }
+        </div>
+        @if (prueba(); as p) {
+          <div class="space-y-2">
+            <ng-container *ngTemplateOutlet="resultado; context: { nombre: 'Menú QR', r: p.menu }" />
+            <ng-container *ngTemplateOutlet="resultado; context: { nombre: 'Panel', r: p.personal }" />
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- ═══ INFORMACIÓN PARA EL CHATBOT ═══ -->
+    <form class="inf-hoja" (submit)="$event.preventDefault(); guardar()">
+      <div class="bloque-cabeza">
+        <h2>Información para el chatbot del menú <span class="inf-sutil font-normal">(opcional)</span></h2>
+        <p>Lo que quieres que el asistente responda a tus clientes. Ya conoce la carta, los precios, el stock, los horarios y los datos de contacto.</p>
+      </div>
+      <div class="bloque-cuerpo grupo">
+        <label class="sr-only" for="ia_info_negocio">Información para el chatbot</label>
+        <textarea id="ia_info_negocio" class="campo" rows="10" [maxLength]="maximo" [value]="info()" (input)="escribir($event)"
+                  placeholder="Ej.:
+- Hacemos tortas por encargo con 2 días de anticipación; se paga la mitad al encargar.
+- La torta de chocolate es la más pedida.
+- Tenemos WiFi para clientes: pídelo en caja.
+- No usamos maní en ningún producto."></textarea>
+        <p class="ayuda flex justify-between gap-3">
+          <span>Escribe frases cortas: preguntas frecuentes, encargos, recomendaciones de la casa, reglas del local.</span>
+          <span class="inf-sutil shrink-0">{{ info().length }}/{{ maximo }}</span>
+        </p>
+      </div>
+      <div class="inf-pie-hoja acciones-guardar">
+        @if (hayCambios()) {
+          <button type="button" class="inf-boton" (click)="descartar()" [disabled]="guardando()">
+            <lucide-icon [img]="icons.descartar" class="w-3.5 h-3.5"></lucide-icon> Descartar cambios
+          </button>
+        }
+        <button type="submit" class="boton-primario" [disabled]="guardando() || !hayCambios()">
+          <lucide-icon [img]="icons.guardar" class="w-4 h-4"></lucide-icon>
+          {{ guardando() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </form>
+
+    <p class="ayuda">
+      Privacidad: a Groq se envía solo lo necesario para responder (carta, horarios, totales de ventas, stock).
+      Nunca se envían contraseñas, datos de propietarios ni datos personales de clientes.
+    </p>
+  </div>
+}

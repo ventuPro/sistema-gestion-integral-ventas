@@ -66,7 +66,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     this.subs.push(this.socketService.escuchar<any>('pedido:nuevo').subscribe(d => {
       if (!this.esDeMiSucursal(d)) return;
       this.sonar();
-      this.mostrarAviso(`🔔 Nuevo pedido de la Mesa ${d.numero_mesa}`);
+      this.mostrarAviso(`🔔 Nuevo pedido de la Mesa ${d.numero_mesa}${d.nombre_cliente ? ` (${d.nombre_cliente})` : ''}`);
       this.cargar();
     }));
     this.subs.push(this.socketService.escuchar<any>('pedido:actualizado').subscribe(d => {
@@ -198,7 +198,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   etiqueta(pedido: any): string {
     return pedido.tipo_pedido === 'Delivery'
       ? `Delivery · ${pedido.nombre_cliente || 'Cliente'}`
-      : `Mesa ${pedido.numero_mesa}`;
+      : `Mesa ${pedido.numero_mesa}${pedido.nombre_cliente ? ` · ${pedido.nombre_cliente}` : ''}`;
   }
 
   private mostrarAviso(msg: string) {
