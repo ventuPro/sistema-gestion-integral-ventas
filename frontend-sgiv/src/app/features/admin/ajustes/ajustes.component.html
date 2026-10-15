@@ -36,7 +36,6 @@
         <section class="inf-hoja">
           <div class="bloque-cabeza">
             <h2>{{ grupo.titulo }}</h2>
-            @if (grupo.detalle) { <p>{{ grupo.detalle }}</p> }
           </div>
           <div class="bloque-cuerpo grid grid-cols-1 md:grid-cols-2 gap-4">
             @for (c of grupo.campos; track c.clave) {
@@ -65,7 +64,6 @@
       <section class="inf-hoja">
         <div class="bloque-cabeza">
           <h2>Logo e ícono</h2>
-          <p>El logo aparece en el menú, los tickets y el menú QR; el ícono, en la pestaña del navegador.</p>
         </div>
         <div class="bloque-cuerpo grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="flex items-center gap-4">
@@ -75,7 +73,6 @@
             </div>
             <div class="space-y-2">
               <p class="inf-tinta text-[13.5px] font-medium">Logo del negocio</p>
-              <p class="ayuda">PNG, JPG o WEBP, hasta 2 MB. Mejor con fondo transparente.</p>
               <div class="flex gap-2">
                 <label class="inf-boton cursor-pointer">
                   <lucide-icon [img]="icons.subir" class="w-3.5 h-3.5"></lucide-icon> {{ logoVista ? 'Cambiar' : 'Subir' }}
@@ -95,7 +92,6 @@
             </div>
             <div class="space-y-2">
               <p class="inf-tinta text-[13.5px] font-medium">Ícono de la pestaña</p>
-              <p class="ayuda">PNG cuadrado o ICO, hasta 512 KB.</p>
               <div class="flex gap-2">
                 <label class="inf-boton cursor-pointer">
                   <lucide-icon [img]="icons.subir" class="w-3.5 h-3.5"></lucide-icon> {{ faviconVista ? 'Cambiar' : 'Subir' }}
@@ -113,7 +109,6 @@
       <section class="inf-hoja">
         <div class="bloque-cabeza">
           <h2>Colores</h2>
-          <p>El principal se usa en botones, menús y encabezados; el secundario, en degradados y detalles.</p>
         </div>
         <div class="bloque-cuerpo space-y-5">
           <div class="flex flex-wrap gap-2">
@@ -151,7 +146,6 @@
       <section class="inf-hoja">
         <div class="bloque-cabeza">
           <h2>Tema por defecto</h2>
-          <p>Es el que verá todo el personal y los clientes del menú QR.</p>
         </div>
         <div class="bloque-cuerpo grid grid-cols-1 sm:grid-cols-3 gap-3">
           @for (t of temas; track t.valor) {
@@ -160,7 +154,6 @@
               <lucide-icon [img]="t.icono" class="w-5 h-5 flex-shrink-0" style="color: var(--i-acento)"></lucide-icon>
               <span>
                 <span class="block font-semibold inf-tinta">{{ t.nombre }}</span>
-                <span class="block text-xs inf-tenue">{{ t.detalle }}</span>
               </span>
             </button>
           }
@@ -170,7 +163,6 @@
       <section class="inf-hoja">
         <div class="bloque-cabeza">
           <h2>Vista previa</h2>
-          <p>Todo el sistema ya muestra estos cambios; se guardan solo al presionar «Guardar apariencia».</p>
         </div>
         <div class="bloque-cuerpo flex flex-col md:flex-row gap-4 items-stretch">
           <div class="md:w-56 bg-gray-900 rounded-lg p-4 text-white flex items-center gap-3">

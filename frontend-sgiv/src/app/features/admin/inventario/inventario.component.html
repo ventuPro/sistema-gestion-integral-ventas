@@ -261,7 +261,6 @@
               {{ previewImagen ? 'Cambiar foto' : 'Elegir foto' }}
               <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onArchivoSeleccionado($event)" class="hidden">
             </label>
-            <p class="ayuda mt-1.5">JPG, PNG o WEBP. Máximo 2 MB.</p>
           </div>
         </div>
 
@@ -295,7 +294,6 @@
           <div class="grupo">
             <label class="inf-etiqueta" for="stock-inicial">Stock inicial</label>
             <input id="stock-inicial" type="number" min="0" class="campo" [(ngModel)]="formulario.stock_inicial" placeholder="0">
-            <p class="ayuda">Luego puedes sumar unidades con el botón «Stock».</p>
           </div>
         }
       </div>
@@ -328,11 +326,9 @@
         <div class="grid grid-cols-2 gap-2">
           <button type="button" class="eleccion flex-col! items-start! gap-0.5!" [class.activa]="mov.tipo === 'INGRESO'" (click)="cambiarTipoMov('INGRESO')">
             <span class="font-semibold inf-tinta">Entrada</span>
-            <span class="text-xs inf-tenue">Suma al stock</span>
           </button>
           <button type="button" class="eleccion flex-col! items-start! gap-0.5!" [class.activa]="mov.tipo === 'SALIDA'" (click)="cambiarTipoMov('SALIDA')">
             <span class="font-semibold inf-tinta">Merma o salida</span>
-            <span class="text-xs inf-tenue">Resta del stock</span>
           </button>
         </div>
 
@@ -357,7 +353,7 @@
             Observación <span class="inf-sutil">{{ mov.motivo === 'Otro' ? '(obligatoria)' : '(opcional)' }}</span>
           </label>
           <textarea id="mov-detalle" class="campo" rows="2" maxlength="200" [(ngModel)]="mov.detalle"
-                    placeholder="Ej.: hornada de la mañana, caja dañada en el transporte…"></textarea>
+                    placeholder="Ej.: hornada de la mañana"></textarea>
         </div>
 
         <dl class="inf-pares">

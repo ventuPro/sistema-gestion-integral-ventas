@@ -51,7 +51,6 @@
             <label for="nombre-cliente" class="inf-tinta text-sm font-medium">¿Cómo te llamas? <span class="inf-sutil font-normal">(opcional)</span></label>
             <input id="nombre-cliente" class="campo mt-1.5" [(ngModel)]="nombreEditado" name="nombre" maxlength="40"
                    autocomplete="given-name" placeholder="Tu nombre">
-            <p class="ayuda mt-1.5">Si en la mesa pagan por separado, así el cajero sabe qué pidió cada uno.</p>
             <button type="submit" class="boton-primario w-full py-3! text-base! mt-4">Ver el menú</button>
           </form>
 
@@ -99,7 +98,6 @@
         <div class="inf-hoja p-4 text-center">
           <lucide-icon [img]="icons.gracias" class="w-8 h-8 mx-auto inf-sube"></lucide-icon>
           <p class="inf-tinta font-semibold mt-2">¡Gracias por tu visita!</p>
-          <p class="inf-tenue text-sm">Tu cuenta fue cerrada. Esperamos verte pronto.</p>
         </div>
       }
     </div>
@@ -221,10 +219,7 @@
                     [disabled]="enviando || !info.recibe_pedidos || !ajustes.config().menu_activo">
               {{ enviando ? 'Enviando…' : 'Enviar pedido' }}
             </button>
-            <p class="text-center ayuda">
-              El cajero confirmará tu pedido. Pagas al final en caja.
-              @if (nombreCliente) { <br>A nombre de <b class="inf-tinta">{{ nombreCliente }}</b>. }
-            </p>
+            @if (nombreCliente) { <p class="text-center ayuda">A nombre de <b class="inf-tinta">{{ nombreCliente }}</b></p> }
           </div>
         }
       </section>
@@ -237,8 +232,8 @@
           @if (!editandoNombre) {
             <div class="flex items-center justify-between gap-3">
               <p class="text-[13.5px] inf-tenue min-w-0 truncate">
-                @if (nombreCliente) { Tus pedidos van a nombre de <b class="inf-tinta">{{ nombreCliente }}</b> }
-                @else { Agrega tu nombre si van a pagar por separado }
+                @if (nombreCliente) { <b class="inf-tinta">{{ nombreCliente }}</b> }
+                @else { Sin nombre }
               </p>
               <button class="inf-enlace text-[13px] shrink-0 inline-flex items-center gap-1" (click)="editandoNombre = true; nombreEditado = nombreCliente">
                 <lucide-icon [img]="icons.editar" class="w-3.5 h-3.5"></lucide-icon> {{ nombreCliente ? 'Cambiar' : 'Agregar' }}
@@ -250,7 +245,6 @@
                      aria-label="Tu nombre" autocomplete="given-name">
               <button type="submit" class="boton-primario py-2!">Listo</button>
             </form>
-            <p class="ayuda mt-1.5">Se usa en tus próximos pedidos.</p>
           }
         </div>
 
@@ -329,7 +323,6 @@
             <p class="flex justify-between text-[13px] inf-tenue mt-1">
               <span>Total de la mesa por pagar</span><span>{{ moneda() }} {{ Number(cuenta.total_mesa).toFixed(2) }}</span>
             </p>
-            <p class="ayuda mt-2">Pagas en caja. Si pagan por separado, te cobran solo lo tuyo.</p>
           </article>
         }
 

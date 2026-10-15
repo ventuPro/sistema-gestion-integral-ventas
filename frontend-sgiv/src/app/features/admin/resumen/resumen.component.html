@@ -91,7 +91,6 @@
       <div>
         <p class="inf-etiqueta">Ticket promedio</p>
         <p class="inf-valor">{{ moneda() }} {{ cifra(hoy.ticket) }}</p>
-        <p class="inf-sub">por venta</p>
       </div>
       <div>
         <p class="inf-etiqueta">Por cobrar en mesas</p>
@@ -288,8 +287,7 @@
     <!-- Últimos 14 días -->
     <section class="inf-hoja p-5">
       <div class="inf-seccion">
-        <h2>Últimos 14 días</h2>
-        <span class="inf-nota">Últimos 7 días contra los 7 anteriores</span>
+        <h2>Últimos 7 días vs. 7 anteriores</h2>
       </div>
       <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 mb-4">
         <p class="inf-valor mt-0!">{{ moneda() }} {{ cifra(semanas.actual) }}</p>

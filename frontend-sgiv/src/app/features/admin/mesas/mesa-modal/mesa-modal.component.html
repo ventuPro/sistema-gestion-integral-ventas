@@ -177,7 +177,6 @@
             <div>
               <p class="inf-etiqueta">{{ parteCobro ? 'Su parte' : 'Total a cobrar' }}</p>
               <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCobro) }}</p>
-              @if (parteCobro) { <p class="inf-sub">La mesa sigue abierta para los demás.</p> }
             </div>
 
             <div>
@@ -219,9 +218,6 @@
             @if (metodoPago === 'QR') {
               <div class="flex flex-col items-center gap-3 text-center">
                 @if (ajustes.qrCobro()) { <img [src]="ajustes.qrCobro()" alt="QR de cobro" class="qr-cobro"> }
-                <p class="inf-tenue text-[13px]">
-                  {{ ajustes.qrCobro() ? 'Muestra este QR al cliente y confirma cuando pague.' : 'Confirma cuando el cliente pague por QR.' }}
-                </p>
               </div>
             }
           </div>
@@ -266,7 +262,6 @@
     <!-- Código QR de la mesa -->
     @if (vista === 'qr') {
       <div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
-        <p class="inf-tenue text-sm mb-5">El cliente escanea este código para ver el menú y pedir desde su celular.</p>
         @if (!qrData) {
           <div class="inf-esqueleto w-56 h-56"></div>
         } @else {

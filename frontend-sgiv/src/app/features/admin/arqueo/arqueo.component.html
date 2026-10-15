@@ -64,7 +64,6 @@
                 }
               </tbody>
             </table>
-            <p class="inf-sub mt-3">Solo el efectivo debe estar físicamente en caja; los demás métodos se verifican en su cuenta.</p>
           } @else {
             <p class="inf-vacio">Todavía no hay cobros en este turno.</p>
           }
@@ -87,7 +86,6 @@
                   <span class="inf-estado" [ngClass]="claseDiferencia(diferencia)">{{ textoDiferencia(diferencia) }}</span>
                 }
               </div>
-              <p class="inf-sub mt-2">Opcional. Si lo ingresas, queda registrado junto con la diferencia para el administrador.</p>
 
               @if (conBilletes) {
                 <button class="flex items-center gap-1.5 inf-enlace mt-4" (click)="mostrarConteo = !mostrarConteo">
@@ -109,13 +107,7 @@
             </div>
 
             <div class="flex flex-col justify-between gap-4">
-              <div>
-                <p class="paso"><span>2</span>Confirma el cierre</p>
-                <p class="text-[13px] inf-tenue mt-3 leading-relaxed">
-                  Al cerrar ya no podrás registrar ventas hasta que el administrador reabra tu caja.
-                  Al día siguiente podrás abrir caja con un nuevo fondo inicial.
-                </p>
-              </div>
+              <p class="paso"><span>2</span>Confirma el cierre</p>
               <button class="boton-cerrar self-start" (click)="confirmarCierre()">Cerrar caja</button>
             </div>
           </div>
@@ -145,9 +137,6 @@
             </p>
           </div>
         </div>
-        @if (!esAdmin) {
-          <p class="inf-sub mt-4">Si necesitas volver a vender hoy, pide al administrador que reabra tu caja.</p>
-        }
       </section>
     }
 
@@ -155,10 +144,7 @@
     @if (!turno) {
       <section class="inf-hoja p-6 flex items-start gap-4">
         <span class="inf-estado aviso mt-1"></span>
-        <div>
-          <p class="inf-tinta font-semibold text-[14px]">No abriste caja hoy</p>
-          <p class="text-[13px] inf-tenue mt-1">Ve a <b class="inf-tinta">Punto de Venta</b> e ingresa tu fondo inicial para empezar a vender.</p>
-        </div>
+        <p class="inf-tinta font-semibold text-[14px]">No abriste caja hoy</p>
       </section>
     }
 
@@ -167,7 +153,6 @@
       <div>
         <p class="inf-etiqueta">Ventas de hoy</p>
         <p class="inf-valor">{{ entero(hoy.total_ventas) }}</p>
-        <p class="inf-sub">registradas por ti</p>
       </div>
       <div>
         <p class="inf-etiqueta">Ingresos de hoy</p>
@@ -237,7 +222,6 @@
           <div class="total"><dt>Resultado</dt><dd><span class="inf-estado" [ngClass]="claseDiferencia(diferencia)">{{ textoDiferencia(diferencia) }}</span></dd></div>
         }
       </dl>
-      <p class="px-5 text-xs inf-tenue">Solo el administrador podrá reabrir tu caja durante las próximas 24 horas.</p>
       <div class="flex gap-2 p-5">
         <button class="inf-boton flex-1 justify-center py-2!" (click)="mostrarConfirmCierre = false">Cancelar</button>
         <button class="boton-cerrar flex-1" [disabled]="cerrando" (click)="ejecutarCierreCaja()">

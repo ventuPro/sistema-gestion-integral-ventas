@@ -39,7 +39,6 @@
         <lucide-icon [img]="icons.shieldAlert" class="w-6 h-6 inf-baja flex-shrink-0 mt-0.5"></lucide-icon>
         <div>
           <h2 class="inf-tinta font-semibold text-[15px]">Tu caja ya fue cerrada hoy</h2>
-          <p class="inf-tenue text-sm mt-1">No puedes atender mesas hasta que el administrador la reabra.</p>
         </div>
       </div>
       @if (turnoCajero) {
@@ -61,7 +60,6 @@
         <lucide-icon [img]="icons.landmark" class="w-6 h-6 flex-shrink-0 mt-0.5" style="color: var(--i-acento)"></lucide-icon>
         <div>
           <h2 class="inf-tinta font-semibold text-[15px]">Aún no abriste tu caja</h2>
-          <p class="inf-tenue text-sm mt-1">Abre la caja del día en Punto de venta para empezar a atender mesas.</p>
         </div>
       </div>
       <a routerLink="/dashboard/punto-venta" class="inf-boton mt-5">Ir a Punto de venta</a>
@@ -120,7 +118,6 @@
                 } @else if (mesa.estado_mesa === 'Ocupada') {
                   <span class="inf-estado mal mt-2">Ocupada</span>
                 } @else {
-                  <span class="inf-sub mt-2!">Toca para abrir</span>
                 }
               </button>
             </div>
@@ -164,7 +161,6 @@
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
         <div>
           <h3 class="inf-tinta font-semibold text-[15px]">Códigos QR de las mesas</h3>
-          <p class="inf-sub mt-0.5!">Imprímelos y pégalos en cada mesa. El cliente escanea y pide desde su celular.</p>
         </div>
         <button class="quitar" (click)="cerrarModalQR()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>

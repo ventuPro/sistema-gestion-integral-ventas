@@ -176,7 +176,6 @@
             </select>
           </div>
         </div>
-        @if (editandoId) { <p class="ayuda">La contraseña se cambia con el botón de la llave en la lista.</p> }
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModal()">Cancelar</button>
@@ -248,7 +247,6 @@
               </label>
             }
           </div>
-          <p class="ayuda">Se aplican cuando el usuario recarga la página o vuelve a iniciar sesión.</p>
         }
         @if (errorPermisos) { <p class="error-formulario">{{ errorPermisos }}</p> }
       </div>

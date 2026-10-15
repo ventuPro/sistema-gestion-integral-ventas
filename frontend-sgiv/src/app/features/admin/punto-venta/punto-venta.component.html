@@ -20,7 +20,6 @@
         <lucide-icon [img]="icons.shieldAlert" class="w-6 h-6 inf-baja flex-shrink-0 mt-0.5"></lucide-icon>
         <div>
           <h2 class="inf-tinta font-semibold text-[15px]">Tu caja ya fue cerrada hoy</h2>
-          <p class="inf-tenue text-sm mt-1">No puedes registrar ventas hasta que el administrador la reabra.</p>
         </div>
       </div>
       @if (turnoActivo) {
@@ -50,7 +49,6 @@
           <lucide-icon [img]="icons.landmark" class="w-6 h-6 flex-shrink-0 mt-0.5" style="color: var(--i-acento)"></lucide-icon>
           <div>
             <h2 class="inf-tinta font-semibold text-[15px]">Abrir la caja del día</h2>
-            <p class="inf-tenue text-sm mt-1">Es tu primera operación de hoy. Cuenta el efectivo con el que empiezas; no necesitas autorización del administrador.</p>
           </div>
         </div>
         <label class="inf-etiqueta block mt-6 mb-2">Fondo inicial</label>
@@ -305,9 +303,6 @@
         @if (metodoPago === 'QR') {
           <div class="flex flex-col items-center gap-3 text-center">
             @if (ajustes.qrCobro()) { <img [src]="ajustes.qrCobro()" alt="QR de cobro" class="qr-cobro"> }
-            <p class="inf-tenue text-[13px]">
-              {{ ajustes.qrCobro() ? 'Muestra este QR al cliente y confirma cuando pague.' : 'Confirma cuando el cliente pague por QR.' }}
-            </p>
           </div>
         }
       </div>

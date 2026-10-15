@@ -4,7 +4,6 @@
   <span class="pista"></span>
   <span>
     <span class="texto">{{ texto }}</span>
-    @if (detalle) { <span class="detalle">{{ detalle }}</span> }
   </span>
 </ng-template>
 
@@ -16,7 +15,6 @@
              [(ngModel)]="$any(p)[c.clave]">
       <span class="inf-tenue text-[13px]">{{ c.unidad }}</span>
     </div>
-    <p class="ayuda">{{ c.ayuda }} <span class="inf-sutil">({{ c.min }}–{{ c.max }})</span></p>
   </div>
 </ng-template>
 
@@ -32,7 +30,6 @@
     <section class="inf-hoja">
       <div class="bloque-cabeza">
         <h2>Ventas y comprobantes</h2>
-        <p>Moneda, métodos de pago y formato del ticket.</p>
       </div>
       <div class="bloque-cuerpo grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="grupo">
@@ -43,13 +40,11 @@
               <button type="button" class="eleccion py-1! px-2.5! rounded-full! text-xs!" [class.activa]="p.moneda_simbolo === m" (click)="p.moneda_simbolo = m">{{ m }}</button>
             }
           </div>
-          <p class="ayuda">Se muestra junto a los precios: {{ p.moneda_simbolo || '?' }} 25.00</p>
         </div>
 
         <div class="grupo">
           <label class="inf-etiqueta" for="pie">Mensaje al pie del ticket</label>
           <input id="pie" name="pie" class="campo" [(ngModel)]="p.ticket_mensaje_pie" maxlength="150">
-          <p class="ayuda">Ej.: «¡Gracias por su compra!» o «Síguenos en Instagram».</p>
         </div>
 
         <div class="grupo">
@@ -64,21 +59,19 @@
                   </span>
                 </span>
                 <span class="font-semibold inf-tinta">{{ a.nombre }}</span>
-                <span class="text-[11px] inf-tenue leading-tight">{{ a.detalle }}</span>
               </button>
             }
           </div>
-          <p class="ayuda">El comprobante se muestra e imprime con este ancho. En la ventana de impresión elige la impresora correspondiente.</p>
         </div>
 
         <div class="grupo">
           <span class="inf-etiqueta">Métodos de pago habilitados</span>
           <div class="space-y-3 mt-1">
             <button type="button" class="interruptor" role="switch" [attr.aria-checked]="p.pago_efectivo" (click)="cambiarPago('pago_efectivo')">
-              <ng-container *ngTemplateOutlet="interruptor; context: { $implicit: p.pago_efectivo, texto: 'Efectivo', detalle: 'Calcula el cambio al cobrar' }"></ng-container>
+              <ng-container *ngTemplateOutlet="interruptor; context: { $implicit: p.pago_efectivo, texto: 'Efectivo' }"></ng-container>
             </button>
             <button type="button" class="interruptor" role="switch" [attr.aria-checked]="p.pago_qr" (click)="cambiarPago('pago_qr')">
-              <ng-container *ngTemplateOutlet="interruptor; context: { $implicit: p.pago_qr, texto: 'QR', detalle: 'Pago con QR del banco' }"></ng-container>
+              <ng-container *ngTemplateOutlet="interruptor; context: { $implicit: p.pago_qr, texto: 'QR' }"></ng-container>
             </button>
           </div>
         </div>
@@ -91,7 +84,6 @@
             </div>
             <div class="space-y-2">
               <p class="inf-tinta text-[13.5px] font-medium">QR de cobro <span class="inf-sutil font-normal">(opcional)</span></p>
-              <p class="ayuda">La imagen del QR de tu banco. Se muestra en la caja al cobrar por QR para que el cliente lo escanee.</p>
               <div class="flex gap-2">
                 <label class="inf-boton cursor-pointer">
                   <lucide-icon [img]="icons.subir" class="w-3.5 h-3.5"></lucide-icon> {{ qrVista ? 'Cambiar' : 'Subir' }}
@@ -109,19 +101,16 @@
     <section class="inf-hoja">
       <div class="bloque-cabeza">
         <h2>Menú QR de las mesas</h2>
-        <p>Lo que puede hacer el cliente desde su celular y los límites contra pedidos falsos.</p>
       </div>
       <div class="bloque-cuerpo grid grid-cols-1 md:grid-cols-2 gap-6">
         <button type="button" class="interruptor md:col-span-2" role="switch" [attr.aria-checked]="p.menu_activo" (click)="p.menu_activo = !p.menu_activo">
-          <ng-container *ngTemplateOutlet="interruptor; context: { $implicit: p.menu_activo, texto: 'Recibir pedidos desde el menú QR',
-                         detalle: p.menu_activo ? 'Los clientes pueden pedir desde su celular.' : 'Los clientes solo pueden ver el menú y deben pedir en caja.' }"></ng-container>
+          <ng-container *ngTemplateOutlet="interruptor; context: { $implicit: p.menu_activo, texto: 'Recibir pedidos desde el menú QR' }"></ng-container>
         </button>
 
         <div class="grupo md:col-span-2">
           <label class="inf-etiqueta" for="bienvenida">Mensaje de bienvenida <span class="inf-sutil">(opcional)</span></label>
           <input id="bienvenida" name="bienvenida" class="campo" [(ngModel)]="p.menu_mensaje_bienvenida" maxlength="200"
-                 placeholder="¡Bienvenido! Elige tus productos y el cajero confirmará tu pedido.">
-          <p class="ayuda">Aparece arriba del menú que ve el cliente.</p>
+                 placeholder="¡Bienvenido!">
         </div>
 
         @for (c of camposMenu; track c.clave) {
@@ -137,8 +126,7 @@
       </div>
       <div class="bloque-cuerpo">
         <ng-container *ngTemplateOutlet="numero; context: { $implicit: { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo por defecto',
-                       unidad: 'unidades', min: 0, max: 10000,
-                       ayuda: 'Alerta de stock bajo para los productos nuevos de cada sucursal. No cambia los productos que ya existen.' } }"></ng-container>
+                       unidad: 'unidades', min: 0, max: 10000 } }"></ng-container>
       </div>
     </section>
 
@@ -150,12 +138,8 @@
       <div class="bloque-cuerpo grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="md:col-span-2 space-y-2">
           <button type="button" class="interruptor" role="switch" [attr.aria-checked]="p.captcha_activo" (click)="p.captcha_activo = !p.captcha_activo">
-            <ng-container *ngTemplateOutlet="interruptor; context: { $implicit: p.captcha_activo, texto: 'Pedir código de la imagen (CAPTCHA)',
-                           detalle: 'Evita que un programa pruebe contraseñas automáticamente.' }"></ng-container>
+            <ng-container *ngTemplateOutlet="interruptor; context: { $implicit: p.captcha_activo, texto: 'Pedir código de la imagen (CAPTCHA)' }"></ng-container>
           </button>
-          @if (!p.captcha_activo) {
-            <p class="aviso-suave">Sin CAPTCHA el inicio de sesión queda protegido solo por el límite de intentos. Recomendado: mantenerlo activo.</p>
-          }
         </div>
         @for (c of camposSeguridad; track c.clave) {
           <ng-container *ngTemplateOutlet="numero; context: { $implicit: c }"></ng-container>

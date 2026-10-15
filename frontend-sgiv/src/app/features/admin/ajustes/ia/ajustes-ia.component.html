@@ -21,7 +21,6 @@
     <section class="inf-hoja">
       <div class="bloque-cabeza">
         <h2>Chatbots</h2>
-        <p>Asistente del menú QR para los clientes y asistente del panel para cajeros y administrador. Solo consultan datos: nunca guardan ni modifican nada.</p>
       </div>
       <div class="bloque-cuerpo space-y-3">
         @if (conClave()) {
@@ -33,10 +32,6 @@
             <code>backend-sgiv/.env</code> como <code>GROQ_API_KEY=…</code>. Luego reinicia el servidor.
           </p>
         }
-        <p class="ayuda">
-          El sistema elige el modelo de IA y, si uno llega a su límite gratuito, pasa solo a otro. También limita las preguntas
-          por celular y por usuario para que el cupo alcance para todos.
-        </p>
         <div class="flex flex-wrap items-center gap-3 pt-1">
           <button type="button" class="inf-boton" (click)="probar()" [disabled]="!conClave() || probando()">
             <lucide-icon [img]="icons.probar" class="w-3.5 h-3.5"></lucide-icon>
@@ -56,21 +51,13 @@
     <!-- ═══ INFORMACIÓN PARA EL CHATBOT ═══ -->
     <form class="inf-hoja" (submit)="$event.preventDefault(); guardar()">
       <div class="bloque-cabeza">
-        <h2>Información para el chatbot del menú <span class="inf-sutil font-normal">(opcional)</span></h2>
-        <p>Lo que quieres que el asistente responda a tus clientes. Ya conoce la carta, los precios, el stock, los horarios y los datos de contacto.</p>
+        <h2>Información para el chatbot del menú</h2>
       </div>
       <div class="bloque-cuerpo grupo">
         <label class="sr-only" for="ia_info_negocio">Información para el chatbot</label>
         <textarea id="ia_info_negocio" class="campo" rows="10" [maxLength]="maximo" [value]="info()" (input)="escribir($event)"
-                  placeholder="Ej.:
-- Hacemos tortas por encargo con 2 días de anticipación; se paga la mitad al encargar.
-- La torta de chocolate es la más pedida.
-- Tenemos WiFi para clientes: pídelo en caja.
-- No usamos maní en ningún producto."></textarea>
-        <p class="ayuda flex justify-between gap-3">
-          <span>Escribe frases cortas: preguntas frecuentes, encargos, recomendaciones de la casa, reglas del local.</span>
-          <span class="inf-sutil shrink-0">{{ info().length }}/{{ maximo }}</span>
-        </p>
+                  placeholder="Ej.: Hacemos tortas por encargo con 2 días de anticipación."></textarea>
+        <p class="ayuda text-right">{{ info().length }}/{{ maximo }}</p>
       </div>
       <div class="inf-pie-hoja acciones-guardar">
         @if (hayCambios()) {
@@ -84,10 +71,5 @@
         </button>
       </div>
     </form>
-
-    <p class="ayuda">
-      Privacidad: a Groq se envía solo lo necesario para responder (carta, horarios, totales de ventas, stock).
-      Nunca se envían contraseñas, datos de propietarios ni datos personales de clientes.
-    </p>
   </div>
 }

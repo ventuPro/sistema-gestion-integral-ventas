@@ -4,12 +4,12 @@
 const GUIAS = {
     panel: { modulo: 'dashboard', titulo: 'Panel principal', resumen: 'resumen del día (ingresos, cobros, turnos abiertos, stock por reponer, lo más vendido).', texto: `
 Menú lateral → «Panel principal». Muestra el día en curso: ingresos de hoy comparados con ayer a la misma hora, ventas, ticket promedio, ritmo de ventas por hora, cobros por método (efectivo / QR), turnos de caja abiertos con el efectivo que debería haber, consumo por cobrar en mesas, pedidos del menú QR, alertas de stock («Stock por reponer», con enlace «Ver inventario»), lo más vendido hoy y las últimas ventas. Se actualiza solo.
-El administrador elige la sucursal (o «Todas») con el selector de sucursal de arriba.` },
+El administrador elige la sucursal (o «Todas») con el selector de sucursal de arriba. «Últimos 7 días vs. 7 anteriores» compara las ventas de la última semana con la semana previa. El ticket promedio es el ingreso por venta.` },
 
     punto_venta: { modulo: 'punto_venta', titulo: 'Punto de venta', resumen: '«Abrir la caja del día» con el fondo inicial; vender tocando productos → «Cobrar venta» → método de pago → «Confirmar venta».', texto: `
 Menú lateral → «Punto de venta».
-Abrir caja: al empezar el día aparece «Abrir la caja del día»; escribe el «Fondo inicial» (efectivo con el que empiezas) y confirma. Sin caja abierta no se puede vender ni cobrar mesas.
-Vender: toca los productos del catálogo (puedes buscar o filtrar por categoría) y se suman a «Venta actual»; ajusta cantidades con − y +. Luego «Cobrar venta» → elige el «Método de pago» (Efectivo o QR). En efectivo puedes escribir el «Monto recibido» y el sistema calcula el «Cambio». Toca «Confirmar venta». Se puede imprimir el comprobante.
+Abrir caja: al empezar el día aparece «Abrir la caja del día»; escribe el «Fondo inicial» (el efectivo con el que empiezas, contado) y confirma. No necesita autorización del administrador. Sin caja abierta no se puede vender ni cobrar mesas. Si la caja ya se cerró hoy, no se puede vender hasta que el administrador la reabra («Verificar de nuevo» revisa si ya la reabrió).
+Vender: toca los productos del catálogo (puedes buscar o filtrar por categoría) y se suman a «Venta actual»; ajusta cantidades con − y +. Luego «Cobrar venta» → elige el «Método de pago» (Efectivo o QR). En efectivo puedes escribir el «Monto recibido» (opcional) y el sistema calcula el «Cambio». Con QR se muestra el QR de cobro del negocio (si se cargó en Ajustes → Parámetros) para que el cliente lo escanee; confirma cuando el cliente haya pagado. Toca «Confirmar venta». Se puede imprimir el comprobante.
 «Ventas de hoy» lista tus ventas del día con su detalle.
 Solo se venden productos con stock en tu sucursal; el precio siempre es el registrado en el sistema.` },
 
@@ -19,40 +19,43 @@ Colores: Libre, Con cuenta (consumo por cobrar). Toca una mesa para abrirla: agr
 Cobrar: en la mesa toca «Cobrar y cerrar mesa», elige el «Método de pago», opcionalmente el «Monto recibido» para calcular el cambio, y confirma; la mesa queda libre y se registra la venta.
 Pagar por separado: si los clientes pidieron cada uno desde su celular, el consumo aparece agrupado por cliente (con su nombre, o «Cliente 1», «Cliente 2»…; lo que agregó el cajero va en «Cargado por el cajero»). Cada grupo tiene el botón «Cobrar» para cobrar solo su parte; la mesa sigue abierta hasta que se pague todo. «Cobrar todo y cerrar mesa» cobra lo que falte de una vez. Lo ya pagado se marca «Pagado» y no se puede quitar.
 «Reiniciar mesa» cancela la cuenta, devuelve el stock y libera la mesa.
-«Nueva mesa» crea una mesa con su número. «Códigos QR» genera e imprime los QR de todas las mesas; en cada mesa se puede «Generar nuevo QR» (el anterior deja de funcionar).
+«Nueva mesa» crea una mesa con su número; una mesa libre se puede eliminar con el ícono de papelera (su QR impreso deja de funcionar). «Códigos QR» genera los QR de todas las mesas para imprimirlos y pegarlos en cada mesa: el cliente lo escanea y ve el menú y pide desde su celular. La dirección que lleva el QR debe poder abrirse desde el celular (con «localhost» solo funciona en esa computadora: usa la IP de la computadora en la red del local, por ejemplo http://192.168.1.10:4200). En cada mesa se puede «Nuevo QR» (el anterior deja de funcionar).
+Sin caja abierta no se pueden atender mesas; si la caja se cerró hoy, hay que pedir al administrador que la reabra.
 Pedidos QR: el cliente escanea el QR de su mesa, elige productos y envía el pedido. Aparece en «Pedidos QR» (barra superior / menú) con aviso. El cajero puede ajustar cantidades, «Confirmar» (se carga a la cuenta de la mesa), «Rechazar» (el stock vuelve) y marcar «Entregado». Si nadie confirma a tiempo, el pedido vence solo.` },
 
     arqueo: { modulo: 'arqueo', titulo: 'Arqueo y cierre de caja', resumen: '«Arqueo de caja»: contar el efectivo y «Cerrar caja».', texto: `
-Menú lateral → «Arqueo de caja». Muestra el «Efectivo que debe haber en caja» = Fondo inicial + Cobrado en efectivo, y los cobros del turno.
-Cerrar el turno: cuenta el efectivo de la caja (billetes y monedas), revisa el «Total contado» y la «Diferencia» con lo esperado, y toca «Cerrar caja» → confirma. Después de cerrar ya no puedes vender ese día salvo que el administrador lo habilite de nuevo.` },
+Menú lateral → «Arqueo de caja». Muestra el «Efectivo que debe haber en caja» = Fondo inicial + Cobrado en efectivo, y los cobros del turno por método. Solo el efectivo debe estar físicamente en la caja; los cobros por QR se verifican en la cuenta del banco.
+Abajo están las ventas de hoy registradas por el usuario y el detalle de cada venta.
+Cerrar el turno: 1) cuenta el efectivo de la caja (puedes usar «Contar por billetes y monedas»); escribirlo es opcional, pero si lo escribes queda registrado junto con la diferencia (sobrante o faltante) para el administrador. 2) toca «Cerrar caja» → «Confirmar cierre».
+Al cerrar ya no puedes registrar ventas ni atender mesas hasta que el administrador reabra tu caja (puede hacerlo durante las 24 horas siguientes). Al día siguiente abres una caja nueva con un nuevo fondo inicial.` },
 
     inventario: { modulo: 'inventario', titulo: 'Inventario', resumen: '«Nuevo producto», «Nueva categoría»; para cambiar stock: botón «Movimiento» en la fila del producto → «Entrada» (suma la cantidad) o «Merma o salida» (la resta) con motivo; historial en la pestaña «Movimientos». El stock no se edita directamente.', texto: `
 Menú lateral → «Inventario». Pestaña «Productos»: lista con precio, stock y estado; filtros por categoría y búsqueda; indicadores de stock bajo y sin stock.
-«Nuevo producto»: nombre, descripción, categoría, precio, imagen (JPG, PNG o WEBP, máx. 2 MB) y «Stock inicial». «Nueva categoría» crea categorías.
+«Nuevo producto»: nombre, descripción (opcional), categoría, precio, imagen (JPG, PNG o WEBP, máximo 2 MB) y «Stock inicial»; después se suman unidades con «Movimiento». «Nueva categoría» crea categorías.
 «Movimiento» (botón en la fila de cada producto): registra una «Entrada» (suma al stock: compra, producción, devolución…) o una «Merma o salida» (resta: vencido, dañado, consumo interno…); escribe la cantidad y elige el motivo; muestra el stock en que queda. La cantidad se suma o se resta: para dejar el stock en un número exacto, registra la diferencia con el stock actual. Una salida nunca puede dejar el stock en negativo.
 Pestaña «Movimientos»: historial de todo cambio de stock (ventas, mesas, pedidos QR, entradas y mermas) con fecha, usuario, motivo y saldo; filtros Hoy / 7 días / 30 días y Entradas / Salidas.
 El cajero solo ve y mueve el stock de su sucursal.` },
 
     reportes: { modulo: 'reportes', titulo: 'Reportes (informes)', resumen: 'elegir período (y sucursal); exportar a PDF o Excel.', texto: `
 Menú lateral → «Reportes». Elige el período (fechas) y, si eres administrador, la sucursal; puedes filtrar por categorías.
-Incluye: ingresos del período comparados con el período anterior, ventas, ticket promedio, unidades, mejor día, evolución diaria, horas de mayor venta, promedio por día de la semana, comparativo de sucursales, cobros por método, desempeño por cajero, ventas por categoría, productos vendidos (y sin ventas), turnos cerrados con su arqueo, inventario actual y pedidos del menú QR.
+Incluye: ingresos del período comparados con el período anterior, ventas, ticket promedio, unidades, mejor día, venta más alta (en una sola venta), evolución diaria (abre un día para ver sus categorías), horas de mayor venta, promedio por día de la semana, comparativo de sucursales, cobros por método, desempeño por cajero, ventas por categoría, productos vendidos (y sin ventas), turnos cerrados con su arqueo, inventario actual y pedidos del menú QR.
 Se puede exportar a PDF o Excel e imprimir.` },
 
     usuarios: { modulo: 'usuarios', titulo: 'Usuarios', resumen: '«Nuevo usuario», cambiar contraseña, activar/desactivar, habilitar caja y «Permisos de acceso».', texto: `
 Menú lateral → «Usuarios». «Nuevo usuario»: nombre completo, correo, contraseña, rol (Administrador o Cajero) y sucursal.
-En cada usuario: editar, «Cambiar contraseña», activar o desactivar (un usuario inactivo no puede entrar), habilitar su caja y ajustar «Permisos de acceso» por módulo (Panel, Punto de venta, Mesas, Arqueo, Inventario, Reportes, Usuarios).` },
+En cada usuario: editar (la contraseña no se cambia ahí: se cambia con el botón de la llave de la lista), «Cambiar contraseña», activar o desactivar (un usuario inactivo no puede entrar), habilitar su caja y ajustar «Permisos de acceso» por módulo (Panel, Punto de venta, Mesas, Arqueo, Inventario, Reportes, Usuarios). Los permisos nuevos se aplican cuando el usuario recarga la página o vuelve a iniciar sesión.` },
 
     cierres: { modulo: null, titulo: 'Cierres de caja (administrador)', resumen: 'turnos cerrados y resultado del arqueo.', texto: `
-Menú lateral → «Cierres de caja». Lista los turnos cerrados con cajero, ventas, total, efectivo y el resultado del arqueo («Cuadra», sobrante o faltante, o «sin conteo»). Muestra el total recaudado y las diferencias de arqueo.` },
+Menú lateral → «Cierres de caja». Lista los turnos cerrados con cajero, ventas, total, efectivo y el resultado del arqueo («Cuadra», sobrante o faltante, o «sin conteo» si el cajero no contó el efectivo). Arriba muestra el total recaudado en todos los turnos, lo cobrado en efectivo y QR y las diferencias de arqueo.` },
 
     ajustes: { modulo: null, titulo: 'Ajustes (administrador)', resumen: 'pestañas Empresa, Apariencia, Propietarios, Sucursales, Parámetros y Chatbot.', texto: `
 Menú lateral → «Ajustes». Pestañas:
-- Empresa: nombre comercial, datos legales (razón social, NIT), contacto, ubicación, redes sociales y el texto del inicio de sesión.
-- Apariencia: logo, ícono, colores (paletas listas o personalizados) y tema claro / oscuro / automático.
-- Propietarios: socios y su porcentaje (la suma no pasa de 100 %).
-- Sucursales: crear, editar, activar o desactivar y horario por día.
-- Parámetros: moneda, métodos de pago, QR de cobro, pie y ancho del ticket (58 mm, 80 mm, A4), menú QR (activar, bienvenida, vencimiento y límites), stock mínimo por defecto y seguridad del inicio de sesión.
-- Chatbot: estado de los asistentes (siempre activos), «Probar conexión» e «Información para el chatbot» (lo que el propietario quiere que el asistente del menú responda a los clientes).` }
+- Empresa: «Identidad» (nombre comercial, rubro, eslogan: aparecen en el menú, los tickets y el menú QR), «Inicio de sesión» (texto grande junto al formulario de ingreso; vacío = nombre comercial), «Datos legales» (razón social, NIT: se imprimen en los comprobantes), contacto, ubicación y redes sociales.
+- Apariencia: logo (PNG, JPG o WEBP hasta 2 MB, mejor con fondo transparente; aparece en el menú, los tickets y el menú QR) e ícono (PNG cuadrado o ICO hasta 512 KB; se ve en la pestaña del navegador). Colores: el principal se usa en botones, menús y encabezados; el secundario en degradados y detalles (paletas listas o personalizados). Tema: claro, oscuro o automático (según el dispositivo); lo ven todo el personal y los clientes del menú QR. Los cambios se ven al instante como vista previa, pero se guardan solo con «Guardar apariencia».
+- Propietarios: socios y su porcentaje (la suma no pasa de 100 %). Son datos privados: solo los ve el administrador y no salen en tickets ni en el menú QR.
+- Sucursales: crear, editar, activar o desactivar y horario por día. Una sucursal desactivada conserva su historial, pero no abre caja ni recibe pedidos del menú QR. Si cierra después de medianoche, la hora de cierre va menor que la de apertura (ej. 18:00 a 02:00).
+- Parámetros: símbolo de moneda (se muestra junto a los precios); mensaje al pie del ticket; ancho del ticket (58 mm y 80 mm para impresoras térmicas, A4 para impresora común; al imprimir se elige la impresora); métodos de pago Efectivo y QR (al menos uno); QR de cobro (imagen del QR del banco que se muestra al cobrar por QR). Menú QR: recibir pedidos (apagado, los clientes solo ven el menú y piden en caja), mensaje de bienvenida (sale en la pantalla de bienvenida del menú), vencimiento de pedidos sin confirmar (pasado ese tiempo se cancelan solos y el stock vuelve), pedidos pendientes por mesa (cuántos pueden esperar confirmación a la vez) y pedidos por celular cada 10 minutos (evita pedidos falsos). Stock mínimo por defecto: alerta de stock bajo para productos nuevos (no cambia los existentes). Seguridad: CAPTCHA (código de la imagen; evita que un programa pruebe contraseñas, se recomienda dejarlo activo), intentos fallidos permitidos (luego se bloquea esa cuenta en ese equipo), duración del bloqueo y duración de la sesión (se aplica desde el próximo inicio de sesión).
+- Chatbot: estado de los asistentes (siempre activos con la clave de Groq; el sistema elige el modelo y cambia solo si uno llega a su límite gratuito, y limita las preguntas por celular y por usuario), «Probar conexión» e «Información para el chatbot del menú» (hasta 3000 caracteres: lo que el propietario quiere que el asistente responda a los clientes, como encargos, recomendaciones o reglas del local; ya conoce la carta, precios, stock, horarios y contacto). A Groq solo se envía lo necesario (carta, horarios, totales, stock); nunca contraseñas, propietarios ni datos personales de clientes.` }
 };
 
 /** Secciones que puede consultar el usuario según sus permisos */

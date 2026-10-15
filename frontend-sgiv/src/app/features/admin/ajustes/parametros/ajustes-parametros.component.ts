@@ -31,7 +31,7 @@ const ORIGINALES: Parametros = {
   login_minutos_bloqueo: 15, sesion_horas: 8
 };
 
-interface CampoNumero { clave: keyof Parametros; etiqueta: string; ayuda: string; min: number; max: number; unidad: string }
+interface CampoNumero { clave: keyof Parametros; etiqueta: string; min: number; max: number; unidad: string }
 
 // ─── Ajustes → Parámetros ───
 @Component({
@@ -50,28 +50,22 @@ export class AjustesParametrosComponent implements OnInit {
 
   readonly monedas = ['Bs.', '$us', '$', 'S/', '€'];
 
-  readonly anchosTicket: { valor: '58' | '80' | 'A4'; nombre: string; detalle: string; escala: number }[] = [
-    { valor: '58', nombre: '58 mm', detalle: 'Impresora térmica pequeña', escala: 0.48 },
-    { valor: '80', nombre: '80 mm', detalle: 'Impresora térmica estándar', escala: 0.66 },
-    { valor: 'A4', nombre: 'Hoja A4', detalle: 'Impresora común (carta/A4)', escala: 1 }
+  readonly anchosTicket: { valor: '58' | '80' | 'A4'; nombre: string; escala: number }[] = [
+    { valor: '58', nombre: '58 mm', escala: 0.48 },
+    { valor: '80', nombre: '80 mm', escala: 0.66 },
+    { valor: 'A4', nombre: 'Hoja A4', escala: 1 }
   ];
 
   readonly camposMenu: CampoNumero[] = [
-    { clave: 'menu_minutos_expiracion', etiqueta: 'Vencimiento de pedidos sin confirmar', unidad: 'min', min: 5, max: 120,
-      ayuda: 'Si nadie confirma el pedido en este tiempo, se cancela solo y el stock vuelve.' },
-    { clave: 'menu_max_pendientes_mesa', etiqueta: 'Pedidos pendientes por mesa', unidad: 'pedidos', min: 1, max: 10,
-      ayuda: 'Cuántos pedidos puede tener una mesa esperando confirmación al mismo tiempo.' },
-    { clave: 'menu_max_pedidos_ip', etiqueta: 'Pedidos por celular cada 10 minutos', unidad: 'pedidos', min: 1, max: 100,
-      ayuda: 'Evita que un mismo dispositivo llene la bandeja de pedidos falsos.' }
+    { clave: 'menu_minutos_expiracion', etiqueta: 'Vencimiento de pedidos sin confirmar', unidad: 'min', min: 5, max: 120 },
+    { clave: 'menu_max_pendientes_mesa', etiqueta: 'Pedidos pendientes por mesa', unidad: 'pedidos', min: 1, max: 10 },
+    { clave: 'menu_max_pedidos_ip', etiqueta: 'Pedidos por celular cada 10 minutos', unidad: 'pedidos', min: 1, max: 100 }
   ];
 
   readonly camposSeguridad: CampoNumero[] = [
-    { clave: 'login_max_intentos', etiqueta: 'Intentos fallidos permitidos', unidad: 'intentos', min: 3, max: 20,
-      ayuda: 'Al llegar a este número se bloquea el inicio de sesión de esa cuenta en ese equipo.' },
-    { clave: 'login_minutos_bloqueo', etiqueta: 'Duración del bloqueo', unidad: 'min', min: 1, max: 1440,
-      ayuda: 'Tiempo que debe esperar antes de volver a intentar.' },
-    { clave: 'sesion_horas', etiqueta: 'Duración de la sesión', unidad: 'horas', min: 1, max: 24,
-      ayuda: 'Pasado este tiempo hay que volver a iniciar sesión. Se aplica desde el próximo inicio.' }
+    { clave: 'login_max_intentos', etiqueta: 'Intentos fallidos permitidos', unidad: 'intentos', min: 3, max: 20 },
+    { clave: 'login_minutos_bloqueo', etiqueta: 'Duración del bloqueo', unidad: 'min', min: 1, max: 1440 },
+    { clave: 'sesion_horas', etiqueta: 'Duración de la sesión', unidad: 'horas', min: 1, max: 24 }
   ];
 
   cargando = true;

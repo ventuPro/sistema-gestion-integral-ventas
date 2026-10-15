@@ -61,22 +61,22 @@ export class AjustesComponent implements OnInit, OnDestroy {
     { campo: 'color_secundario', nombre: 'Color secundario', original: COLOR_SECUNDARIO_ORIGINAL }
   ];
 
-  readonly temas: { valor: Tema; nombre: string; detalle: string; icono: any }[] = [
-    { valor: 'claro',  nombre: 'Claro',      detalle: 'Fondo blanco',              icono: Sun },
-    { valor: 'oscuro', nombre: 'Oscuro',     detalle: 'Descansa la vista de noche', icono: Moon },
-    { valor: 'auto',   nombre: 'Automático', detalle: 'Según el dispositivo',      icono: MonitorSmartphone }
+  readonly temas: { valor: Tema; nombre: string; icono: any }[] = [
+    { valor: 'claro',  nombre: 'Claro',      icono: Sun },
+    { valor: 'oscuro', nombre: 'Oscuro',     icono: Moon },
+    { valor: 'auto',   nombre: 'Automático', icono: MonitorSmartphone }
   ];
 
-  readonly gruposEmpresa: { titulo: string; detalle?: string; campos: CampoEmpresa[] }[] = [
-    { titulo: 'Identidad', detalle: 'Aparece en el menú, los tickets y el menú QR.', campos: [
+  readonly gruposEmpresa: { titulo: string; campos: CampoEmpresa[] }[] = [
+    { titulo: 'Identidad', campos: [
       { clave: 'nombre_comercial', etiqueta: 'Nombre comercial *', ejemplo: "Pastelería Ricky's", max: 100 },
       { clave: 'rubro',            etiqueta: 'Rubro',               ejemplo: 'Pastelería, cafetería, panadería…', max: 60 },
       { clave: 'eslogan',          etiqueta: 'Eslogan',             ejemplo: 'El sabor de siempre', max: 150, ancho: true }
     ]},
-    { titulo: 'Inicio de sesión', detalle: 'Texto grande junto al formulario de ingreso. Si lo dejas vacío, se muestra el nombre comercial.', campos: [
+    { titulo: 'Inicio de sesión', campos: [
       { clave: 'login_titulo', etiqueta: 'Texto del inicio de sesión', ejemplo: "Pastelería Ricky's", max: 100, ancho: true }
     ]},
-    { titulo: 'Datos legales', detalle: 'Se imprimen en los comprobantes.', campos: [
+    { titulo: 'Datos legales', campos: [
       { clave: 'razon_social', etiqueta: 'Razón social', ejemplo: 'Ricky’s S.R.L.', max: 150 },
       { clave: 'nit',          etiqueta: 'NIT',          ejemplo: '1234567019', max: 20 }
     ]},
