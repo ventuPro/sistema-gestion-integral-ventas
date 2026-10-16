@@ -104,7 +104,6 @@ export class LoginComponent implements OnInit {
   }
 
   private completarSesion(res: any) {
-    this.authService.guardarToken(res.token);
     localStorage.setItem('usuario_sgiv', JSON.stringify({
       id_usuario:      res.usuario.id_usuario,
       nombre_completo: res.usuario.nombre_completo,

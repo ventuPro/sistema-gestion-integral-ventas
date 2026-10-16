@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const jwt    = require('jsonwebtoken');
 require('dotenv').config();
 
 // ─── Secreto JWT ───
@@ -23,6 +24,42 @@ const obtenerSecretoJWT = () => {
 const JWT_SECRET    = obtenerSecretoJWT();
 const JWT_OPCIONES  = { algorithm: 'HS256', expiresIn: '8h' };
 const JWT_ALGORITMOS = ['HS256'];
+
+// ─── Cookie de sesión ───
+// httpOnly: JavaScript no puede leerla (un XSS no roba la sesión).
+// SameSite=Strict: no viaja en peticiones iniciadas desde otro sitio (CSRF).
+// Secure solo bajo HTTPS (en la red local se usa HTTP).
+const COOKIE_SESION = 'sgiv_sesion';
+
+const opcionesCookie = (req, horas) => ({
+    httpOnly: true,
+    sameSite: 'strict',
+    secure:   req.secure,
+    path:     '/',
+    ...(horas ? { maxAge: horas * 3600 * 1000 } : {})
+});
+
+const leerCookie = (cabecera, nombre) => {
+    for (const parte of String(cabecera || '').split(';')) {
+        const i = parte.indexOf('=');
+        if (i > 0 && parte.slice(0, i).trim() === nombre) return decodeURIComponent(parte.slice(i + 1).trim());
+    }
+    return null;
+};
+
+/** Token de la cookie; el encabezado Bearer queda para clientes de API (pruebas, Postman). */
+const leerToken = (req) => {
+    const deCookie = leerCookie(req.headers.cookie, COOKIE_SESION);
+    if (deCookie) return deCookie;
+    const [tipo, valor] = String(req.headers.authorization || '').split(' ');
+    return tipo === 'Bearer' && valor ? valor : null;
+};
+
+/** Payload del token si es válido; si no, null. */
+const verificarJWT = (token) => {
+    try { return token ? jwt.verify(token, JWT_SECRET, { algorithms: JWT_ALGORITMOS }) : null; }
+    catch { return null; }
+};
 
 // ─── Orígenes permitidos (CORS) ───
 // Se permite:
@@ -58,4 +95,7 @@ const origenPermitido = (origin, hostPeticion) => {
     }
 };
 
-module.exports = { JWT_SECRET, JWT_OPCIONES, JWT_ALGORITMOS, origenPermitido };
+module.exports = {
+    JWT_SECRET, JWT_OPCIONES, JWT_ALGORITMOS, origenPermitido,
+    COOKIE_SESION, opcionesCookie, leerToken, verificarJWT
+};

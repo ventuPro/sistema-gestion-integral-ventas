@@ -15,7 +15,7 @@ const api = async (ruta, token, metodo = 'GET', body) => {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: body ? JSON.stringify(body) : undefined
     });
-    return { status: r.status, body: await r.json() };
+    return { status: r.status, body: await r.json(), headers: r.headers };
 };
 
 const venta = async (id_sucursal, fecha, lineas, metodo = 'Efectivo') => {
@@ -64,7 +64,7 @@ before(async () => {
         const r = await fetch(`${URL_BASE}/api${ruta}`, {
             method: metodo, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
         });
-        return { body: await r.json() };
+        return { body: await r.json(), headers: r.headers };
     });
     tAdmin  = await login('admin@rickys.com', 'password');
     tCajero = await login('cajero.reportes@prueba.com', 'Prueba123');

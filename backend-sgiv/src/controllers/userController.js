@@ -5,8 +5,8 @@ const ajusteModel = require('../models/ajusteModel');
 const db          = require('../config/db');
 const captcha     = require('../utils/captcha');
 const contexto    = require('../auditoria/contexto');
-const { marcarEvento } = require('../auditoria/registroAcceso');
-const { JWT_SECRET, JWT_OPCIONES } = require('../config/seguridad');
+const { marcarEvento, huellaSesion } = require('../auditoria/registroAcceso');
+const { JWT_SECRET, JWT_OPCIONES, COOKIE_SESION, opcionesCookie, leerToken, verificarJWT } = require('../config/seguridad');
 
 // Un usuario con permiso 'usuarios' que no es administrador no puede crear,
 // ascender ni modificar administradores.
@@ -99,7 +99,6 @@ const loginUsuario = async (req, res) => {
         }
         intentosFallidos.delete(clave);
         contexto.asignarUsuario(u.id_usuario, `${u.nombre_completo} <${u.correo_electronico}>`);
-        marcarEvento(res, 'INICIO_SESION');
 
         // Obtener nombre de sucursal
         const rSuc = await require('../config/db').query(
@@ -114,9 +113,10 @@ const loginUsuario = async (req, res) => {
             { ...JWT_OPCIONES, expiresIn: `${p.sesion_horas}h` }
         );
 
+        marcarEvento(res, 'INICIO_SESION', { sesion: huellaSesion(token) });
+        res.cookie(COOKIE_SESION, token, opcionesCookie(req, p.sesion_horas));
         res.json({
             mensaje: 'Login exitoso',
-            token,
             usuario: {
                 id_usuario:      u.id_usuario,
                 nombre_completo: u.nombre_completo,
@@ -131,9 +131,15 @@ const loginUsuario = async (req, res) => {
     }
 };
 
-// El token sigue siendo válido hasta que vence; esto deja constancia del cierre
-const cerrarSesion = (req, res) => {
-    marcarEvento(res, 'CIERRE_SESION');
+// Borra la cookie siempre; el cierre queda en la auditoría si la sesión seguía vigente
+const cerrarSesion = async (req, res) => {
+    const payload = verificarJWT(leerToken(req));
+    const u = payload && await userModel.obtenerPerfil(payload.id_usuario).catch(() => null);
+    if (u) {
+        contexto.asignarUsuario(u.id_usuario, `${u.nombre_completo} <${u.correo_electronico}>`);
+        marcarEvento(res, 'CIERRE_SESION');
+    }
+    res.clearCookie(COOKIE_SESION, opcionesCookie(req));
     res.json({ mensaje: 'Sesión cerrada' });
 };
 

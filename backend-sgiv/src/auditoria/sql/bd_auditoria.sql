@@ -4,6 +4,9 @@
 --  Es idempotente: se puede ejecutar varias veces.
 --
 --  registro_acceso → cada petición a la API (sesiones, consultas, denegados).
+--                    Las consultas GET exitosas que se repiten (misma sesión,
+--                    IP, navegador y ruta, dentro de 10 min) se agrupan en una
+--                    fila: repeticiones = veces, fecha_hora_ultima = la última.
 --  registro_cambio → cada INSERT/UPDATE/DELETE/TRUNCATE en sgiv_db,
 --                    escrito por los triggers de sgiv_db (postgres_fdw).
 -- ════════════════════════════════════════════════════════════════════
@@ -23,6 +26,10 @@ CREATE TABLE IF NOT EXISTS registro_acceso (
     duracion_ms     INT,
     detalle         JSONB
 );
+
+ALTER TABLE registro_acceso ADD COLUMN IF NOT EXISTS sesion            VARCHAR(16);
+ALTER TABLE registro_acceso ADD COLUMN IF NOT EXISTS repeticiones      INT NOT NULL DEFAULT 1;
+ALTER TABLE registro_acceso ADD COLUMN IF NOT EXISTS fecha_hora_ultima TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS registro_cambio (
     id_cambio           BIGSERIAL PRIMARY KEY,
@@ -45,14 +52,17 @@ CREATE TABLE IF NOT EXISTS registro_cambio (
 CREATE INDEX IF NOT EXISTS idx_acceso_fecha        ON registro_acceso (fecha_hora);
 CREATE INDEX IF NOT EXISTS idx_acceso_usuario      ON registro_acceso (id_usuario, fecha_hora);
 CREATE INDEX IF NOT EXISTS idx_acceso_evento       ON registro_acceso (evento, fecha_hora);
+CREATE INDEX IF NOT EXISTS idx_acceso_agrupar      ON registro_acceso (ruta, fecha_hora) WHERE metodo = 'GET';
+CREATE INDEX IF NOT EXISTS idx_acceso_sesion       ON registro_acceso (sesion, fecha_hora);
 CREATE INDEX IF NOT EXISTS idx_cambio_fecha        ON registro_cambio (fecha_hora);
 CREATE INDEX IF NOT EXISTS idx_cambio_usuario      ON registro_cambio (id_usuario, fecha_hora);
 CREATE INDEX IF NOT EXISTS idx_cambio_tabla        ON registro_cambio (tabla, id_registro);
 CREATE INDEX IF NOT EXISTS idx_cambio_acceso       ON registro_cambio (id_acceso);
 
 -- ─── Inmutabilidad ───
--- Los registros no se modifican ni se borran. Única excepción: completar
--- el resultado de una petición (estado, duración, usuario, evento) una vez.
+-- Los registros no se modifican ni se borran. Excepciones: completar el
+-- resultado de una petición (estado, duración, usuario, evento) una vez, y
+-- sumar una repetición a una consulta agrupada ya completada.
 CREATE OR REPLACE FUNCTION fn_impedir_cambios() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     RAISE EXCEPTION 'La auditoría no se puede modificar ni borrar (% en %)', TG_OP, TG_TABLE_NAME;
@@ -60,7 +70,19 @@ END $$;
 
 CREATE OR REPLACE FUNCTION fn_completar_acceso() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+    -- Una repetición más: solo cambian el contador (+1) y la última fecha
     IF OLD.estado_http IS NOT NULL
+       AND NEW.repeticiones = OLD.repeticiones + 1
+       AND NEW.fecha_hora_ultima >= COALESCE(OLD.fecha_hora_ultima, OLD.fecha_hora)
+       AND (to_jsonb(NEW) - 'repeticiones' - 'fecha_hora_ultima')
+         = (to_jsonb(OLD) - 'repeticiones' - 'fecha_hora_ultima') THEN
+        RETURN NEW;
+    END IF;
+
+    IF OLD.estado_http IS NOT NULL
+       OR NEW.repeticiones      IS DISTINCT FROM OLD.repeticiones
+       OR NEW.fecha_hora_ultima IS DISTINCT FROM OLD.fecha_hora_ultima
+       OR NEW.sesion            IS DISTINCT FROM OLD.sesion
        OR NEW.id_acceso      IS DISTINCT FROM OLD.id_acceso
        OR NEW.fecha_hora     IS DISTINCT FROM OLD.fecha_hora
        OR NEW.ip             IS DISTINCT FROM OLD.ip
@@ -92,17 +114,27 @@ CREATE OR REPLACE TRIGGER trg_acceso_sin_truncate
     FOR EACH STATEMENT EXECUTE FUNCTION fn_impedir_cambios();
 
 -- ─── Vistas para consultar en pgAdmin (hora de Bolivia) ───
-CREATE OR REPLACE VIEW v_accesos AS
+-- Se recrean en cada arranque (cambiar columnas de una vista exige borrarla)
+DROP VIEW IF EXISTS v_sesiones;
+DROP VIEW IF EXISTS v_accesos;
+
+CREATE VIEW v_accesos AS
 SELECT a.id_acceso,
        to_char(a.fecha_hora AT TIME ZONE 'America/La_Paz', 'YYYY-MM-DD HH24:MI:SS') AS fecha,
        a.evento,
-       COALESCE(a.usuario, 'Sin sesión') AS usuario,
+       COALESCE(a.usuario, CASE WHEN a.sesion IS NULL THEN 'Sin sesión' ELSE 'Ruta pública' END) AS usuario,
        a.ip,
        a.metodo || ' ' || a.ruta AS peticion,
        a.estado_http,
        a.duracion_ms,
+       a.repeticiones AS veces,
+       to_char(a.fecha_hora_ultima AT TIME ZONE 'America/La_Paz', 'YYYY-MM-DD HH24:MI:SS') AS hasta,
+       COALESCE(a.sesion, a.detalle ->> 'sesion') AS sesion,
        (SELECT count(*) FROM registro_cambio c WHERE c.id_acceso = a.id_acceso) AS filas_modificadas,
-       a.detalle
+       a.detalle,
+       a.metodo,
+       a.fecha_hora,
+       a.id_usuario
 FROM registro_acceso a;
 
 CREATE OR REPLACE VIEW v_cambios AS
@@ -117,11 +149,12 @@ SELECT c.id_cambio,
        c.datos_nuevos,
        c.origen,
        c.ip,
-       c.id_acceso
+       c.id_acceso,
+       c.fecha_hora
 FROM registro_cambio c;
 
-CREATE OR REPLACE VIEW v_sesiones AS
-SELECT id_acceso, fecha, evento, usuario, ip, detalle
+CREATE VIEW v_sesiones AS
+SELECT id_acceso, fecha, evento, usuario, ip, sesion, detalle
 FROM v_accesos
 WHERE evento IN ('INICIO_SESION', 'INICIO_SESION_FALLIDO', 'CAPTCHA_INCORRECTO',
                  'BLOQUEO_POR_INTENTOS', 'CIERRE_SESION');

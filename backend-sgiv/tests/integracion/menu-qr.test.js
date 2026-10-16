@@ -24,7 +24,7 @@ const api = async (metodo, ruta, { token, body } = {}) => {
     const texto = await r.text();
     let datos;
     try { datos = JSON.parse(texto); } catch { datos = texto; }
-    return { status: r.status, body: datos };
+    return { status: r.status, body: datos, headers: r.headers };
 };
 
 const iniciarSesion = crearLogin((...a) => api(...a));

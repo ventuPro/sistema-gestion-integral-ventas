@@ -1,25 +1,24 @@
-const jwt = require('jsonwebtoken');
 const db  = require('../config/db');
 const permisoModel = require('../models/permisoModel');
 const contexto     = require('../auditoria/contexto');
-const { JWT_SECRET, JWT_ALGORITMOS } = require('../config/seguridad');
+const { leerToken, verificarJWT, COOKIE_SESION, opcionesCookie } = require('../config/seguridad');
 
 // ─── Verificación de token ───
 // Además de validar la firma, se consulta el usuario en la BD en cada petición:
 // si fue desactivado (o eliminado) el token deja de servir de inmediato, y el rol
 // y la sucursal se toman siempre de la BD (un cambio de rol aplica sin re-login).
 // 401 = sesión no válida (el frontend cierra la sesión); 403 = sin permiso.
-const verificarToken = async (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token      = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({ mensaje: 'Acceso denegado. Sin token.' });
+const sesionInvalida = (req, res, mensaje) => {
+    res.clearCookie(COOKIE_SESION, opcionesCookie(req));
+    return res.status(401).json({ mensaje });
+};
 
-    let payload;
-    try {
-        payload = jwt.verify(token, JWT_SECRET, { algorithms: JWT_ALGORITMOS });
-    } catch {
-        return res.status(401).json({ mensaje: 'Token inválido o expirado.' });
-    }
+const verificarToken = async (req, res, next) => {
+    const token = leerToken(req);
+    if (!token) return res.status(401).json({ mensaje: 'Acceso denegado. Sin sesión.' });
+
+    const payload = verificarJWT(token);
+    if (!payload) return sesionInvalida(req, res, 'Sesión inválida o expirada.');
 
     try {
         const r = await db.query(
@@ -29,7 +28,7 @@ const verificarToken = async (req, res, next) => {
         );
         const u = r.rows[0];
         if (!u || !u.estado_activo)
-            return res.status(401).json({ mensaje: 'Usuario desactivado. Inicie sesión nuevamente.' });
+            return sesionInvalida(req, res, 'Usuario desactivado. Inicie sesión nuevamente.');
 
         req.usuario = { ...payload, id_rol: u.id_rol, id_sucursal: u.id_sucursal };
         contexto.asignarUsuario(u.id_usuario, `${u.nombre_completo} <${u.correo_electronico}>`);

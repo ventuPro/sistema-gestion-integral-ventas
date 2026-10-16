@@ -17,7 +17,7 @@ const api = async (metodo, ruta, { token, body } = {}) => {
     const texto = await r.text();
     let datos;
     try { datos = JSON.parse(texto); } catch { datos = texto; }
-    return { status: r.status, body: datos };
+    return { status: r.status, body: datos, headers: r.headers };
 };
 
 const iniciarSesion = crearLogin((...a) => api(...a));
@@ -85,6 +85,11 @@ describe('Auditoría de sesiones', () => {
         assert.equal(ok.id_usuario, id);
         assert.equal(ok.usuario, 'sesion@prueba.com <sesion@prueba.com>');
         assert.equal(ok.ip, '127.0.0.1');
+        assert.equal(ok.detalle.sesion.length, 16);
+
+        // Las peticiones de esa sesión llevan la misma huella
+        await api('GET', '/permisos/mis-permisos', { token });
+        assert.equal((await ultimoAcceso('GET', '/permisos/mis-permisos')).sesion, ok.detalle.sesion);
 
         assert.equal((await api('POST', '/usuarios/logout', { token })).status, 200);
         const cierre = await ultimoAcceso('POST', '/usuarios/logout');
@@ -118,6 +123,66 @@ describe('Auditoría de consultas', () => {
 
         await api('GET', '/usuarios');
         assert.equal((await ultimoAcceso('GET', '/usuarios')).evento, 'SESION_INVALIDA');
+    });
+});
+
+// ─── Agrupación de consultas repetidas ───
+describe('Auditoría: consultas repetidas agrupadas', () => {
+    const filasDe = (ruta) => bd.sqlAuditoria(
+        `SELECT * FROM registro_acceso WHERE ruta = $1 ORDER BY id_acceso`, [`/api${ruta}`]);
+
+    test('las consultas GET exitosas de la misma sesión suman repeticiones en una fila', async () => {
+        await crearUsuario('repite@prueba.com', 2);
+        const tAdmin  = await login('admin@rickys.com', 'password');
+        const tCajero = await login('repite@prueba.com');
+        const ruta = '/sucursales?agrupar=1';
+
+        for (let i = 0; i < 3; i++) {
+            await api('GET', ruta, { token: tAdmin });
+            await ultimoAcceso('GET', ruta);
+        }
+        await api('GET', ruta, { token: tCajero });
+        await ultimoAcceso('GET', ruta);
+
+        const filas = await filasDe(ruta);
+        assert.equal(filas.length, 2);
+        assert.equal(filas[0].repeticiones, 3);
+        assert.ok(filas[0].fecha_hora_ultima > filas[0].fecha_hora);
+        assert.match(filas[0].usuario, /<admin@rickys\.com>$/);
+        assert.equal(filas[1].repeticiones, 1);
+        assert.notEqual(filas[0].sesion, filas[1].sesion);
+        assert.equal(filas[0].sesion.length, 16);
+        assert.ok(!tAdmin.includes(filas[0].sesion));
+    });
+
+    test('las operaciones y los rechazos nunca se agrupan', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        for (let i = 0; i < 2; i++) {
+            await api('POST', '/usuarios/logout', { token: tAdmin });
+            await ultimoAcceso('POST', '/usuarios/logout');
+            await api('GET', '/usuarios?sin=sesion');
+            await ultimoAcceso('GET', '/usuarios?sin=sesion');
+        }
+        const salidas = (await filasDe('/usuarios/logout')).slice(-2);
+        assert.ok(salidas.every(f => f.repeticiones === 1));
+        const rechazos = await filasDe('/usuarios?sin=sesion');
+        assert.equal(rechazos.length, 2);
+        assert.ok(rechazos.every(f => f.repeticiones === 1 && f.estado_http === 401));
+    });
+
+    test('solo se permite sumar de a una repetición', async () => {
+        const [f] = await bd.sqlAuditoria(
+            `SELECT id_acceso FROM registro_acceso WHERE estado_http IS NOT NULL ORDER BY id_acceso LIMIT 1`);
+        await assert.rejects(bd.sqlAuditoria(
+            `UPDATE registro_acceso SET repeticiones = repeticiones + 2, fecha_hora_ultima = now() WHERE id_acceso = $1`, [f.id_acceso]),
+            /no se puede modificar/);
+        await assert.rejects(bd.sqlAuditoria(
+            `UPDATE registro_acceso SET repeticiones = repeticiones + 1, fecha_hora_ultima = now(), ruta = '/otra'
+             WHERE id_acceso = $1`, [f.id_acceso]),
+            /no se puede modificar/);
+        await assert.rejects(bd.sqlAuditoria(
+            `UPDATE registro_acceso SET sesion = 'x' WHERE id_acceso = $1`, [f.id_acceso]),
+            /no se puede modificar/);
     });
 });
 

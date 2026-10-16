@@ -21,7 +21,7 @@ const obtenerUsuarioPorCorreo = async (correo) => {
 /** Nombre y sucursal (sin datos de acceso) */
 const obtenerPerfil = async (id_usuario) => {
     const result = await db.query(
-        `SELECT u.nombre_completo, s.nombre_sucursal
+        `SELECT u.id_usuario, u.nombre_completo, u.correo_electronico, s.nombre_sucursal
          FROM usuario u LEFT JOIN sucursal s ON s.id_sucursal = u.id_sucursal
          WHERE u.id_usuario = $1`,
         [id_usuario]

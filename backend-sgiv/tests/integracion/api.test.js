@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
 const { crearBdPrueba } = require('../bdPrueba');
-const { crearLogin, resolverCaptcha } = require('../sesionPrueba');
+const { crearLogin, resolverCaptcha, tokenDeCookie } = require('../sesionPrueba');
 
 // ─── Pruebas de integración de la API ───
 // Levantan el backend real (en un puerto libre) contra una BD temporal.
@@ -84,11 +84,29 @@ describe('Login', () => {
     const intentar = (correo, contrasena, extra = resolverCaptcha()) =>
         api('POST', '/usuarios/login', { body: { correo_electronico: correo, contrasena, ...extra } });
 
-    test('el admin del seed inicia sesión y recibe token', async () => {
+    test('el admin del seed inicia sesión con cookie httpOnly (el token no va en el cuerpo)', async () => {
         const r = await intentar('admin@rickys.com', 'password');
         assert.equal(r.status, 200);
-        assert.ok(r.body.token);
+        assert.equal(r.body.token, undefined);
         assert.equal(r.body.usuario.id_rol, 1);
+        const cookie = r.headers.getSetCookie().find(c => c.startsWith('sgiv_sesion='));
+        assert.match(cookie, /HttpOnly/i);
+        assert.match(cookie, /SameSite=Strict/i);
+        assert.match(cookie, /Path=\//);
+        assert.ok(tokenDeCookie(r.headers));
+    });
+
+    test('la cookie sola abre la sesión y el cierre la borra', async () => {
+        const r = await intentar('admin@rickys.com', 'password');
+        const cookie = `sgiv_sesion=${encodeURIComponent(tokenDeCookie(r.headers))}`;
+        assert.equal((await api('GET', '/usuarios', { headers: { Cookie: cookie } })).status, 200);
+
+        const salir = await api('POST', '/usuarios/logout', { headers: { Cookie: cookie } });
+        assert.equal(salir.status, 200);
+        assert.match(salir.headers.getSetCookie().find(c => c.startsWith('sgiv_sesion=')), /Expires=Thu, 01 Jan 1970/);
+
+        // Sin sesión también responde (borra la cookie que hubiera)
+        assert.equal((await api('POST', '/usuarios/logout')).status, 200);
     });
 
     test('sin CAPTCHA o con CAPTCHA incorrecto no se evalúa la contraseña', async () => {

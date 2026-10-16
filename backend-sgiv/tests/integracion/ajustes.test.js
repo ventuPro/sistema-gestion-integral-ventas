@@ -4,7 +4,7 @@ const fs     = require('fs');
 const path   = require('path');
 const bcrypt = require('bcryptjs');
 const { crearBdPrueba } = require('../bdPrueba');
-const { crearLogin }    = require('../sesionPrueba');
+const { crearLogin, tokenDeCookie } = require('../sesionPrueba');
 
 // ─── Módulo Ajustes: configuración del negocio ───
 
@@ -16,7 +16,7 @@ const api = async (metodo, ruta, { token, body } = {}) => {
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: body ? JSON.stringify(body) : undefined
     });
-    return { status: r.status, body: await r.json() };
+    return { status: r.status, body: await r.json(), headers: r.headers };
 };
 
 const login = crearLogin((...a) => api(...a));
@@ -282,7 +282,7 @@ test('parámetros: sin CAPTCHA y con duración de sesión configurada', async ()
     await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body: { captcha_activo: false, sesion_horas: 2 } });
     const r = await api('POST', '/usuarios/login', { body: { correo_electronico: 'admin@rickys.com', contrasena: 'password' } });
     assert.equal(r.status, 200);
-    const { exp, iat } = JSON.parse(Buffer.from(r.body.token.split('.')[1], 'base64url').toString());
+    const { exp, iat } = JSON.parse(Buffer.from(tokenDeCookie(r.headers).split('.')[1], 'base64url').toString());
     assert.equal(exp - iat, 2 * 3600);
 
     await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body: { captcha_activo: true, sesion_horas: 8 } });

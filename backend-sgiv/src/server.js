@@ -6,8 +6,7 @@ const { Server } = require('socket.io');
 require('dotenv').config();
 
 const db = require('./config/db');
-const jwt = require('jsonwebtoken');
-const { origenPermitido, JWT_SECRET, JWT_ALGORITMOS } = require('./config/seguridad');
+const { origenPermitido, leerToken, verificarJWT } = require('./config/seguridad');
 const { registrarAcceso } = require('./auditoria/registroAcceso');
 const { instalarAuditoria } = require('./auditoria/instalar');
 const { aplicarMigraciones } = require('./config/migraciones');
@@ -32,7 +31,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: true,
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST'],
+    credentials: true
   },
   allowRequest: (req, callback) => {
     callback(null, origenPermitido(req.headers.origin, req.headers.host));
@@ -51,7 +51,7 @@ app.use(cors((req, callback) => {
         origin:         publico || origenPermitido(req.headers.origin, req.headers.host),
         methods:        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
-        credentials:    false
+        credentials:    true
     });
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -82,11 +82,12 @@ app.use('/api/asistente',  asistenteRoutes);
 io.on('connection', (socket) => {
     console.log(`🔌 Cliente conectado: ${socket.id}`);
 
-    // Personal del sistema: la sala 'cajeros' exige un token válido
-    socket.on('unirse_sala', async (sala, token) => {
+    // Personal del sistema: la sala 'cajeros' exige la cookie de sesión del handshake
+    socket.on('unirse_sala', async (sala) => {
         if (sala !== 'cajeros') return;
         try {
-            const payload = jwt.verify(String(token || ''), JWT_SECRET, { algorithms: JWT_ALGORITMOS });
+            const payload = verificarJWT(leerToken(socket.request));
+            if (!payload) return;
             const r = await db.query(
                 `SELECT 1 FROM usuario WHERE id_usuario = $1 AND estado_activo = TRUE`, [payload.id_usuario]);
             if (!r.rows.length) return;

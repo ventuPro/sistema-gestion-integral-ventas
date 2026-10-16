@@ -19,7 +19,7 @@ const api = async (metodo, ruta, { token, body } = {}) => {
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: body ? JSON.stringify(body) : undefined
     });
-    return { status: r.status, body: await r.json() };
+    return { status: r.status, body: await r.json(), headers: r.headers };
 };
 
 const login = crearLogin((...a) => api(...a));
