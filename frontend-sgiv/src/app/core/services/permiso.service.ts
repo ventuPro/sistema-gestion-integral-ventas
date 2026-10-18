@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, Subscription, merge } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { sondeo } from '../utils/sondeo';
+import { SocketService } from './socket.service';
 
 export const MODULOS = [
   { key: 'dashboard',   label: 'Panel Principal' },
@@ -24,12 +24,13 @@ const DEFAULTS: Record<number, Record<string, boolean>> = {
 export class PermisoService {
   private apiUrl = environment.apiUrl;
   private permisosSubject = new BehaviorSubject<Record<string, boolean>>({});
-  private detenerPoll_: (() => void) | null = null;
+  private subCambios: Subscription | null = null;
+  private cargadoEn = 0;
 
   /** Observable que el dashboard puede consumir para re-renderizar el sidebar */
   public permisos$ = this.permisosSubject.asObservable();
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private socket: SocketService) {}
 
   private getRolActual(): number {
     try {
@@ -49,6 +50,7 @@ export class PermisoService {
           const permisos: Record<string, boolean> = res?.permisos || this.getDefaults();
           this.permisosSubject.next(permisos);
           localStorage.setItem('permisos_sgiv', JSON.stringify(permisos));
+          this.cargadoEn = Date.now();
           observer.next(permisos);
           observer.complete();
         },
@@ -100,25 +102,27 @@ export class PermisoService {
   }
 
   limpiarPermisos() {
-    this.detenerPoll();
+    this.dejarDeEscuchar();
     this.permisosSubject.next({});
     localStorage.removeItem('permisos_sgiv');
   }
 
-  /**
-   * Inicia un polling silencioso que recarga los permisos del usuario logueado
-   * cada N segundos. Si cambian, emite por permisos$ y actualiza localStorage.
-   * Admin (id_rol = 1) no necesita poll: siempre tiene todo.
-   */
-  iniciarPollPermisos(intervaloMs: number = 30000) {
-    if (this.getRolActual() === 1) return;  // admin: skip
-    this.detenerPoll();
-    this.detenerPoll_ = sondeo(() => this.recargarPermisos().subscribe(), intervaloMs);
+  // ─── Cambios en vivo ───
+  // Se recargan solo cuando el admin los cambia o al (re)entrar a la sala. El admin no lo necesita.
+  escucharCambios() {
+    if (this.getRolActual() === 1 || this.subCambios) return;
+    this.socket.conectar('cajeros');
+    this.subCambios = merge(
+      this.socket.escuchar('permisos:actualizados'),
+      this.socket.escuchar('sala_unida')
+    ).subscribe(() => {
+      if (Date.now() - this.cargadoEn > 5000) this.recargarPermisos().subscribe({ error: () => {} });
+    });
   }
 
-  detenerPoll() {
-    this.detenerPoll_?.();
-    this.detenerPoll_ = null;
+  dejarDeEscuchar() {
+    this.subCambios?.unsubscribe();
+    this.subCambios = null;
   }
 
   /**
@@ -130,6 +134,7 @@ export class PermisoService {
     return new Observable(observer => {
       this.http.get<any>(`${this.apiUrl}/permisos/mis-permisos`).subscribe({
         next: (res) => {
+          this.cargadoEn = Date.now();
           const nuevos: Record<string, boolean> = res?.permisos || this.getDefaults();
           const previo = localStorage.getItem('permisos_sgiv') || '{}';
           const nuevoStr = JSON.stringify(nuevos);

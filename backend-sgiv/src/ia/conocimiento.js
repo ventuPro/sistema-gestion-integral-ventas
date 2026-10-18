@@ -43,7 +43,7 @@ Se puede exportar a PDF o Excel e imprimir.` },
 
     usuarios: { modulo: 'usuarios', titulo: 'Usuarios', resumen: '«Nuevo usuario», cambiar contraseña, activar/desactivar, habilitar caja y «Permisos de acceso».', texto: `
 Menú lateral → «Usuarios». «Nuevo usuario»: nombre completo, correo, contraseña, rol (Administrador o Cajero) y sucursal.
-En cada usuario: editar (la contraseña no se cambia ahí: se cambia con el botón de la llave de la lista), «Cambiar contraseña», activar o desactivar (un usuario inactivo no puede entrar), habilitar su caja y ajustar «Permisos de acceso» por módulo (Panel, Punto de venta, Mesas, Arqueo, Inventario, Reportes, Usuarios). Los permisos nuevos se aplican cuando el usuario recarga la página o vuelve a iniciar sesión.` },
+En cada usuario: editar (la contraseña no se cambia ahí: se cambia con el botón de la llave de la lista), «Cambiar contraseña», activar o desactivar (un usuario inactivo no puede entrar), habilitar su caja y ajustar «Permisos de acceso» por módulo (Panel, Punto de venta, Mesas, Arqueo, Inventario, Reportes, Usuarios). Los permisos nuevos se aplican al instante en la sesión abierta del usuario: su menú cambia y, si estaba en una pantalla que ya no puede ver, sale de ella.` },
 
     cierres: { modulo: null, titulo: 'Cierres de caja (administrador)', resumen: 'turnos cerrados y resultado del arqueo.', texto: `
 Menú lateral → «Cierres de caja». Lista los turnos cerrados con cajero, ventas, total, efectivo y el resultado del arqueo («Cuadra», sobrante o faltante, o «sin conteo» si el cajero no contó el efectivo). Arriba muestra el total recaudado en todos los turnos, lo cobrado en efectivo y QR y las diferencias de arqueo.` },

@@ -1,4 +1,4 @@
-// ─── Tiempo real: salas 'cajeros' y 'mesa_<id_mesa>' ───
+// ─── Tiempo real: salas 'cajeros', 'usuario_<id>' y 'mesa_<id_mesa>' ───
 
 const io = () => global.io;
 
@@ -17,8 +17,11 @@ const emitirCatalogo = () => io()?.emit('catalogo:actualizado', {});
 
 const emitirCajeros = (evento, datos) => io()?.to('cajeros').emit(evento, datos);
 
+// Sala propia de cada usuario del personal ('usuario_<id>')
+const emitirUsuario = (id_usuario, evento, datos = {}) => io()?.to(`usuario_${id_usuario}`).emit(evento, datos);
+
 const emitirMesa = (id_mesa, evento, datos) => {
     if (id_mesa) io()?.to(`mesa_${id_mesa}`).emit(evento, datos);
 };
 
-module.exports = { emitirStock, emitirCatalogo, emitirCajeros, emitirMesa };
+module.exports = { emitirStock, emitirCatalogo, emitirCajeros, emitirUsuario, emitirMesa };

@@ -105,19 +105,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
       if (previo !== nuevo && !this.esAdmin) {
         this.mostrarToast('Tus permisos fueron actualizados por el administrador.');
+        this.salirSiPerdioAcceso();
       }
     });
 
-    // Arrancar poll silencioso solo para no-admin
-    if (!this.esAdmin) {
-      this.permisoService.iniciarPollPermisos(30000);  // cada 30s
-    }
+    this.permisoService.escucharCambios();
   }
 
   ngOnDestroy() {
     this.subPermisos?.unsubscribe();
     this.subRuta?.unsubscribe();
-    this.permisoService.detenerPoll();
+    this.permisoService.dejarDeEscuchar();
   }
 
   // ─── Menú ───
@@ -183,6 +181,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
       return this.permisosActuales[modulo] === true;
     }
     return this.permisoService.tienePermiso(modulo);
+  }
+
+  private salirSiPerdioAcceso() {
+    const ruta = this.router.url.split(/[/?#]/)[2];
+    const enlace = this.secciones.flatMap(s => s.enlaces).find(e => e.ruta === ruta);
+    if (enlace?.modulo && !this.tiene(enlace.modulo)) this.router.navigate(['/dashboard/sin-acceso']);
   }
 
   /** Botón manual de recarga (cajero) */

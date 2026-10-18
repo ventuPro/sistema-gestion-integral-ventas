@@ -1,5 +1,6 @@
 const permisoModel = require('../models/permisoModel');
 const db           = require('../config/db');
+const { emitirUsuario } = require('../utils/tiempoReal');
 
 const getMisPermisos = async (req, res) => {
     try {
@@ -51,6 +52,7 @@ const putPermisosUsuario = async (req, res) => {
             return res.status(400).json({ error: 'Cuerpo inválido: se esperaba { permisos: { ... } }' });
 
         const resultado = await permisoModel.guardarPermisosUsuario(id_usuario, permisos);
+        emitirUsuario(id_usuario, 'permisos:actualizados');
         res.json({ mensaje: 'Permisos guardados correctamente', permisos: resultado });
     } catch (e) {
         console.error('[permisos] putPermisosUsuario error:', e);

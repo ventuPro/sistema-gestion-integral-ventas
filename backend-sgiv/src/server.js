@@ -91,7 +91,8 @@ io.on('connection', (socket) => {
             const r = await db.query(
                 `SELECT 1 FROM usuario WHERE id_usuario = $1 AND estado_activo = TRUE`, [payload.id_usuario]);
             if (!r.rows.length) return;
-            socket.join(sala);
+            socket.join([sala, `usuario_${payload.id_usuario}`]);
+            socket.emit('sala_unida', sala);
             console.log(`📡 ${socket.id} unido a sala: ${sala}`);
         } catch { /* token inválido: no se une */ }
     });
