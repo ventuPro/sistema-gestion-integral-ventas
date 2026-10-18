@@ -1,5 +1,3 @@
-@if (mensaje(); as m) { <div class="aviso-flotante" [class.error]="m.tipo === 'error'" role="status">{{ m.texto }}</div> }
-
 <ng-template #resultado let-nombre="nombre" let-r="r">
   <div class="flex flex-wrap items-baseline gap-x-2 text-[12.5px]">
     <span class="inf-tinta font-medium">{{ nombre }}</span>

@@ -2,6 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { LucideAngularModule, Save, Undo2, Zap } from 'lucide-angular';
 import { AjustesService, PruebaChatbot } from '../../../../core/services/ajustes.service';
+import { DialogoService } from '../../../../core/services/dialogo.service';
 
 export const MAX_INFO_CHATBOT = 3000;
 
@@ -19,6 +20,7 @@ export const MAX_INFO_CHATBOT = 3000;
 })
 export class AjustesIaComponent implements OnInit {
   readonly ajustes = inject(AjustesService);
+  private dialogo  = inject(DialogoService);
 
   readonly icons = { guardar: Save, descartar: Undo2, probar: Zap };
   readonly maximo = MAX_INFO_CHATBOT;
@@ -26,7 +28,6 @@ export class AjustesIaComponent implements OnInit {
   readonly conClave  = computed(() => this.ajustes.config().ia_cliente_disponible);
   readonly cargando  = signal(true);
   readonly guardando = signal(false);
-  readonly mensaje   = signal<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
 
   readonly info     = signal('');
   private  guardado = signal('');
@@ -39,7 +40,7 @@ export class AjustesIaComponent implements OnInit {
   ngOnInit() {
     this.ajustes.obtenerCompleto().subscribe({
       next: (c) => { this.llenar(c.ia_info_negocio); this.cargando.set(false); },
-      error: () => { this.cargando.set(false); this.avisar('error', 'No se pudieron cargar los ajustes.'); }
+      error: () => { this.cargando.set(false); this.dialogo.error('No se pudieron cargar los ajustes.'); }
     });
   }
 
@@ -69,16 +70,11 @@ export class AjustesIaComponent implements OnInit {
 
   guardar() {
     if (this.info().length > MAX_INFO_CHATBOT)
-      return this.avisar('error', `La información admite hasta ${MAX_INFO_CHATBOT} caracteres.`);
+      return this.dialogo.error(`La información admite hasta ${MAX_INFO_CHATBOT} caracteres.`);
     this.guardando.set(true);
     this.ajustes.guardarIa({ ia_info_negocio: this.info() }).subscribe({
-      next: (r) => { this.llenar(r.configuracion.ia_info_negocio); this.guardando.set(false); this.avisar('ok', 'Información del chatbot guardada'); },
-      error: (e) => { this.guardando.set(false); this.avisar('error', e?.error?.error || 'No se pudo guardar.'); }
+      next: (r) => { this.llenar(r.configuracion.ia_info_negocio); this.guardando.set(false); this.dialogo.avisar('Información del chatbot guardada'); },
+      error: (e) => { this.guardando.set(false); this.dialogo.error(e?.error?.error || 'No se pudo guardar.'); }
     });
-  }
-
-  private avisar(tipo: 'ok' | 'error', texto: string) {
-    this.mensaje.set({ tipo, texto });
-    setTimeout(() => this.mensaje.set(null), 4500);
   }
 }

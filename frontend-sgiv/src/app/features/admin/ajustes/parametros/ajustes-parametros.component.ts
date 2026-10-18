@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, Save, Undo2, RotateCcw, Upload, ImageIcon } from 'lucide-angular';
 import { AjustesService, Configuracion } from '../../../../core/services/ajustes.service';
 import { ImagenUrlPipe } from '../../../../core/pipes/imagen-url.pipe';
+import { DialogoService } from '../../../../core/services/dialogo.service';
 
 interface Parametros {
   moneda_simbolo: string;
@@ -44,6 +45,7 @@ interface CampoNumero { clave: keyof Parametros; etiqueta: string; min: number; 
 })
 export class AjustesParametrosComponent implements OnInit {
   private ajustes = inject(AjustesService);
+  private dialogo = inject(DialogoService);
   private cdr     = inject(ChangeDetectorRef);
 
   readonly icons = { guardar: Save, descartar: Undo2, original: RotateCcw, subir: Upload, imagen: ImageIcon };
@@ -70,7 +72,6 @@ export class AjustesParametrosComponent implements OnInit {
 
   cargando = true;
   guardando = false;
-  mensaje: { tipo: 'ok' | 'error'; texto: string } | null = null;
 
   p: Parametros = { ...ORIGINALES };
   private guardado: Parametros = { ...ORIGINALES };
@@ -81,7 +82,7 @@ export class AjustesParametrosComponent implements OnInit {
   ngOnInit() {
     this.ajustes.obtenerCompleto().subscribe({
       next: (c) => { this.llenar(c); this.cargando = false; this.cdr.detectChanges(); },
-      error: () => { this.cargando = false; this.avisar('error', 'No se pudieron cargar los parámetros.'); }
+      error: () => { this.cargando = false; this.dialogo.error('No se pudieron cargar los parámetros.'); }
     });
   }
 
@@ -113,7 +114,7 @@ export class AjustesParametrosComponent implements OnInit {
   cambiarPago(metodo: 'pago_efectivo' | 'pago_qr') {
     const otro = metodo === 'pago_efectivo' ? 'pago_qr' : 'pago_efectivo';
     if (this.p[metodo] && !this.p[otro])
-      return this.avisar('error', 'Debe quedar al menos un método de pago habilitado.');
+      return this.dialogo.error('Debe quedar al menos un método de pago habilitado.');
     this.p[metodo] = !this.p[metodo];
   }
 
@@ -123,8 +124,8 @@ export class AjustesParametrosComponent implements OnInit {
     input.value = '';
     if (!archivo) return;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(archivo.type))
-      return this.avisar('error', 'La imagen del QR debe ser PNG, JPG o WEBP.');
-    if (archivo.size > 2 * 1024 * 1024) return this.avisar('error', 'La imagen no debe superar 2 MB.');
+      return this.dialogo.error('La imagen del QR debe ser PNG, JPG o WEBP.');
+    if (archivo.size > 2 * 1024 * 1024) return this.dialogo.error('La imagen no debe superar 2 MB.');
     const lector = new FileReader();
     lector.onload = () => { this.qrNuevo = lector.result as string; this.cdr.detectChanges(); };
     lector.readAsDataURL(archivo);
@@ -146,22 +147,16 @@ export class AjustesParametrosComponent implements OnInit {
     const fuera = [...this.camposMenu, ...this.camposSeguridad,
                    { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo por defecto', min: 0, max: 10000 } as CampoNumero]
       .find(c => { const n = Number(this.p[c.clave]); return !Number.isInteger(n) || n < c.min || n > c.max; });
-    if (fuera) return this.avisar('error', `${fuera.etiqueta}: debe ser un número entero entre ${fuera.min} y ${fuera.max}.`);
-    if (!this.p.moneda_simbolo.trim()) return this.avisar('error', 'El símbolo de moneda es obligatorio.');
-    if (!this.p.ticket_mensaje_pie.trim()) return this.avisar('error', 'El mensaje del pie del ticket es obligatorio.');
+    if (fuera) return this.dialogo.error(`${fuera.etiqueta}: debe ser un número entero entre ${fuera.min} y ${fuera.max}.`);
+    if (!this.p.moneda_simbolo.trim()) return this.dialogo.error('El símbolo de moneda es obligatorio.');
+    if (!this.p.ticket_mensaje_pie.trim()) return this.dialogo.error('El mensaje del pie del ticket es obligatorio.');
 
     const datos: any = { ...this.p };
     if (this.qrNuevo !== undefined) datos.qr_cobro = this.qrNuevo;
     this.guardando = true;
     this.ajustes.guardarParametros(datos).subscribe({
-      next: (r) => { this.llenar(r.configuracion); this.guardando = false; this.avisar('ok', 'Parámetros guardados'); },
-      error: (e) => { this.guardando = false; this.avisar('error', e?.error?.error || 'No se pudieron guardar los parámetros.'); }
+      next: (r) => { this.llenar(r.configuracion); this.guardando = false; this.dialogo.avisar('Parámetros guardados'); },
+      error: (e) => { this.guardando = false; this.dialogo.error(e?.error?.error || 'No se pudieron guardar los parámetros.'); }
     });
-  }
-
-  private avisar(tipo: 'ok' | 'error', texto: string) {
-    this.mensaje = { tipo, texto };
-    this.cdr.detectChanges();
-    setTimeout(() => { this.mensaje = null; this.cdr.detectChanges(); }, 4500);
   }
 }

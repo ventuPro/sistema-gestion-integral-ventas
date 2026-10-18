@@ -58,7 +58,6 @@ export class MesasComponent implements OnInit, OnDestroy {
   // ─── Estado ───
   mesas:            any[] = [];
   cargando          = true;
-  notificacion: string | null = null;
 
   // ─── Modal nueva mesa ───
   mostrarModalMesa  = false;
@@ -157,15 +156,9 @@ export class MesasComponent implements OnInit, OnDestroy {
       this.subs.push(this.socketService.escuchar<any>(evento).subscribe(() => this.cargarMesas()));
 
     this.subs.push(this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
-      this.mostrarToast(`Pedido QR cargado a la Mesa ${data.numero_mesa || ''}`);
+      this.dialogo.avisar(`Pedido QR cargado a la Mesa ${data.numero_mesa || ''}`);
       this.cargarMesas();
     }));
-  }
-
-  mostrarToast(msg: string) {
-    this.notificacion = msg;
-    this.cdr.detectChanges();
-    setTimeout(() => { this.notificacion = null; this.cdr.detectChanges(); }, 4000);
   }
 
   // ─── CARGA DE DATOS ───
@@ -227,7 +220,7 @@ export class MesasComponent implements OnInit, OnDestroy {
 
     this.mesaService.eliminarMesa(mesa.id_mesa).subscribe({
       next: () => {
-        this.mostrarToast(`Mesa ${mesa.numero_mesa} eliminada`);
+        this.dialogo.avisar(`Mesa ${mesa.numero_mesa} eliminada`);
         this.cargarMesas();
       },
       error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo eliminar la mesa.')
@@ -298,7 +291,7 @@ export class MesasComponent implements OnInit, OnDestroy {
     });
     if (!si) return;
     this.mesaService.regenerarQR(c.id_mesa).subscribe({
-      next: (r: any) => { this.mostrarToast(r.mensaje); this.generarCodigosQR(); },
+      next: (r: any) => { this.dialogo.avisar(r.mensaje); this.generarCodigosQR(); },
       error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo regenerar el QR')
     });
   }

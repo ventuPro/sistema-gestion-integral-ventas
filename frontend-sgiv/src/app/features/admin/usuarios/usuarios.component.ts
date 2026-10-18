@@ -9,6 +9,7 @@ import { ConfirmacionComponent } from '../../shared/confirmacion/confirmacion.co
 import { LucideAngularModule,
          Pencil, KeyRound, ShieldCheck, Lock, Unlock,
          UserCheck, UserX, X, Plus, Search } from 'lucide-angular';
+import { DialogoService } from '../../../core/services/dialogo.service';
 
 interface Confirmacion {
   titulo:  string;
@@ -29,6 +30,7 @@ interface Confirmacion {
 })
 export class UsuariosComponent implements OnInit {
   private usuarioService = inject(UsuarioService);
+  private dialogo        = inject(DialogoService);
   private permisoService = inject(PermisoService);
   private cdr            = inject(ChangeDetectorRef);
   private cajaService    = inject(CajaService);
@@ -84,7 +86,6 @@ export class UsuariosComponent implements OnInit {
   confirmando       = false;
   errorConfirmacion = '';
 
-  mensajeExito: string | null = null;
 
   ngOnInit() { this.cargarDatos(); }
 
@@ -157,12 +158,12 @@ export class UsuariosComponent implements OnInit {
     if (this.editandoId) {
       const d = { nombre_completo: f.nombre_completo, correo_electronico: f.correo_electronico, id_rol: f.id_rol, id_sucursal: f.id_sucursal };
       this.usuarioService.actualizarUsuario(this.editandoId, d).subscribe({
-        next:  () => { this.cerrarModal(); this.mostrarToast('Usuario actualizado'); this.cargarDatos(); },
+        next:  () => { this.cerrarModal(); this.dialogo.avisar('Usuario actualizado'); this.cargarDatos(); },
         error: (e) => fallo(e, 'No se pudo actualizar el usuario.')
       });
     } else {
       this.usuarioService.crearUsuario(f).subscribe({
-        next:  () => { this.cerrarModal(); this.mostrarToast('Usuario creado'); this.cargarDatos(); },
+        next:  () => { this.cerrarModal(); this.dialogo.avisar('Usuario creado'); this.cargarDatos(); },
         error: (e) => fallo(e, 'No se pudo crear el usuario.')
       });
     }
@@ -210,7 +211,7 @@ export class UsuariosComponent implements OnInit {
       next: (res) => {
         this.confirmando  = false;
         this.confirmacion = null;
-        this.mostrarToast(c.exito(res));
+        this.dialogo.avisar(c.exito(res));
         this.cargarDatos();
       },
       error: (e: any) => {
@@ -239,7 +240,7 @@ export class UsuariosComponent implements OnInit {
       next: () => {
         this.cerrarModalContrasena();
         this.cargandoContrasena = false;
-        this.mostrarToast(`Contraseña de ${this.usuarioContrasena.nombre_completo} actualizada`);
+        this.dialogo.avisar(`Contraseña de ${this.usuarioContrasena.nombre_completo} actualizada`);
       },
       error: (e: any) => {
         this.errorContrasena    = e?.error?.error || 'No se pudo cambiar la contraseña.';
@@ -287,7 +288,7 @@ export class UsuariosComponent implements OnInit {
       next: () => {
         this.cargandoPermisos = false;
         this.cerrarModalPermisos();
-        this.mostrarToast(`Permisos de ${nombre} guardados`);
+        this.dialogo.avisar(`Permisos de ${nombre} guardados`);
       },
       error: (e: any) => {
         this.cargandoPermisos = false;
@@ -295,11 +296,5 @@ export class UsuariosComponent implements OnInit {
         this.cdr.detectChanges();
       }
     });
-  }
-
-  private mostrarToast(msg: string) {
-    this.mensajeExito = msg;
-    this.cdr.detectChanges();
-    setTimeout(() => { this.mensajeExito = null; this.cdr.detectChanges(); }, 3500);
   }
 }

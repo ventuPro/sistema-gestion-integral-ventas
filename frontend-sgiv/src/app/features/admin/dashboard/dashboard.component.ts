@@ -16,6 +16,7 @@ import { Subscription, filter } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { componenteDiferido } from '../../../core/utils/diferido';
 import type { MensajeChat } from '../../shared/asistente/asistente-chat.component';
+import { DialogoService } from '../../../core/services/dialogo.service';
 
 interface Enlace { ruta: string; texto: string; icono: any; modulo?: string }
 
@@ -28,6 +29,7 @@ interface Enlace { ruta: string; texto: string; icono: any; modulo?: string }
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   private router         = inject(Router);
+  private dialogo        = inject(DialogoService);
   private permisoService = inject(PermisoService);
   private authService    = inject(AuthService);
   private socketService  = inject(SocketService);
@@ -49,7 +51,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   /** Cache reactivo de permisos — se actualiza con permisos$ del service */
   permisosActuales: Record<string, boolean> = {};
   recargandoPermisos = false;
-  toastPermisos: string | null = null;
 
   private subPermisos?: Subscription;
   private subRuta?: Subscription;
@@ -104,7 +105,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.permisosActuales = p;
       this.cdr.detectChanges();
       if (previo !== nuevo && !this.esAdmin) {
-        this.mostrarToast('Tus permisos fueron actualizados por el administrador.');
+        this.dialogo.avisar('Tus permisos fueron actualizados por el administrador.');
         this.salirSiPerdioAcceso();
       }
     });
@@ -196,21 +197,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.permisoService.recargarPermisos().subscribe({
       next: () => {
         this.recargandoPermisos = false;
-        this.mostrarToast('Permisos actualizados.');
+        this.dialogo.avisar('Permisos actualizados.');
         this.cdr.detectChanges();
       },
       error: () => {
         this.recargandoPermisos = false;
-        this.mostrarToast('No se pudieron recargar los permisos.');
+        this.dialogo.error('No se pudieron recargar los permisos.');
         this.cdr.detectChanges();
       }
     });
-  }
-
-  private mostrarToast(msg: string) {
-    this.toastPermisos = msg;
-    this.cdr.detectChanges();
-    setTimeout(() => { this.toastPermisos = null; this.cdr.detectChanges(); }, 4000);
   }
 
   cerrarSesion() {

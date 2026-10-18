@@ -11,6 +11,7 @@ import { AjustesPropietariosComponent } from './propietarios/ajustes-propietario
 import { AjustesSucursalesComponent } from './sucursales/ajustes-sucursales.component';
 import { AjustesParametrosComponent } from './parametros/ajustes-parametros.component';
 import { AjustesIaComponent } from './ia/ajustes-ia.component';
+import { DialogoService } from '../../../core/services/dialogo.service';
 
 type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'parametros' | 'ia';
 
@@ -36,6 +37,7 @@ const IMAGENES = {
 })
 export class AjustesComponent implements OnInit, OnDestroy {
   private ajustes = inject(AjustesService);
+  private dialogo = inject(DialogoService);
   private cdr     = inject(ChangeDetectorRef);
 
   readonly icons = {
@@ -110,8 +112,6 @@ export class AjustesComponent implements OnInit, OnDestroy {
   pestana: Pestana = 'empresa';
   cargando = true;
   guardando = false;
-  mensajeExito: string | null = null;
-  mensajeError: string | null = null;
   fechaActualizacion: string | null = null;
 
   empresa: Record<string, string> = {};
@@ -131,7 +131,7 @@ export class AjustesComponent implements OnInit, OnDestroy {
       next: (c) => { this.llenar(c); this.cargando = false; this.cdr.detectChanges(); },
       error: () => {
         this.cargando = false;
-        this.mostrarError('No se pudieron cargar los ajustes.');
+        this.dialogo.error('No se pudieron cargar los ajustes.');
       }
     });
   }
@@ -147,11 +147,11 @@ export class AjustesComponent implements OnInit, OnDestroy {
 
   // ─── Empresa ───
   guardarEmpresa() {
-    if (!this.empresa['nombre_comercial']?.trim()) return this.mostrarError('El nombre comercial es obligatorio.');
+    if (!this.empresa['nombre_comercial']?.trim()) return this.dialogo.error('El nombre comercial es obligatorio.');
     this.guardando = true;
     this.ajustes.guardarEmpresa(this.empresa).subscribe({
       next: (r) => { this.llenar(r.configuracion); this.terminar('Datos de la empresa guardados'); },
-      error: (e) => { this.guardando = false; this.mostrarError(e?.error?.error || 'No se pudieron guardar los datos.'); }
+      error: (e) => { this.guardando = false; this.dialogo.error(e?.error?.error || 'No se pudieron guardar los datos.'); }
     });
   }
 
@@ -208,9 +208,9 @@ export class AjustesComponent implements OnInit, OnDestroy {
     if (!archivo) return;
     const regla = IMAGENES[tipo];
     if (!regla.tipos.includes(archivo.type))
-      return this.mostrarError(tipo === 'logo' ? 'El logo debe ser PNG, JPG o WEBP.' : 'El ícono debe ser PNG o ICO.');
+      return this.dialogo.error(tipo === 'logo' ? 'El logo debe ser PNG, JPG o WEBP.' : 'El ícono debe ser PNG o ICO.');
     if (archivo.size > regla.maxKb * 1024)
-      return this.mostrarError(`La imagen no debe superar ${regla.maxKb >= 1024 ? regla.maxKb / 1024 + ' MB' : regla.maxKb + ' KB'}.`);
+      return this.dialogo.error(`La imagen no debe superar ${regla.maxKb >= 1024 ? regla.maxKb / 1024 + ' MB' : regla.maxKb + ' KB'}.`);
 
     const lector = new FileReader();
     lector.onload = () => {
@@ -240,23 +240,13 @@ export class AjustesComponent implements OnInit, OnDestroy {
     this.guardando = true;
     this.ajustes.guardarApariencia(datos).subscribe({
       next: (r) => { this.llenar(r.configuracion); this.terminar('Apariencia guardada'); },
-      error: (e) => { this.guardando = false; this.mostrarError(e?.error?.error || 'No se pudo guardar la apariencia.'); }
+      error: (e) => { this.guardando = false; this.dialogo.error(e?.error?.error || 'No se pudo guardar la apariencia.'); }
     });
   }
 
   // ─── Mensajes ───
   private terminar(mensaje: string) {
     this.guardando = false;
-    this.mensajeError = null;
-    this.mensajeExito = mensaje;
-    this.cdr.detectChanges();
-    setTimeout(() => { this.mensajeExito = null; this.cdr.detectChanges(); }, 3500);
-  }
-
-  private mostrarError(mensaje: string) {
-    this.mensajeExito = null;
-    this.mensajeError = mensaje;
-    this.cdr.detectChanges();
-    setTimeout(() => { this.mensajeError = null; this.cdr.detectChanges(); }, 5000);
+    this.dialogo.avisar(mensaje);
   }
 }

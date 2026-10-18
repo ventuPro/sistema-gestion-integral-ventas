@@ -13,6 +13,7 @@ import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { cifra } from '../../../core/utils/informe';
+import { DialogoService } from '../../../core/services/dialogo.service';
 
 type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
 
@@ -26,6 +27,7 @@ type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
 })
 export class InventarioComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
+  private dialogo         = inject(DialogoService);
   private socketService   = inject(SocketService);
   private inventarioService = inject(InventarioService);
   private cdr             = inject(ChangeDetectorRef);
@@ -69,7 +71,6 @@ export class InventarioComponent implements OnInit, OnDestroy {
   categorias:            any[] = [];
   cargando               = true;
   guardando              = false;
-  notificacion:          string | null = null;
   resumen = { activos: 0, bajos: 0, agotados: 0, valor: 0 };
 
   // ─── Filtros ───
@@ -321,14 +322,14 @@ export class InventarioComponent implements OnInit, OnDestroy {
     if (this.editandoId) {
       // Editar: solo datos del producto, no el inventario
       this.productoService.actualizarProducto(this.editandoId, datos, this.archivoImagen || undefined).subscribe({
-        next:  () => { this.cerrarModal(); this.avisar('Producto actualizado'); this.cargarProductos(); },
+        next:  () => { this.cerrarModal(); this.dialogo.avisar('Producto actualizado'); this.cargarProductos(); },
         error: (e: any) => fallo(e, 'No se pudo actualizar el producto.')
       });
     } else {
       // Crear: queda asignado a la sucursal elegida con su stock inicial
       const nuevo = { ...datos, id_sucursal: this.idSucursal, stock_inicial: this.formulario.stock_inicial || 0 };
       this.productoService.crearProducto(nuevo, this.archivoImagen || undefined).subscribe({
-        next:  () => { this.cerrarModal(); this.avisar('Producto creado'); this.cargarProductos(); },
+        next:  () => { this.cerrarModal(); this.dialogo.avisar('Producto creado'); this.cargarProductos(); },
         error: (e: any) => fallo(e, 'No se pudo crear el producto.')
       });
     }
@@ -340,8 +341,8 @@ export class InventarioComponent implements OnInit, OnDestroy {
       : this.productoService.reactivarProducto(prod.id_producto);
     const texto  = prod.estado_activo ? 'desactivado' : 'reactivado';
     accion.subscribe({
-      next:  () => { this.avisar(`«${prod.nombre_producto}» ${texto}`); this.cargarProductos(); },
-      error: () => this.avisar(`No se pudo dejar el producto ${texto}.`)
+      next:  () => { this.dialogo.avisar(`«${prod.nombre_producto}» ${texto}`); this.cargarProductos(); },
+      error: () => this.dialogo.error(`No se pudo dejar el producto ${texto}.`)
     });
   }
 
@@ -386,7 +387,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
       next: (r) => {
         prod.stock_actual = r.stock_actual;
         this.cerrarMovimiento();
-        this.avisar(`${this.mov.tipo === 'INGRESO' ? 'Entrada' : 'Merma'} registrada: ${prod.nombre_producto} queda en ${r.stock_actual}`);
+        this.dialogo.avisar(`${this.mov.tipo === 'INGRESO' ? 'Entrada' : 'Merma'} registrada: ${prod.nombre_producto} queda en ${r.stock_actual}`);
         this.aplicarFiltros();
         if (this.vista === 'movimientos') this.cargarMovimientos();
       },
@@ -415,7 +416,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
       tipo: this.tipoMov, desde: desde.toLocaleDateString('en-CA')   // AAAA-MM-DD en hora local
     }).subscribe({
       next:  (m) => { this.movimientos = m; this.cargandoMov = false; this.cdr.detectChanges(); },
-      error: () => { this.movimientos = []; this.cargandoMov = false; this.avisar('No se pudo cargar el historial.'); }
+      error: () => { this.movimientos = []; this.cargandoMov = false; this.dialogo.error('No se pudo cargar el historial.'); }
     });
   }
 
@@ -426,7 +427,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   crearCategoria() {
     if (!this.nombreCategoria.trim()) { this.errorCategoria = 'Escribe el nombre.'; return; }
     this.productoService.crearCategoria({ nombre_categoria: this.nombreCategoria, descripcion_categoria: '' }).subscribe({
-      next:  () => { this.cerrarModalCategoria(); this.avisar('Categoría creada'); this.cargarCategorias(); },
+      next:  () => { this.cerrarModalCategoria(); this.dialogo.avisar('Categoría creada'); this.cargarCategorias(); },
       error: (e: any) => { this.errorCategoria = e?.error?.error || 'No se pudo crear la categoría.'; this.cdr.detectChanges(); }
     });
   }
@@ -468,7 +469,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
       next: () => {
         if (this.filtroCategoria === this.catABorrar.id_categoria) this.filtroCategoria = null;
         this.cerrarModalBorrarCategoria();
-        this.avisar('Categoría eliminada');
+        this.dialogo.avisar('Categoría eliminada');
         this.cargarCategorias();
         this.aplicarFiltros();
       },
@@ -478,11 +479,5 @@ export class InventarioComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       }
     });
-  }
-
-  private avisar(msg: string) {
-    this.notificacion = msg;
-    this.cdr.detectChanges();
-    setTimeout(() => { this.notificacion = null; this.cdr.detectChanges(); }, 3500);
   }
 }

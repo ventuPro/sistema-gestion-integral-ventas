@@ -34,14 +34,13 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   abierta  = false;
   /** false = el botón para abrirla lo pone el panel (barra lateral / superior) */
   flotante = input(true);
-  /** Para mostrar el aviso fuera de este componente */
+  /** Lo muestra el botón del panel cuando la bandeja no es flotante */
   readonly conteo = signal({ pendientes: 0, porEntregar: 0 });
   pestana: Pestana = 'pendientes';
   pendientes: any[] = [];
   porEntregar: any[] = [];
   ocupado: Record<number, boolean> = {};
   errores: Record<number, string> = {};
-  aviso: string | null = null;
   sonidoActivo = true;
   ahora = Date.now();
 
@@ -66,7 +65,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     this.subs.push(this.socketService.escuchar<any>('pedido:nuevo').subscribe(d => {
       if (!this.esDeMiSucursal(d)) return;
       this.sonar();
-      this.mostrarAviso(`🔔 Nuevo pedido de la Mesa ${d.numero_mesa}${d.nombre_cliente ? ` (${d.nombre_cliente})` : ''}`);
+      this.dialogo.avisar(`🔔 Nuevo pedido de la Mesa ${d.numero_mesa}${d.nombre_cliente ? ` (${d.nombre_cliente})` : ''}`);
       this.cargar();
     }));
     this.subs.push(this.socketService.escuchar<any>('pedido:actualizado').subscribe(d => {
@@ -169,7 +168,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     accion.subscribe({
       next: () => {
         delete this.ocupado[id];
-        if (exito) this.mostrarAviso(exito);
+        if (exito) this.dialogo.avisar(exito);
         this.cargar();
       },
       error: (e: any) => {
@@ -199,12 +198,6 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     return pedido.tipo_pedido === 'Delivery'
       ? `Delivery · ${pedido.nombre_cliente || 'Cliente'}`
       : `Mesa ${pedido.numero_mesa}${pedido.nombre_cliente ? ` · ${pedido.nombre_cliente}` : ''}`;
-  }
-
-  private mostrarAviso(msg: string) {
-    this.aviso = msg;
-    this.cdr.detectChanges();
-    setTimeout(() => { if (this.aviso === msg) { this.aviso = null; this.cdr.detectChanges(); } }, 4000);
   }
 
   // ─── Sonido (requiere un clic previo en la página) ───

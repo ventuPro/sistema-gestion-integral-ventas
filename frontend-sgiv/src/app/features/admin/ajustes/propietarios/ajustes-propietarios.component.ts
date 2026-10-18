@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, Plus, Pencil, Trash2, X } from 'lucide-angular';
 import { AjustesService, Propietario } from '../../../../core/services/ajustes.service';
 import { ConfirmacionComponent } from '../../../shared/confirmacion/confirmacion.component';
+import { DialogoService } from '../../../../core/services/dialogo.service';
 
 const VACIO: Propietario = {
   nombre_completo: '', ci: '', cargo: '', telefono: '', correo: '', porcentaje_participacion: 0
@@ -20,6 +21,7 @@ const VACIO: Propietario = {
 })
 export class AjustesPropietariosComponent implements OnInit {
   private ajustes = inject(AjustesService);
+  private dialogo = inject(DialogoService);
   private cdr     = inject(ChangeDetectorRef);
 
   readonly icons = { nuevo: Plus, editar: Pencil, eliminar: Trash2, cerrar: X };
@@ -27,7 +29,6 @@ export class AjustesPropietariosComponent implements OnInit {
   propietarios: Propietario[] = [];
   cargando = true;
   guardando = false;
-  mensaje: { tipo: 'ok' | 'error'; texto: string } | null = null;
 
   modalAbierto = false;
   formulario: Propietario = { ...VACIO };
@@ -42,7 +43,7 @@ export class AjustesPropietariosComponent implements OnInit {
   cargar() {
     this.ajustes.listarPropietarios().subscribe({
       next: (p) => { this.propietarios = p; this.cargando = false; this.cdr.detectChanges(); },
-      error: () => { this.cargando = false; this.avisar('error', 'No se pudieron cargar los propietarios.'); }
+      error: () => { this.cargando = false; this.dialogo.error('No se pudieron cargar los propietarios.'); }
     });
   }
 
@@ -84,7 +85,7 @@ export class AjustesPropietariosComponent implements OnInit {
       next: (r) => {
         this.guardando = false;
         this.modalAbierto = false;
-        this.avisar('ok', r.mensaje);
+        this.dialogo.avisar(r.mensaje);
         this.cargar();
       },
       error: (e) => {
@@ -101,7 +102,7 @@ export class AjustesPropietariosComponent implements OnInit {
       next: () => {
         this.eliminando = false;
         this.aEliminar  = null;
-        this.avisar('ok', 'Propietario eliminado');
+        this.dialogo.avisar('Propietario eliminado');
         this.cargar();
       },
       error: (e) => {
@@ -114,11 +115,5 @@ export class AjustesPropietariosComponent implements OnInit {
 
   private disponibleParaNuevo(): number {
     return Math.max(0, Math.round((100 - this.totalParticipacion) * 100) / 100);
-  }
-
-  private avisar(tipo: 'ok' | 'error', texto: string) {
-    this.mensaje = { tipo, texto };
-    this.cdr.detectChanges();
-    setTimeout(() => { this.mensaje = null; this.cdr.detectChanges(); }, 4000);
   }
 }
