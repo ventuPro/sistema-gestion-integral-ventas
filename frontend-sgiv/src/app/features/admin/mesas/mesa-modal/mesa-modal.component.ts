@@ -11,6 +11,7 @@ import { ImpresionService } from '../../../../core/services/impresion.service';
 import { cifra } from '../../../../core/utils/informe';
 import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User } from 'lucide-angular';
 import { DialogoService } from '../../../../core/services/dialogo.service';
+import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
 
 /** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
 export interface GrupoCuenta {
@@ -59,7 +60,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   categoriaFiltro: number | null = null;
   busqueda        = '';
 
-  metodoPago      = 'Efectivo';
+  readonly metodo = METODO_PAGO;
+  metodoPago: MetodoPago = METODO_PAGO.efectivo;
   montoPagado     = 0;
   @ViewChild('inputMontoMesa') inputMontoMesaRef?: ElementRef<HTMLInputElement>;
   @ViewChild('zonaTicket') zonaTicket?: ElementRef<HTMLElement>;
@@ -318,7 +320,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   irAPago(parte: GrupoCuenta | null = null) {
     this.parteCobro  = parte;
     this.montoPagado = 0;
-    this.metodoPago  = this.ajustes.config().pago_efectivo ? 'Efectivo' : 'QR';
+    this.metodoPago  = this.ajustes.config().pago_efectivo ? METODO_PAGO.efectivo : METODO_PAGO.qr;
     this.vista       = 'pago';
     setTimeout(() => {
       const el = this.inputMontoMesaRef?.nativeElement;
@@ -328,7 +330,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   confirmarPago() {
     const totalReq = this.totalCobro;
-    if (this.metodoPago === 'Efectivo' && (!this.montoPagado || this.montoPagado < totalReq)) {
+    if (this.metodoPago === METODO_PAGO.efectivo && (!this.montoPagado || this.montoPagado < totalReq)) {
       this.montoPagado = totalReq;
     }
 

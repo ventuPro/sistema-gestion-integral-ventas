@@ -17,6 +17,7 @@ import { ImpresionService } from '../../../core/services/impresion.service';
 import { sondeo } from '../../../core/utils/sondeo';
 import { cifra, fechaLarga } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
+import { METODO_PAGO, MetodoPago } from '../../../core/utils/metodos-pago';
 
 @Component({
   selector: 'app-punto-venta',
@@ -104,7 +105,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── Modal cobro ───
   mostrarModalCobro = false;
-  metodoPago        = 'Efectivo';
+  readonly metodo = METODO_PAGO;
+  metodoPago: MetodoPago = METODO_PAGO.efectivo;
   montoPagado       = 0;
   @ViewChild('inputMonto') inputMontoRef?: ElementRef<HTMLInputElement>;
   @ViewChild('zonaTicket') zonaTicket?: ElementRef<HTMLElement>;
@@ -346,7 +348,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       this.dialogo.error('La caja está cerrada. No puedes registrar ventas.');
       return;
     }
-    this.metodoPago  = this.ajustes.config().pago_efectivo ? 'Efectivo' : 'QR';
+    this.metodoPago  = this.ajustes.config().pago_efectivo ? METODO_PAGO.efectivo : METODO_PAGO.qr;
     this.montoPagado = 0;
     this.mostrarModalCobro = true;
     setTimeout(() => {
@@ -358,7 +360,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   cerrarModalCobro() { this.mostrarModalCobro = false; }
 
   confirmarVenta() {
-    if (this.metodoPago === 'Efectivo' && (!this.montoPagado || this.montoPagado < this.total)) {
+    if (this.metodoPago === METODO_PAGO.efectivo && (!this.montoPagado || this.montoPagado < this.total)) {
       this.montoPagado = this.total;
     }
     this.mostrarModalCobro = false;

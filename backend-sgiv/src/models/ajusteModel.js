@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { HABILITACION } = require('../utils/metodosPago');
 
 // ─── Configuración del negocio (una sola fila, id 1) ───
 // La tabla la crea config/migraciones.js. Los valores por defecto son los del
@@ -58,9 +59,9 @@ const limpiarCache = () => { cache = null; };
 /** null si el método de pago se puede usar; si no, el motivo */
 const motivoMetodoPago = async (metodo) => {
     const p = await parametros();
-    if (metodo === 'Efectivo') return p.pago_efectivo ? null : 'El pago en efectivo está deshabilitado';
-    if (metodo === 'QR')       return p.pago_qr ? null : 'El pago por QR está deshabilitado';
-    return 'Método de pago inválido';
+    const h = HABILITACION[metodo];
+    if (!h) return 'Método de pago inválido';
+    return p[h.campo] ? null : h.motivo;
 };
 
 // Solo se actualizan columnas de la lista permitida

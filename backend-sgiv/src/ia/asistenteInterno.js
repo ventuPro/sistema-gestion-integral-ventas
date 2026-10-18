@@ -7,6 +7,7 @@ const sucursalModel = require('../models/sucursalModel');
 const permisoModel  = require('../models/permisoModel');
 const userModel     = require('../models/userModel');
 const { guiasPermitidas } = require('./conocimiento');
+const { METODO_PAGO } = require('../utils/metodosPago');
 const groq          = require('./groq');
 
 // ─── Asistente del personal (cajero y administrador) ───
@@ -177,7 +178,7 @@ REGLAS:
 - Antes de explicar cómo hacer algo en el sistema llama SIEMPRE a ayuda_sistema y usa solo los pasos y nombres de botones de esa guía; nunca describas pantallas o botones de memoria.
 - Eres de solo lectura: no puedes registrar ventas, cambiar stock, cobrar ni modificar nada. Si te lo piden, dilo y explica cómo hacerlo con la guía de ayuda_sistema.
 - Si piden algo para lo que no tienes función, el rol del usuario no tiene acceso a esa información: dilo con amabilidad y sugiere pedírsela al administrador (no lo mandes a otra pantalla).
-- Métodos de pago habilitados: ${[p.pago_efectivo && 'Efectivo', p.pago_qr && 'QR'].filter(Boolean).join(' y ')} (no hay otros).
+- Métodos de pago habilitados: ${[p.pago_efectivo && METODO_PAGO.efectivo, p.pago_qr && METODO_PAGO.qr].filter(Boolean).join(' y ')} (no hay otros).
 - Montos en ${p.moneda_simbolo} con dos decimales. Fechas en formato día/mes/año al responder.
 - No menciones al usuario los nombres internos de las funciones.
 - Si piden dejar el stock en una cantidad exacta y puedes consultar el stock, consúltalo y di cuánto registrar (la diferencia) como Entrada o Merma.

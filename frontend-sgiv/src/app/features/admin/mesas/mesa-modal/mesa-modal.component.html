@@ -183,19 +183,19 @@
               <p class="inf-etiqueta mb-2">Método de pago</p>
               <div class="metodos">
                 @if (ajustes.config().pago_efectivo) {
-                  <button class="metodo" [class.activo]="metodoPago === 'Efectivo'" (click)="metodoPago = 'Efectivo'">
+                  <button class="metodo" [class.activo]="metodoPago === metodo.efectivo" (click)="metodoPago = metodo.efectivo">
                     <lucide-icon [img]="icons.efectivo" class="w-4 h-4"></lucide-icon> Efectivo
                   </button>
                 }
                 @if (ajustes.config().pago_qr) {
-                  <button class="metodo" [class.activo]="metodoPago === 'QR'" (click)="metodoPago = 'QR'">
+                  <button class="metodo" [class.activo]="metodoPago === metodo.qr" (click)="metodoPago = metodo.qr">
                     <lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon> QR
                   </button>
                 }
               </div>
             </div>
 
-            @if (metodoPago === 'Efectivo') {
+            @if (metodoPago === metodo.efectivo) {
               <div>
                 <p class="inf-etiqueta mb-2">Monto recibido <span class="inf-sutil font-normal">· opcional</span></p>
                 <div class="campo-monto">
@@ -215,7 +215,7 @@
               </div>
             }
 
-            @if (metodoPago === 'QR') {
+            @if (metodoPago === metodo.qr) {
               <div class="flex flex-col items-center gap-3 text-center">
                 @if (ajustes.qrCobro()) { <img [src]="ajustes.qrCobro()" alt="QR de cobro" class="qr-cobro"> }
               </div>

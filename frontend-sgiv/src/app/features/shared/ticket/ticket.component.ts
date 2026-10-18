@@ -2,6 +2,7 @@ import { Component, ElementRef, ViewEncapsulation, computed, inject, input } fro
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { cifra, fechaHora } from '../../../core/utils/informe';
 import { ESTILOS_TICKET } from './ticket.estilos';
+import { METODO_PAGO } from '../../../core/utils/metodos-pago';
 
 export interface DatosTicket {
   id_venta: number;
@@ -32,6 +33,7 @@ export class TicketComponent {
   readonly c = this.ajustes.config;
   readonly ancho = computed(() => this.c().ticket_ancho || '80');
   readonly cifra = cifra;
+  readonly metodo = METODO_PAGO;
 
   get textoFecha(): string { return fechaHora(this.fecha().toISOString()); }
 }

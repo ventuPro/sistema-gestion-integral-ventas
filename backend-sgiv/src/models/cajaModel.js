@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { registrarHistorial } = require('./inventarioModel');
+const { METODO_PAGO } = require('../utils/metodosPago');
 
 // Estado de caja basado en turno_caja.estado_turno.
 // caja_habilitada se sincroniza automáticamente con el estado del turno.
@@ -130,7 +131,7 @@ const cerrarCaja = async (id_sucursal, id_usuario_cajero, efectivo_contado = nul
                 diferencia = $2::numeric - (t.monto_inicial + e.efectivo)
             FROM (
                 SELECT t2.id_turno,
-                       COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = 'Efectivo'), 0) AS efectivo
+                       COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = '${METODO_PAGO.efectivo}'), 0) AS efectivo
                 FROM turno_caja t2
                 LEFT JOIN venta_caja v ON v.id_turno = t2.id_turno
                 WHERE t2.id_usuario_cajero = $1 AND t2.estado_turno = 'Abierto'
@@ -308,8 +309,8 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
         SELECT
             COUNT(id_venta)::int                                                           AS total_ventas,
             COALESCE(SUM(monto_total_venta), 0)                                            AS ingresos_totales,
-            COALESCE(SUM(CASE WHEN metodo_pago = 'Efectivo' THEN monto_total_venta END), 0) AS total_efectivo,
-            COALESCE(SUM(CASE WHEN metodo_pago = 'QR'       THEN monto_total_venta END), 0) AS total_qr
+            COALESCE(SUM(CASE WHEN metodo_pago = '${METODO_PAGO.efectivo}' THEN monto_total_venta END), 0) AS total_efectivo,
+            COALESCE(SUM(CASE WHEN metodo_pago = '${METODO_PAGO.qr}' THEN monto_total_venta END), 0) AS total_qr
         FROM venta_caja
         WHERE id_sucursal       = $1
           AND id_usuario_cajero = $2
@@ -369,7 +370,7 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
             FROM venta_caja WHERE id_turno = $1
             GROUP BY metodo_pago ORDER BY total DESC
         `, [turnoFinal.id_turno]);
-        const efectivo = m.rows.find(x => x.metodo_pago === 'Efectivo')?.total || 0;
+        const efectivo = m.rows.find(x => x.metodo_pago === METODO_PAGO.efectivo)?.total || 0;
         turnoResumen = {
             metodos: m.rows,
             ventas:  m.rows.reduce((a, x) => a + x.ventas, 0),
@@ -612,8 +613,8 @@ const obtenerCierresCaja = async () => {
             s.nombre_sucursal,
             COUNT(v.id_venta)::int       AS total_ventas,
             COALESCE(SUM(v.monto_total_venta), 0)                                             AS total_recaudado,
-            COALESCE(SUM(CASE WHEN v.metodo_pago='Efectivo' THEN v.monto_total_venta END), 0) AS total_efectivo,
-            COALESCE(SUM(CASE WHEN v.metodo_pago='QR'       THEN v.monto_total_venta END), 0) AS total_qr
+            COALESCE(SUM(CASE WHEN v.metodo_pago = '${METODO_PAGO.efectivo}' THEN v.monto_total_venta END), 0) AS total_efectivo,
+            COALESCE(SUM(CASE WHEN v.metodo_pago = '${METODO_PAGO.qr}' THEN v.monto_total_venta END), 0) AS total_qr
         FROM turno_caja t
         JOIN usuario  u ON t.id_usuario_cajero = u.id_usuario
         JOIN sucursal s ON t.id_sucursal       = s.id_sucursal

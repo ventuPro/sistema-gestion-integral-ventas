@@ -28,7 +28,7 @@
   <hr class="tk-linea">
   <div class="tk-fila tk-total"><span>TOTAL {{ c().moneda_simbolo }}</span><span>{{ cifra(datos().total) }}</span></div>
   <div class="tk-fila"><span>Pago</span><span>{{ datos().metodo }}</span></div>
-  @if (datos().metodo === 'Efectivo' && datos().cambio) {
+  @if (datos().metodo === metodo.efectivo && datos().cambio) {
     <div class="tk-fila"><span>Cambio</span><span>{{ cifra(datos().cambio) }}</span></div>
   }
 

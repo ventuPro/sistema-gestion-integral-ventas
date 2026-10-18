@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { METODO_PAGO } = require('../utils/metodosPago');
 
 // id_sucursal = 0 → todas las sucursales (solo administrador, lo controla el controlador)
 const deSucursal = (columna) => `($1::int = 0 OR ${columna} = $1)`;
@@ -84,7 +85,7 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
                    t.fecha_hora_apertura, t.monto_inicial::float8 AS monto_inicial,
                    COUNT(v.id_venta)::int AS ventas,
                    ROUND(COALESCE(SUM(v.monto_total_venta), 0), 2)::float8 AS total,
-                   ROUND(COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = 'Efectivo'), 0), 2)::float8 AS efectivo
+                   ROUND(COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = '${METODO_PAGO.efectivo}'), 0), 2)::float8 AS efectivo
             FROM turno_caja t
             JOIN usuario u  ON u.id_usuario = t.id_usuario_cajero
             JOIN sucursal s ON s.id_sucursal = t.id_sucursal
@@ -303,7 +304,7 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
                    t.diferencia::float8 AS diferencia,
                    COUNT(v.id_venta)::int AS ventas,
                    ROUND(COALESCE(SUM(v.monto_total_venta), 0), 2)::float8 AS total,
-                   ROUND(COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = 'Efectivo'), 0), 2)::float8 AS efectivo
+                   ROUND(COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = '${METODO_PAGO.efectivo}'), 0), 2)::float8 AS efectivo
             FROM turno_caja t
             JOIN usuario u  ON u.id_usuario = t.id_usuario_cajero
             JOIN sucursal s ON s.id_sucursal = t.id_sucursal
