@@ -26,6 +26,7 @@ router.get   ('/ventas-hoy/:id_sucursal',      verificarToken, ctrl.getVentasHoy
 router.get   ('/cierres',                      verificarToken, soloAdministrador, ctrl.getCierresCaja);
 router.post  ('/cobrar',                       verificarToken, verificarPermiso('punto_venta'), ctrl.cobrarVenta);
 router.post  ('/cotizar',                      verificarToken, verificarPermiso('punto_venta'), ctrl.cotizarVenta);
+router.get   ('/promociones-vigentes',         verificarToken, verificarPermiso('punto_venta'), ctrl.promocionesVigentes);
 router.get   ('/estado-sucursal/:id_sucursal', verificarToken, ctrl.getEstadoCajaSucursal);
 
 module.exports = router;

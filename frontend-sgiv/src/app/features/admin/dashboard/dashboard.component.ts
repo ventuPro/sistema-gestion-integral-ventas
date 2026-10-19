@@ -5,7 +5,7 @@ import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
          Landmark, LogOut, Building2, RefreshCw,
-         Settings, Menu, X, Bell } from 'lucide-angular';
+         Settings, Menu, X, Bell, BadgePercent } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
@@ -81,7 +81,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     cerrar:     X,
     sucursal:   Building2,
     refresh:    RefreshCw,
-    ajustes:    Settings
+    ajustes:    Settings,
+    promociones: BadgePercent
   };
 
   ngOnInit() {
@@ -122,6 +123,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         { ruta: 'resumen',      texto: 'Panel principal', icono: i.dashboard },
         { ruta: 'inventario',   texto: 'Inventario',      icono: i.inventario },
         { ruta: 'reportes',     texto: 'Reportes',        icono: i.reportes },
+        { ruta: 'promociones',  texto: 'Promociones',     icono: i.promociones },
         { ruta: 'cierres-caja', texto: 'Cierres de caja', icono: i.cierres }
       ]},
       { titulo: 'Sistema', enlaces: [
@@ -137,6 +139,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         { ruta: 'arqueo',      texto: 'Arqueo de caja',  icono: i.arqueo,     modulo: 'arqueo' },
         { ruta: 'inventario',  texto: 'Inventario',      icono: i.inventario, modulo: 'inventario' },
         { ruta: 'reportes',    texto: 'Reportes',        icono: i.reportes,   modulo: 'reportes' },
+        { ruta: 'promociones', texto: 'Promociones',     icono: i.promociones, modulo: 'promociones' },
         { ruta: 'usuarios',    texto: 'Usuarios',        icono: i.usuarios,   modulo: 'usuarios' }
       ]}
     ];

@@ -57,6 +57,7 @@ export interface Configuracion {
   menu_max_pendientes_mesa?: number;
   menu_max_pedidos_ip?: number;
   stock_minimo_defecto?: number;
+  descuento_max_cajero?: number;
   login_max_intentos?: number;
   login_minutos_bloqueo?: number;
   sesion_horas?: number;
@@ -90,7 +91,7 @@ const TONOS: [number, string, number][] = [
 const CLAVE_CACHE = 'ajustes_sgiv';
 
 // Llegan solo al administrador: no se guardan en la configuración compartida
-const PRIVADOS = ['menu_minutos_expiracion', 'menu_max_pendientes_mesa', 'menu_max_pedidos_ip', 'stock_minimo_defecto',
+const PRIVADOS = ['menu_minutos_expiracion', 'menu_max_pendientes_mesa', 'menu_max_pedidos_ip', 'stock_minimo_defecto', 'descuento_max_cajero',
                   'login_max_intentos', 'login_minutos_bloqueo', 'sesion_horas', 'id_configuracion', 'fecha_actualizacion',
                   'ia_info_negocio'];
 

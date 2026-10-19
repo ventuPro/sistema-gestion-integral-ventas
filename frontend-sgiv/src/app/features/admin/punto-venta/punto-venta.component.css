@@ -5,3 +5,37 @@
 }
 
 .historial { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--i-papel); border-radius: 8px; }
+
+/* ─── Promociones ─── */
+.foto { position: relative; }
+.etiqueta-promo {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--i-baja);
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.35);
+}
+.promo-linea { font-size: 11.5px; font-weight: 600; color: var(--i-sube); }
+.campo-texto {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--i-linea);
+  border-radius: 8px;
+  background: var(--i-papel);
+  color: var(--i-tinta);
+  font-size: 13.5px;
+  outline: none;
+}
+.campo-texto:focus { border-color: var(--i-acento); box-shadow: 0 0 0 3px var(--i-acento-suave); }
+.error-descuento {
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--i-baja);
+  background: color-mix(in oklab, var(--i-baja) 10%, transparent);
+}

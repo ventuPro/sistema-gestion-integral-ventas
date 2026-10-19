@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, OnDestroy, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, computed, effect, inject, OnInit, OnDestroy, signal, untracked, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProductoService } from '../../../core/services/producto.service';
@@ -7,11 +7,12 @@ import { SocketService } from '../../../core/services/socket.service';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { Subscription } from 'rxjs';
+import { Cotizacion, DescuentoManual, PromocionService, PromocionVigente, etiquetaPromocion } from '../../../core/services/promocion.service';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { TicketComponent } from '../../shared/ticket/ticket.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Search, X, ReceiptText, Trash2,
-         ShoppingCart, Banknote, QrCode, Printer } from 'lucide-angular';
+         ShoppingCart, Banknote, QrCode, Printer, BadgePercent } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../core/services/impresion.service';
 import { sondeo } from '../../../core/utils/sondeo';
@@ -35,6 +36,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   private socketService   = inject(SocketService);
   readonly ajustes         = inject(AjustesService);
   private impresion = inject(ImpresionService);
+  private promociones = inject(PromocionService);
   readonly moneda          = this.ajustes.moneda;
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
@@ -53,7 +55,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     carrito:     ShoppingCart,
     efectivo:    Banknote,
     qr:          QrCode,
-    imprimir:    Printer
+    imprimir:    Printer,
+    descuento:   BadgePercent
   };
 
   readonly cifra    = cifra;
@@ -94,8 +97,50 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   readonly unidades = computed(() => this.carrito().reduce((s, i) => s + Number(i.cantidad), 0));
 
-  readonly total = computed(() =>
+  /** A precio de lista */
+  readonly subtotal = computed(() =>
     this.carrito().reduce((s, i) => s + (Number(i.precio_unitario) * Number(i.cantidad) || 0), 0));
+
+  // ─── Promociones y descuento manual: el total lo calcula el backend ───
+  readonly descuento   = signal<DescuentoManual | null>(null);
+  readonly vigentes    = signal<PromocionVigente[]>([]);
+  private readonly cotizacionGuardada = signal<{ clave: string; datos: Cotizacion } | null>(null);
+  private subCotizacion?: Subscription;
+  private esperaCotizacion: any;
+
+  /** Lo que se cotiza: productos, cantidades y descuento */
+  private readonly clave = computed(() => JSON.stringify([
+    this.carrito().map(i => [i.id_producto, i.cantidad]), this.descuento()
+  ]));
+
+  /** La cotización vale solo si corresponde al carrito actual */
+  readonly cotizacion = computed(() => {
+    const c = this.cotizacionGuardada();
+    return c && c.clave === this.clave() ? c.datos : null;
+  });
+  readonly cotizando = computed(() => this.carrito().length > 0 && !this.cotizacion());
+  readonly total = computed(() => this.cotizacion()?.total ?? this.subtotal());
+  readonly descuentoMax = computed(() => this.cotizacionGuardada()?.datos.descuento_max ?? null);
+
+  /** Línea cotizada por producto */
+  readonly lineas = computed(() => new Map((this.cotizacion()?.items || []).map(l => [l.id_producto, l])));
+
+  /** Etiqueta de promoción de cada producto del catálogo */
+  readonly etiquetas = computed(() => {
+    const mapa = new Map<number, string>();
+    const vigentes = this.vigentes();
+    for (const p of this.productosDisponibles()) {
+      const promo = vigentes.find(v => v.productos.includes(p.id_producto) || v.categorias.includes(Number(p.id_categoria)));
+      if (promo) mapa.set(p.id_producto, etiquetaPromocion(promo, this.moneda()));
+    }
+    return mapa;
+  });
+
+  // ─── Modal del descuento manual ───
+  readonly mostrarDescuento = signal(false);
+  readonly formDescuento    = signal<DescuentoManual>({ tipo: 'PORCENTAJE', valor: 0, motivo: '' });
+  readonly errorDescuento   = signal('');
+  readonly aplicandoDescuento = signal(false);
 
   // ─── Modal cobro ───
   readonly mostrarModalCobro = signal(false);
@@ -127,12 +172,42 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     return [...totales].map(([metodo, total]) => ({ metodo, total }));
   });
 
+  constructor() {
+    // Cada cambio del carrito o del descuento se vuelve a cotizar (con una espera corta)
+    effect(() => {
+      const clave = this.clave();
+      untracked(() => this.programarCotizacion(clave));
+    });
+  }
+
+  private detalles() { return this.carrito().map(i => ({ id_producto: i.id_producto, cantidad: i.cantidad })); }
+
+  private programarCotizacion(clave: string) {
+    clearTimeout(this.esperaCotizacion);
+    this.subCotizacion?.unsubscribe();
+    if (!this.carrito().length) return;
+    this.esperaCotizacion = setTimeout(() => {
+      this.subCotizacion = this.promociones.cotizarVenta(this.detalles(), this.descuento()).subscribe({
+        next: (datos) => this.cotizacionGuardada.set({ clave, datos }),
+        error: (e) => {
+          // El descuento ya no entra en el tope (cambió el carrito): se quita y se avisa
+          if (e?.error?.error === 'DESCUENTO_INVALIDO' && this.descuento()) {
+            this.descuento.set(null);
+            this.dialogo.error(`Se quitó el descuento: ${e.error.detalle}`);
+          }
+        }
+      });
+    }, 200);
+  }
+
   ngOnInit() {
     this.verificarAccesoCaja();
     this.suscribirStockGlobal();
   }
 
   ngOnDestroy() {
+    clearTimeout(this.esperaCotizacion);
+    this.subCotizacion?.unsubscribe();
     this.detenerSondeo?.();
     this.stockSub?.unsubscribe();
   }
@@ -265,6 +340,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       },
       error: () => this.cargando.set(false)
     });
+    this.promociones.vigentesPuntoVenta().subscribe({ next: (v) => this.vigentes.set(v) });
   }
 
   // ─── CARRITO ───
@@ -315,6 +391,37 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   cerrarModalCobro() { this.mostrarModalCobro.set(false); }
 
+  // ─── DESCUENTO MANUAL ───
+  abrirDescuento() {
+    this.formDescuento.set({ ...(this.descuento() ?? { tipo: 'PORCENTAJE', valor: 0, motivo: '' }) });
+    this.errorDescuento.set('');
+    this.mostrarDescuento.set(true);
+  }
+
+  cerrarDescuento() { if (!this.aplicandoDescuento()) this.mostrarDescuento.set(false); }
+
+  aplicarDescuento() {
+    const d = { ...this.formDescuento(), valor: Number(this.formDescuento().valor) };
+    if (!(d.valor > 0)) return this.errorDescuento.set('Indica el descuento.');
+    if (d.motivo.trim().length < 3) return this.errorDescuento.set('Indica el motivo del descuento.');
+    // Se valida con el backend antes de aplicarlo (tope del cajero, total)
+    this.aplicandoDescuento.set(true);
+    this.promociones.cotizarVenta(this.detalles(), d).subscribe({
+      next: (datos) => {
+        this.aplicandoDescuento.set(false);
+        this.descuento.set(d);
+        this.cotizacionGuardada.set({ clave: this.clave(), datos });
+        this.mostrarDescuento.set(false);
+      },
+      error: (e) => {
+        this.aplicandoDescuento.set(false);
+        this.errorDescuento.set(e?.error?.detalle || 'No se pudo aplicar el descuento.');
+      }
+    });
+  }
+
+  quitarDescuento() { this.descuento.set(null); }
+
   confirmarVenta() {
     if (this.metodoPago() === METODO_PAGO.efectivo && (!this.montoPagado() || this.montoPagado() < this.total())) {
       this.montoPagado.set(this.total());
@@ -332,6 +439,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       id_pedido_mesa:    null,
       monto_total_venta: this.total(),
       metodo_pago:       this.metodoPago(),
+      descuento:         this.descuento(),
       detalles: this.carrito().map(item => ({
         id_producto: item.id_producto,
         cantidad:    item.cantidad,
@@ -345,16 +453,27 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       datosVenta
     ).subscribe({
       next: (res) => {
+        const cot: Cotizacion | undefined = res.cotizacion;
+        const lineas = new Map((cot?.items || []).map(l => [l.id_producto, l]));
         this.datosTicket.set({
           id_venta: res.id_venta,
-          items:    [...this.carrito()],
-          total:    this.total(),
+          items:    this.carrito().map(i => {
+            const l = lineas.get(i.id_producto);
+            return { nombre_producto: i.nombre_producto, cantidad: i.cantidad, precio_unitario: Number(i.precio_unitario),
+                     subtotal: l?.subtotal_bruto ?? Number(i.subtotal), descuento: l?.descuento_promocion || 0,
+                     promocion: l?.promociones.join(', ') };
+          }),
+          total:    cot?.total ?? this.total(),
+          descuento_promociones: cot?.descuento_promociones || 0,
+          descuento_manual:      cot?.descuento_manual || 0,
+          motivo_descuento:      this.descuento()?.motivo ?? null,
           metodo:   this.metodoPago(),
           cambio:   this.cambio()
         });
         this.fechaTicket.set(new Date());
         this.mostrarTicket.set(true);
         this.carrito.set([]);
+        this.descuento.set(null);
         this.cargarCatalogo();
         this.cargarVentasHoy();
         this.cargando.set(false);
@@ -376,6 +495,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
             const precio = precios.get(Number(i.id_producto)) ?? Number(i.precio_unitario);
             return { ...i, precio_unitario: precio, subtotal: precio * Number(i.cantidad) };
           }));
+          if (e.error.cotizacion) this.cotizacionGuardada.set({ clave: this.clave(), datos: e.error.cotizacion });
           this.dialogo.error(`Los precios cambiaron. Nuevo total: ${this.moneda()} ${Number(e.error.total).toFixed(2)}. Revisa el carrito y vuelve a cobrar.`);
           this.cargarCatalogo();
           this.cargando.set(false);

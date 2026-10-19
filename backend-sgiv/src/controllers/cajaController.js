@@ -205,13 +205,27 @@ const cobrarVenta = async (req, res) => {
     }
 };
 
+/** Sucursal de trabajo: el administrador puede pedir otra; el cajero usa la suya */
+const sucursalDe = (req, pedida) => Number(req.usuario.id_rol) === 1
+    ? Number(pedida) || Number(req.usuario.id_sucursal)
+    : Number(req.usuario.id_sucursal);
+
+// GET /api/caja/promociones-vigentes?id_sucursal=  etiquetas del catálogo del punto de venta
+const promocionesVigentes = async (req, res) => {
+    try {
+        const lista = await promocionModel.vigentes(db, sucursalDe(req, req.query.id_sucursal));
+        res.json(lista.map(p => ({ ...p, productos: p.productos.map(x => x.id_producto) })));
+    } catch (e) {
+        console.error('promocionesVigentes:', e.message);
+        res.status(500).json({ error: 'No se pudieron cargar las promociones.' });
+    }
+};
+
 // POST /api/caja/cotizar { detalles, descuento? }: precios con promociones (no registra nada)
 const cotizarVenta = async (req, res) => {
     const client = await db.connect();
     try {
-        const id_sucursal = Number(req.usuario.id_rol) === 1
-            ? Number(req.body?.id_sucursal) || Number(req.usuario.id_sucursal)
-            : Number(req.usuario.id_sucursal);
+        const id_sucursal = sucursalDe(req, req.body?.id_sucursal);
         const descuento_max = await ajusteModel.topeDescuento(req.usuario);
         const items = await cajaModel.calcularItemsVenta(client, req.body?.detalles);
         const cot = await promocionModel.cotizar(client, {
@@ -245,6 +259,6 @@ module.exports = {
     getEstadoCaja, getEstadoCompleto,
     habilitarCajaUsuario, deshabilitarCajaUsuario, reabrirCajaAdmin,
     getTurnoHoy, abrirCaja, cerrarCaja,
-    getArqueoHoy, getVentasHoyPOS, getCierresCaja, cobrarVenta, cotizarVenta,
+    getArqueoHoy, getVentasHoyPOS, getCierresCaja, cobrarVenta, cotizarVenta, promocionesVigentes,
     getEstadoCajaSucursal
 };

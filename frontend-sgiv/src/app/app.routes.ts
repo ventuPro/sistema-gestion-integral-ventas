@@ -57,6 +57,11 @@ export const routes: Routes = [
         canActivate: [permisoGuard('usuarios')]
       },
       {
+        path: 'promociones',
+        loadComponent: () => import('./features/admin/promociones/promociones.component').then(m => m.PromocionesComponent),
+        canActivate: [permisoGuard('promociones')]
+      },
+      {
         path: 'reportes',
         loadComponent: () => import('./features/admin/reportes/reportes.component').then(m => m.ReportesComponent),
         canActivate: [permisoGuard('reportes')]

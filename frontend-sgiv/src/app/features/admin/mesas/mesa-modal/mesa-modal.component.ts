@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, computed, effect, inject, signal, untracked, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CuentaService } from '../../../../core/services/cuenta.service';
@@ -12,6 +12,7 @@ import { cifra } from '../../../../core/utils/informe';
 import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User } from 'lucide-angular';
 import { DialogoService } from '../../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
+import { Cotizacion, PromocionService } from '../../../../core/services/promocion.service';
 import { SesionService } from '../../../../core/services/sesion.service';
 
 /** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
@@ -47,6 +48,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   private socketService = inject(SocketService);
   readonly ajustes       = inject(AjustesService);
   private impresion = inject(ImpresionService);
+  private promociones = inject(PromocionService);
   readonly moneda        = this.ajustes.moneda;
   readonly cifra         = cifra;
 
@@ -71,13 +73,26 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   @ViewChild('inputMontoMesa') inputMontoMesaRef?: ElementRef<HTMLInputElement>;
   @ViewChild('zonaTicket') zonaTicket?: ElementRef<HTMLElement>;
 
-  readonly totalCuenta = computed(() => Number(this.cuentaActiva()?.total_acumulado || 0));
+  /** A precio de lista */
+  readonly brutoCuenta = computed(() => Number(this.cuentaActiva()?.total_acumulado || 0));
+
+  // ─── Promociones: lo pendiente se cotiza en el backend cada vez que cambia la cuenta ───
+  readonly cotizacionCuenta = signal<Cotizacion | null>(null);
+  readonly totalCuenta = computed(() => this.cotizacionCuenta()?.total ?? this.brutoCuenta());
+  private readonly claveCuenta = computed(() => {
+    const c = this.cuentaActiva();
+    return c ? JSON.stringify([c.id_cuenta, (c.items || []).map((i: any) => [i.id_detalle_cuenta, i.cantidad, !!i.pagado])]) : '';
+  });
+  private esperaCotizacion: any;
+
+  /** Lo que se cobra en este momento (toda la cuenta o la parte de una persona) */
+  readonly cotizacionPago = signal<Cotizacion | null>(null);
 
   // ─── Cobro por separado ───
   /** null = cobrar todo lo pendiente */
   readonly parteCobro = signal<GrupoCuenta | null>(null);
 
-  readonly totalCobro = computed(() => this.parteCobro()?.pendiente ?? this.totalCuenta());
+  readonly totalCobro = computed(() => this.cotizacionPago()?.total ?? this.parteCobro()?.pendiente ?? this.totalCuenta());
   readonly cambio     = computed(() => Math.max(0, this.montoPagado() - this.totalCobro()));
 
   readonly itemsPendientes = computed<any[]>(() => (this.cuentaActiva()?.items || []).filter((i: any) => !i.pagado));
@@ -123,6 +138,23 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   private subs: Subscription[] = [];
 
+  constructor() {
+    effect(() => {
+      const clave = this.claveCuenta();
+      untracked(() => this.cotizarCuenta(clave));
+    });
+  }
+
+  private cotizarCuenta(clave: string) {
+    clearTimeout(this.esperaCotizacion);
+    const cuenta = this.cuentaActiva();
+    if (!clave || !cuenta || !this.itemsPendientes().length) return this.cotizacionCuenta.set(null);
+    this.esperaCotizacion = setTimeout(() =>
+      this.promociones.cotizarCuenta(cuenta.id_cuenta).subscribe({
+        next: (c) => { if (this.claveCuenta() === clave) this.cotizacionCuenta.set(c); }
+      }), 150);
+  }
+
   ngOnInit() {
     this.cargarEstadoMesa();
     this.cargarProductos();
@@ -130,6 +162,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    clearTimeout(this.esperaCotizacion);
     this.subs.forEach(s => s.unsubscribe());
   }
 
@@ -287,6 +320,10 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   irAPago(parte: GrupoCuenta | null = null) {
     this.parteCobro.set(parte);
+    this.cotizacionPago.set(null);
+    this.promociones.cotizarCuenta(this.cuentaActiva().id_cuenta, parte ? parte.clave : undefined).subscribe({
+      next: (c) => { if (this.parteCobro() === parte) this.cotizacionPago.set(c); }
+    });
     this.montoPagado.set(0);
     this.metodoPago.set(this.ajustes.config().pago_efectivo ? METODO_PAGO.efectivo : METODO_PAGO.qr);
     this.vista.set('pago');
@@ -308,12 +345,19 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     this.cuentaService.cerrarCuenta(this.cuentaActiva().id_cuenta, metodo, parte ? parte.clave : undefined).subscribe({
       next: (res: any) => {
         this.cuentaCerrada.set(res.cuenta_cerrada !== false);
+        const cot: Cotizacion | undefined = res.cotizacion;
+        const nombres = new Map<number, string>((this.cuentaActiva()?.items || []).map((i: any) => [i.id_producto, i.nombre_producto]));
         this.datosTicket.set({
           id_venta:     res.id_venta,
           numero_mesa:  this.mesa.numero_mesa,
           cliente:      parte?.clave ? parte.nombre : undefined,
-          items:        parte ? parte.items.filter(i => !i.pagado) : this.itemsPendientes(),
+          items:        cot
+            ? cot.items.map(l => ({ nombre_producto: nombres.get(l.id_producto) || '', cantidad: l.cantidad,
+                                    precio_unitario: l.precio_unitario, subtotal: l.subtotal_bruto,
+                                    descuento: l.descuento_promocion, promocion: l.promociones.join(', ') }))
+            : (parte ? parte.items.filter(i => !i.pagado) : this.itemsPendientes()),
           total:        res.total ?? totalReq,
+          descuento_promociones: cot?.descuento_promociones || 0,
           metodo,
           cambio:       this.cambio()
         });

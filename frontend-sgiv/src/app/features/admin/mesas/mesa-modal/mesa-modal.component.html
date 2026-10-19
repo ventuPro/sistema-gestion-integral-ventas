@@ -150,6 +150,12 @@
           </div>
 
           <div class="p-5 separador flex-shrink-0">
+            @if (cotizacionCuenta()?.descuento_promociones) {
+              <dl class="inf-pares mb-3">
+                <div><dt>Subtotal</dt><dd>{{ moneda() }} {{ cifra(cotizacionCuenta()!.subtotal_bruto) }}</dd></div>
+                <div><dt>Promociones</dt><dd class="inf-sube">−{{ moneda() }} {{ cifra(cotizacionCuenta()!.descuento_promociones) }}</dd></div>
+              </dl>
+            }
             <div class="flex items-end justify-between gap-3 mb-4">
               <span class="inf-etiqueta">{{ porCliente() ? 'Total por cobrar' : 'Total' }}</span>
               <span class="inf-valor mt-0! text-[28px]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCuenta()) }}</span>
@@ -176,7 +182,10 @@
           <div class="p-5 space-y-5">
             <div>
               <p class="inf-etiqueta">{{ parteCobro() ? 'Su parte' : 'Total a cobrar' }}</p>
-              <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCobro()) }}</p>
+              <p class="inf-cifra-xl" [class.inf-refrescando]="!cotizacionPago()"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCobro()) }}</p>
+              @if (cotizacionPago()?.descuento_promociones) {
+                <p class="inf-sub inf-sube">Promociones −{{ moneda() }} {{ cifra(cotizacionPago()!.descuento_promociones) }}</p>
+              }
             </div>
 
             <div>
@@ -224,7 +233,7 @@
 
           <div class="inf-pie-hoja flex justify-end gap-2">
             <button class="inf-boton" (click)="vista.set('comanda')">Cancelar</button>
-            <button class="boton-primario" (click)="confirmarPago()" [disabled]="cargando()">
+            <button class="boton-primario" (click)="confirmarPago()" [disabled]="cargando() || !cotizacionPago()">
               <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon>
               {{ cargando() ? 'Procesando…' : 'Confirmar pago' }}
             </button>

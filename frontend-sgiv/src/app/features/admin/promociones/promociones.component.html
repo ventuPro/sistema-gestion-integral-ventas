@@ -1,0 +1,311 @@
+<div class="space-y-5">
+
+  <header class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="inf-antetitulo">
+        <span>{{ esAdmin() ? 'Todas las sucursales' : 'Tu sucursal' }}</span>
+        <span>{{ promociones().length }} promoción(es)</span>
+      </p>
+      <h1 class="inf-titulo">Promociones</h1>
+    </div>
+    <button class="boton-primario py-1.5! text-[12.5px]!" (click)="abrirNueva()">
+      <lucide-icon [img]="icons.nueva" class="w-3.5 h-3.5"></lucide-icon> Nueva promoción
+    </button>
+  </header>
+
+  @if (esAdmin() && sucursales().length > 1) {
+    <app-selector-sucursal [sucursales]="sucursales()" [seleccionada]="sucursalFiltro()" [todas]="true"
+                           (cambio)="cambiarSucursal($event)" />
+  }
+
+  <section class="inf-hoja inf-tira overflow-hidden">
+    <div>
+      <p class="inf-etiqueta">Vigentes ahora</p>
+      <p class="inf-valor" [class.inf-sube]="resumen().vigentes > 0">{{ resumen().vigentes }}</p>
+    </div>
+    <div>
+      <p class="inf-etiqueta">Programadas</p>
+      <p class="inf-valor">{{ resumen().programadas }}</p>
+    </div>
+    <div>
+      <p class="inf-etiqueta">Ventas con promoción</p>
+      <p class="inf-valor">{{ entero(resumen().usos) }}</p>
+    </div>
+    <div>
+      <p class="inf-etiqueta">Ahorro otorgado</p>
+      <p class="inf-valor">{{ moneda() }} {{ cifra(resumen().ahorro) }}</p>
+    </div>
+  </section>
+
+  <section class="inf-hoja overflow-hidden">
+    <div class="p-4 pb-3 separador-inferior flex flex-wrap items-center gap-3">
+      <div class="buscador flex-1 min-w-[220px]">
+        <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
+        <input type="text" [(ngModel)]="busqueda" placeholder="Buscar promoción">
+        @if (busqueda()) {
+          <button class="quitar" (click)="busqueda.set('')" aria-label="Limpiar búsqueda">
+            <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
+          </button>
+        }
+      </div>
+      <div class="inf-segmentos">
+        @for (f of filtros; track f.valor) {
+          <button [class.activa]="filtro() === f.valor" (click)="filtro.set(f.valor)">{{ f.texto }}</button>
+        }
+      </div>
+    </div>
+
+    @if (cargando()) {
+      <div class="p-4 space-y-2">
+        @for (n of [1,2,3]; track n) { <div class="inf-esqueleto h-12"></div> }
+      </div>
+    } @else if (!lista().length) {
+      <p class="inf-vacio">{{ promociones().length ? 'Ninguna promoción coincide con el filtro.' : 'Aún no hay promociones.' }}</p>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="inf-tabla">
+          <thead>
+            <tr>
+              <th>Promoción</th>
+              <th>Descuento</th>
+              <th>Vigencia</th>
+              @if (esAdmin()) { <th>Sucursal</th> }
+              <th>Estado</th>
+              <th class="num">Ventas</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of lista(); track p.id_promocion) {
+              <tr [class.inactiva]="!p.estado_activo">
+                <td class="max-w-[280px]">
+                  <span class="fuerte">{{ p.nombre }}</span>
+                  <span class="inf-secundario truncate" [title]="textoAlcance(p)">{{ textoAlcance(p) }}</span>
+                </td>
+                <td><span class="inf-ficha">{{ textoTipo(p) }}</span></td>
+                <td class="whitespace-nowrap">{{ textoVigencia(p) }}</td>
+                @if (esAdmin()) { <td>{{ p.nombre_sucursal || 'Todas' }}</td> }
+                <td><span class="inf-estado" [ngClass]="estado(p).clase">{{ estado(p).texto }}</span></td>
+                <td class="num">
+                  {{ entero(p.usos || 0) }}
+                  @if (p.ahorro) { <span class="inf-secundario">−{{ moneda() }} {{ cifra(p.ahorro) }}</span> }
+                </td>
+                <td>
+                  <div class="flex justify-end gap-1">
+                    @if (p.editable) {
+                      <button class="accion" (click)="abrirEdicion(p)" title="Editar" aria-label="Editar promoción">
+                        <lucide-icon [img]="icons.editar" class="w-4 h-4"></lucide-icon>
+                      </button>
+                      <button class="accion" (click)="alternarEstado(p)" [title]="p.estado_activo ? 'Desactivar' : 'Activar'"
+                              [attr.aria-label]="p.estado_activo ? 'Desactivar promoción' : 'Activar promoción'">
+                        <lucide-icon [img]="icons.estado" class="w-4 h-4"></lucide-icon>
+                      </button>
+                      @if (!p.usos) {
+                        <button class="accion peligro" (click)="eliminar(p)" title="Eliminar" aria-label="Eliminar promoción">
+                          <lucide-icon [img]="icons.eliminar" class="w-4 h-4"></lucide-icon>
+                        </button>
+                      }
+                    } @else {
+                      <span class="accion cursor-default" title="La administra el administrador" aria-label="Solo lectura">
+                        <lucide-icon [img]="icons.bloqueada" class="w-4 h-4"></lucide-icon>
+                      </span>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</div>
+
+<!-- ═══ CREAR / EDITAR ═══ -->
+@if (modalAbierto()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModal()">
+    <form class="inf-hoja ventana w-full max-w-2xl max-h-[92vh] flex flex-col" (ngSubmit)="guardar()" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[15px]">{{ formulario().id_promocion ? 'Editar promoción' : 'Nueva promoción' }}</h3>
+        <button type="button" class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-5 space-y-5">
+        @if (errorFormulario()) { <p class="error-formulario" role="alert">{{ errorFormulario() }}</p> }
+
+        <div class="grupo">
+          <label class="inf-etiqueta" for="promo-nombre">Nombre</label>
+          <input id="promo-nombre" name="nombre" class="campo" [(ngModel)]="formulario().nombre" maxlength="80"
+                 placeholder="Hora feliz de tortas" required>
+        </div>
+
+        <!-- Tipo -->
+        <div class="grupo">
+          <span class="inf-etiqueta">Tipo</span>
+          <div class="tipos">
+            @for (t of tipos; track t.valor) {
+              <button type="button" class="opcion" [class.activa]="formulario().tipo === t.valor" (click)="cambiarTipo(t.valor)"
+                      [attr.aria-pressed]="formulario().tipo === t.valor">
+                <lucide-icon [img]="t.icono" class="w-4 h-4"></lucide-icon> {{ t.nombre }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Valor según el tipo -->
+        @switch (formulario().tipo) {
+          @case ('PORCENTAJE') {
+            <div class="grupo">
+              <label class="inf-etiqueta" for="promo-pct">Descuento (%)</label>
+              <input id="promo-pct" name="valor" type="number" min="1" max="99" class="campo w-32!" [(ngModel)]="formulario().valor">
+            </div>
+          }
+          @case ('PRECIO') {
+            <div class="grupo">
+              <label class="inf-etiqueta" for="promo-precio">Precio especial por unidad ({{ moneda() }})</label>
+              <input id="promo-precio" name="valor" type="number" min="0.1" step="0.1" class="campo w-40!" [(ngModel)]="formulario().valor">
+            </div>
+          }
+          @case ('NXM') {
+            <div class="flex items-end gap-3">
+              <div class="grupo">
+                <label class="inf-etiqueta" for="promo-lleva">Lleva</label>
+                <input id="promo-lleva" name="lleva" type="number" min="2" max="20" class="campo w-24!" [(ngModel)]="formulario().lleva">
+              </div>
+              <div class="grupo">
+                <label class="inf-etiqueta" for="promo-paga">Paga</label>
+                <input id="promo-paga" name="paga" type="number" min="1" max="19" class="campo w-24!" [(ngModel)]="formulario().paga">
+              </div>
+              @if (formulario().lleva && formulario().paga) {
+                <span class="inf-ficha mb-2">{{ formulario().lleva }}×{{ formulario().paga }}</span>
+              }
+            </div>
+          }
+          @case ('COMBO') {
+            <div class="flex flex-wrap items-end gap-4">
+              <div class="grupo">
+                <label class="inf-etiqueta" for="promo-combo">Precio del combo ({{ moneda() }})</label>
+                <input id="promo-combo" name="valor" type="number" min="0.1" step="0.1" class="campo w-40!" [(ngModel)]="formulario().valor">
+              </div>
+              @if (formulario().productos.length) {
+                <dl class="inf-pares combo-resumen">
+                  <div><dt>Precio normal</dt><dd>{{ moneda() }} {{ cifra(precioNormalCombo) }}</dd></div>
+                  <div><dt>Ahorro</dt><dd [class.inf-baja]="precioNormalCombo - formulario().valor <= 0">
+                    {{ moneda() }} {{ cifra(precioNormalCombo - formulario().valor) }}</dd></div>
+                </dl>
+              }
+            </div>
+          }
+        }
+
+        <!-- Alcance -->
+        @if (usaCategorias) {
+          <div class="grupo">
+            <span class="inf-etiqueta">Categorías</span>
+            <div class="fichas">
+              @for (c of categorias(); track c.id_categoria) {
+                <button type="button" class="opcion chica" [class.activa]="tieneCategoria(c.id_categoria)" (click)="alternarCategoria(c)"
+                        [attr.aria-pressed]="tieneCategoria(c.id_categoria)">{{ c.nombre_categoria }}</button>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="grupo">
+          <span class="inf-etiqueta">{{ formulario().tipo === 'COMBO' ? 'Productos del combo' : 'Productos' }}</span>
+          @if (formulario().productos.length) {
+            <ul class="elegidos">
+              @for (x of formulario().productos; track x.id_producto) {
+                <li>
+                  <span class="flex-1 min-w-0 truncate">{{ x.nombre_producto }}</span>
+                  @if (formulario().tipo === 'COMBO') {
+                    <span class="cantidad">
+                      <button type="button" (click)="cambiarCantidad(x.id_producto, -1)" aria-label="Uno menos">
+                        <lucide-icon [img]="icons.menos" class="w-3 h-3"></lucide-icon>
+                      </button>
+                      <b>{{ x.cantidad }}</b>
+                      <button type="button" (click)="cambiarCantidad(x.id_producto, 1)" aria-label="Uno más">
+                        <lucide-icon [img]="icons.mas" class="w-3 h-3"></lucide-icon>
+                      </button>
+                    </span>
+                  }
+                  <button type="button" class="quitar" (click)="alternarProducto(x)" aria-label="Quitar producto">
+                    <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+          <div class="buscador">
+            <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
+            <input type="text" name="buscaProducto" [(ngModel)]="buscaProducto" placeholder="Buscar producto para agregar">
+          </div>
+          <div class="catalogo">
+            @for (prod of productosModal(); track prod.id_producto) {
+              <button type="button" class="opcion chica" [class.activa]="tieneProducto(prod.id_producto)" (click)="alternarProducto(prod)">
+                {{ prod.nombre_producto }} <span class="inf-tenue">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Vigencia -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="grupo">
+            <label class="inf-etiqueta" for="promo-desde">Desde</label>
+            <input id="promo-desde" name="desde" type="date" class="campo" [(ngModel)]="formulario().fecha_inicio" required>
+          </div>
+          <div class="grupo">
+            <label class="inf-etiqueta" for="promo-hasta">Hasta</label>
+            <input id="promo-hasta" name="hasta" type="date" class="campo" [(ngModel)]="formulario().fecha_fin" required>
+          </div>
+        </div>
+
+        <div class="grupo">
+          <span class="inf-etiqueta">Días</span>
+          <div class="fichas">
+            @for (d of DIAS; track d.n) {
+              <button type="button" class="opcion chica dia" [class.activa]="diaActivo(d.n)" (click)="alternarDia(d.n)"
+                      [attr.aria-pressed]="diaActivo(d.n)">{{ d.texto }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="grupo">
+          <button type="button" class="interruptor" role="switch" [attr.aria-checked]="!!formulario().hora_inicio" (click)="alternarHorario()">
+            <span class="pista"></span><span class="texto">Solo en un horario</span>
+          </button>
+          @if (formulario().hora_inicio) {
+            <div class="flex items-center gap-2 mt-1">
+              <input name="horaDesde" type="time" class="campo w-32!" [(ngModel)]="formulario().hora_inicio" aria-label="Hora de inicio">
+              <span class="inf-tenue">a</span>
+              <input name="horaHasta" type="time" class="campo w-32!" [(ngModel)]="formulario().hora_fin" aria-label="Hora de fin">
+            </div>
+          }
+        </div>
+
+        @if (esAdmin()) {
+          <div class="grupo">
+            <label class="inf-etiqueta" for="promo-sucursal">Sucursal</label>
+            <select id="promo-sucursal" name="sucursal" class="campo sm:w-72!" [(ngModel)]="formulario().id_sucursal">
+              <option [ngValue]="null">Todas las sucursales</option>
+              @for (s of sucursales(); track s.id_sucursal) { <option [ngValue]="s.id_sucursal">{{ s.nombre_sucursal }}</option> }
+            </select>
+          </div>
+        }
+
+        <button type="button" class="interruptor" role="switch" [attr.aria-checked]="formulario().estado_activo"
+                (click)="formulario().estado_activo = !formulario().estado_activo">
+          <span class="pista"></span><span class="texto">Activa</span>
+        </button>
+      </div>
+
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button type="button" class="inf-boton" (click)="cerrarModal()">Cancelar</button>
+        <button type="submit" class="boton-primario" [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar' }}</button>
+      </div>
+    </form>
+  </div>
+}

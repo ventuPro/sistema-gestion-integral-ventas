@@ -127,6 +127,7 @@
                   <div class="foto">
                     @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
                     @else { {{ prod.nombre_producto?.charAt(0) }} }
+                    @if (etiquetas().get(prod.id_producto); as etiqueta) { <span class="etiqueta-promo">{{ etiqueta }}</span> }
                   </div>
                   <div class="datos">
                     <span class="nombre">{{ prod.nombre_producto }}</span>
@@ -212,14 +213,23 @@
 
         <div class="flex-1 overflow-y-auto">
           @for (item of carrito(); track item.id_producto; let i = $index) {
+            @let linea = lineas().get(item.id_producto);
             <div class="linea-carrito">
               <div class="min-w-0">
                 <p class="inf-tinta text-[13.5px] font-medium truncate">{{ item.nombre_producto }}</p>
                 <p class="inf-sub mt-0!">{{ moneda() }} {{ cifra(item.precio_unitario) }} c/u</p>
+                @if (linea?.descuento_promocion) {
+                  <p class="promo-linea truncate">{{ linea!.promociones.join(', ') }} · −{{ moneda() }} {{ cifra(linea!.descuento_promocion) }}</p>
+                }
               </div>
               <span class="cantidad">×{{ item.cantidad }}</span>
               <div class="flex items-center gap-1">
-                <span class="inf-tinta font-semibold text-[14px] whitespace-nowrap">{{ moneda() }} {{ cifra(item.subtotal) }}</span>
+                <span class="flex flex-col items-end">
+                  @if (linea?.descuento_promocion) { <s class="inf-sutil text-[12px]">{{ moneda() }} {{ cifra(item.subtotal) }}</s> }
+                  <span class="inf-tinta font-semibold text-[14px] whitespace-nowrap">
+                    {{ moneda() }} {{ cifra(linea ? linea.subtotal_bruto - linea.descuento_promocion : item.subtotal) }}
+                  </span>
+                </span>
                 <button class="quitar" (click)="quitarDelCarrito(i)" title="Quitar" aria-label="Quitar producto">
                   <lucide-icon [img]="icons.quitar" class="w-4 h-4"></lucide-icon>
                 </button>
@@ -234,16 +244,89 @@
         </div>
 
         <div class="p-5 separador flex-shrink-0">
+          @if (cotizacion(); as c) {
+            @if (c.descuento_promociones || c.descuento_manual) {
+              <dl class="inf-pares mb-3">
+                <div><dt>Subtotal</dt><dd>{{ moneda() }} {{ cifra(c.subtotal_bruto) }}</dd></div>
+                @if (c.descuento_promociones) {
+                  <div><dt>Promociones</dt><dd class="inf-sube">−{{ moneda() }} {{ cifra(c.descuento_promociones) }}</dd></div>
+                }
+                @if (c.descuento_manual) {
+                  <div>
+                    <dt class="min-w-0 truncate">Descuento · {{ descuento()?.motivo }}</dt>
+                    <dd class="flex items-center gap-1 inf-sube">
+                      −{{ moneda() }} {{ cifra(c.descuento_manual) }}
+                      <button class="quitar p-0.5!" (click)="quitarDescuento()" aria-label="Quitar descuento">
+                        <lucide-icon [img]="icons.close" class="w-3.5 h-3.5"></lucide-icon>
+                      </button>
+                    </dd>
+                  </div>
+                }
+              </dl>
+            }
+          }
           <div class="flex items-end justify-between gap-3 mb-4">
             <span class="inf-etiqueta">Total</span>
-            <span class="inf-valor mt-0! text-[28px]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total()) }}</span>
+            <span class="inf-valor mt-0! text-[28px]!" [class.inf-refrescando]="cotizando()">
+              <span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total()) }}
+            </span>
           </div>
-          <button class="boton-primario w-full py-3!" [disabled]="carrito().length === 0" (click)="abrirModalCobro()">
-            Cobrar
-          </button>
+          <div class="flex gap-2">
+            <button class="inf-boton py-3! px-4!" [disabled]="carrito().length === 0 || cotizando()" (click)="abrirDescuento()"
+                    [attr.aria-label]="'Descuento'">
+              <lucide-icon [img]="icons.descuento" class="w-4 h-4"></lucide-icon> Descuento
+            </button>
+            <button class="boton-primario flex-1 py-3!" [disabled]="carrito().length === 0 || cotizando()" (click)="abrirModalCobro()">
+              Cobrar
+            </button>
+          </div>
         </div>
       </section>
     </div>
+  </div>
+}
+
+<!-- ═══ DESCUENTO MANUAL ═══ -->
+@if (mostrarDescuento()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarDescuento()">
+    <form class="inf-hoja ventana w-full max-w-sm" (ngSubmit)="aplicarDescuento()" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[15px]">Descuento</h3>
+        <button type="button" class="quitar" (click)="cerrarDescuento()" aria-label="Cancelar">
+          <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        @if (errorDescuento()) { <p class="error-descuento" role="alert">{{ errorDescuento() }}</p> }
+        <div class="metodos">
+          <button type="button" class="metodo" [class.activo]="formDescuento().tipo === 'PORCENTAJE'"
+                  (click)="formDescuento().tipo = 'PORCENTAJE'">%</button>
+          <button type="button" class="metodo" [class.activo]="formDescuento().tipo === 'MONTO'"
+                  (click)="formDescuento().tipo = 'MONTO'">{{ moneda() }}</button>
+        </div>
+        <div>
+          <p class="inf-etiqueta mb-2">
+            {{ formDescuento().tipo === 'PORCENTAJE' ? 'Porcentaje' : 'Monto' }}
+            @if (descuentoMax() !== null) { <span class="inf-sutil font-normal">· máx. {{ descuentoMax() }} %</span> }
+          </p>
+          <div class="campo-monto">
+            <span>{{ formDescuento().tipo === 'PORCENTAJE' ? '%' : moneda() }}</span>
+            <input type="number" name="valor" inputmode="decimal" min="0" [(ngModel)]="formDescuento().valor" aria-label="Descuento">
+          </div>
+        </div>
+        <div>
+          <label class="inf-etiqueta mb-2 block" for="motivo-descuento">Motivo</label>
+          <input id="motivo-descuento" name="motivo" class="campo-texto" maxlength="120" [(ngModel)]="formDescuento().motivo"
+                 placeholder="Cliente frecuente">
+        </div>
+      </div>
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button type="button" class="inf-boton" (click)="cerrarDescuento()">Cancelar</button>
+        <button type="submit" class="boton-primario" [disabled]="aplicandoDescuento()">
+          {{ aplicandoDescuento() ? 'Aplicando…' : 'Aplicar' }}
+        </button>
+      </div>
+    </form>
   </div>
 }
 

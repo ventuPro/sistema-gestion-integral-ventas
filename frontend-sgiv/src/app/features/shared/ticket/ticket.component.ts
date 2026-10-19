@@ -6,8 +6,12 @@ import { METODO_PAGO } from '../../../core/utils/metodos-pago';
 
 export interface DatosTicket {
   id_venta: number;
-  items: { nombre_producto: string; cantidad: number; precio_unitario?: number; subtotal: number }[];
+  /** subtotal = cantidad × precio de lista; descuento = ahorro por promoción en esa línea */
+  items: { nombre_producto: string; cantidad: number; precio_unitario?: number; subtotal: number; descuento?: number; promocion?: string }[];
   total: number;
+  descuento_promociones?: number;
+  descuento_manual?: number;
+  motivo_descuento?: string | null;
   metodo: string;
   cambio?: number;
   numero_mesa?: number;
@@ -36,4 +40,7 @@ export class TicketComponent {
   readonly metodo = METODO_PAGO;
 
   get textoFecha(): string { return fechaHora(this.fecha().toISOString()); }
+
+  readonly ahorro = computed(() => (this.datos().descuento_promociones || 0) + (this.datos().descuento_manual || 0));
+  readonly subtotal = computed(() => this.datos().items.reduce((s, i) => s + i.subtotal, 0));
 }
