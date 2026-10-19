@@ -1,6 +1,8 @@
 const cajaModel     = require('../models/cajaModel');
 const sucursalModel = require('../models/sucursalModel');
 const ajusteModel   = require('../models/ajusteModel');
+const promocionModel = require('../models/promocionModel');
+const db            = require('../config/db');
 
 // ─── ESTADO COMPLETO (la fuente de verdad para el front) ──────────
 const getEstadoCompleto = async (req, res) => {
@@ -168,10 +170,11 @@ const getCierresCaja = async (req, res) => {
 
 const cobrarVenta = async (req, res) => {
     try {
-        const datos = { ...req.body, id_usuario_cajero: req.usuario.id_usuario };
+        const datos = { ...req.body, id_usuario_cajero: req.usuario.id_usuario,
+                        maxDescuentoPct: await ajusteModel.topeDescuento(req.usuario) };
         const motivo = await ajusteModel.motivoMetodoPago(datos.metodo_pago);
         if (motivo) return res.status(400).json({ error: 'VENTA_INVALIDA', detalle: motivo });
-        const { id_venta, cambiosStock } = await cajaModel.registrarVenta(datos);
+        const { id_venta, cambiosStock, cotizacion } = await cajaModel.registrarVenta(datos);
 
         for (const c of cambiosStock) {
             global.io?.emit('actualizacion_stock_global', {
@@ -181,7 +184,7 @@ const cobrarVenta = async (req, res) => {
             });
         }
 
-        res.status(201).json({ mensaje: 'Venta registrada', id_venta });
+        res.status(201).json({ mensaje: 'Venta registrada', id_venta, cotizacion });
     } catch (e) {
         console.error('cobrarVenta:', e.message);
         if (e.message === 'CAJA_CERRADA')
@@ -192,10 +195,39 @@ const cobrarVenta = async (req, res) => {
         if (e.code === 'STOCK_INSUFICIENTE')
             return res.status(409).json({ error: 'STOCK_INSUFICIENTE', detalle: e.message });
         if (e.code === 'PRECIO_DESACTUALIZADO')
-            return res.status(409).json({ error: 'PRECIO_DESACTUALIZADO', detalle: e.message, precios: e.precios, total: e.total });
+            return res.status(409).json({ error: 'PRECIO_DESACTUALIZADO', detalle: e.message, precios: e.precios,
+                                          total: e.total, cotizacion: e.cotizacion });
+        if (e.code === 'DESCUENTO_INVALIDO')
+            return res.status(400).json({ error: 'DESCUENTO_INVALIDO', detalle: e.message });
         if (e.code === 'VENTA_INVALIDA')
             return res.status(400).json({ error: 'VENTA_INVALIDA', detalle: e.message });
         res.status(500).json({ error: 'Error al registrar la venta.', detalle: e.message });
+    }
+};
+
+// POST /api/caja/cotizar { detalles, descuento? }: precios con promociones (no registra nada)
+const cotizarVenta = async (req, res) => {
+    const client = await db.connect();
+    try {
+        const id_sucursal = Number(req.usuario.id_rol) === 1
+            ? Number(req.body?.id_sucursal) || Number(req.usuario.id_sucursal)
+            : Number(req.usuario.id_sucursal);
+        const descuento_max = await ajusteModel.topeDescuento(req.usuario);
+        const items = await cajaModel.calcularItemsVenta(client, req.body?.detalles);
+        const cot = await promocionModel.cotizar(client, {
+            id_sucursal,
+            lineas: items.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria,
+                                      cantidad: i.cantidad, precioCentavos: Math.round(i.precio * 100) })),
+            descuento: req.body?.descuento || null, maxManualPct: descuento_max
+        });
+        res.json({ ...promocionModel.enBolivianos(cot), descuento_max });
+    } catch (e) {
+        if (e.code === 'VENTA_INVALIDA' || e.code === 'DESCUENTO_INVALIDO')
+            return res.status(400).json({ error: e.code, detalle: e.message });
+        console.error('cotizarVenta:', e.message);
+        res.status(500).json({ error: 'No se pudo calcular el total.' });
+    } finally {
+        client.release();
     }
 };
 
@@ -213,6 +245,6 @@ module.exports = {
     getEstadoCaja, getEstadoCompleto,
     habilitarCajaUsuario, deshabilitarCajaUsuario, reabrirCajaAdmin,
     getTurnoHoy, abrirCaja, cerrarCaja,
-    getArqueoHoy, getVentasHoyPOS, getCierresCaja, cobrarVenta,
+    getArqueoHoy, getVentasHoyPOS, getCierresCaja, cobrarVenta, cotizarVenta,
     getEstadoCajaSucursal
 };

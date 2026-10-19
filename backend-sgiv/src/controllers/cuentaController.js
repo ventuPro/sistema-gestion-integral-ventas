@@ -114,7 +114,15 @@ const quitarProducto = async (req, res) => {
 
 const CLIENTE_MESA = /^[0-9a-f]{32}$/;
 
-// POST /api/cuentas/:id_cuenta/cerrar  { metodo_pago, cliente_mesa? }
+/** null = toda la cuenta; { cliente_mesa } = solo esa parte (null = lo del cajero); false = inválido */
+const leerParte = (datos = {}) => {
+    if (!('cliente_mesa' in datos)) return null;
+    const cliente_mesa = datos.cliente_mesa === '' ? null : datos.cliente_mesa ?? null;
+    if (cliente_mesa !== null && !CLIENTE_MESA.test(String(cliente_mesa))) return false;
+    return { cliente_mesa };
+};
+
+// POST /api/cuentas/:id_cuenta/cerrar  { metodo_pago, cliente_mesa?, descuento? }
 // Con cliente_mesa (código del celular, o null = lo cargado por el cajero) se cobra solo esa parte.
 const cerrarCuenta = async (req, res) => {
     try {
@@ -123,15 +131,12 @@ const cerrarCuenta = async (req, res) => {
         const motivo = await ajusteModel.motivoMetodoPago(metodo_pago);
         if (motivo) return res.status(400).json({ error: motivo });
 
-        let parte = null;
-        if ('cliente_mesa' in (req.body || {})) {
-            const cliente_mesa = req.body.cliente_mesa ?? null;
-            if (cliente_mesa !== null && !CLIENTE_MESA.test(String(cliente_mesa)))
-                return res.status(400).json({ error: 'Cliente inválido' });
-            parte = { cliente_mesa };
-        }
+        const parte = leerParte(req.body);
+        if (parte === false) return res.status(400).json({ error: 'Cliente inválido' });
 
-        const resultado = await cuentaModel.cerrarCuenta(id_cuenta, metodo_pago, req.usuario.id_usuario, parte);
+        const resultado = await cuentaModel.cerrarCuenta(id_cuenta, metodo_pago, req.usuario.id_usuario, parte, {
+            descuento: req.body?.descuento || null, maxDescuentoPct: await ajusteModel.topeDescuento(req.usuario)
+        });
         const { id_mesa } = resultado;
 
         if (resultado.cuenta_cerrada) {
@@ -153,8 +158,24 @@ const cerrarCuenta = async (req, res) => {
             return res.status(409).json({ error: 'No hay nada pendiente de cobro para ese cliente' });
         if (e.message === 'CAJA_CERRADA')
             return res.status(403).json({ error: 'Tu caja está cerrada. Abre un turno para cobrar.' });
+        if (e.code === 'DESCUENTO_INVALIDO')
+            return res.status(400).json({ error: e.message });
         console.error('cerrarCuenta:', e);
         res.status(500).json({ error: 'Error al cerrar la cuenta' });
+    }
+};
+
+// GET /api/cuentas/:id_cuenta/cotizacion?cliente_mesa=  lo pendiente con promociones (no registra nada)
+const cotizarCuenta = async (req, res) => {
+    try {
+        const parte = leerParte(req.query);
+        if (parte === false) return res.status(400).json({ error: 'Cliente inválido' });
+        const r = await cuentaModel.cotizarCuenta(Number(req.params.id_cuenta), parte);
+        if (!r) return res.status(404).json({ error: 'No hay cuenta activa en esta mesa' });
+        res.json({ ...r, descuento_max: await ajusteModel.topeDescuento(req.usuario) });
+    } catch (e) {
+        console.error('cotizarCuenta:', e);
+        res.status(500).json({ error: 'No se pudo calcular el total.' });
     }
 };
 
@@ -169,4 +190,4 @@ const getMesasConCuenta = async (req, res) => {
     }
 };
 
-module.exports = { abrirCuenta, getCuentaActiva, agregarProducto, quitarProducto, cerrarCuenta, getMesasConCuenta };
+module.exports = { abrirCuenta, getCuentaActiva, agregarProducto, quitarProducto, cerrarCuenta, getMesasConCuenta, cotizarCuenta };

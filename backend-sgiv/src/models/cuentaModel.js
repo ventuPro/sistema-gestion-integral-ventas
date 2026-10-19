@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { finalizarPedidosDeCuenta } = require('./pedidoModel');
 const { registrarHistorial } = require('./inventarioModel');
+const promocionModel = require('./promocionModel');
 
 // total_acumulado = lo que falta cobrar (las partes ya pagadas tienen id_venta)
 const recalcularTotal = (client, id_cuenta) => client.query(`
@@ -246,7 +247,9 @@ const devolverStockCuenta = async (client, id_cuenta, id_usuario = null) => {
 // parte = null → todo lo pendiente; { cliente_mesa } → lo pedido desde ese celular
 // (cliente_mesa null = lo que cargó el cajero). Si ya no queda nada pendiente se
 // cierra la cuenta y se libera la mesa.
-const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = null) => {
+// Las promociones vigentes se aplican al cobrar, sobre lo que se paga en este momento.
+// descuento: { tipo, valor, motivo } opcional; maxDescuentoPct = null → sin tope (administrador)
+const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = null, { descuento = null, maxDescuentoPct = null } = {}) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
@@ -266,26 +269,38 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         const id_turno = rTurno.rows[0].id_turno;
 
         const rItems = await client.query(`
-            SELECT * FROM detalle_cuenta
-            WHERE id_cuenta=$1 AND id_venta IS NULL
-              AND (NOT $2::boolean OR cliente_mesa IS NOT DISTINCT FROM $3)
-            ORDER BY id_detalle_cuenta
+            SELECT dc.*, p.id_categoria FROM detalle_cuenta dc
+            JOIN producto p ON p.id_producto = dc.id_producto
+            WHERE dc.id_cuenta=$1 AND dc.id_venta IS NULL
+              AND (NOT $2::boolean OR dc.cliente_mesa IS NOT DISTINCT FROM $3)
+            ORDER BY dc.id_detalle_cuenta
         `, [id_cuenta, !!parte, parte?.cliente_mesa ?? null]);
         if (!rItems.rows.length) throw new Error('NADA_POR_COBRAR');
-        const total = rItems.rows.reduce((suma, i) => suma + Math.round(Number(i.subtotal) * 100), 0) / 100;
+
+        const cot = await promocionModel.cotizar(client, {
+            id_sucursal: cuenta.id_sucursal,
+            lineas: rItems.rows.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria, cantidad: Number(i.cantidad),
+                                             precioCentavos: Math.round(Number(i.precio_unitario) * 100) })),
+            descuento, maxManualPct: maxDescuentoPct
+        });
+        const total = cot.totalCentavos / 100;
 
         const rVenta = await client.query(`
-            INSERT INTO venta_caja (id_sucursal,id_usuario_cajero,id_turno,monto_total_venta,metodo_pago)
-            VALUES ($1,$2,$3,$4,$5) RETURNING id_venta
-        `, [cuenta.id_sucursal, id_usuario_cajero, id_turno, total, metodo_pago]);
+            INSERT INTO venta_caja (id_sucursal,id_usuario_cajero,id_turno,monto_total_venta,metodo_pago,
+                                    descuento_promociones,descuento_manual,motivo_descuento)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id_venta
+        `, [cuenta.id_sucursal, id_usuario_cajero, id_turno, total, metodo_pago,
+            cot.promoCentavos / 100, cot.manualCentavos / 100, cot.motivo]);
         const id_venta = rVenta.rows[0].id_venta;
 
         // El stock ya se descontó al agregar cada producto: aquí no se toca
-        for (const item of rItems.rows) {
+        for (const l of cot.lineas) {
             await client.query(`
-                INSERT INTO detalle_venta (id_venta,id_producto,cantidad_vendida,precio_unitario,subtotal_venta)
-                VALUES ($1,$2,$3,$4,$5)
-            `, [id_venta, item.id_producto, item.cantidad, item.precio_unitario, item.subtotal]);
+                INSERT INTO detalle_venta (id_venta,id_producto,cantidad_vendida,precio_unitario,subtotal_venta,
+                                           descuento_promocion,descuento_manual,id_promocion)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            `, [id_venta, l.id_producto, l.cantidad, l.precioCentavos / 100, l.netoCentavos / 100,
+                l.descuentoPromoCentavos / 100, l.descuentoManualCentavos / 100, l.id_promocion]);
         }
         await client.query(`UPDATE detalle_cuenta SET id_venta=$1 WHERE id_detalle_cuenta = ANY($2::int[])`,
                            [id_venta, rItems.rows.map(i => i.id_detalle_cuenta)]);
@@ -317,10 +332,36 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         }
 
         await client.query('COMMIT');
-        return { id_venta, total, id_mesa: cuenta.id_mesa, pedidos_pagados, cuenta_cerrada };
+        return { id_venta, total, id_mesa: cuenta.id_mesa, pedidos_pagados, cuenta_cerrada,
+                 cotizacion: promocionModel.enBolivianos(cot) };
     } catch(e) {
         await client.query('ROLLBACK');
         throw e;
+    } finally {
+        client.release();
+    }
+};
+
+// ─── Lo que falta cobrar de una cuenta, con las promociones vigentes (solo lectura) ───
+const cotizarCuenta = async (id_cuenta, parte = null) => {
+    const client = await db.connect();
+    try {
+        const rCuenta = await client.query(`
+            SELECT ml.id_sucursal FROM cuenta_mesa c JOIN mesa_local ml ON ml.id_mesa = c.id_mesa
+            WHERE c.id_cuenta = $1 AND c.estado = 'Abierta'`, [id_cuenta]);
+        if (!rCuenta.rows.length) return null;
+        const rItems = await client.query(`
+            SELECT dc.id_producto, dc.cantidad, dc.precio_unitario, p.id_categoria FROM detalle_cuenta dc
+            JOIN producto p ON p.id_producto = dc.id_producto
+            WHERE dc.id_cuenta = $1 AND dc.id_venta IS NULL
+              AND (NOT $2::boolean OR dc.cliente_mesa IS NOT DISTINCT FROM $3)
+            ORDER BY dc.id_detalle_cuenta`, [id_cuenta, !!parte, parte?.cliente_mesa ?? null]);
+        const cot = await promocionModel.cotizar(client, {
+            id_sucursal: rCuenta.rows[0].id_sucursal,
+            lineas: rItems.rows.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria, cantidad: Number(i.cantidad),
+                                             precioCentavos: Math.round(Number(i.precio_unitario) * 100) }))
+        });
+        return promocionModel.enBolivianos(cot);
     } finally {
         client.release();
     }
@@ -353,5 +394,5 @@ const obtenerMesasConCuenta = async (id_sucursal) => {
 module.exports = {
     abrirCuenta, obtenerCuentaActiva, agregarProductoCuenta,
     quitarProductoCuenta, devolverStockCuenta, cerrarCuenta,
-    obtenerMesasConCuenta
+    obtenerMesasConCuenta, cotizarCuenta
 };

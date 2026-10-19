@@ -23,6 +23,7 @@ const menuRoutes      = require('./routes/menuRoutes');
 const mesaRoutes      = require('./routes/mesaRoutes');
 const ajusteRoutes    = require('./routes/ajusteRoutes');
 const asistenteRoutes = require('./routes/asistenteRoutes');
+const promocionRoutes = require('./routes/promocionRoutes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -77,6 +78,7 @@ app.use('/api/mesas',      mesaRoutes);
 app.use('/api/cuentas', require('./routes/cuentaRoutes'));
 app.use('/api/ajustes',    ajusteRoutes);
 app.use('/api/asistente',  asistenteRoutes);
+app.use('/api/promociones', promocionRoutes);
 
 // Socket.IO eventos
 io.on('connection', (socket) => {

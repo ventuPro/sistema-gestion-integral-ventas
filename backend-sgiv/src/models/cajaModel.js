@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { registrarHistorial } = require('./inventarioModel');
 const { METODO_PAGO } = require('../utils/metodosPago');
+const promocionModel = require('./promocionModel');
 
 // Estado de caja basado en turno_caja.estado_turno.
 // caja_habilitada se sincroniza automáticamente con el estado del turno.
@@ -447,7 +448,7 @@ const calcularItemsVenta = async (client, detalles) => {
 
     const ids = [...new Set(detalles.map(d => Number(d.id_producto)))];
     const r = await client.query(
-        `SELECT id_producto, nombre_producto, precio_unitario
+        `SELECT id_producto, id_categoria, nombre_producto, precio_unitario
          FROM producto WHERE id_producto = ANY($1::int[]) AND estado_activo = TRUE`,
         [ids]
     );
@@ -463,15 +464,18 @@ const calcularItemsVenta = async (client, detalles) => {
         const precioCentavos = Math.round(Number(prod.precio_unitario) * 100);
         return {
             id_producto, cantidad,
+            id_categoria:     Number(prod.id_categoria),
             precio:           precioCentavos / 100,
             subtotalCentavos: precioCentavos * cantidad
         };
     });
 };
 
+// descuento: { tipo, valor, motivo } opcional; maxDescuentoPct = null → sin tope (administrador)
 const registrarVenta = async ({
     id_sucursal, id_usuario_cajero, id_cliente,
-    id_pedido_mesa, monto_total_venta, metodo_pago, detalles
+    id_pedido_mesa, monto_total_venta, metodo_pago, detalles,
+    descuento = null, maxDescuentoPct = null
 }) => {
     const client = await db.connect();
     try {
@@ -487,17 +491,24 @@ const registrarVenta = async ({
         if (rTurno.rows.length === 0) throw new Error('CAJA_CERRADA');
         const id_turno = rTurno.rows[0].id_turno;
 
-        // 2. Precios y total se calculan con la BD; del cliente solo se toman
-        //    producto y cantidad. Si el total que vio el cajero no coincide
-        //    (precio cambiado mientras tenía el carrito), se rechaza la venta.
+        // 2. Precios, promociones y total se calculan con la BD; del cliente solo se toman
+        //    producto, cantidad y el descuento manual. Si el total que vio el cajero no
+        //    coincide (precio o promoción cambió mientras tenía el carrito), se rechaza.
         const items = await calcularItemsVenta(client, detalles);
-        const totalCentavos = items.reduce((s, i) => s + i.subtotalCentavos, 0);
+        const cot = await promocionModel.cotizar(client, {
+            id_sucursal: Number(id_sucursal),
+            lineas: items.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria,
+                                      cantidad: i.cantidad, precioCentavos: Math.round(i.precio * 100) })),
+            descuento, maxManualPct: maxDescuentoPct
+        });
+        const totalCentavos = cot.totalCentavos;
         const totalCliente  = Math.round(Number(monto_total_venta) * 100);
         if (monto_total_venta !== undefined && totalCliente !== totalCentavos) {
             const err = new Error('Los precios cambiaron. Revise el carrito y vuelva a cobrar.');
-            err.code    = 'PRECIO_DESACTUALIZADO';
-            err.precios = items.map(i => ({ id_producto: i.id_producto, precio_unitario: i.precio }));
-            err.total   = totalCentavos / 100;
+            err.code       = 'PRECIO_DESACTUALIZADO';
+            err.precios    = items.map(i => ({ id_producto: i.id_producto, precio_unitario: i.precio }));
+            err.total      = totalCentavos / 100;
+            err.cotizacion = promocionModel.enBolivianos(cot);
             throw err;
         }
 
@@ -505,8 +516,9 @@ const registrarVenta = async ({
         const rVenta = await client.query(`
             INSERT INTO venta_caja
                 (id_sucursal, id_usuario_cajero, id_cliente, id_pedido_mesa,
-                 id_turno, monto_total_venta, metodo_pago)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 id_turno, monto_total_venta, metodo_pago,
+                 descuento_promociones, descuento_manual, motivo_descuento)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id_venta
         `, [
             Number(id_sucursal),
@@ -515,22 +527,26 @@ const registrarVenta = async ({
             id_pedido_mesa|| null,
             id_turno,
             totalCentavos / 100,
-            metodo_pago
+            metodo_pago,
+            cot.promoCentavos / 100,
+            cot.manualCentavos / 100,
+            cot.motivo
         ]);
         const id_venta = rVenta.rows[0].id_venta;
 
         // 4. Procesar cada ítem del carrito
         const cambiosStock = [];
-        for (const item of items) {
-            const { cantidad, precio } = item;
-            const subtotal = item.subtotalCentavos / 100;
+        for (const item of cot.lineas) {
+            const { cantidad } = item;
             const id_prod  = item.id_producto;
 
             await client.query(`
                 INSERT INTO detalle_venta
-                    (id_venta, id_producto, cantidad_vendida, precio_unitario, subtotal_venta)
-                VALUES ($1, $2, $3, $4, $5)
-            `, [id_venta, id_prod, cantidad, precio, subtotal]);
+                    (id_venta, id_producto, cantidad_vendida, precio_unitario, subtotal_venta,
+                     descuento_promocion, descuento_manual, id_promocion)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            `, [id_venta, id_prod, cantidad, item.precioCentavos / 100, item.netoCentavos / 100,
+                item.descuentoPromoCentavos / 100, item.descuentoManualCentavos / 100, item.id_promocion]);
 
             // Descuento atómico: solo si hay stock suficiente (evita sobreventa
             // cuando dos cajas venden el mismo producto a la vez).
@@ -582,7 +598,7 @@ const registrarVenta = async ({
         }
 
         await client.query('COMMIT');
-        return { id_venta, cambiosStock };
+        return { id_venta, cambiosStock, cotizacion: promocionModel.enBolivianos(cot) };
 
     } catch (e) {
         await client.query('ROLLBACK');

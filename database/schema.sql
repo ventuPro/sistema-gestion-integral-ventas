@@ -20,6 +20,8 @@ DROP TABLE IF EXISTS mesa_local CASCADE;
 DROP TABLE IF EXISTS notificacion_admin CASCADE;
 DROP TABLE IF EXISTS historial_inventario CASCADE;
 DROP TABLE IF EXISTS inventario_sucursal CASCADE;
+DROP TABLE IF EXISTS promocion_categoria CASCADE;
+DROP TABLE IF EXISTS promocion_producto CASCADE;
 DROP TABLE IF EXISTS promocion CASCADE;
 DROP TABLE IF EXISTS producto CASCADE;
 DROP TABLE IF EXISTS categoria_producto CASCADE;
@@ -93,13 +95,41 @@ CREATE TABLE producto (
     estado_activo BOOLEAN DEFAULT TRUE
 );
 
+-- Promociones: se aplican solas al cobrar y siempre gana la que más ahorra al cliente
+-- tipo: PORCENTAJE (valor = %), PRECIO (valor = precio especial por unidad),
+--       NXM (lleva/paga, ej. 3x2), COMBO (valor = precio del combo; productos con cantidad)
 CREATE TABLE promocion (
-    id_promocion SERIAL PRIMARY KEY,
-    id_producto INT REFERENCES producto(id_producto),
-    precio_promocional DECIMAL(10, 2) NOT NULL,
-    fecha_inicio TIMESTAMP NOT NULL,
-    fecha_fin TIMESTAMP NOT NULL,
-    estado_activo BOOLEAN DEFAULT TRUE
+    id_promocion  SERIAL PRIMARY KEY,
+    nombre        VARCHAR(80) NOT NULL,
+    tipo          VARCHAR(10) NOT NULL CHECK (tipo IN ('PORCENTAJE', 'PRECIO', 'NXM', 'COMBO')),
+    valor         DECIMAL(10, 2) NOT NULL DEFAULT 0 CHECK (valor >= 0),
+    lleva         SMALLINT CHECK (lleva BETWEEN 2 AND 20),
+    paga          SMALLINT CHECK (paga >= 1),
+    id_sucursal   INT REFERENCES sucursal(id_sucursal),
+    fecha_inicio  DATE NOT NULL,
+    fecha_fin     DATE NOT NULL,
+    dias_semana   SMALLINT[],
+    hora_inicio   TIME,
+    hora_fin      TIME,
+    estado_activo BOOLEAN NOT NULL DEFAULT TRUE,
+    id_usuario_creador INT REFERENCES usuario(id_usuario),
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CHECK (fecha_inicio <= fecha_fin),
+    CHECK ((hora_inicio IS NULL) = (hora_fin IS NULL)),
+    CHECK (tipo <> 'NXM' OR (lleva IS NOT NULL AND paga IS NOT NULL AND paga < lleva))
+);
+
+CREATE TABLE promocion_producto (
+    id_promocion INT NOT NULL REFERENCES promocion(id_promocion) ON DELETE CASCADE,
+    id_producto  INT NOT NULL REFERENCES producto(id_producto),
+    cantidad     SMALLINT NOT NULL DEFAULT 1 CHECK (cantidad BETWEEN 1 AND 50),
+    PRIMARY KEY (id_promocion, id_producto)
+);
+
+CREATE TABLE promocion_categoria (
+    id_promocion INT NOT NULL REFERENCES promocion(id_promocion) ON DELETE CASCADE,
+    id_categoria INT NOT NULL REFERENCES categoria_producto(id_categoria),
+    PRIMARY KEY (id_promocion, id_categoria)
 );
 
 -- ==========================================
@@ -253,7 +283,11 @@ CREATE TABLE venta_caja (
     id_turno INT REFERENCES turno_caja(id_turno),
     monto_total_venta DECIMAL(10, 2) NOT NULL,
     metodo_pago VARCHAR(50) NOT NULL,
-    fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Descuentos ya restados de monto_total_venta
+    descuento_promociones DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    descuento_manual      DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    motivo_descuento      VARCHAR(120)
 );
 
 CREATE TABLE detalle_venta (
@@ -262,7 +296,11 @@ CREATE TABLE detalle_venta (
     id_producto INT REFERENCES producto(id_producto),
     cantidad_vendida INT NOT NULL,
     precio_unitario DECIMAL(10, 2) NOT NULL,
-    subtotal_venta DECIMAL(10, 2) NOT NULL
+    subtotal_venta DECIMAL(10, 2) NOT NULL,
+    -- precio_unitario = precio de lista; subtotal_venta = lo cobrado tras los descuentos
+    descuento_promocion DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    descuento_manual    DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    id_promocion        INT REFERENCES promocion(id_promocion)
 );
 
 ALTER TABLE detalle_cuenta
@@ -312,6 +350,8 @@ CREATE TABLE configuracion (
     menu_max_pedidos_ip      INT NOT NULL DEFAULT 10 CHECK (menu_max_pedidos_ip BETWEEN 1 AND 100),
     -- Parámetros: inventario
     stock_minimo_defecto     INT NOT NULL DEFAULT 5  CHECK (stock_minimo_defecto BETWEEN 0 AND 10000),
+    -- Parámetros: descuento manual máximo del cajero (% de la venta)
+    descuento_max_cajero     INT NOT NULL DEFAULT 10 CHECK (descuento_max_cajero BETWEEN 0 AND 100),
     -- Parámetros: seguridad
     captcha_activo           BOOLEAN NOT NULL DEFAULT TRUE,
     login_max_intentos       INT NOT NULL DEFAULT 5  CHECK (login_max_intentos BETWEEN 3 AND 20),
@@ -367,3 +407,8 @@ CREATE INDEX idx_detalle_cuenta_cuenta    ON detalle_cuenta (id_cuenta);
 CREATE INDEX idx_detalle_pedido_pedido    ON detalle_pedido (id_pedido);
 CREATE INDEX idx_turno_sucursal_estado    ON turno_caja (id_sucursal, estado_turno);
 CREATE INDEX idx_historial_inv_fecha      ON historial_inventario (id_inventario, fecha_registro);
+CREATE INDEX idx_promocion_vigencia      ON promocion (estado_activo, fecha_inicio, fecha_fin);
+CREATE INDEX idx_promocion_sucursal      ON promocion (id_sucursal);
+CREATE INDEX idx_promocion_producto_prod ON promocion_producto (id_producto);
+CREATE INDEX idx_promocion_categoria_cat ON promocion_categoria (id_categoria);
+CREATE INDEX idx_detalle_venta_promocion ON detalle_venta (id_promocion);

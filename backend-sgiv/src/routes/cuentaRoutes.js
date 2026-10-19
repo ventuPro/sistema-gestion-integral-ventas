@@ -13,6 +13,7 @@ router.post ('/abrir',                    mesas, ctrl.abrirCuenta);
 router.post ('/:id_cuenta/producto',      mesas, ctrl.agregarProducto);
 router.delete('/detalle/:id_detalle',     mesas, ctrl.quitarProducto);
 router.post ('/:id_cuenta/cerrar',        mesas, ctrl.cerrarCuenta);
+router.get  ('/:id_cuenta/cotizacion',    mesas, ctrl.cotizarCuenta);
 router.post('/:id_cuenta/cancelar-si-vacia', mesas, async (req, res) => {
     try {
         const id_cuenta = Number(req.params.id_cuenta);

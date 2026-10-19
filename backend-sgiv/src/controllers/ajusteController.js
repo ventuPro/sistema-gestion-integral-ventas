@@ -90,6 +90,7 @@ const ENTEROS = {
     menu_max_pendientes_mesa: { min: 1, max: 10,    nombre: 'Pedidos pendientes por mesa' },
     menu_max_pedidos_ip:      { min: 1, max: 100,   nombre: 'Pedidos por dispositivo cada 10 minutos' },
     stock_minimo_defecto:     { min: 0, max: 10000, nombre: 'Stock mínimo por defecto' },
+    descuento_max_cajero:     { min: 0, max: 100,   nombre: 'Descuento máximo del cajero (%)' },
     login_max_intentos:       { min: 3, max: 20,    nombre: 'Intentos de inicio de sesión' },
     login_minutos_bloqueo:    { min: 1, max: 1440,  nombre: 'Minutos de bloqueo' },
     sesion_horas:             { min: 1, max: 24,    nombre: 'Duración de la sesión (horas)' }

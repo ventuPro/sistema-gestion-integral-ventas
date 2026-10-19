@@ -119,7 +119,66 @@ const MIGRACIONES = [
     ALTER TABLE detalle_cuenta
         ADD COLUMN IF NOT EXISTS cliente_mesa   VARCHAR(32),
         ADD COLUMN IF NOT EXISTS nombre_cliente VARCHAR(40),
-        ADD COLUMN IF NOT EXISTS id_venta       INT REFERENCES venta_caja(id_venta);`
+        ADD COLUMN IF NOT EXISTS id_venta       INT REFERENCES venta_caja(id_venta);`,
+
+    // Promociones (reemplaza la tabla promocion original, que nunca se usó) y descuentos en las ventas
+    `DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'promocion' AND column_name = 'precio_promocional') THEN
+            DROP TABLE promocion CASCADE;
+        END IF;
+    END $$;
+    -- Promociones: se aplican solas al cobrar y siempre gana la que más ahorra al cliente
+    -- tipo: PORCENTAJE (valor = %), PRECIO (valor = precio especial por unidad),
+    --       NXM (lleva/paga, ej. 3x2), COMBO (valor = precio del combo; productos con cantidad)
+    CREATE TABLE IF NOT EXISTS promocion (
+        id_promocion  SERIAL PRIMARY KEY,
+        nombre        VARCHAR(80) NOT NULL,
+        tipo          VARCHAR(10) NOT NULL CHECK (tipo IN ('PORCENTAJE', 'PRECIO', 'NXM', 'COMBO')),
+        valor         DECIMAL(10, 2) NOT NULL DEFAULT 0 CHECK (valor >= 0),
+        lleva         SMALLINT CHECK (lleva BETWEEN 2 AND 20),
+        paga          SMALLINT CHECK (paga >= 1),
+        id_sucursal   INT REFERENCES sucursal(id_sucursal),
+        fecha_inicio  DATE NOT NULL,
+        fecha_fin     DATE NOT NULL,
+        dias_semana   SMALLINT[],
+        hora_inicio   TIME,
+        hora_fin      TIME,
+        estado_activo BOOLEAN NOT NULL DEFAULT TRUE,
+        id_usuario_creador INT REFERENCES usuario(id_usuario),
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CHECK (fecha_inicio <= fecha_fin),
+        CHECK ((hora_inicio IS NULL) = (hora_fin IS NULL)),
+        CHECK (tipo <> 'NXM' OR (lleva IS NOT NULL AND paga IS NOT NULL AND paga < lleva))
+    );
+
+    CREATE TABLE IF NOT EXISTS promocion_producto (
+        id_promocion INT NOT NULL REFERENCES promocion(id_promocion) ON DELETE CASCADE,
+        id_producto  INT NOT NULL REFERENCES producto(id_producto),
+        cantidad     SMALLINT NOT NULL DEFAULT 1 CHECK (cantidad BETWEEN 1 AND 50),
+        PRIMARY KEY (id_promocion, id_producto)
+    );
+
+    CREATE TABLE IF NOT EXISTS promocion_categoria (
+        id_promocion INT NOT NULL REFERENCES promocion(id_promocion) ON DELETE CASCADE,
+        id_categoria INT NOT NULL REFERENCES categoria_producto(id_categoria),
+        PRIMARY KEY (id_promocion, id_categoria)
+    );
+    ALTER TABLE venta_caja
+        ADD COLUMN IF NOT EXISTS descuento_promociones DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS descuento_manual      DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS motivo_descuento      VARCHAR(120);
+    ALTER TABLE detalle_venta
+        ADD COLUMN IF NOT EXISTS descuento_promocion DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS descuento_manual    DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS id_promocion        INT REFERENCES promocion(id_promocion);
+    ALTER TABLE configuracion
+        ADD COLUMN IF NOT EXISTS descuento_max_cajero INT NOT NULL DEFAULT 10 CHECK (descuento_max_cajero BETWEEN 0 AND 100);
+    CREATE INDEX IF NOT EXISTS idx_promocion_vigencia      ON promocion (estado_activo, fecha_inicio, fecha_fin);
+    CREATE INDEX IF NOT EXISTS idx_promocion_sucursal      ON promocion (id_sucursal);
+    CREATE INDEX IF NOT EXISTS idx_promocion_producto_prod ON promocion_producto (id_producto);
+    CREATE INDEX IF NOT EXISTS idx_promocion_categoria_cat ON promocion_categoria (id_categoria);
+    CREATE INDEX IF NOT EXISTS idx_detalle_venta_promocion ON detalle_venta (id_promocion);`
 ];
 
 const aplicarMigraciones = async () => {

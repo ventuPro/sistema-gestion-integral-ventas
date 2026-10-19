@@ -25,6 +25,7 @@ router.get   ('/arqueo/:id_sucursal',          verificarToken, ctrl.getArqueoHoy
 router.get   ('/ventas-hoy/:id_sucursal',      verificarToken, ctrl.getVentasHoyPOS);
 router.get   ('/cierres',                      verificarToken, soloAdministrador, ctrl.getCierresCaja);
 router.post  ('/cobrar',                       verificarToken, verificarPermiso('punto_venta'), ctrl.cobrarVenta);
+router.post  ('/cotizar',                      verificarToken, verificarPermiso('punto_venta'), ctrl.cotizarVenta);
 router.get   ('/estado-sucursal/:id_sucursal', verificarToken, ctrl.getEstadoCajaSucursal);
 
 module.exports = router;

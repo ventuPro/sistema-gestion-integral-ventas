@@ -4,8 +4,8 @@ const { calcularItemsVenta } = require('../../src/models/cajaModel');
 
 // Cliente de BD simulado: devuelve los productos activos del "catálogo"
 const catalogo = [
-    { id_producto: 1, nombre_producto: 'Torta',  precio_unitario: '25.50' },
-    { id_producto: 2, nombre_producto: 'Queque', precio_unitario: '10.10' }
+    { id_producto: 1, id_categoria: 3, nombre_producto: 'Torta',  precio_unitario: '25.50' },
+    { id_producto: 2, id_categoria: 3, nombre_producto: 'Queque', precio_unitario: '10.10' }
 ];
 const clienteFalso = {
     query: async (_sql, [ids]) => ({ rows: catalogo.filter(p => ids.includes(p.id_producto)) })
@@ -16,7 +16,7 @@ test('usa el precio de la BD e ignora el precio enviado por el cliente', async (
     const items = await calcularItemsVenta(clienteFalso, [
         { id_producto: 1, cantidad: 2, precio: 0.01, subtotal: 0.02 }
     ]);
-    assert.deepEqual(items, [{ id_producto: 1, cantidad: 2, precio: 25.5, subtotalCentavos: 5100 }]);
+    assert.deepEqual(items, [{ id_producto: 1, cantidad: 2, id_categoria: 3, precio: 25.5, subtotalCentavos: 5100 }]);
 });
 
 test('calcula en centavos sin errores de redondeo', async () => {
