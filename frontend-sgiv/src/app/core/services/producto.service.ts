@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, of, switchMap } from 'rxjs';
+import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -29,28 +29,13 @@ export class ProductoService {
     });
   }
 
-  // El backend no procesa multipart: la imagen viaja como data URI (base64) en el JSON
-  // y el servidor la guarda en /uploads/productos.
-  crearProducto(datos: any, archivo?: File): Observable<any> {
-    return this.conImagen(datos, archivo).pipe(
-      switchMap(body => this.http.post(`${this.apiUrl}/catalogo/productos`, body))
-    );
+  // foto: data URI ya comprimida (core/utils/imagen.ts); sin foto, el backend conserva la actual
+  crearProducto(datos: any, foto?: string | null): Observable<any> {
+    return this.http.post(`${this.apiUrl}/catalogo/productos`, foto ? { ...datos, url_imagen: foto } : datos);
   }
 
-  actualizarProducto(id: number, datos: any, archivo?: File): Observable<any> {
-    return this.conImagen(datos, archivo).pipe(
-      switchMap(body => this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, body))
-    );
-  }
-
-  private conImagen(datos: any, archivo?: File): Observable<any> {
-    if (!archivo) return of(datos);
-    return new Observable<any>(sub => {
-      const reader = new FileReader();
-      reader.onload  = () => { sub.next({ ...datos, url_imagen: reader.result as string }); sub.complete(); };
-      reader.onerror = () => sub.error(reader.error);
-      reader.readAsDataURL(archivo);
-    });
+  actualizarProducto(id: number, datos: any, foto?: string | null): Observable<any> {
+    return this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, foto ? { ...datos, url_imagen: foto } : datos);
   }
 
   desactivarProducto(id: number): Observable<any> {

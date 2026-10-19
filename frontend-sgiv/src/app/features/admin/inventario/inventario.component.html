@@ -255,8 +255,8 @@
             @else { <lucide-icon [img]="icons.imagen" class="w-6 h-6"></lucide-icon> }
           </div>
           <div>
-            <label class="inf-boton cursor-pointer">
-              {{ previewImagen() ? 'Cambiar foto' : 'Elegir foto' }}
+            <label class="inf-boton cursor-pointer" [class.opacity-60]="procesandoFoto()">
+              {{ procesandoFoto() ? 'Procesando…' : previewImagen() ? 'Cambiar foto' : 'Elegir foto' }}
               <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onArchivoSeleccionado($event)" class="hidden">
             </label>
           </div>

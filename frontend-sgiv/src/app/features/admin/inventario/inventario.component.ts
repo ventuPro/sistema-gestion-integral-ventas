@@ -15,6 +15,7 @@ import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { cifra } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
+import { comprimirImagen } from '../../../core/utils/imagen';
 
 type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
 
@@ -108,7 +109,8 @@ export class InventarioComponent implements OnInit, OnDestroy {
   readonly mostrarModal  = signal(false);
   readonly editandoId    = signal<number | null>(null);
   readonly errorModal    = signal('');
-  private archivoImagen: File | null = null;
+  private fotoNueva: string | null = null;
+  readonly procesandoFoto = signal(false);
   readonly previewImagen = signal<string | null>(null);
   readonly formulario    = signal<any>({
     nombre_producto: '', descripcion_producto: '',
@@ -244,7 +246,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   abrirModalNuevo() {
     this.editandoId.set(null);
     this.errorModal.set('');
-    this.archivoImagen = null;
+    this.fotoNueva = null;
     this.previewImagen.set(null);
     this.formulario.set({
       nombre_producto: '', descripcion_producto: '',
@@ -257,7 +259,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   abrirModalEditar(prod: any) {
     this.editandoId.set(prod.id_producto);
     this.errorModal.set('');
-    this.archivoImagen = null;
+    this.fotoNueva = null;
     this.previewImagen.set(prod.url_imagen || null);
     this.formulario.set({
       nombre_producto:      prod.nombre_producto,
@@ -271,16 +273,21 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
   cerrarModal() { this.mostrarModal.set(false); this.editandoId.set(null); this.errorModal.set(''); this.guardando.set(false); }
 
-  onArchivoSeleccionado(event: any) {
-    const file: File = event.target.files[0];
+  async onArchivoSeleccionado(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
     if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) return this.errorModal.set('La imagen no debe superar 2 MB.');
-
-    this.archivoImagen = file;
-    const reader = new FileReader();
-    reader.onload = (e: any) => this.previewImagen.set(e.target.result);
-    reader.readAsDataURL(file);
+    this.errorModal.set('');
+    this.procesandoFoto.set(true);
+    try {
+      this.fotoNueva = await comprimirImagen(file);
+      this.previewImagen.set(this.fotoNueva);
+    } catch (e: any) {
+      this.errorModal.set(e?.message || 'No se pudo leer la imagen.');
+    } finally {
+      this.procesandoFoto.set(false);
+    }
   }
 
   guardarProducto() {
@@ -303,14 +310,14 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
     if (id) {
       // Editar: solo datos del producto, no el inventario
-      this.productoService.actualizarProducto(id, datos, this.archivoImagen || undefined).subscribe({
+      this.productoService.actualizarProducto(id, datos, this.fotoNueva).subscribe({
         next:  () => { this.cerrarModal(); this.dialogo.avisar('Producto actualizado'); this.cargarProductos(); },
         error: (e: any) => fallo(e, 'No se pudo actualizar el producto.')
       });
     } else {
       // Crear: queda asignado a la sucursal elegida con su stock inicial
       const nuevo = { ...datos, id_sucursal: this.idSucursal(), stock_inicial: f.stock_inicial || 0 };
-      this.productoService.crearProducto(nuevo, this.archivoImagen || undefined).subscribe({
+      this.productoService.crearProducto(nuevo, this.fotoNueva).subscribe({
         next:  () => { this.cerrarModal(); this.dialogo.avisar('Producto creado'); this.cargarProductos(); },
         error: (e: any) => fallo(e, 'No se pudo crear el producto.')
       });

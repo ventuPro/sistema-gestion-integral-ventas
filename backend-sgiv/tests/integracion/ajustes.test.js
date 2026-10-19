@@ -107,16 +107,17 @@ test('apariencia: colores, tema y logo; NULL restaura lo original', async () => 
     const c = r.body.configuracion;
     assert.equal(c.color_primario, '#b45309');
     assert.equal(c.tema, 'oscuro');
-    assert.match(c.url_logo, /^\/uploads\/empresa\/logo_\d+\.png$/);
-    const archivo = path.join(__dirname, '..', '..', c.url_logo);
+    assert.match(c.url_logo, /^\/uploads\/empresa\/logo_\d+_[0-9a-f]+\.png$/);
+    const archivo = path.join(process.env.UPLOADS_DIR, c.url_logo.slice('/uploads/'.length));
     assert.ok(fs.existsSync(archivo));
-    fs.unlinkSync(archivo);
 
     const r2 = await api('PUT', '/ajustes/apariencia', {
         token: tokenAdmin, body: { color_primario: null, color_secundario: null, tema: 'claro', logo: null }
     });
     assert.equal(r2.body.configuracion.color_primario, null);
     assert.equal(r2.body.configuracion.url_logo, null);
+    await new Promise(ok => setTimeout(ok, 100));
+    assert.ok(!fs.existsSync(archivo), 'al quitar el logo se borra el archivo');
 });
 
 test('apariencia inválida se rechaza (color, tema, SVG, imagen grande)', async () => {
@@ -264,8 +265,7 @@ test('parámetros: valores originales, validación y método de pago', async () 
     assert.equal(r.status, 200);
     assert.equal(r.body.configuracion.ticket_ancho, '58');
     assert.equal(r.body.configuracion.moneda_simbolo, '$');
-    assert.match(r.body.configuracion.url_qr_cobro, /^\/uploads\/empresa\/qr-cobro_\d+\.png$/);
-    fs.unlinkSync(path.join(__dirname, '..', '..', r.body.configuracion.url_qr_cobro));
+    assert.match(r.body.configuracion.url_qr_cobro, /^\/uploads\/empresa\/qr-cobro_\d+_[0-9a-f]+\.png$/);
 
     // QR deshabilitado: el cobro por QR se rechaza
     const v = await api('POST', '/caja/cobrar', { token: tokenAdmin, body: { id_sucursal: 1, metodo_pago: 'QR', detalles: [] } });

@@ -246,3 +246,58 @@ describe('Inventario: mesas y menú QR también quedan en el historial', () => {
         ]);
     });
 });
+
+// ─── Fotos de productos: solo imágenes reales, la reemplazada se borra ───
+describe('Fotos de productos', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const archivo = (url) => path.join(process.env.UPLOADS_DIR, url.slice('/uploads/'.length));
+
+    test('rechaza SVG, archivos disfrazados y rutas externas; al cambiar la foto borra la anterior', async () => {
+        const [{ id_categoria }] = await bd.sql(`SELECT min(id_categoria) AS id_categoria FROM categoria_producto`);
+        const base = { nombre_producto: 'Con foto', precio_unitario: 10, id_categoria, id_sucursal: 1 };
+        const svg = 'data:image/svg+xml;base64,' + Buffer.from('<svg onload="alert(1)"/>').toString('base64');
+        const falso = 'data:image/png;base64,' + Buffer.from('<script>alert(1)</script>').toString('base64');
+        for (const url_imagen of [svg, falso])
+            assert.equal((await api('POST', '/catalogo/productos', { token: tAdmin, body: { ...base, url_imagen } })).status, 400);
+
+        const externo = await api('POST', '/catalogo/productos', { token: tAdmin, body: { ...base, url_imagen: 'https://otro.com/x.png' } });
+        assert.equal(externo.body.producto.url_imagen, null);
+
+        const r = await api('POST', '/catalogo/productos', { token: tAdmin, body: { ...base, url_imagen: PNG } });
+        const id = r.body.producto.id_producto, primera = r.body.producto.url_imagen;
+        assert.match(primera, /^\/uploads\/productos\/prod_\d+_[0-9a-f]+\.png$/);
+        assert.ok(fs.existsSync(archivo(primera)));
+
+        const sinCambio = await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: { ...base, precio_unitario: 11 } });
+        assert.equal(sinCambio.body.producto.url_imagen, primera);
+
+        const nueva = (await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: { ...base, url_imagen: PNG } })).body.producto.url_imagen;
+        assert.notEqual(nueva, primera);
+        await new Promise(ok => setTimeout(ok, 100));
+        assert.ok(!fs.existsSync(archivo(primera)), 'la foto reemplazada se borra');
+        assert.ok(fs.existsSync(archivo(nueva)));
+
+        const img = await fetch(`${URL_BASE}${nueva}`);
+        assert.equal(img.status, 200);
+        assert.match(img.headers.get('cache-control'), /max-age=31536000.*immutable/);
+        assert.equal((await api('PUT', '/catalogo/productos/999999', { token: tAdmin, body: base })).status, 404);
+    });
+
+    test('al arrancar se borran las fotos que nadie usa', async () => {
+        const { limpiarHuerfanas } = require('../../src/utils/imagenes');
+        const dir = path.join(process.env.UPLOADS_DIR, 'productos');
+        const vieja = path.join(dir, 'prod_huerfana.png'), reciente = path.join(dir, 'prod_reciente.png');
+        fs.writeFileSync(vieja, 'x'); fs.writeFileSync(reciente, 'x');
+        const hace2h = new Date(Date.now() - 2 * 3600 * 1000);
+        fs.utimesSync(vieja, hace2h, hace2h);
+        const usadas = (await bd.sql(`SELECT url_imagen FROM producto WHERE url_imagen IS NOT NULL`)).map(x => archivo(x.url_imagen));
+        for (const u of usadas) fs.utimesSync(u, hace2h, hace2h);
+
+        assert.equal(await limpiarHuerfanas(pool), 1);
+        assert.ok(!fs.existsSync(vieja));
+        assert.ok(fs.existsSync(reciente), 'las recientes se dejan (pueden estar guardándose)');
+        for (const u of usadas) assert.ok(fs.existsSync(u), 'las que usa un producto se quedan');
+    });
+});

@@ -44,6 +44,7 @@ const crearBdPrueba = async () => {
     process.env.AUDIT_DB_NAME_REAL = process.env.AUDIT_DB_NAME || '';
     process.env.DB_NAME            = nombre;
     process.env.AUDIT_DB_NAME      = `${nombre}_aud`;
+    process.env.UPLOADS_DIR        = path.join(require('os').tmpdir(), `${nombre}_uploads`);
     await instalarAuditoria();
 
     const aud = new Client(conexion(process.env.AUDIT_DB_NAME));
@@ -60,6 +61,7 @@ const crearBdPrueba = async () => {
             process.env.AUDIT_DB_NAME = process.env.AUDIT_DB_NAME_REAL;
             await conAdmin(a => a.query(`DROP DATABASE IF EXISTS ${nombre} WITH (FORCE)`));
             await conAdmin(a => a.query(`DROP DATABASE IF EXISTS ${nombre}_aud WITH (FORCE)`));
+            fs.rmSync(process.env.UPLOADS_DIR, { recursive: true, force: true });
         }
     };
 };

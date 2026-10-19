@@ -59,6 +59,10 @@ const reactivarProducto = async (id) =>
 
 const eliminarProducto = desactivarProducto;
 
+/** Ruta de la foto actual (null = sin foto; undefined = el producto no existe) */
+const urlImagen = async (id) =>
+    (await db.query('SELECT url_imagen FROM producto WHERE id_producto = $1', [id])).rows[0]?.url_imagen;
+
 const actualizarProducto = async (id, { id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen }) => {
     const vals  = [id_categoria, nombre_producto, descripcion_producto, precio_unitario, id];
     let   query = `UPDATE producto
@@ -97,5 +101,6 @@ module.exports = {
     desactivarProducto,
     reactivarProducto,
     actualizarProducto,
+    urlImagen,
     asignarProductoASucursal
 };

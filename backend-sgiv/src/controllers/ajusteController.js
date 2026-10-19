@@ -1,5 +1,5 @@
 const ajusteModel = require('../models/ajusteModel');
-const { guardarImagen } = require('../middlewares/uploadMiddleware');
+const { guardarImagen, borrarImagen } = require('../utils/imagenes');
 const groq = require('../ia/groq');
 
 // ─── Reglas de validación ───
@@ -174,7 +174,10 @@ const avisarCambio = async () => {
 const guardar = (validar, permitidos) => async (req, res) => {
     try {
         const datos = await validar(req.body || {});
+        const antes = await ajusteModel.obtener();
         const config = await ajusteModel.actualizar(datos, permitidos);
+        for (const campo of ['url_logo', 'url_favicon', 'url_qr_cobro'])
+            if (campo in datos && antes[campo] !== config[campo]) borrarImagen(antes[campo]);
         await avisarCambio();
         res.json({ mensaje: 'Ajustes guardados', configuracion: config });
     } catch (e) {

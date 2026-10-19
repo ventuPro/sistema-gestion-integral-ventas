@@ -34,7 +34,7 @@ Al cerrar ya no puedes registrar ventas ni atender mesas hasta que el administra
 
     inventario: { modulo: 'inventario', titulo: 'Inventario', resumen: '«Nuevo producto», «Nueva categoría»; para cambiar stock: botón «Movimiento» en la fila del producto → «Entrada» (suma la cantidad) o «Merma o salida» (la resta) con motivo; historial en la pestaña «Movimientos». El stock no se edita directamente.', texto: `
 Menú lateral → «Inventario». Pestaña «Productos»: lista con precio, stock y estado; filtros por categoría y búsqueda; indicadores de stock bajo y sin stock.
-«Nuevo producto»: nombre, descripción (opcional), categoría, precio, imagen (JPG, PNG o WEBP, máximo 2 MB) y «Stock inicial»; después se suman unidades con «Movimiento». «Nueva categoría» crea categorías.
+«Nuevo producto»: nombre, descripción (opcional), categoría, precio, foto con «Elegir foto» (JPG, PNG o WEBP; se achica sola para que cargue rápido en el menú QR; al cambiarla, la anterior se borra) y «Stock inicial»; después se suman unidades con «Movimiento». «Nueva categoría» crea categorías.
 «Movimiento» (botón en la fila de cada producto): registra una «Entrada» (suma al stock: compra, producción, devolución…) o una «Merma o salida» (resta: vencido, dañado, consumo interno…); escribe la cantidad y elige el motivo; muestra el stock en que queda. La cantidad se suma o se resta: para dejar el stock en un número exacto, registra la diferencia con el stock actual. Una salida nunca puede dejar el stock en negativo.
 Pestaña «Movimientos»: historial de todo cambio de stock (ventas, mesas, pedidos QR, entradas y mermas) con fecha, usuario, motivo y saldo; filtros Hoy / 7 días / 30 días y Entradas / Salidas.
 El cajero solo ve y mueve el stock de su sucursal.` },

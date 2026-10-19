@@ -74,6 +74,17 @@ docker-compose up --build
 
 > La primera vez tarda más porque descarga las imágenes y compila Angular.
 
+#### Respaldo (base de datos + fotos)
+Las fotos de productos y el logo no están en la base de datos: viven en el volumen `sgiv_uploads_data`
+(sin Docker, en `backend-sgiv/uploads`). Se respaldan las dos cosas juntas:
+
+```bash
+docker exec sgiv_db pg_dump -U sgiv_user -Fc sgiv_db > respaldo_bd.backup
+docker run --rm -v sgiv_uploads_data:/datos -v "$(pwd)":/respaldo alpine tar czf /respaldo/respaldo_fotos.tar.gz -C /datos .
+```
+
+Para restaurar las fotos: `docker run --rm -v sgiv_uploads_data:/datos -v "$(pwd)":/respaldo alpine tar xzf /respaldo/respaldo_fotos.tar.gz -C /datos`.
+
 ---
 ### Opción B — Sin Docker
 - Node.js v20+

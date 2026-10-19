@@ -1,8 +1,18 @@
 const m = require('../models/productoModel');
-const { guardarBase64ComoArchivo } = require('../middlewares/uploadMiddleware');
+const { guardarImagen, borrarImagen } = require('../utils/imagenes');
 const { emitirCatalogo } = require('../utils/tiempoReal');
 const db = require('../config/db');
 const { registrarHistorial } = require('../models/inventarioModel');
+
+// Fotos de productos: el navegador ya las comprime (WebP, 800 px); el tope es por si llegan de otro cliente
+const FOTO = { carpeta: 'productos', prefijo: 'prod', maxBytes: 1024 * 1024, formatos: ['png', 'jpg', 'webp'] };
+
+/** Guarda la foto nueva si viene como data URI; undefined = no cambia. Error de validación → 400 */
+const fotoNueva = (url_imagen) => {
+    if (!String(url_imagen || '').startsWith('data:')) return undefined;
+    try { return guardarImagen(url_imagen, FOTO); }
+    catch (e) { e.status = 400; throw e; }
+};
 
 const agregarCategoria  = async (req, res) => {
     try {
@@ -63,21 +73,14 @@ const listarProductos   = async (req, res) => {
 
 // Crear producto Y asignarlo a la sucursal seleccionada
 const agregarProducto   = async (req, res) => {
+    let url_imagen = null;
     try {
         const {
             id_categoria, nombre_producto, descripcion_producto,
             precio_unitario, id_sucursal, stock_inicial
         } = req.body;
 
-        // Resolver imagen
-        let url_imagen = null;
-        if (req.file) {
-            url_imagen = `/uploads/productos/${req.file.filename}`;
-        } else if (req.body.url_imagen?.startsWith('data:')) {
-            url_imagen = guardarBase64ComoArchivo(req.body.url_imagen);
-        } else if (req.body.url_imagen) {
-            url_imagen = req.body.url_imagen;
-        }
+        url_imagen = fotoNueva(req.body.url_imagen) ?? null;
 
         // 1. Crear el producto en el catálogo global
         const prod = await m.crearProducto({
@@ -99,6 +102,8 @@ const agregarProducto   = async (req, res) => {
         emitirCatalogo();
         res.status(201).json({ producto: prod });
     } catch(e) {
+        if (e.status === 400) return res.status(400).json({ error: e.message });
+        borrarImagen(url_imagen);
         console.error('agregarProducto:', e);
         res.status(500).json({ error: e.message });
     }
@@ -106,22 +111,24 @@ const agregarProducto   = async (req, res) => {
 
 // Actualizar producto
 const actualizarProducto = async (req, res) => {
+    let url_imagen;
     try {
         const { id_categoria, nombre_producto, descripcion_producto, precio_unitario } = req.body;
+        const anterior = await m.urlImagen(req.params.id);
+        if (anterior === undefined) return res.status(404).json({ error: 'Producto no encontrado' });
 
-        let url_imagen = req.body.url_imagen || null;
-        if (req.file) {
-            url_imagen = `/uploads/productos/${req.file.filename}`;
-        } else if (req.body.url_imagen?.startsWith('data:')) {
-            url_imagen = guardarBase64ComoArchivo(req.body.url_imagen);
-        }
-
+        url_imagen = fotoNueva(req.body.url_imagen);
         const prod = await m.actualizarProducto(req.params.id, {
             id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen
         });
+        if (url_imagen) borrarImagen(anterior);
         emitirCatalogo();
         res.json({ producto: prod });
-    } catch(e) { res.status(500).json({ error: e.message }); }
+    } catch(e) {
+        if (e.status === 400) return res.status(400).json({ error: e.message });
+        borrarImagen(url_imagen);
+        res.status(500).json({ error: e.message });
+    }
 };
 
 const eliminarProducto  = async (req, res) => {

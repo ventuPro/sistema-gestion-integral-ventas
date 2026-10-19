@@ -10,6 +10,7 @@ const { origenPermitido, leerToken, verificarJWT } = require('./config/seguridad
 const { registrarAcceso } = require('./auditoria/registroAcceso');
 const { instalarAuditoria } = require('./auditoria/instalar');
 const { aplicarMigraciones } = require('./config/migraciones');
+const imagenes = require('./utils/imagenes');
 
 const userRoutes      = require('./routes/userRoutes');
 const productoRoutes  = require('./routes/productoRoutes');
@@ -61,8 +62,11 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // Auditoría: cada petición a la API queda registrada en la BD de auditoría
 app.use('/api', registrarAcceso);
 
-// Imágenes de productos guardadas por uploadMiddleware
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// Imágenes subidas (utils/imagenes.js): nombre único por archivo → el navegador las guarda 1 año
+app.use('/uploads', express.static(imagenes.RAIZ, {
+    maxAge: '365d', immutable: true, index: false,
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff')
+}));
 
 // Rutas
 app.use('/api/usuarios',   userRoutes);
@@ -132,6 +136,9 @@ if (require.main === module) {
                 console.log(`🚀 Servidor + WebSocket corriendo en puerto ${PORT}`);
             });
             require('./controllers/pedidoController').iniciarExpiracion();
+            imagenes.limpiarHuerfanas(require('./config/db'))
+                .then(n => n && console.log(`🧹 ${n} imágenes sin uso borradas`))
+                .catch(e => console.error('Limpieza de imágenes:', e.message));
         })
         .catch(e => {
             console.error('❌ No se pudo preparar la base de datos o la auditoría:', e.message);
