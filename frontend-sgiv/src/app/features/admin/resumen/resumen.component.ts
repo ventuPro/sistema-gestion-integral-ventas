@@ -10,6 +10,7 @@ import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { cifra, entero, variacion, porcentaje, fechaLarga, fechaCorta, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
 import { sondeo } from '../../../core/utils/sondeo';
+import { SesionService } from '../../../core/services/sesion.service';
 
 @Component({
   selector: 'app-resumen',
@@ -19,6 +20,7 @@ import { sondeo } from '../../../core/utils/sondeo';
   styleUrls: ['../../shared/informe/informe.css', './resumen.component.css']
 })
 export class ResumenComponent implements OnInit, OnDestroy {
+  private readonly sesion = inject(SesionService);
   private reporteService  = inject(ReporteService);
   private sucursalService = inject(SucursalService);
   private productoService = inject(ProductoService);
@@ -37,7 +39,7 @@ export class ResumenComponent implements OnInit, OnDestroy {
 
   readonly cargando    = signal(true);
   readonly refrescando = signal(false);
-  esAdmin              = false;
+  readonly esAdmin = this.sesion.esAdmin;
   readonly datos       = signal<any>(null);
   readonly actualizado = signal<Date | null>(null);
   readonly hoyTexto = fechaLarga(new Date());
@@ -67,11 +69,7 @@ export class ResumenComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    try {
-      const u = JSON.parse(localStorage.getItem('usuario_sgiv') || 'null');
-      this.esAdmin = u?.id_rol === 1;
-      this.sucursalActual.set(u?.id_sucursal || 1);
-    } catch { }
+    this.sucursalActual.set(this.sesion.idSucursal());
 
     this.sucursalService.listarSucursales().subscribe({
       next: (s: any[]) => this.sucursales.set(s || [])

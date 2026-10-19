@@ -12,6 +12,7 @@ import { cifra } from '../../../../core/utils/informe';
 import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User } from 'lucide-angular';
 import { DialogoService } from '../../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
+import { SesionService } from '../../../../core/services/sesion.service';
 
 /** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
 export interface GrupoCuenta {
@@ -36,6 +37,7 @@ const totalPendiente = (items: any[]) =>
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css', './mesa-modal.component.css']
 })
 export class MesaModalComponent implements OnInit, OnDestroy {
+  private readonly sesion = inject(SesionService);
   @Input()  mesa:             any = null;
   @Output() cerrado           = new EventEmitter<void>();
   @Output() mesaActualizada   = new EventEmitter<void>();
@@ -53,7 +55,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User
   };
 
-  esAdmin = false;
+  readonly esAdmin = this.sesion.esAdmin;
   readonly cargando     = signal(false);
   readonly cuentaActiva = signal<any>(null);
   readonly vista        = signal<'info' | 'comanda' | 'pago' | 'qr' | 'ticket'>('info');
@@ -122,8 +124,6 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   private subs: Subscription[] = [];
 
   ngOnInit() {
-    const usr = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
-    this.esAdmin = usr.id_rol === 1;
     this.cargarEstadoMesa();
     this.cargarProductos();
     this.escucharSocket();
@@ -166,7 +166,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   async forzarReset() {
-    if (!this.esAdmin) { this.dialogo.error('Solo el administrador puede resetear una mesa.'); return; }
+    if (!this.esAdmin()) { this.dialogo.error('Solo el administrador puede resetear una mesa.'); return; }
     const si = await this.dialogo.confirmar({
       titulo: `¿Resetear la Mesa ${this.mesa.numero_mesa}?`,
       mensaje: 'Se cancela la cuenta actual, el stock reservado vuelve al inventario y la mesa queda libre.',

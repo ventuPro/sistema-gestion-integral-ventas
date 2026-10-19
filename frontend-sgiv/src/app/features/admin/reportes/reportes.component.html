@@ -7,7 +7,7 @@
       <h1 class="inf-titulo">Informes</h1>
     </div>
     <app-selector-sucursal [sucursales]="sucursales()" [seleccionada]="sucursalSeleccionada()"
-                           [todas]="esAdmin" [soloLectura]="!esAdmin"
+                           [todas]="esAdmin()" [soloLectura]="!esAdmin()"
                            (cambio)="cambiarSucursal($event)" />
   </header>
 

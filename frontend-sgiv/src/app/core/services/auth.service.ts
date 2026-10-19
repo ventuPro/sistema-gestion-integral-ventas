@@ -1,13 +1,15 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { SesionService } from './sesion.service';
 
 // La sesión viaja en una cookie httpOnly que pone el backend: JavaScript no la ve.
 // En localStorage solo quedan los datos visibles del usuario (nombre, rol, sucursal).
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private apiUrl = environment.apiUrl;
+  private sesion = inject(SesionService);
   constructor(private http: HttpClient) {
     try { localStorage.removeItem('token_sgiv'); } catch { }   // token de la versión anterior
   }
@@ -21,7 +23,7 @@ export class AuthService {
   }
 
   estaLogueado(): boolean {
-    try { return !!localStorage.getItem('usuario_sgiv'); } catch { return false; }
+    return !!this.sesion.usuario();
   }
 
   /** avisarServidor: borra la cookie y deja constancia del cierre (una sesión vencida ya la borró el backend). */
@@ -29,7 +31,7 @@ export class AuthService {
     if (avisarServidor) {
       this.http.post(`${this.apiUrl}/usuarios/logout`, {}).subscribe({ error: () => {} });
     }
-    localStorage.removeItem('usuario_sgiv');
-    localStorage.removeItem('permisos_sgiv');
+    this.sesion.cerrar();
+    try { localStorage.removeItem('permisos_sgiv'); } catch { }
   }
 }

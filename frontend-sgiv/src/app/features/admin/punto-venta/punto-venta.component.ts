@@ -18,6 +18,7 @@ import { sondeo } from '../../../core/utils/sondeo';
 import { cifra, fechaLarga } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../core/utils/metodos-pago';
+import { SesionService } from '../../../core/services/sesion.service';
 
 @Component({
   selector: 'app-punto-venta',
@@ -27,6 +28,7 @@ import { METODO_PAGO, MetodoPago } from '../../../core/utils/metodos-pago';
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './punto-venta.component.css']
 })
 export class PuntoVentaComponent implements OnInit, OnDestroy {
+  private readonly sesion = inject(SesionService);
   private productoService = inject(ProductoService);
   private dialogo = inject(DialogoService);
   private cajaService     = inject(CajaService);
@@ -61,7 +63,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly verificandoCaja = signal(true);
   readonly estadoCaja      = signal<EstadoCajaCompleto['estado']>('SIN_APERTURA');
   readonly puedeVender     = signal(false);
-  usuarioActual: any = null;
 
   // ─── Turno ───
   readonly turnoActivo       = signal<any>(null);
@@ -127,8 +128,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit() {
-    const raw = localStorage.getItem('usuario_sgiv');
-    this.usuarioActual = raw ? JSON.parse(raw) : null;
     this.verificarAccesoCaja();
     this.suscribirStockGlobal();
   }
@@ -142,7 +141,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.socketService.conectar('cajeros');
     this.stockSub = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(payload => {
       if (!payload) return;
-      const idSuc = Number(this.usuarioActual?.id_sucursal) || 1;
+      const idSuc = this.sesion.idSucursal();
       if (Number(payload.id_sucursal) !== idSuc) return;
 
       const idProd = Number(payload.id_producto);
@@ -158,7 +157,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.verificandoCaja.set(true);
 
     // Admin: acceso libre (no opera caja)
-    if (this.usuarioActual?.id_rol === 1) {
+    if (this.sesion.esAdmin()) {
       this.estadoCaja.set('ABIERTA');
       this.puedeVender.set(true);
       this.verificandoCaja.set(false);
@@ -184,12 +183,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.turnoActivo.set(res.turno);
     this.verificandoCaja.set(false);
 
-    // Sincronizar localStorage para que otros componentes vean el flag
-    if (this.usuarioActual) {
-      this.usuarioActual.caja_habilitada = res.caja_habilitada;
-      localStorage.setItem('usuario_sgiv', JSON.stringify(this.usuarioActual));
-    }
-
     if (res.estado === 'ABIERTA') {
       this.mostrarAbrirTurno.set(false);
       this.cargarCatalogo();
@@ -210,7 +203,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.detenerSondeo?.();
     // Cada 30s reverificar — si el admin cierra desde Usuarios, bloqueamos rápido
     this.detenerSondeo = sondeo(() => {
-      if (this.usuarioActual?.id_rol === 1) return;
+      if (this.sesion.esAdmin()) return;
       this.cajaService.obtenerEstadoCompleto().subscribe({
         next: (res) => {
           if (res.estado !== this.estadoCaja()) this.aplicarEstado(res);
@@ -226,7 +219,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.errorTurno.set('');
 
     this.cajaService.abrirTurno({
-      id_sucursal:   this.usuarioActual?.id_sucursal || 1,
+      id_sucursal:   this.sesion.idSucursal(),
       monto_inicial: this.montoInicial()
     }).subscribe({
       next: (res) => {
@@ -235,10 +228,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
         this.puedeVender.set(true);
         this.mostrarAbrirTurno.set(false);
         this.abriendoTurno.set(false);
-        if (this.usuarioActual) {
-          this.usuarioActual.caja_habilitada = true;
-          localStorage.setItem('usuario_sgiv', JSON.stringify(this.usuarioActual));
-        }
         this.cargarCatalogo();
         this.cargarVentasHoy();
         this.iniciarPollEstado();
@@ -253,7 +242,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   // ─── CATÁLOGO ───
   cargarCatalogo() {
     this.cargando.set(true);
-    const id_sucursal = this.usuarioActual?.id_sucursal || 1;
+    const id_sucursal = this.sesion.idSucursal();
 
     this.productoService.obtenerInventario(id_sucursal).subscribe({
       next: (datos: any[]) => {
@@ -338,7 +327,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.cargando.set(true);
 
     const datosVenta = {
-      id_sucursal:       this.usuarioActual?.id_sucursal || 1,
+      id_sucursal:       this.sesion.idSucursal(),
       id_cliente:        null,
       id_pedido_mesa:    null,
       monto_total_venta: this.total(),
@@ -402,7 +391,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   // ─── HISTORIAL VENTAS DEL DÍA ───
   cargarVentasHoy() {
     this.cargandoVentas.set(true);
-    const id_sucursal   = this.usuarioActual?.id_sucursal || 1;
+    const id_sucursal   = this.sesion.idSucursal();
 
     this.cajaService.obtenerVentasHoy(id_sucursal).subscribe({
       next: (v: any[]) => {

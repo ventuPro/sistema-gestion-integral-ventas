@@ -45,7 +45,7 @@
           </nav>
         }
         <div class="flex items-center gap-1 pb-2.5">
-          @if (esAdmin && (cuentaActiva() || mesa?.estado_mesa === 'Ocupada')) {
+          @if (esAdmin() && (cuentaActiva() || mesa?.estado_mesa === 'Ocupada')) {
             <button class="inf-boton inf-baja py-1!" (click)="forzarReset()" title="Cancela la cuenta y libera la mesa">Reiniciar mesa</button>
           }
           <button class="quitar" (click)="cerrarModal()" aria-label="Cerrar">

@@ -7,6 +7,7 @@ import { SocketService } from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { sondeo } from '../../../core/utils/sondeo';
+import { SesionService } from '../../../core/services/sesion.service';
 
 type Pestana = 'pendientes' | 'entregar';
 
@@ -23,6 +24,7 @@ const sinClave = <T>(o: Record<number, T>, clave: number): Record<number, T> => 
   templateUrl: './bandeja-pedidos.component.html'
 })
 export class BandejaPedidosComponent implements OnInit, OnDestroy {
+  private readonly sesion = inject(SesionService);
   private pedidoService = inject(PedidoService);
   private dialogo        = inject(DialogoService);
   private socketService = inject(SocketService);
@@ -48,7 +50,6 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   readonly sonidoActivo = signal(true);
   readonly ahora = signal(Date.now());
 
-  private idSucursal = 1;
   private subs: Subscription[] = [];
   private timers: any[] = [];
   private detenerSondeo?: () => void;
@@ -58,7 +59,6 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     try {
-      this.idSucursal   = Number(JSON.parse(localStorage.getItem('usuario_sgiv') || '{}').id_sucursal) || 1;
       this.sonidoActivo.set(localStorage.getItem(this.CLAVE_SONIDO) !== 'no');
     } catch { /* valores por defecto */ }
 
@@ -94,7 +94,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   }
 
   private esDeMiSucursal(d: any): boolean {
-    return !d?.id_sucursal || Number(d.id_sucursal) === this.idSucursal;
+    return !d?.id_sucursal || Number(d.id_sucursal) === this.sesion.idSucursal();
   }
 
   // ─── Carga ───

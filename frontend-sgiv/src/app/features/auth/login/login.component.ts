@@ -6,6 +6,7 @@ import { LucideAngularModule, RefreshCw, Eye, EyeOff } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { SesionService } from '../../../core/services/sesion.service';
 
 // ─── Login: correo, contraseña y CAPTCHA ───
 @Component({
@@ -34,6 +35,7 @@ export class LoginComponent implements OnInit {
   private authService    = inject(AuthService);
   private permisoService = inject(PermisoService);
   private router         = inject(Router);
+  private sesion         = inject(SesionService);
   private route          = inject(ActivatedRoute);
   readonly ajustes       = inject(AjustesService);
 
@@ -96,13 +98,7 @@ export class LoginComponent implements OnInit {
   }
 
   private completarSesion(res: any) {
-    localStorage.setItem('usuario_sgiv', JSON.stringify({
-      id_usuario:      res.usuario.id_usuario,
-      nombre_completo: res.usuario.nombre_completo,
-      id_rol:          res.usuario.id_rol,
-      id_sucursal:     res.usuario.id_sucursal,
-      nombre_sucursal: res.usuario.nombre_sucursal
-    }));
+    this.sesion.iniciar(res.usuario);
 
     // Cargar permisos antes de redirigir (si falla, igual se redirige)
     const ir = () => { this.cargando.set(false); this.router.navigate(['/dashboard']); };

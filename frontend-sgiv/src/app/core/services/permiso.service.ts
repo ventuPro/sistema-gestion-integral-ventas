@@ -1,8 +1,9 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, Subscription, merge } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SocketService } from './socket.service';
+import { ROL, SesionService } from './sesion.service';
 
 export const MODULOS = [
   { key: 'dashboard',   label: 'Panel Principal' },
@@ -15,9 +16,8 @@ export const MODULOS = [
 ];
 
 const DEFAULTS: Record<number, Record<string, boolean>> = {
-  1: { dashboard:true,  inventario:true,  punto_venta:true,  mesas:true,  arqueo:true,  reportes:true,  usuarios:true  },
-  2: { dashboard:true,  inventario:false, punto_venta:true,  mesas:true,  arqueo:true,  reportes:false, usuarios:false },
-  3: { dashboard:false, inventario:false, punto_venta:false, mesas:false, arqueo:false, reportes:false, usuarios:false }
+  [ROL.administrador]: { dashboard:true,  inventario:true,  punto_venta:true,  mesas:true,  arqueo:true,  reportes:true,  usuarios:true  },
+  [ROL.cajero]:        { dashboard:true,  inventario:false, punto_venta:true,  mesas:true,  arqueo:true,  reportes:false, usuarios:false }
 };
 
 @Injectable({ providedIn: 'root' })
@@ -32,11 +32,10 @@ export class PermisoService {
 
   constructor(private http: HttpClient, private socket: SocketService) {}
 
+  private sesion = inject(SesionService);
+
   private getRolActual(): number {
-    try {
-      const raw = localStorage.getItem('usuario_sgiv');
-      return raw ? Number(JSON.parse(raw).id_rol) : 0;
-    } catch { return 0; }
+    return this.sesion.usuario()?.id_rol ?? 0;
   }
 
   private getDefaults(): Record<string, boolean> {
@@ -110,7 +109,7 @@ export class PermisoService {
   // ─── Cambios en vivo ───
   // Se recargan solo cuando el admin los cambia o al (re)entrar a la sala. El admin no lo necesita.
   escucharCambios() {
-    if (this.getRolActual() === 1 || this.subCambios) return;
+    if (this.getRolActual() === ROL.administrador || this.subCambios) return;
     this.socket.conectar('cajeros');
     this.subCambios = merge(
       this.socket.escuchar('permisos:actualizados'),

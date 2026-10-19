@@ -14,6 +14,7 @@ import { LucideAngularModule,
 import { sondeo } from '../../../core/utils/sondeo';
 import { cifra, fechaLarga } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
+import { SesionService } from '../../../core/services/sesion.service';
 
 @Component({
   selector: 'app-mesas',
@@ -23,6 +24,7 @@ import { DialogoService } from '../../../core/services/dialogo.service';
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './mesas.component.css']
 })
 export class MesasComponent implements OnInit, OnDestroy {
+  private readonly sesion = inject(SesionService);
   private cuentaService = inject(CuentaService);
   private dialogo = inject(DialogoService);
   private cajaService   = inject(CajaService);
@@ -51,8 +53,7 @@ export class MesasComponent implements OnInit, OnDestroy {
   readonly cajaHabilitada  = signal(false);
   readonly estadoCaja      = signal<EstadoCajaCompleto['estado']>('SIN_APERTURA');
   readonly turnoCajero     = signal<any>(null);
-  usuarioActual: any = null;
-  esAdmin            = false;
+  readonly esAdmin = this.sesion.esAdmin;
 
   // ─── Estado ───
   readonly mesas    = signal<any[]>([]);
@@ -80,10 +81,6 @@ export class MesasComponent implements OnInit, OnDestroy {
   private subs: Subscription[] = [];
 
   ngOnInit() {
-    const raw = localStorage.getItem('usuario_sgiv');
-    this.usuarioActual = raw ? JSON.parse(raw) : null;
-    this.esAdmin       = this.usuarioActual?.id_rol === 1;
-
     this.verificarAccesoCaja();
   }
 
@@ -96,7 +93,7 @@ export class MesasComponent implements OnInit, OnDestroy {
   // ─── VERIFICAR ACCESO (usa el estado real del turno) ───
   verificarAccesoCaja() {
     // Admin siempre tiene acceso
-    if (this.esAdmin) {
+    if (this.esAdmin()) {
       this.cajaHabilitada.set(true);
       this.estadoCaja.set('ABIERTA');
       this.verificandoCaja.set(false);
@@ -110,12 +107,6 @@ export class MesasComponent implements OnInit, OnDestroy {
         this.cajaHabilitada.set(res.puede_vender);
         this.turnoCajero.set(res.turno);
         this.verificandoCaja.set(false);
-
-        // Sincronizar localStorage
-        if (this.usuarioActual) {
-          this.usuarioActual.caja_habilitada = res.caja_habilitada;
-          localStorage.setItem('usuario_sgiv', JSON.stringify(this.usuarioActual));
-        }
 
         if (res.puede_vender) this.inicializar();
         else this.cargando.set(false);
@@ -160,7 +151,7 @@ export class MesasComponent implements OnInit, OnDestroy {
 
   // ─── CARGA DE DATOS ───
   cargarMesas() {
-    const id_sucursal = this.usuarioActual?.id_sucursal || 1;
+    const id_sucursal = this.sesion.idSucursal();
     this.cuentaService.getMesasConCuenta(id_sucursal).subscribe({
       next: (m) => { this.mesas.set(m); this.cargando.set(false); },
       error: ()  => { this.cargando.set(false); }
@@ -195,7 +186,7 @@ export class MesasComponent implements OnInit, OnDestroy {
   crearMesa() {
     const numero = this.nuevaMesaNum();
     if (!numero || isNaN(+numero)) return this.errorMesa.set('Número inválido');
-    const id_sucursal = this.usuarioActual?.id_sucursal || 1;
+    const id_sucursal = this.sesion.idSucursal();
     this.mesaService.crearMesa({ id_sucursal, numero_mesa: +numero }).subscribe({
       next: () => { this.cerrarModalMesa(); this.cargarMesas(); },
       error: (e: any) => this.errorMesa.set(e?.error?.error || 'Error al crear la mesa')
@@ -260,7 +251,7 @@ export class MesasComponent implements OnInit, OnDestroy {
     if (!this.mesas().length) return this.codigosQR.set([]);
     this.generandoQR.set(true);
     this.errorQR.set('');
-    this.mesaService.obtenerQRSucursal(this.usuarioActual?.id_sucursal || 1, base).subscribe({
+    this.mesaService.obtenerQRSucursal(this.sesion.idSucursal(), base).subscribe({
       next: (codigos) => {
         this.codigosQR.set(codigos);
         this.generandoQR.set(false);

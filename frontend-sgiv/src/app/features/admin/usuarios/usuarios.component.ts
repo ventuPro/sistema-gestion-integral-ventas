@@ -10,6 +10,7 @@ import { LucideAngularModule,
          Pencil, KeyRound, ShieldCheck, Lock, Unlock,
          UserCheck, UserX, X, Plus, Search } from 'lucide-angular';
 import { DialogoService } from '../../../core/services/dialogo.service';
+import { SesionService, ROL } from '../../../core/services/sesion.service';
 
 interface Confirmacion {
   titulo:  string;
@@ -29,6 +30,7 @@ interface Confirmacion {
               '../../shared/formulario/formulario.css', './usuarios.component.css']
 })
 export class UsuariosComponent implements OnInit {
+  private readonly sesion = inject(SesionService);
   private usuarioService = inject(UsuarioService);
   private dialogo        = inject(DialogoService);
   private permisoService = inject(PermisoService);
@@ -47,7 +49,7 @@ export class UsuariosComponent implements OnInit {
     search:      Search
   };
 
-  private idActual = Number(JSON.parse(localStorage.getItem('usuario_sgiv') || 'null')?.id_usuario) || 0;
+  readonly ROL = ROL;
 
   readonly listaUsuarios   = signal<any[]>([]);
   readonly listaRoles      = signal<any[]>([]);
@@ -59,10 +61,10 @@ export class UsuariosComponent implements OnInit {
 
   readonly resumen = computed(() => {
     const activos = this.listaUsuarios().filter(u => u.estado_activo);
-    const cajeros = activos.filter(u => +u.id_rol === 2);
+    const cajeros = activos.filter(u => +u.id_rol === ROL.cajero);
     return {
       activos:       activos.length,
-      admins:        activos.filter(u => +u.id_rol === 1).length,
+      admins:        activos.filter(u => +u.id_rol === ROL.administrador).length,
       cajeros:       cajeros.length,
       cajasAbiertas: cajeros.filter(u => u.caja_habilitada).length
     };
@@ -118,7 +120,7 @@ export class UsuariosComponent implements OnInit {
     });
   }
 
-  esYo(usr: any): boolean { return Number(usr.id_usuario) === this.idActual; }
+  esYo(usr: any): boolean { return Number(usr.id_usuario) === this.sesion.usuario()?.id_usuario; }
 
   // ─── Modal CRUD ───
   abrirModalNuevo() {

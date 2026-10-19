@@ -17,6 +17,7 @@ import { environment } from '../../../../environments/environment';
 import { componenteDiferido } from '../../../core/utils/diferido';
 import type { MensajeChat } from '../../shared/asistente/asistente-chat.component';
 import { DialogoService } from '../../../core/services/dialogo.service';
+import { SesionService } from '../../../core/services/sesion.service';
 
 interface Enlace { ruta: string; texto: string; icono: any; modulo?: string }
 
@@ -28,6 +29,7 @@ interface Enlace { ruta: string; texto: string; icono: any; modulo?: string }
   styleUrl: './dashboard.component.css'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
+  private readonly sesion = inject(SesionService);
   private router         = inject(Router);
   private dialogo        = inject(DialogoService);
   private permisoService = inject(PermisoService);
@@ -42,10 +44,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly preguntarAsistente = (mensajes: MensajeChat[]) =>
     this.http.post<{ respuesta: string }>(`${environment.apiUrl}/asistente`, { mensajes });
 
-  usuario:        any  = null;
-  esAdmin         = false;
-  esCajero        = false;
-  nombreSucursal  = '';
+  readonly usuario        = this.sesion.usuario;
+  readonly esAdmin        = this.sesion.esAdmin;
+  readonly esCajero       = this.sesion.esCajero;
+  readonly nombreSucursal = computed(() => this.usuario()?.nombre_sucursal || '');
+  readonly saludoAsistente = computed(() => {
+    const nombre = this.usuario()?.nombre_completo?.split(' ')[0];
+    return `¡Hola${nombre ? ', ' + nombre : ''}! Pregúntame por ventas, stock, pedidos o cómo hacer algo en el sistema.`;
+  });
 
   /** Cache reactivo de permisos — se actualiza con permisos$ del service */
   readonly permisosActuales   = signal<Record<string, boolean>>({});
@@ -57,7 +63,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   /** Menú lateral abierto (solo en celular y tablet) */
   readonly menuAbierto = signal(false);
   readonly bandeja = viewChild(BandejaPedidosComponent);
-  secciones: { titulo: string; enlaces: Enlace[] }[] = [];
+  readonly secciones = computed(() => this.armarMenu());
 
   // Iconos
   readonly icons = {
@@ -79,15 +85,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   };
 
   ngOnInit() {
-    const raw = localStorage.getItem('usuario_sgiv');
-    if (raw) {
-      this.usuario       = JSON.parse(raw);
-      this.esAdmin       = this.usuario.id_rol === 1;
-      this.esCajero      = this.usuario.id_rol === 2;
-      this.nombreSucursal = this.usuario.nombre_sucursal || '';
-    }
-    this.secciones = this.armarMenu();
-
     // En celular el menú se cierra al cambiar de pantalla
     this.subRuta = this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => this.cerrarMenu());
 
@@ -102,7 +99,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       const previo = JSON.stringify(this.permisosActuales());
       const nuevo  = JSON.stringify(p);
       this.permisosActuales.set(p);
-      if (previo !== nuevo && !this.esAdmin) {
+      if (previo !== nuevo && !this.esAdmin()) {
         this.dialogo.avisar('Tus permisos fueron actualizados por el administrador.');
         this.salirSiPerdioAcceso();
       }
@@ -120,7 +117,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // ─── Menú ───
   private armarMenu(): { titulo: string; enlaces: Enlace[] }[] {
     const i = this.icons;
-    if (this.esAdmin) return [
+    if (this.esAdmin()) return [
       { titulo: 'Administración', enlaces: [
         { ruta: 'resumen',      texto: 'Panel principal', icono: i.dashboard },
         { ruta: 'inventario',   texto: 'Inventario',      icono: i.inventario },
@@ -132,7 +129,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         { ruta: 'ajustes',  texto: 'Ajustes',  icono: i.ajustes }
       ]}
     ];
-    if (this.esCajero) return [
+    if (this.esCajero()) return [
       { titulo: 'Operaciones', enlaces: [
         { ruta: 'resumen',     texto: 'Panel principal', icono: i.dashboard,  modulo: 'dashboard' },
         { ruta: 'punto-venta', texto: 'Punto de venta',  icono: i.pos,        modulo: 'punto_venta' },
@@ -148,7 +145,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   /** Preguntas de ejemplo según lo que el usuario puede ver */
   readonly sugerenciasAsistente = computed<string[]>(() => {
-    if (this.esAdmin) return ['¿Cómo van las ventas hoy?', '¿Qué productos tienen stock bajo?',
+    if (this.esAdmin()) return ['¿Cómo van las ventas hoy?', '¿Qué productos tienen stock bajo?',
                               '¿Cuánto vendimos este mes?', '¿Cómo registro una merma?'];
     return [
       this.tiene('dashboard') && '¿Cómo van las ventas hoy?',
@@ -172,7 +169,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   alPresionarEscape() { this.cerrarMenu(); }
 
   tiene(modulo: string): boolean {
-    if (this.esAdmin) return true;
+    if (this.esAdmin()) return true;
     // Usar el cache reactivo si está poblado, sino fallback al service
     const permisos = this.permisosActuales();
     if (Object.keys(permisos).length > 0) return permisos[modulo] === true;
@@ -181,7 +178,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private salirSiPerdioAcceso() {
     const ruta = this.router.url.split(/[/?#]/)[2];
-    const enlace = this.secciones.flatMap(s => s.enlaces).find(e => e.ruta === ruta);
+    const enlace = this.secciones().flatMap(s => s.enlaces).find(e => e.ruta === ruta);
     if (enlace?.modulo && !this.tiene(enlace.modulo)) this.router.navigate(['/dashboard/sin-acceso']);
   }
 

@@ -12,8 +12,8 @@
       <h1 class="inf-titulo">Panel del día</h1>
     </div>
     <app-selector-sucursal [sucursales]="sucursales()" [seleccionada]="sucursalActual()"
-                           [todas]="esAdmin" [soloLectura]="!esAdmin"
-                           [estados]="esAdmin ? cajasAbiertas() : null"
+                           [todas]="esAdmin()" [soloLectura]="!esAdmin()"
+                           [estados]="esAdmin() ? cajasAbiertas() : null"
                            (cambio)="cambiarSucursal($event)" />
   </header>
 

@@ -14,6 +14,7 @@ import { SelectorSucursalComponent } from '../../shared/selector-sucursal/select
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { cifra } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
+import { SesionService } from '../../../core/services/sesion.service';
 
 type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
 
@@ -26,6 +27,7 @@ type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
               '../../shared/formulario/formulario.css', './inventario.component.css']
 })
 export class InventarioComponent implements OnInit, OnDestroy {
+  private readonly sesion = inject(SesionService);
   private productoService = inject(ProductoService);
   private dialogo         = inject(DialogoService);
   private socketService   = inject(SocketService);
@@ -59,8 +61,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   ];
 
   // ─── Usuario y sucursales ───
-  usuarioActual: any = null;
-  esAdmin            = false;
+  readonly esAdmin = this.sesion.esAdmin;
   readonly sucursales           = signal<any[]>([]);
   readonly sucursalSeleccionada = signal<any>(null);
   readonly idSucursal           = computed<number>(() => this.sucursalSeleccionada()?.id_sucursal || 1);
@@ -145,10 +146,6 @@ export class InventarioComponent implements OnInit, OnDestroy {
   readonly cargandoBorrarCat     = signal(false);
 
   ngOnInit() {
-    const raw = localStorage.getItem('usuario_sgiv');
-    this.usuarioActual = raw ? JSON.parse(raw) : null;
-    this.esAdmin       = this.usuarioActual?.id_rol === 1;
-
     this.cargarSucursales();
     this.suscribirStock();
   }
@@ -177,7 +174,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
   // ─── SUCURSALES ───
   cargarSucursales() {
-    if (!this.esAdmin) { this.usarSucursalPropia(); return; }
+    if (!this.esAdmin()) { this.usarSucursalPropia(); return; }
     this.http.get<any[]>(`${this.apiUrl}/sucursales`).subscribe({
       next: (suc) => {
         this.sucursales.set(suc || []);
@@ -193,8 +190,8 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
   private usarSucursalPropia() {
     this.sucursalSeleccionada.set({
-      id_sucursal:     this.usuarioActual?.id_sucursal || 1,
-      nombre_sucursal: this.usuarioActual?.nombre_sucursal || 'Mi Sucursal'
+      id_sucursal:     this.sesion.idSucursal(),
+      nombre_sucursal: this.sesion.usuario()?.nombre_sucursal || 'Mi Sucursal'
     });
     this.cargarProductos();
     this.cargarCategorias();

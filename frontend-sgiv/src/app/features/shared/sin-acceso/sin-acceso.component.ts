@@ -4,6 +4,7 @@ import { LucideAngularModule,
          ShoppingCart, Wallet, Receipt,
          LayoutDashboard, ArrowRight, Sparkles } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { SesionService } from '../../../core/services/sesion.service';
 
 @Component({
   selector: 'app-sin-acceso',
@@ -72,6 +73,7 @@ import { AjustesService } from '../../../core/services/ajustes.service';
   `
 })
 export class SinAccesoComponent implements OnInit {
+  private readonly sesion = inject(SesionService);
   readonly ajustes = inject(AjustesService);
   nombreCorto = '';
   saludo      = 'Hola';
@@ -96,10 +98,7 @@ export class SinAccesoComponent implements OnInit {
   ];
 
   ngOnInit() {
-    try {
-      const u = JSON.parse(localStorage.getItem('usuario_sgiv') || '{}');
-      this.nombreCorto = (u.nombre_completo || '').split(' ')[0] || 'colega';
-    } catch { this.nombreCorto = 'colega'; }
+    this.nombreCorto = (this.sesion.usuario()?.nombre_completo || '').split(' ')[0] || 'colega';
 
     const h = new Date().getHours();
     if (h < 12)      this.saludo = 'Buenos días';

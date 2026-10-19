@@ -84,14 +84,14 @@
                   @else { <span class="inf-estado neutro">Inactivo</span> }
                 </td>
                 <td>
-                  @if (+usr.id_rol === 2 && usr.estado_activo) {
+                  @if (+usr.id_rol === ROL.cajero && usr.estado_activo) {
                     @if (usr.caja_habilitada) { <span class="inf-estado ok">Habilitada</span> }
                     @else { <span class="inf-estado mal">Cerrada</span> }
                   } @else { <span class="inf-sutil">—</span> }
                 </td>
                 <td>
                   <div class="flex items-center justify-end gap-1">
-                    @if (+usr.id_rol === 2 && usr.estado_activo) {
+                    @if (+usr.id_rol === ROL.cajero && usr.estado_activo) {
                       <button class="inf-boton" (click)="pedirToggleCaja(usr)"
                               [title]="usr.caja_habilitada ? 'El cajero no podrá vender hasta que la reabras' : 'Si cerró caja hoy, se reabre su turno'">
                         <lucide-icon [img]="usr.caja_habilitada ? icons.cajaClose : icons.cajaOpen" class="w-3.5 h-3.5"></lucide-icon>
@@ -106,7 +106,7 @@
                         <lucide-icon [img]="icons.password" class="w-4 h-4"></lucide-icon>
                       </button>
                     }
-                    @if (usr.estado_activo && +usr.id_rol === 2) {
+                    @if (usr.estado_activo && +usr.id_rol === ROL.cajero) {
                       <button class="accion" (click)="abrirModalPermisos(usr)" title="Módulos a los que tiene acceso" aria-label="Permisos">
                         <lucide-icon [img]="icons.permissions" class="w-4 h-4"></lucide-icon>
                       </button>

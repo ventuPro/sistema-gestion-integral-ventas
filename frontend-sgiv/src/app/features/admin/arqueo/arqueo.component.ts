@@ -5,6 +5,7 @@ import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X } from 'luc
 import { CajaService } from '../../../core/services/caja.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { cifra, entero, porcentaje, fechaLarga, fechaHora, hora, temaGrafico } from '../../../core/utils/informe';
+import { SesionService } from '../../../core/services/sesion.service';
 
 // Billetes y monedas en circulación (boliviano)
 const DENOMINACIONES = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1];
@@ -17,6 +18,7 @@ const DENOMINACIONES = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1];
   styleUrls: ['../../shared/informe/informe.css', './arqueo.component.css']
 })
 export class ArqueoComponent implements OnInit {
+  private readonly sesion = inject(SesionService);
   private cajaService = inject(CajaService);
   private ajustes     = inject(AjustesService);
   readonly moneda     = this.ajustes.moneda;
@@ -35,8 +37,7 @@ export class ArqueoComponent implements OnInit {
   readonly error    = signal('');
   readonly mostrarConfirmCierre = signal(false);
 
-  usuarioActual: any = null;
-  esAdmin = false;
+  readonly esAdmin = this.sesion.esAdmin;
   readonly arqueo = signal<any>({ resumen: {}, ventas: [], turno_activo: null, turno_resumen: null });
 
   readonly efectivoContado = signal<number | null>(null);
@@ -45,15 +46,13 @@ export class ArqueoComponent implements OnInit {
   readonly conteo = signal<Record<number, number | null>>({});
 
   ngOnInit() {
-    try { this.usuarioActual = JSON.parse(localStorage.getItem('usuario_sgiv') || 'null'); } catch { }
-    this.esAdmin = this.usuarioActual?.id_rol === 1;
     this.cargarArqueo();
   }
 
   cargarArqueo() {
     const a = this.arqueo();
     this.cargando.set(!a.turno_activo && !a.ventas?.length);
-    this.cajaService.obtenerArqueo(this.usuarioActual?.id_sucursal || 1).subscribe({
+    this.cajaService.obtenerArqueo(this.sesion.idSucursal()).subscribe({
       next: (data) => { this.arqueo.set(data); this.cargando.set(false); },
       error: () => { this.cargando.set(false); this.error.set('No se pudo cargar el arqueo.'); }
     });
@@ -124,16 +123,12 @@ export class ArqueoComponent implements OnInit {
   ejecutarCierreCaja() {
     this.cerrando.set(true);
     const contado = this.diferencia() === null ? null : Number(this.efectivoContado());
-    this.cajaService.cerrarCaja({ id_sucursal: this.usuarioActual?.id_sucursal || 1, efectivo_contado: contado }).subscribe({
+    this.cajaService.cerrarCaja({ id_sucursal: this.sesion.idSucursal(), efectivo_contado: contado }).subscribe({
       next: () => {
         this.cerrando.set(false);
         this.mostrarConfirmCierre.set(false);
         this.efectivoContado.set(null);
         this.conteo.set({});
-        if (this.usuarioActual) {
-          this.usuarioActual.caja_habilitada = false;
-          localStorage.setItem('usuario_sgiv', JSON.stringify(this.usuarioActual));
-        }
         this.cargarArqueo();
       },
       error: (e) => {

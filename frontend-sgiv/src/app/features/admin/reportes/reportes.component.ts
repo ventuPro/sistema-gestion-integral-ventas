@@ -10,6 +10,7 @@ import { SucursalService } from '../../../core/services/sucursal.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { cifra, entero, variacion, porcentaje, fechaCorta, fechaLarga, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
+import { SesionService } from '../../../core/services/sesion.service';
 
 type Periodo = 'hoy' | 'ayer' | 'semana' | 'mes' | 'mes_anterior' | 'personalizado';
 
@@ -21,6 +22,7 @@ type Periodo = 'hoy' | 'ayer' | 'semana' | 'mes' | 'mes_anterior' | 'personaliza
   styleUrls: ['../../shared/informe/informe.css', './reportes.component.css']
 })
 export class ReportesComponent implements OnInit, OnDestroy {
+  private readonly sesion = inject(SesionService);
   private reporteService  = inject(ReporteService);
   private productoService = inject(ProductoService);
   private sucursalService = inject(SucursalService);
@@ -57,7 +59,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
   readonly fechaInicio = signal('');
   readonly fechaFin    = signal('');
 
-  esAdmin = false;
+  readonly esAdmin = this.sesion.esAdmin;
   readonly sucursales           = signal<any[]>([]);
   readonly sucursalSeleccionada = signal<number | null>(1);   // null = todas
 
@@ -86,11 +88,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    try {
-      const u = JSON.parse(localStorage.getItem('usuario_sgiv') || 'null');
-      this.esAdmin = u?.id_rol === 1;
-      this.sucursalSeleccionada.set(u?.id_sucursal || 1);
-    } catch { }
+    this.sucursalSeleccionada.set(this.sesion.idSucursal());
     this.sucursalService.listarSucursales().subscribe({
       next: (s: any[]) => this.sucursales.set(s || [])
     });
