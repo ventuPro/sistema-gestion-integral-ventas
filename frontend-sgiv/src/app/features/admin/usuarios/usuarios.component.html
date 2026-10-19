@@ -13,15 +13,15 @@
   <section class="inf-hoja inf-tira overflow-hidden">
     <div>
       <p class="inf-etiqueta">Usuarios activos</p>
-      <p class="inf-valor">{{ resumen.activos }} <span class="inf-tenue text-sm font-normal">de {{ listaUsuarios.length }}</span></p>
+      <p class="inf-valor">{{ resumen().activos }} <span class="inf-tenue text-sm font-normal">de {{ listaUsuarios().length }}</span></p>
     </div>
     <div>
       <p class="inf-etiqueta">Administradores</p>
-      <p class="inf-valor">{{ resumen.admins }}</p>
+      <p class="inf-valor">{{ resumen().admins }}</p>
     </div>
     <div>
       <p class="inf-etiqueta">Cajeros con caja habilitada</p>
-      <p class="inf-valor">{{ resumen.cajasAbiertas }} <span class="inf-tenue text-sm font-normal">de {{ resumen.cajeros }}</span></p>
+      <p class="inf-valor">{{ resumen().cajasAbiertas }} <span class="inf-tenue text-sm font-normal">de {{ resumen().cajeros }}</span></p>
     </div>
   </section>
 
@@ -30,24 +30,24 @@
       <div class="buscador flex-1 min-w-[220px]">
         <lucide-icon [img]="icons.search" class="w-4 h-4 inf-tenue"></lucide-icon>
         <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por nombre o correo">
-        @if (busqueda) {
-          <button class="quitar" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+        @if (busqueda()) {
+          <button class="quitar" (click)="busqueda.set('')" aria-label="Limpiar búsqueda">
             <lucide-icon [img]="icons.close" class="w-3.5 h-3.5"></lucide-icon>
           </button>
         }
       </div>
       <div class="inf-segmentos">
-        <button [class.activa]="filtroEstado === 'activos'" (click)="filtroEstado = 'activos'">Activos</button>
-        <button [class.activa]="filtroEstado === 'inactivos'" (click)="filtroEstado = 'inactivos'">Inactivos</button>
-        <button [class.activa]="filtroEstado === 'todos'" (click)="filtroEstado = 'todos'">Todos</button>
+        <button [class.activa]="filtroEstado() === 'activos'" (click)="filtroEstado.set('activos')">Activos</button>
+        <button [class.activa]="filtroEstado() === 'inactivos'" (click)="filtroEstado.set('inactivos')">Inactivos</button>
+        <button [class.activa]="filtroEstado() === 'todos'" (click)="filtroEstado.set('todos')">Todos</button>
       </div>
     </div>
 
-    @if (cargando && !listaUsuarios.length) {
+    @if (cargando() && !listaUsuarios().length) {
       <div class="p-4 space-y-2">
         @for (n of [1,2,3,4]; track n) { <div class="inf-esqueleto h-12"></div> }
       </div>
-    } @else if (usuariosFiltrados.length === 0) {
+    } @else if (usuariosFiltrados().length === 0) {
       <p class="inf-vacio">Ningún usuario coincide con los filtros.</p>
     } @else {
       <div class="overflow-x-auto">
@@ -63,7 +63,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (usr of usuariosFiltrados; track usr.id_usuario) {
+            @for (usr of usuariosFiltrados(); track usr.id_usuario) {
               <tr [class.inactivo]="!usr.estado_activo">
                 <td>
                   <div class="flex items-center gap-3 min-w-[220px]">
@@ -127,58 +127,58 @@
           </tbody>
         </table>
       </div>
-      <div class="inf-pie-hoja">{{ usuariosFiltrados.length }} de {{ listaUsuarios.length }} usuario(s)</div>
+      <div class="inf-pie-hoja">{{ usuariosFiltrados().length }} de {{ listaUsuarios().length }} usuario(s)</div>
     }
   </section>
 </div>
 
 <!-- ═══ CREAR / EDITAR ═══ -->
-@if (mostrarModal) {
+@if (mostrarModal()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModal()">
     <div class="inf-hoja ventana w-full max-w-lg max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId ? 'Editar usuario' : 'Nuevo usuario' }}</h3>
+        <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId() ? 'Editar usuario' : 'Nuevo usuario' }}</h3>
         <button class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
           <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
       <div class="flex-1 overflow-y-auto p-5 space-y-4">
-        @if (mensajeError) { <p class="error-formulario">{{ mensajeError }}</p> }
+        @if (mensajeError()) { <p class="error-formulario">{{ mensajeError() }}</p> }
         <div class="grupo">
           <label class="inf-etiqueta" for="usr-nombre">Nombre completo</label>
-          <input id="usr-nombre" type="text" class="campo" [(ngModel)]="formulario.nombre_completo" placeholder="Ej.: Juan Pérez">
+          <input id="usr-nombre" type="text" class="campo" [(ngModel)]="formulario().nombre_completo" placeholder="Ej.: Juan Pérez">
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="usr-correo">Correo</label>
-          <input id="usr-correo" type="email" class="campo" [(ngModel)]="formulario.correo_electronico" placeholder="nombre@correo.com" autocomplete="off">
+          <input id="usr-correo" type="email" class="campo" [(ngModel)]="formulario().correo_electronico" placeholder="nombre@correo.com" autocomplete="off">
         </div>
-        @if (!editandoId) {
+        @if (!editandoId()) {
           <div class="grupo">
             <label class="inf-etiqueta" for="usr-contrasena">Contraseña</label>
-            <input id="usr-contrasena" type="password" class="campo" [(ngModel)]="formulario.contrasena" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            <input id="usr-contrasena" type="password" class="campo" [(ngModel)]="formulario().contrasena" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
           </div>
         }
         <div class="grid grid-cols-2 gap-4">
           <div class="grupo">
             <label class="inf-etiqueta" for="usr-rol">Rol</label>
-            <select id="usr-rol" class="campo" [(ngModel)]="formulario.id_rol">
+            <select id="usr-rol" class="campo" [(ngModel)]="formulario().id_rol">
               <option value="" disabled>Elegir…</option>
-              @for (r of listaRoles; track r.id_rol) { <option [ngValue]="+r.id_rol">{{ r.nombre_rol }}</option> }
+              @for (r of listaRoles(); track r.id_rol) { <option [ngValue]="+r.id_rol">{{ r.nombre_rol }}</option> }
             </select>
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="usr-sucursal">Sucursal</label>
-            <select id="usr-sucursal" class="campo" [(ngModel)]="formulario.id_sucursal">
+            <select id="usr-sucursal" class="campo" [(ngModel)]="formulario().id_sucursal">
               <option value="" disabled>Elegir…</option>
-              @for (s of listaSucursales; track s.id_sucursal) { <option [ngValue]="+s.id_sucursal">{{ s.nombre_sucursal }}</option> }
+              @for (s of listaSucursales(); track s.id_sucursal) { <option [ngValue]="+s.id_sucursal">{{ s.nombre_sucursal }}</option> }
             </select>
           </div>
         </div>
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModal()">Cancelar</button>
-        <button class="boton-primario" (click)="guardarUsuario()" [disabled]="guardando">
-          {{ guardando ? 'Guardando…' : (editandoId ? 'Guardar cambios' : 'Crear usuario') }}
+        <button class="boton-primario" (click)="guardarUsuario()" [disabled]="guardando()">
+          {{ guardando() ? 'Guardando…' : (editandoId() ? 'Guardar cambios' : 'Crear usuario') }}
         </button>
       </div>
     </div>
@@ -186,34 +186,34 @@
 }
 
 <!-- ═══ CONTRASEÑA ═══ -->
-@if (mostrarModalContrasena) {
+@if (mostrarModalContrasena()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalContrasena()">
     <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
         <div class="min-w-0">
           <h3 class="inf-tinta font-semibold text-[15px]">Cambiar contraseña</h3>
-          <p class="inf-sub mt-0.5! truncate">{{ usuarioContrasena?.nombre_completo }}</p>
+          <p class="inf-sub mt-0.5! truncate">{{ usuarioContrasena()?.nombre_completo }}</p>
         </div>
         <button class="quitar" (click)="cerrarModalContrasena()" aria-label="Cerrar">
           <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
       <div class="p-5 space-y-4">
-        @if (errorContrasena) { <p class="error-formulario">{{ errorContrasena }}</p> }
+        @if (errorContrasena()) { <p class="error-formulario">{{ errorContrasena() }}</p> }
         <div class="grupo">
           <label class="inf-etiqueta" for="nueva-contrasena">Nueva contraseña</label>
-          <input id="nueva-contrasena" type="password" class="campo" [(ngModel)]="cambioContrasena.nueva" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          <input id="nueva-contrasena" type="password" class="campo" [(ngModel)]="cambioContrasena().nueva" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="confirmar-contrasena">Repetir contraseña</label>
-          <input id="confirmar-contrasena" type="password" class="campo" [(ngModel)]="cambioContrasena.confirmar"
+          <input id="confirmar-contrasena" type="password" class="campo" [(ngModel)]="cambioContrasena().confirmar"
                  autocomplete="new-password" (keyup.enter)="confirmarCambioContrasena()">
         </div>
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalContrasena()">Cancelar</button>
-        <button class="boton-primario" (click)="confirmarCambioContrasena()" [disabled]="cargandoContrasena">
-          {{ cargandoContrasena ? 'Guardando…' : 'Cambiar' }}
+        <button class="boton-primario" (click)="confirmarCambioContrasena()" [disabled]="cargandoContrasena()">
+          {{ cargandoContrasena() ? 'Guardando…' : 'Cambiar' }}
         </button>
       </div>
     </div>
@@ -221,37 +221,37 @@
 }
 
 <!-- ═══ PERMISOS ═══ -->
-@if (mostrarModalPermisos) {
+@if (mostrarModalPermisos()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalPermisos()">
     <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
         <div class="min-w-0">
           <h3 class="inf-tinta font-semibold text-[15px]">Permisos de acceso</h3>
-          <p class="inf-sub mt-0.5! truncate">{{ usuarioPermisos?.nombre_completo }} · {{ usuarioPermisos?.nombre_rol }}</p>
+          <p class="inf-sub mt-0.5! truncate">{{ usuarioPermisos()?.nombre_completo }} · {{ usuarioPermisos()?.nombre_rol }}</p>
         </div>
         <button class="quitar" (click)="cerrarModalPermisos()" aria-label="Cerrar">
           <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
       <div class="p-5 space-y-3">
-        @if (cargandoPermisos && !modulosCargados) {
+        @if (cargandoPermisos() && !modulosCargados()) {
           @for (n of [1,2,3,4,5]; track n) { <div class="inf-esqueleto h-9"></div> }
         } @else {
           <div class="opciones">
             @for (mod of modulosSistema; track mod.key) {
               <label class="opcion">
-                <input type="checkbox" [(ngModel)]="permisosEdicion[mod.key]" [name]="mod.key">
+                <input type="checkbox" [(ngModel)]="permisosEdicion()[mod.key]" [name]="mod.key">
                 <span>{{ mod.label }}</span>
               </label>
             }
           </div>
         }
-        @if (errorPermisos) { <p class="error-formulario">{{ errorPermisos }}</p> }
+        @if (errorPermisos()) { <p class="error-formulario">{{ errorPermisos() }}</p> }
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalPermisos()">Cancelar</button>
-        <button class="boton-primario" (click)="guardarPermisos()" [disabled]="cargandoPermisos || !modulosCargados">
-          {{ cargandoPermisos && modulosCargados ? 'Guardando…' : 'Guardar' }}
+        <button class="boton-primario" (click)="guardarPermisos()" [disabled]="cargandoPermisos() || !modulosCargados()">
+          {{ cargandoPermisos() && modulosCargados() ? 'Guardando…' : 'Guardar' }}
         </button>
       </div>
     </div>
@@ -259,8 +259,8 @@
 }
 
 <!-- ═══ CONFIRMACIONES ═══ -->
-@if (confirmacion; as c) {
+@if (confirmacion(); as c) {
   <app-confirmacion [titulo]="c.titulo" [mensaje]="c.mensaje" [textoConfirmar]="c.boton" [peligro]="c.peligro"
-                    [ocupado]="confirmando" [error]="errorConfirmacion"
+                    [ocupado]="confirmando()" [error]="errorConfirmacion()"
                     (confirmar)="ejecutarConfirmacion()" (cancelar)="cerrarConfirmacion()" />
 }

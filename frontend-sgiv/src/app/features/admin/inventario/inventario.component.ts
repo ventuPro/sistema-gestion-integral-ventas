@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -30,7 +30,6 @@ export class InventarioComponent implements OnInit, OnDestroy {
   private dialogo         = inject(DialogoService);
   private socketService   = inject(SocketService);
   private inventarioService = inject(InventarioService);
-  private cdr             = inject(ChangeDetectorRef);
   readonly moneda          = inject(AjustesService).moneda;
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
@@ -60,64 +59,90 @@ export class InventarioComponent implements OnInit, OnDestroy {
   ];
 
   // ─── Usuario y sucursales ───
-  usuarioActual:         any   = null;
-  esAdmin                = false;
-  sucursales:            any[] = [];
-  sucursalSeleccionada:  any   = null;
+  usuarioActual: any = null;
+  esAdmin            = false;
+  readonly sucursales           = signal<any[]>([]);
+  readonly sucursalSeleccionada = signal<any>(null);
+  readonly idSucursal           = computed<number>(() => this.sucursalSeleccionada()?.id_sucursal || 1);
 
   // ─── Productos e inventario ───
-  productos:             any[] = [];
-  productosFiltrados:    any[] = [];
-  categorias:            any[] = [];
-  cargando               = true;
-  guardando              = false;
-  resumen = { activos: 0, bajos: 0, agotados: 0, valor: 0 };
+  readonly productos  = signal<any[]>([]);
+  readonly categorias = signal<any[]>([]);
+  readonly cargando   = signal(true);
+  readonly guardando  = signal(false);
 
   // ─── Filtros ───
-  filtroCategoria:       number | null = null;
-  filtroBusqueda         = '';
-  filtroEstado:          FiltroEstado = 'activos';
+  readonly filtroCategoria = signal<number | null>(null);
+  readonly filtroBusqueda  = signal('');
+  readonly filtroEstado    = signal<FiltroEstado>('activos');
+
+  readonly productosFiltrados = computed(() => {
+    const texto = this.filtroBusqueda().toLowerCase(), f = this.filtroEstado(), cat = this.filtroCategoria();
+    return this.productos().filter(p => {
+      const porCat    = !cat || p.id_categoria === cat;
+      const porNomb   = !texto || p.nombre_producto.toLowerCase().includes(texto);
+      const porEstado = f === 'todos'
+                        || (f === 'inactivos' && !p.estado_activo)
+                        || (p.estado_activo && (f === 'activos' || this.estadoStock(p) === f));
+      return porCat && porNomb && porEstado;
+    });
+  });
+
+  readonly resumen = computed(() => {
+    const activos = this.productos().filter(p => p.estado_activo);
+    return {
+      activos:  activos.length,
+      bajos:    activos.filter(p => this.estadoStock(p) === 'bajo').length,
+      agotados: activos.filter(p => this.estadoStock(p) === 'sin').length,
+      valor:    activos.reduce((t, p) => t + Number(p.precio_unitario) * Math.max(Number(p.stock_actual) || 0, 0), 0)
+    };
+  });
+
+  readonly categoriaActual = computed(() =>
+    this.categorias().find(c => c.id_categoria === this.filtroCategoria()) || null);
+
+  // Formularios de los modales: se reemplazan con set(); el template edita los campos del objeto actual
 
   // ─── Modal Producto ───
-  mostrarModal           = false;
-  editandoId:            number | null = null;
-  errorModal             = '';
-  archivoImagen:         File | null = null;
-  previewImagen:         string | null = null;
-  formulario: any = {
+  readonly mostrarModal  = signal(false);
+  readonly editandoId    = signal<number | null>(null);
+  readonly errorModal    = signal('');
+  private archivoImagen: File | null = null;
+  readonly previewImagen = signal<string | null>(null);
+  readonly formulario    = signal<any>({
     nombre_producto: '', descripcion_producto: '',
     precio_unitario: '', id_categoria: '',
     stock_inicial: 0
-  };
+  });
 
   // ─── Modal movimiento (entrada o merma) ───
-  productoMov:           any = null;
-  mov = { tipo: 'INGRESO' as TipoMovimiento, cantidad: 0, motivo: '', detalle: '' };
-  motivos: Record<TipoMovimiento, string[]> = { INGRESO: [], SALIDA: [] };
-  errorMov               = '';
+  readonly productoMov = signal<any>(null);
+  readonly mov         = signal({ tipo: 'INGRESO' as TipoMovimiento, cantidad: 0, motivo: '', detalle: '' });
+  readonly motivos     = signal<Record<TipoMovimiento, string[]>>({ INGRESO: [], SALIDA: [] });
+  readonly errorMov    = signal('');
 
   // ─── Pestaña Movimientos ───
-  vista: 'productos' | 'movimientos' = 'productos';
-  movimientos:           Movimiento[] = [];
-  cargandoMov            = false;
-  periodoMov: 'hoy' | '7' | '30' = '7';
-  tipoMov:               TipoMovimiento | null = null;
-  productoFiltroMov:     { id_producto: number; nombre_producto: string } | null = null;
-  private recargaMov:    any;
+  readonly vista             = signal<'productos' | 'movimientos'>('productos');
+  readonly movimientos       = signal<Movimiento[]>([]);
+  readonly cargandoMov       = signal(false);
+  readonly periodoMov        = signal<'hoy' | '7' | '30'>('7');
+  readonly tipoMov           = signal<TipoMovimiento | null>(null);
+  readonly productoFiltroMov = signal<{ id_producto: number; nombre_producto: string } | null>(null);
+  private recargaMov: any;
 
   // ─── Modal Categoría ───
-  mostrarModalCategoria  = false;
-  nombreCategoria        = '';
-  errorCategoria         = '';
+  readonly mostrarModalCategoria = signal(false);
+  readonly nombreCategoria       = signal('');
+  readonly errorCategoria        = signal('');
 
   // ─── Borrado de categoría (doble confirmación) ───
-  mostrarModalBorrarCat   = false;
-  catABorrar:             any = null;
-  productosBloqueantes:   any[] = [];
-  pasoBorradoCat          = 1;
-  inputConfirmacionCat    = '';
-  errorBorrarCat          = '';
-  cargandoBorrarCat       = false;
+  readonly mostrarModalBorrarCat = signal(false);
+  readonly catABorrar            = signal<any>(null);
+  readonly productosBloqueantes  = signal<any[]>([]);
+  readonly pasoBorradoCat        = signal(1);
+  readonly inputConfirmacionCat  = signal('');
+  readonly errorBorrarCat        = signal('');
+  readonly cargandoBorrarCat     = signal(false);
 
   ngOnInit() {
     const raw = localStorage.getItem('usuario_sgiv');
@@ -134,16 +159,20 @@ export class InventarioComponent implements OnInit, OnDestroy {
   private suscribirStock() {
     this.socketService.conectar('cajeros');
     this.stockSub = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(p => {
-      if (!p || Number(p.id_sucursal) !== this.idSucursal) return;
-      const prod = this.productos.find(x => Number(x.id_producto) === Number(p.id_producto));
-      if (!prod) return;
-      prod.stock_actual = Number(p.nueva_cantidad_disponible) || 0;
-      this.aplicarFiltros();
-      if (this.vista === 'movimientos') {
+      if (!p || Number(p.id_sucursal) !== this.idSucursal()) return;
+      if (!this.fijarStock(Number(p.id_producto), Number(p.nueva_cantidad_disponible) || 0)) return;
+      if (this.vista() === 'movimientos') {
         clearTimeout(this.recargaMov);
         this.recargaMov = setTimeout(() => this.cargarMovimientos(), 600);
       }
     });
+  }
+
+  /** Cambia el stock de un producto de la lista; false si no está en ella */
+  private fijarStock(id_producto: number, stock: number): boolean {
+    if (!this.productos().some(x => Number(x.id_producto) === id_producto)) return false;
+    this.productos.update(ps => ps.map(x => Number(x.id_producto) === id_producto ? { ...x, stock_actual: stock } : x));
+    return true;
   }
 
   // ─── SUCURSALES ───
@@ -151,91 +180,58 @@ export class InventarioComponent implements OnInit, OnDestroy {
     if (!this.esAdmin) { this.usarSucursalPropia(); return; }
     this.http.get<any[]>(`${this.apiUrl}/sucursales`).subscribe({
       next: (suc) => {
-        this.sucursales = suc || [];
-        if (this.sucursales.length > 0 && !this.sucursalSeleccionada) {
-          this.seleccionarSucursal(this.sucursales[0]);
-        } else if (this.sucursales.length === 0) {
+        this.sucursales.set(suc || []);
+        if (this.sucursales().length > 0 && !this.sucursalSeleccionada()) {
+          this.seleccionarSucursal(this.sucursales()[0]);
+        } else if (this.sucursales().length === 0) {
           this.usarSucursalPropia();
         }
-        this.cdr.detectChanges();
       },
       error: () => this.usarSucursalPropia()
     });
   }
 
   private usarSucursalPropia() {
-    this.sucursalSeleccionada = {
+    this.sucursalSeleccionada.set({
       id_sucursal:     this.usuarioActual?.id_sucursal || 1,
       nombre_sucursal: this.usuarioActual?.nombre_sucursal || 'Mi Sucursal'
-    };
+    });
     this.cargarProductos();
     this.cargarCategorias();
-    this.cdr.detectChanges();
   }
 
   seleccionarSucursal(suc: any) {
-    this.sucursalSeleccionada = suc;
-    this.cargando             = true;
-    this.productoFiltroMov    = null;
+    this.sucursalSeleccionada.set(suc);
+    this.cargando.set(true);
+    this.productoFiltroMov.set(null);
     this.cargarProductos();
     this.cargarCategorias();
-    if (this.vista === 'movimientos') this.cargarMovimientos();
-    this.cdr.detectChanges();
+    if (this.vista() === 'movimientos') this.cargarMovimientos();
   }
 
   cambiarSucursal(id: number | null) {
-    const suc = this.sucursales.find(s => s.id_sucursal === id);
+    const suc = this.sucursales().find(s => s.id_sucursal === id);
     if (suc) this.seleccionarSucursal(suc);
-  }
-
-  get idSucursal(): number {
-    return this.sucursalSeleccionada?.id_sucursal || 1;
   }
 
   // ─── PRODUCTOS ───
   cargarProductos() {
-    this.productoService.obtenerInventario(this.idSucursal, true).subscribe({
+    this.productoService.obtenerInventario(this.idSucursal(), true).subscribe({
       next: (datos) => {
-        this.productos = datos;
-        this.cargando  = false;
-        this.aplicarFiltros();
+        this.productos.set(datos);
+        this.cargando.set(false);
       },
-      error: () => { this.cargando = false; this.cdr.detectChanges(); }
+      error: () => this.cargando.set(false)
     });
   }
 
   cargarCategorias() {
     this.productoService.obtenerCategorias().subscribe({
-      next: (c) => { this.categorias = c; this.cdr.detectChanges(); }
+      next: (c) => this.categorias.set(c)
     });
   }
 
   // ─── FILTROS ───
-  aplicarFiltros() {
-    const texto = this.filtroBusqueda.toLowerCase();
-    const f     = this.filtroEstado;
-    this.productosFiltrados = this.productos.filter(p => {
-      const porCat    = !this.filtroCategoria || p.id_categoria === this.filtroCategoria;
-      const porNomb   = !texto || p.nombre_producto.toLowerCase().includes(texto);
-      const porEstado = f === 'todos'
-                        || (f === 'inactivos' && !p.estado_activo)
-                        || (p.estado_activo && (f === 'activos' || this.estadoStock(p) === f));
-      return porCat && porNomb && porEstado;
-    });
-    this.calcularResumen();
-    this.cdr.detectChanges();
-  }
-
-  private calcularResumen() {
-    const activos = this.productos.filter(p => p.estado_activo);
-    this.resumen = {
-      activos:  activos.length,
-      bajos:    activos.filter(p => this.estadoStock(p) === 'bajo').length,
-      agotados: activos.filter(p => this.estadoStock(p) === 'sin').length,
-      valor:    activos.reduce((t, p) => t + Number(p.precio_unitario) * Math.max(Number(p.stock_actual) || 0, 0), 0)
-    };
-  }
-
   // Mismo criterio que el Panel: bajo = hasta el mínimo de alerta de la sucursal
   estadoStock(p: any): 'sin' | 'bajo' | 'ok' {
     const stock = Number(p.stock_actual) || 0;
@@ -243,91 +239,80 @@ export class InventarioComponent implements OnInit, OnDestroy {
     return stock <= Number(p.stock_minimo_alerta ?? 0) ? 'bajo' : 'ok';
   }
 
-  get categoriaActual(): any {
-    return this.categorias.find(c => c.id_categoria === this.filtroCategoria) || null;
-  }
-
   seleccionarCategoria(id: number | null) {
-    this.filtroCategoria = id;
-    this.aplicarFiltros();
+    this.filtroCategoria.set(id);
   }
 
   // ─── MODAL PRODUCTO ───
   abrirModalNuevo() {
-    this.editandoId     = null;
-    this.errorModal     = '';
-    this.archivoImagen  = null;
-    this.previewImagen  = null;
-    this.formulario     = {
+    this.editandoId.set(null);
+    this.errorModal.set('');
+    this.archivoImagen = null;
+    this.previewImagen.set(null);
+    this.formulario.set({
       nombre_producto: '', descripcion_producto: '',
-      precio_unitario: '', id_categoria: this.filtroCategoria || '',
+      precio_unitario: '', id_categoria: this.filtroCategoria() || '',
       stock_inicial: 0
-    };
-    this.mostrarModal = true;
+    });
+    this.mostrarModal.set(true);
   }
 
   abrirModalEditar(prod: any) {
-    this.editandoId    = prod.id_producto;
-    this.errorModal    = '';
+    this.editandoId.set(prod.id_producto);
+    this.errorModal.set('');
     this.archivoImagen = null;
-    this.previewImagen = prod.url_imagen || null;
-    this.formulario    = {
+    this.previewImagen.set(prod.url_imagen || null);
+    this.formulario.set({
       nombre_producto:      prod.nombre_producto,
       descripcion_producto: prod.descripcion_producto || '',
       precio_unitario:      prod.precio_unitario,
       id_categoria:         prod.id_categoria,
       stock_inicial:        0
-    };
-    this.mostrarModal = true;
+    });
+    this.mostrarModal.set(true);
   }
 
-  cerrarModal() { this.mostrarModal = false; this.editandoId = null; this.errorModal = ''; this.guardando = false; }
+  cerrarModal() { this.mostrarModal.set(false); this.editandoId.set(null); this.errorModal.set(''); this.guardando.set(false); }
 
   onArchivoSeleccionado(event: any) {
     const file: File = event.target.files[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      this.errorModal = 'La imagen no debe superar 2 MB.'; this.cdr.detectChanges(); return;
-    }
+    if (file.size > 2 * 1024 * 1024) return this.errorModal.set('La imagen no debe superar 2 MB.');
 
     this.archivoImagen = file;
     const reader = new FileReader();
-    reader.onload = (e: any) => {
-      this.previewImagen = e.target.result;
-      this.cdr.detectChanges();
-    };
+    reader.onload = (e: any) => this.previewImagen.set(e.target.result);
     reader.readAsDataURL(file);
   }
 
   guardarProducto() {
-    if (!this.formulario.nombre_producto || !this.formulario.precio_unitario || !this.formulario.id_categoria) {
-      this.errorModal = 'Completa nombre, precio y categoría.'; return;
-    }
+    const f = this.formulario(), id = this.editandoId();
+    if (!f.nombre_producto || !f.precio_unitario || !f.id_categoria)
+      return this.errorModal.set('Completa nombre, precio y categoría.');
 
-    this.guardando  = true;
-    this.errorModal = '';
+    this.guardando.set(true);
+    this.errorModal.set('');
     const datos = {
-      nombre_producto:      this.formulario.nombre_producto,
-      descripcion_producto: this.formulario.descripcion_producto || '',
-      precio_unitario:      this.formulario.precio_unitario,
-      id_categoria:         this.formulario.id_categoria
+      nombre_producto:      f.nombre_producto,
+      descripcion_producto: f.descripcion_producto || '',
+      precio_unitario:      f.precio_unitario,
+      id_categoria:         f.id_categoria
     };
     const fallo = (e: any, msg: string) => {
-      this.errorModal = e?.error?.error || msg;
-      this.guardando  = false;
-      this.cdr.detectChanges();
+      this.errorModal.set(e?.error?.error || msg);
+      this.guardando.set(false);
     };
 
-    if (this.editandoId) {
+    if (id) {
       // Editar: solo datos del producto, no el inventario
-      this.productoService.actualizarProducto(this.editandoId, datos, this.archivoImagen || undefined).subscribe({
+      this.productoService.actualizarProducto(id, datos, this.archivoImagen || undefined).subscribe({
         next:  () => { this.cerrarModal(); this.dialogo.avisar('Producto actualizado'); this.cargarProductos(); },
         error: (e: any) => fallo(e, 'No se pudo actualizar el producto.')
       });
     } else {
       // Crear: queda asignado a la sucursal elegida con su stock inicial
-      const nuevo = { ...datos, id_sucursal: this.idSucursal, stock_inicial: this.formulario.stock_inicial || 0 };
+      const nuevo = { ...datos, id_sucursal: this.idSucursal(), stock_inicial: f.stock_inicial || 0 };
       this.productoService.crearProducto(nuevo, this.archivoImagen || undefined).subscribe({
         next:  () => { this.cerrarModal(); this.dialogo.avisar('Producto creado'); this.cargarProductos(); },
         error: (e: any) => fallo(e, 'No se pudo crear el producto.')
@@ -348,135 +333,129 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
   // ─── MOVIMIENTO (entrada o merma) ───
   abrirMovimiento(prod: any) {
-    this.productoMov = prod;
-    this.errorMov    = '';
-    this.guardando   = false;
-    this.mov         = { tipo: 'INGRESO', cantidad: 0, motivo: '', detalle: '' };
+    this.productoMov.set(prod);
+    this.errorMov.set('');
+    this.guardando.set(false);
+    this.mov.set({ tipo: 'INGRESO', cantidad: 0, motivo: '', detalle: '' });
     this.inventarioService.motivos$.subscribe({
-      next:  (m) => { this.motivos = m; this.cambiarTipoMov(this.mov.tipo); this.cdr.detectChanges(); },
-      error: () => { this.errorMov = 'No se pudieron cargar los motivos.'; this.cdr.detectChanges(); }
+      next:  (m) => { this.motivos.set(m); this.cambiarTipoMov(this.mov().tipo); },
+      error: () => this.errorMov.set('No se pudieron cargar los motivos.')
     });
   }
 
   cambiarTipoMov(tipo: TipoMovimiento) {
-    this.mov.tipo   = tipo;
-    this.mov.motivo = this.motivos[tipo]?.[0] || '';
-    this.errorMov   = '';
+    this.mov.update(m => ({ ...m, tipo, motivo: this.motivos()[tipo]?.[0] || '' }));
+    this.errorMov.set('');
   }
 
-  cerrarMovimiento() { this.productoMov = null; this.guardando = false; }
+  cerrarMovimiento() { this.productoMov.set(null); this.guardando.set(false); }
 
   get stockTrasMovimiento(): number {
-    const n = Math.trunc(Number(this.mov.cantidad)) || 0;
-    return (Number(this.productoMov?.stock_actual) || 0) + (this.mov.tipo === 'SALIDA' ? -n : n);
+    const mov = this.mov(), n = Math.trunc(Number(mov.cantidad)) || 0;
+    return (Number(this.productoMov()?.stock_actual) || 0) + (mov.tipo === 'SALIDA' ? -n : n);
   }
 
   guardarMovimiento() {
-    const cantidad = Number(this.mov.cantidad);
-    const detalle  = this.mov.detalle.trim();
-    if (!Number.isInteger(cantidad) || cantidad < 1) { this.errorMov = 'La cantidad debe ser un número entero mayor a 0.'; return; }
-    if (this.stockTrasMovimiento < 0) { this.errorMov = `Solo hay ${this.productoMov.stock_actual || 0} en stock.`; return; }
-    if (this.mov.motivo === 'Otro' && !detalle) { this.errorMov = 'Describe el motivo en la observación.'; return; }
+    const cantidad = Number(this.mov().cantidad);
+    const detalle  = this.mov().detalle.trim();
+    if (!Number.isInteger(cantidad) || cantidad < 1) return this.errorMov.set('La cantidad debe ser un número entero mayor a 0.');
+    if (this.stockTrasMovimiento < 0) return this.errorMov.set(`Solo hay ${this.productoMov().stock_actual || 0} en stock.`);
+    if (this.mov().motivo === 'Otro' && !detalle) return this.errorMov.set('Describe el motivo en la observación.');
 
-    const prod = this.productoMov;
-    this.guardando = true;
+    const prod = this.productoMov();
+    this.guardando.set(true);
     this.inventarioService.registrar({
-      id_producto: prod.id_producto, id_sucursal: this.idSucursal,
-      tipo: this.mov.tipo, cantidad, motivo: this.mov.motivo, detalle: detalle || undefined
+      id_producto: prod.id_producto, id_sucursal: this.idSucursal(),
+      tipo: this.mov().tipo, cantidad, motivo: this.mov().motivo, detalle: detalle || undefined
     }).subscribe({
       next: (r) => {
-        prod.stock_actual = r.stock_actual;
+        this.fijarStock(Number(prod.id_producto), r.stock_actual);
         this.cerrarMovimiento();
-        this.dialogo.avisar(`${this.mov.tipo === 'INGRESO' ? 'Entrada' : 'Merma'} registrada: ${prod.nombre_producto} queda en ${r.stock_actual}`);
-        this.aplicarFiltros();
-        if (this.vista === 'movimientos') this.cargarMovimientos();
+        this.dialogo.avisar(`${this.mov().tipo === 'INGRESO' ? 'Entrada' : 'Merma'} registrada: ${prod.nombre_producto} queda en ${r.stock_actual}`);
+        if (this.vista() === 'movimientos') this.cargarMovimientos();
       },
       error: (e: any) => {
-        this.errorMov  = e?.error?.error || 'No se pudo registrar el movimiento.';
-        this.guardando = false;
-        this.cdr.detectChanges();
+        this.errorMov.set(e?.error?.error || 'No se pudo registrar el movimiento.');
+        this.guardando.set(false);
       }
     });
   }
 
   // ─── PESTAÑA MOVIMIENTOS ───
   verMovimientos(prod?: any) {
-    this.productoFiltroMov = prod ? { id_producto: prod.id_producto, nombre_producto: prod.nombre_producto } : null;
-    this.vista = 'movimientos';
+    this.productoFiltroMov.set(prod ? { id_producto: prod.id_producto, nombre_producto: prod.nombre_producto } : null);
+    this.vista.set('movimientos');
     this.cargarMovimientos();
   }
 
   cargarMovimientos() {
-    const dias  = { hoy: 0, '7': 6, '30': 29 }[this.periodoMov];
+    const dias  = { hoy: 0, '7': 6, '30': 29 }[this.periodoMov()];
     const desde = new Date();
     desde.setDate(desde.getDate() - dias);
-    this.cargandoMov = true;
+    this.cargandoMov.set(true);
     this.inventarioService.listar({
-      id_sucursal: this.idSucursal, id_producto: this.productoFiltroMov?.id_producto,
-      tipo: this.tipoMov, desde: desde.toLocaleDateString('en-CA')   // AAAA-MM-DD en hora local
+      id_sucursal: this.idSucursal(), id_producto: this.productoFiltroMov()?.id_producto,
+      tipo: this.tipoMov(), desde: desde.toLocaleDateString('en-CA')   // AAAA-MM-DD en hora local
     }).subscribe({
-      next:  (m) => { this.movimientos = m; this.cargandoMov = false; this.cdr.detectChanges(); },
-      error: () => { this.movimientos = []; this.cargandoMov = false; this.dialogo.error('No se pudo cargar el historial.'); }
+      next:  (m) => { this.movimientos.set(m); this.cargandoMov.set(false); },
+      error: () => { this.movimientos.set([]); this.cargandoMov.set(false); this.dialogo.error('No se pudo cargar el historial.'); }
     });
   }
 
   // ─── MODAL CATEGORÍA ───
-  abrirModalCategoria() { this.nombreCategoria = ''; this.errorCategoria = ''; this.mostrarModalCategoria = true; }
-  cerrarModalCategoria() { this.mostrarModalCategoria = false; }
+  abrirModalCategoria() { this.nombreCategoria.set(''); this.errorCategoria.set(''); this.mostrarModalCategoria.set(true); }
+  cerrarModalCategoria() { this.mostrarModalCategoria.set(false); }
 
   crearCategoria() {
-    if (!this.nombreCategoria.trim()) { this.errorCategoria = 'Escribe el nombre.'; return; }
-    this.productoService.crearCategoria({ nombre_categoria: this.nombreCategoria, descripcion_categoria: '' }).subscribe({
+    if (!this.nombreCategoria().trim()) return this.errorCategoria.set('Escribe el nombre.');
+    this.productoService.crearCategoria({ nombre_categoria: this.nombreCategoria(), descripcion_categoria: '' }).subscribe({
       next:  () => { this.cerrarModalCategoria(); this.dialogo.avisar('Categoría creada'); this.cargarCategorias(); },
-      error: (e: any) => { this.errorCategoria = e?.error?.error || 'No se pudo crear la categoría.'; this.cdr.detectChanges(); }
+      error: (e: any) => this.errorCategoria.set(e?.error?.error || 'No se pudo crear la categoría.')
     });
   }
 
   // ─── BORRAR CATEGORÍA ───
   abrirModalBorrarCategoria(cat: any) {
-    this.catABorrar            = cat;
-    this.productosBloqueantes  = this.productos.filter(p => p.id_categoria === cat.id_categoria);
-    this.pasoBorradoCat        = 1;
-    this.inputConfirmacionCat  = '';
-    this.errorBorrarCat        = '';
-    this.cargandoBorrarCat     = false;
-    this.mostrarModalBorrarCat = true;
+    this.catABorrar.set(cat);
+    this.productosBloqueantes.set(this.productos().filter(p => p.id_categoria === cat.id_categoria));
+    this.pasoBorradoCat.set(1);
+    this.inputConfirmacionCat.set('');
+    this.errorBorrarCat.set('');
+    this.cargandoBorrarCat.set(false);
+    this.mostrarModalBorrarCat.set(true);
   }
 
   cerrarModalBorrarCategoria() {
-    this.mostrarModalBorrarCat = false;
-    this.catABorrar            = null;
-    this.productosBloqueantes  = [];
-    this.pasoBorradoCat        = 1;
-    this.inputConfirmacionCat  = '';
-    this.errorBorrarCat        = '';
+    this.mostrarModalBorrarCat.set(false);
+    this.catABorrar.set(null);
+    this.productosBloqueantes.set([]);
+    this.pasoBorradoCat.set(1);
+    this.inputConfirmacionCat.set('');
+    this.errorBorrarCat.set('');
   }
 
   avanzarBorradoCat() {
-    if (this.productosBloqueantes.length > 0) return;
-    this.pasoBorradoCat = 2;
-    this.errorBorrarCat = '';
+    if (this.productosBloqueantes().length > 0) return;
+    this.pasoBorradoCat.set(2);
+    this.errorBorrarCat.set('');
   }
 
   confirmarBorradoCategoria() {
-    if (!this.catABorrar) return;
-    if (this.inputConfirmacionCat.trim() !== this.catABorrar.nombre_categoria) {
-      this.errorBorrarCat = 'El nombre no coincide.'; return;
-    }
-    this.cargandoBorrarCat = true;
-    this.errorBorrarCat    = '';
-    this.productoService.eliminarCategoria(this.catABorrar.id_categoria, this.inputConfirmacionCat).subscribe({
+    const cat = this.catABorrar();
+    if (!cat) return;
+    if (this.inputConfirmacionCat().trim() !== cat.nombre_categoria) return this.errorBorrarCat.set('El nombre no coincide.');
+    this.cargandoBorrarCat.set(true);
+    this.errorBorrarCat.set('');
+    this.productoService.eliminarCategoria(cat.id_categoria, this.inputConfirmacionCat()).subscribe({
       next: () => {
-        if (this.filtroCategoria === this.catABorrar.id_categoria) this.filtroCategoria = null;
+        if (this.filtroCategoria() === cat.id_categoria) this.filtroCategoria.set(null);
         this.cerrarModalBorrarCategoria();
         this.dialogo.avisar('Categoría eliminada');
         this.cargarCategorias();
-        this.aplicarFiltros();
       },
       error: (e: any) => {
-        this.cargandoBorrarCat = false;
-        this.errorBorrarCat    = e?.error?.error || 'No se pudo eliminar la categoría.';
-        this.cdr.detectChanges();
+        this.cargandoBorrarCat.set(false);
+        this.errorBorrarCat.set(e?.error?.error || 'No se pudo eliminar la categoría.');
       }
     });
   }

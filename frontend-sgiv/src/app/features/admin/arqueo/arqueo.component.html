@@ -5,8 +5,8 @@
     <div>
       <p class="inf-antetitulo">
         <span>{{ hoyTexto }}</span>
-        @if (abierto) { <span class="inf-vivo">Caja abierta</span> }
-        @if (cerrado) { <span class="inf-estado mal">Caja cerrada</span> }
+        @if (abierto()) { <span class="inf-vivo">Caja abierta</span> }
+        @if (cerrado()) { <span class="inf-estado mal">Caja cerrada</span> }
       </p>
       <h1 class="inf-titulo">Arqueo de caja</h1>
     </div>
@@ -15,11 +15,11 @@
     </button>
   </header>
 
-  @if (error) {
-    <p class="inf-hoja px-4 py-3 text-sm inf-baja">{{ error }}</p>
+  @if (error()) {
+    <p class="inf-hoja px-4 py-3 text-sm inf-baja">{{ error() }}</p>
   }
 
-  @if (cargando) {
+  @if (cargando()) {
     <div class="space-y-5">
       <div class="inf-esqueleto h-48"></div>
       <div class="inf-esqueleto h-24"></div>
@@ -28,34 +28,34 @@
   } @else {
 
     <!-- Turno abierto: lo que debe haber en caja -->
-    @if (abierto) {
+    @if (abierto()) {
       <section class="inf-hoja grid lg:grid-cols-2">
         <div class="p-6 bloque-linea lg:border-r">
           <p class="inf-etiqueta">Efectivo que debe haber en caja</p>
-          <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(tr.efectivo_esperado) }}</p>
+          <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(tr().efectivo_esperado) }}</p>
           <dl class="inf-pares mt-5 pt-4 separador">
-            <div><dt>Fondo inicial</dt><dd>{{ moneda() }} {{ cifra(turno.monto_inicial) }}</dd></div>
-            <div><dt>+ Cobrado en efectivo</dt><dd>{{ moneda() }} {{ cifra(tr.efectivo) }}</dd></div>
-            <div class="total"><dt>= Esperado en caja</dt><dd>{{ moneda() }} {{ cifra(tr.efectivo_esperado) }}</dd></div>
+            <div><dt>Fondo inicial</dt><dd>{{ moneda() }} {{ cifra(turno().monto_inicial) }}</dd></div>
+            <div><dt>+ Cobrado en efectivo</dt><dd>{{ moneda() }} {{ cifra(tr().efectivo) }}</dd></div>
+            <div class="total"><dt>= Esperado en caja</dt><dd>{{ moneda() }} {{ cifra(tr().efectivo_esperado) }}</dd></div>
           </dl>
-          <p class="inf-sub mt-4">Turno #{{ turno.id_turno }} · abierto desde {{ desde(turno.fecha_hora_apertura) }}</p>
+          <p class="inf-sub mt-4">Turno #{{ turno().id_turno }} · abierto desde {{ desde(turno().fecha_hora_apertura) }}</p>
         </div>
 
         <div class="p-6">
           <div class="flex items-baseline justify-between gap-3">
             <p class="inf-etiqueta">Cobros del turno</p>
-            <p class="inf-tenue text-xs">{{ entero(tr.ventas) }} ventas</p>
+            <p class="inf-tenue text-xs">{{ entero(tr().ventas) }} ventas</p>
           </div>
-          <p class="inf-valor">{{ moneda() }} {{ cifra(tr.total) }}</p>
-          @if (tr.metodos.length) {
+          <p class="inf-valor">{{ moneda() }} {{ cifra(tr().total) }}</p>
+          @if (tr().metodos.length) {
             <div class="inf-apilada my-4">
-              @for (m of tr.metodos; track m.metodo_pago; let i = $index) {
-                <span [style.width.%]="porcentaje(m.total, tr.total)" [style.background]="colorSerie(i)"></span>
+              @for (m of tr().metodos; track m.metodo_pago; let i = $index) {
+                <span [style.width.%]="porcentaje(m.total, tr().total)" [style.background]="colorSerie(i)"></span>
               }
             </div>
             <table class="inf-tabla">
               <tbody>
-                @for (m of tr.metodos; track m.metodo_pago; let i = $index) {
+                @for (m of tr().metodos; track m.metodo_pago; let i = $index) {
                   <tr>
                     <td class="pl-0!"><span class="flex items-center gap-2"><i class="inf-muestra" [style.background]="colorSerie(i)"></i>{{ m.metodo_pago }}</span></td>
                     <td class="num inf-tenue">{{ m.ventas }} vta.</td>
@@ -82,22 +82,22 @@
                   <span>{{ moneda() }}</span>
                   <input type="number" min="0" step="0.1" placeholder="0.00" [(ngModel)]="efectivoContado" aria-label="Efectivo contado">
                 </div>
-                @if (diferencia !== null) {
-                  <span class="inf-estado" [ngClass]="claseDiferencia(diferencia)">{{ textoDiferencia(diferencia) }}</span>
+                @if (diferencia() !== null) {
+                  <span class="inf-estado" [ngClass]="claseDiferencia(diferencia())">{{ textoDiferencia(diferencia()) }}</span>
                 }
               </div>
 
-              @if (conBilletes) {
-                <button class="flex items-center gap-1.5 inf-enlace mt-4" (click)="mostrarConteo = !mostrarConteo">
-                  <lucide-icon [img]="mostrarConteo ? icons.abajo : icons.derecha" class="w-3.5 h-3.5"></lucide-icon>
+              @if (conBilletes()) {
+                <button class="flex items-center gap-1.5 inf-enlace mt-4" (click)="mostrarConteo.set(!mostrarConteo())">
+                  <lucide-icon [img]="mostrarConteo() ? icons.abajo : icons.derecha" class="w-3.5 h-3.5"></lucide-icon>
                   Contar por billetes y monedas
                 </button>
-                @if (mostrarConteo) {
+                @if (mostrarConteo()) {
                   <div class="conteo mt-3">
                     @for (d of denominaciones; track d) {
                       <label>
                         <span class="inf-tenue">{{ d >= 1 ? d : (d * 100) + ' ctv.' }}</span>
-                        <input type="number" min="0" step="1" placeholder="0" [(ngModel)]="conteo[d]" (ngModelChange)="actualizarConteo()">
+                        <input type="number" min="0" step="1" placeholder="0" [(ngModel)]="conteo()[d]" (ngModelChange)="actualizarConteo()">
                       </label>
                     }
                   </div>
@@ -116,23 +116,23 @@
     }
 
     <!-- Turno ya cerrado -->
-    @if (cerrado) {
+    @if (cerrado()) {
       <section class="inf-hoja p-6">
         <div class="inf-seccion">
-          <h2>Turno #{{ turno.id_turno }} cerrado</h2>
-          <span class="inf-nota">{{ desde(turno.fecha_hora_apertura) }} → {{ hora(turno.fecha_hora_cierre) }}</span>
+          <h2>Turno #{{ turno().id_turno }} cerrado</h2>
+          <span class="inf-nota">{{ desde(turno().fecha_hora_apertura) }} → {{ hora(turno().fecha_hora_cierre) }}</span>
         </div>
         <div class="grid sm:grid-cols-3 gap-px resultado">
-          <div><p class="inf-etiqueta">Esperado en caja</p><p class="inf-valor">{{ moneda() }} {{ cifra(tr.efectivo_esperado) }}</p></div>
+          <div><p class="inf-etiqueta">Esperado en caja</p><p class="inf-valor">{{ moneda() }} {{ cifra(tr().efectivo_esperado) }}</p></div>
           <div>
             <p class="inf-etiqueta">Efectivo contado</p>
-            <p class="inf-valor">{{ turno.efectivo_contado !== null ? moneda() + ' ' + cifra(turno.efectivo_contado) : '—' }}</p>
+            <p class="inf-valor">{{ turno().efectivo_contado !== null ? moneda() + ' ' + cifra(turno().efectivo_contado) : '—' }}</p>
           </div>
           <div>
             <p class="inf-etiqueta">Diferencia</p>
             <p class="inf-valor">
-              @if (turno.diferencia !== null) {
-                <span class="inf-estado text-sm!" [ngClass]="claseDiferencia(turno.diferencia)">{{ textoDiferencia(turno.diferencia) }}</span>
+              @if (turno().diferencia !== null) {
+                <span class="inf-estado text-sm!" [ngClass]="claseDiferencia(turno().diferencia)">{{ textoDiferencia(turno().diferencia) }}</span>
               } @else { <span class="inf-tenue">No se contó</span> }
             </p>
           </div>
@@ -141,7 +141,7 @@
     }
 
     <!-- Sin caja -->
-    @if (!turno) {
+    @if (!turno()) {
       <section class="inf-hoja p-6 flex items-start gap-4">
         <span class="inf-estado aviso mt-1"></span>
         <p class="inf-tinta font-semibold text-[14px]">No abriste caja hoy</p>
@@ -152,14 +152,14 @@
     <section class="inf-hoja inf-tira overflow-hidden">
       <div>
         <p class="inf-etiqueta">Ventas de hoy</p>
-        <p class="inf-valor">{{ entero(hoy.total_ventas) }}</p>
+        <p class="inf-valor">{{ entero(hoy().total_ventas) }}</p>
       </div>
       <div>
         <p class="inf-etiqueta">Ingresos de hoy</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(hoy.ingresos_totales) }}</p>
-        <p class="inf-sub">ticket promedio {{ moneda() }} {{ cifra(hoy.total_ventas ? hoy.ingresos_totales / hoy.total_ventas : 0) }}</p>
+        <p class="inf-valor">{{ moneda() }} {{ cifra(hoy().ingresos_totales) }}</p>
+        <p class="inf-sub">ticket promedio {{ moneda() }} {{ cifra(hoy().total_ventas ? hoy().ingresos_totales / hoy().total_ventas : 0) }}</p>
       </div>
-      @for (m of metodosHoy; track m.metodo) {
+      @for (m of metodosHoy(); track m.metodo) {
         <div>
           <p class="inf-etiqueta">{{ m.metodo }}</p>
           <p class="inf-valor">{{ moneda() }} {{ cifra(m.total) }}</p>
@@ -173,15 +173,15 @@
       <div class="px-5 pt-5">
         <div class="inf-seccion mb-1!">
           <h2>Ventas del día</h2>
-          <span class="inf-nota">{{ arqueo.ventas?.length || 0 }} registros</span>
+          <span class="inf-nota">{{ arqueo().ventas?.length || 0 }} registros</span>
         </div>
       </div>
-      @if (arqueo.ventas?.length) {
+      @if (arqueo().ventas?.length) {
         <div class="overflow-x-auto">
           <table class="inf-tabla">
             <thead><tr><th>Hora</th><th>Venta</th><th class="num">Ítems</th><th>Método</th><th class="num">Total</th></tr></thead>
             <tbody>
-              @for (v of arqueo.ventas; track v.id_venta) {
+              @for (v of arqueo().ventas; track v.id_venta) {
                 <tr>
                   <td class="inf-tenue">{{ hora(v.fecha_venta) }}</td>
                   <td class="fuerte">#{{ v.id_venta }}</td>
@@ -192,7 +192,7 @@
               }
             </tbody>
             <tfoot>
-              <tr><td colspan="4">Total del día</td><td class="num">{{ moneda() }} {{ cifra(hoy.ingresos_totales) }}</td></tr>
+              <tr><td colspan="4">Total del día</td><td class="num">{{ moneda() }} {{ cifra(hoy().ingresos_totales) }}</td></tr>
             </tfoot>
           </table>
         </div>
@@ -204,28 +204,28 @@
 </div>
 
 <!-- Confirmación del cierre -->
-@if (mostrarConfirmCierre) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="mostrarConfirmCierre = false">
+@if (mostrarConfirmCierre()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="mostrarConfirmCierre.set(false)">
     <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <h3 class="inf-tinta font-semibold text-[15px]">¿Cerrar la caja?</h3>
-        <button class="inf-tenue" (click)="mostrarConfirmCierre = false" aria-label="Cancelar">
+        <button class="inf-tenue" (click)="mostrarConfirmCierre.set(false)" aria-label="Cancelar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
       <dl class="inf-pares p-5">
-        <div><dt>Ventas del turno</dt><dd>{{ entero(tr.ventas) }}</dd></div>
-        <div><dt>Total cobrado</dt><dd>{{ moneda() }} {{ cifra(tr.total) }}</dd></div>
-        <div><dt>Esperado en caja</dt><dd>{{ moneda() }} {{ cifra(tr.efectivo_esperado) }}</dd></div>
-        <div><dt>Efectivo contado</dt><dd>{{ diferencia !== null ? moneda() + ' ' + cifra(efectivoContado) : 'No se registró' }}</dd></div>
-        @if (diferencia !== null) {
-          <div class="total"><dt>Resultado</dt><dd><span class="inf-estado" [ngClass]="claseDiferencia(diferencia)">{{ textoDiferencia(diferencia) }}</span></dd></div>
+        <div><dt>Ventas del turno</dt><dd>{{ entero(tr().ventas) }}</dd></div>
+        <div><dt>Total cobrado</dt><dd>{{ moneda() }} {{ cifra(tr().total) }}</dd></div>
+        <div><dt>Esperado en caja</dt><dd>{{ moneda() }} {{ cifra(tr().efectivo_esperado) }}</dd></div>
+        <div><dt>Efectivo contado</dt><dd>{{ diferencia() !== null ? moneda() + ' ' + cifra(efectivoContado()) : 'No se registró' }}</dd></div>
+        @if (diferencia() !== null) {
+          <div class="total"><dt>Resultado</dt><dd><span class="inf-estado" [ngClass]="claseDiferencia(diferencia())">{{ textoDiferencia(diferencia()) }}</span></dd></div>
         }
       </dl>
       <div class="flex gap-2 p-5">
-        <button class="inf-boton flex-1 justify-center py-2!" (click)="mostrarConfirmCierre = false">Cancelar</button>
-        <button class="boton-cerrar flex-1" [disabled]="cerrando" (click)="ejecutarCierreCaja()">
-          {{ cerrando ? 'Cerrando…' : 'Confirmar cierre' }}
+        <button class="inf-boton flex-1 justify-center py-2!" (click)="mostrarConfirmCierre.set(false)">Cancelar</button>
+        <button class="boton-cerrar flex-1" [disabled]="cerrando()" (click)="ejecutarCierreCaja()">
+          {{ cerrando() ? 'Cerrando…' : 'Confirmar cierre' }}
         </button>
       </div>
     </div>

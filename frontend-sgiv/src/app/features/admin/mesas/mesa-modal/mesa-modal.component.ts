@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, inject, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CuentaService } from '../../../../core/services/cuenta.service';
@@ -24,6 +24,10 @@ export interface GrupoCuenta {
 
 const centavos = (n: any) => Math.round(Number(n || 0) * 100);
 
+/** Total de lo que falta cobrar */
+const totalPendiente = (items: any[]) =>
+  items.filter(i => !i.pagado).reduce((s, i) => s + centavos(i.subtotal), 0) / 100;
+
 @Component({
   selector: 'app-mesa-modal',
   standalone: true,
@@ -39,7 +43,6 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   private cuentaService = inject(CuentaService);
   private dialogo = inject(DialogoService);
   private socketService = inject(SocketService);
-  private cdr           = inject(ChangeDetectorRef);
   readonly ajustes       = inject(AjustesService);
   private impresion = inject(ImpresionService);
   readonly moneda        = this.ajustes.moneda;
@@ -50,45 +53,38 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User
   };
 
-  esAdmin         = false;
-  cargando        = false;
-  cuentaActiva:   any = null;
-  vista: 'info' | 'comanda' | 'pago' | 'qr' | 'ticket' = 'info';
+  esAdmin = false;
+  readonly cargando     = signal(false);
+  readonly cuentaActiva = signal<any>(null);
+  readonly vista        = signal<'info' | 'comanda' | 'pago' | 'qr' | 'ticket'>('info');
 
-  productos:      any[] = [];
-  categorias:     any[] = [];
-  categoriaFiltro: number | null = null;
-  busqueda        = '';
+  readonly productos       = signal<any[]>([]);
+  readonly categorias      = signal<{ id: number; nombre: string }[]>([]);
+  readonly categoriaFiltro = signal<number | null>(null);
+  readonly busqueda        = signal('');
 
   readonly metodo = METODO_PAGO;
-  metodoPago: MetodoPago = METODO_PAGO.efectivo;
-  montoPagado     = 0;
+  readonly metodoPago  = signal<MetodoPago>(METODO_PAGO.efectivo);
+  readonly montoPagado = signal(0);
   @ViewChild('inputMontoMesa') inputMontoMesaRef?: ElementRef<HTMLInputElement>;
   @ViewChild('zonaTicket') zonaTicket?: ElementRef<HTMLElement>;
-  get cambio(): number {
-    return Math.max(0, this.montoPagado - this.totalCobro);
-  }
-  get totalCuenta(): number {
-    return Number(this.cuentaActiva?.total_acumulado || 0);
-  }
+
+  readonly totalCuenta = computed(() => Number(this.cuentaActiva()?.total_acumulado || 0));
 
   // ─── Cobro por separado ───
   /** null = cobrar todo lo pendiente */
-  parteCobro: GrupoCuenta | null = null;
+  readonly parteCobro = signal<GrupoCuenta | null>(null);
 
-  get totalCobro(): number {
-    return this.parteCobro ? this.parteCobro.pendiente : this.totalCuenta;
-  }
+  readonly totalCobro = computed(() => this.parteCobro()?.pendiente ?? this.totalCuenta());
+  readonly cambio     = computed(() => Math.max(0, this.montoPagado() - this.totalCobro()));
 
-  get itemsPendientes(): any[] {
-    return (this.cuentaActiva?.items || []).filter((i: any) => !i.pagado);
-  }
+  readonly itemsPendientes = computed<any[]>(() => (this.cuentaActiva()?.items || []).filter((i: any) => !i.pagado));
 
   /** Agrupa por celular; los clientes sin nombre se numeran en orden de llegada */
-  get grupos(): GrupoCuenta[] {
+  readonly grupos = computed(() => {
     const mapa = new Map<string | null, GrupoCuenta>();
     let numero = 0;
-    for (const item of this.cuentaActiva?.items || []) {
+    for (const item of this.cuentaActiva()?.items || []) {
       const clave = item.cliente_mesa ?? null;
       let g = mapa.get(clave);
       if (!g) {
@@ -102,19 +98,26 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     }
     // Lo del cajero al final
     return [...mapa.values()].sort((a, b) => Number(a.clave === null) - Number(b.clave === null));
-  }
+  });
 
   /** Se agrupa cuando algún producto vino del celular de un cliente */
-  get porCliente(): boolean {
-    return (this.cuentaActiva?.items || []).some((i: any) => i.cliente_mesa);
-  }
+  readonly porCliente = computed(() => (this.cuentaActiva()?.items || []).some((i: any) => i.cliente_mesa));
 
-  datosTicket: any = null;
-  fechaTicket = new Date();
+  readonly productosFiltrados = computed(() => {
+    const cat = this.categoriaFiltro(), texto = this.busqueda().toLowerCase();
+    return this.productos().filter(p =>
+      (!cat || p.id_categoria === cat) && (!texto || p.nombre_producto.toLowerCase().includes(texto)));
+  });
 
-  qrData: any = null;
+  readonly datosTicket = signal<any>(null);
+  readonly fechaTicket = signal(new Date());
 
-  notaProducto = '';
+  readonly qrData = signal<any>(null);
+
+  readonly notaProducto = signal('');
+
+  /** false tras cobrar solo una parte: la mesa sigue abierta */
+  readonly cuentaCerrada = signal(true);
 
   private subs: Subscription[] = [];
 
@@ -131,47 +134,34 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   private escucharSocket() {
-    const sub = this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
-      if (this.cuentaActiva && data.id_mesa === this.mesa?.id_mesa && data.items) {
-        this.cuentaActiva.items          = data.items;
-        this.cuentaActiva.total_acumulado = data.total_acumulado;
-        this.cdr.detectChanges();
-      }
-    });
-    this.subs.push(sub);
+    this.subs.push(this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
+      if (this.cuentaActiva() && data.id_mesa === this.mesa?.id_mesa && data.items)
+        this.cuentaActiva.update(c => ({ ...c, items: data.items, total_acumulado: data.total_acumulado }));
+    }));
 
-    const subStock = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(payload => {
-      if (!payload) return;
-      const idSuc = Number(this.mesa?.id_sucursal) || 1;
-      if (Number(payload.id_sucursal) !== idSuc) return;
+    this.subs.push(this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(payload => {
+      if (!payload || Number(payload.id_sucursal) !== (Number(this.mesa?.id_sucursal) || 1)) return;
+      this.fijarStock(Number(payload.id_producto), Number(payload.nueva_cantidad_disponible) || 0);
+    }));
+  }
 
-      const idProd = Number(payload.id_producto);
-      const nuevo  = Number(payload.nueva_cantidad_disponible) || 0;
-
-      this.productos = this.productos.map(p =>
-        Number(p.id_producto) === idProd
-          ? { ...p, stock_actual: nuevo }
-          : p
-      );
-      this.cdr.detectChanges();
-    });
-    this.subs.push(subStock);
+  private fijarStock(id_producto: number, stock: number) {
+    this.productos.update(ps => ps.map(p => Number(p.id_producto) === id_producto ? { ...p, stock_actual: stock } : p));
   }
 
   cargarEstadoMesa() {
-    this.cargando = true;
+    this.cargando.set(true);
     this.cuentaService.getCuentaActiva(this.mesa.id_mesa).subscribe({
       next: (res) => {
-        this.cuentaActiva = res.cuenta;
-        if (this.cuentaActiva) {
-          this.vista    = 'comanda';
-          this.cargando = false;
-          this.cdr.detectChanges();
+        this.cuentaActiva.set(res.cuenta);
+        if (res.cuenta) {
+          this.vista.set('comanda');
+          this.cargando.set(false);
         } else {
           this.abrirMesa();
         }
       },
-      error: () => { this.cargando = false; this.cdr.detectChanges(); }
+      error: () => this.cargando.set(false)
     });
   }
 
@@ -184,14 +174,14 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     });
     if (!si) return;
 
-    this.cargando = true;
+    this.cargando.set(true);
     this.cuentaService.resetMesa(this.mesa.id_mesa).subscribe({
       next: () => {
-        this.cargando = false;
+        this.cargando.set(false);
         this.mesaActualizada.emit();
         this.cerrarModal();
       },
-      error: (e: any) => { this.cargando = false; this.dialogo.error(e?.error?.error || 'No se pudo resetear la mesa.'); this.cdr.detectChanges(); }
+      error: (e: any) => { this.cargando.set(false); this.dialogo.error(e?.error?.error || 'No se pudo resetear la mesa.'); }
     });
   }
 
@@ -200,13 +190,11 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
     this.cuentaService.getProductos(id_sucursal).subscribe({
       next: (prods: any[]) => {
-        this.productos = prods.filter(p => Number(p.stock_actual) > 0);
-
+        const productos = prods.filter(p => Number(p.stock_actual) > 0);
         const cats = new Map<number, string>();
-        this.productos.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
-        this.categorias = Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre }));
-
-        this.cdr.detectChanges();
+        productos.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
+        this.productos.set(productos);
+        this.categorias.set(Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre })));
       },
       error: () => {
         console.error('Error al cargar catálogo de la mesa');
@@ -214,34 +202,25 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     });
   }
 
-  get productosFiltrados(): any[] {
-    return this.productos.filter(p => {
-      const porCat    = !this.categoriaFiltro || p.id_categoria === this.categoriaFiltro;
-      const porNombre = !this.busqueda || p.nombre_producto.toLowerCase().includes(this.busqueda.toLowerCase());
-      return porCat && porNombre;
-    });
-  }
-
   abrirMesa() {
-    this.cargando = true;
+    this.cargando.set(true);
     this.cuentaService.abrirCuenta(this.mesa.id_mesa).subscribe({
       next: (res) => {
-        this.cuentaActiva = { ...res.cuenta, items: [], total_acumulado: 0 };
-        this.vista        = 'comanda';
-        this.cargando     = false;
+        this.cuentaActiva.set({ ...res.cuenta, items: [], total_acumulado: 0 });
+        this.vista.set('comanda');
+        this.cargando.set(false);
         this.mesaActualizada.emit();
-        this.cdr.detectChanges();
       },
       error: (e: any) => {
         this.dialogo.error(e?.error?.error || 'No se pudo abrir la mesa.');
-        this.cargando = false;
-        this.cdr.detectChanges();
+        this.cargando.set(false);
       }
     });
   }
 
   agregarProducto(producto: any) {
-    if (!this.cuentaActiva) return;
+    const cuenta = this.cuentaActiva();
+    if (!cuenta) return;
 
     const stockDisponible = Number(producto.stock_actual) || 0;
     if (stockDisponible <= 0) {
@@ -250,78 +229,67 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     }
 
     const precio = Number(producto.precio_unitario);
+    const nota   = this.notaProducto() || undefined;
 
-    this.cuentaService.agregarProducto(this.cuentaActiva.id_cuenta, {
+    this.cuentaService.agregarProducto(cuenta.id_cuenta, {
       id_producto:     producto.id_producto,
       cantidad:        1,
       precio_unitario: precio,
-      nota:            this.notaProducto || undefined
+      nota
     }).subscribe({
       next: (res: any) => {
-        if (!this.cuentaActiva.items) this.cuentaActiva.items = [];
-
-        const itemExistente = this.cuentaActiva.items.find(
-          (i: any) => i.id_producto === producto.id_producto && i.origen === 'cajero' && !i.pagado && !i.cliente_mesa
-        );
-
-        if (itemExistente) {
-          itemExistente.cantidad++;
-          itemExistente.subtotal = itemExistente.cantidad * precio;
-        } else {
-          this.cuentaActiva.items.push({
-            id_detalle_cuenta: res.detalle?.id_detalle_cuenta,
-            id_producto:       producto.id_producto,
-            nombre_producto:   producto.nombre_producto,
-            url_imagen:        producto.url_imagen,
-            precio_unitario:   precio,
-            cantidad:          1,
-            subtotal:          precio,
-            nota:              this.notaProducto || null,
-            origen:            'cajero'
-          });
-        }
-
-        producto.stock_actual = stockDisponible - 1;
-        this.cuentaActiva.total_acumulado = res.total ?? this.calcularTotalLocal();
-        this.notaProducto = '';
-        this.cdr.detectChanges();
+        this.cuentaActiva.update(c => {
+          const items = [...(c.items || [])];
+          const i = items.findIndex((x: any) =>
+            x.id_producto === producto.id_producto && x.origen === 'cajero' && !x.pagado && !x.cliente_mesa);
+          if (i >= 0) {
+            const cantidad = items[i].cantidad + 1;
+            items[i] = { ...items[i], cantidad, subtotal: cantidad * precio };
+          } else {
+            items.push({
+              id_detalle_cuenta: res.detalle?.id_detalle_cuenta,
+              id_producto:       producto.id_producto,
+              nombre_producto:   producto.nombre_producto,
+              url_imagen:        producto.url_imagen,
+              precio_unitario:   precio,
+              cantidad:          1,
+              subtotal:          precio,
+              nota:              nota || null,
+              origen:            'cajero'
+            });
+          }
+          return { ...c, items, total_acumulado: res.total ?? totalPendiente(items) };
+        });
+        this.fijarStock(Number(producto.id_producto), stockDisponible - 1);
+        this.notaProducto.set('');
       },
       error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo agregar el producto.')
     });
   }
 
   quitarProducto(id_detalle: number) {
-    const itemQuitado = this.cuentaActiva?.items?.find(
-      (i: any) => i.id_detalle_cuenta === id_detalle
-    );
+    const itemQuitado = this.cuentaActiva()?.items?.find((i: any) => i.id_detalle_cuenta === id_detalle);
 
     this.cuentaService.quitarProducto(id_detalle).subscribe({
       next: (res: any) => {
-        this.cuentaActiva.items = this.cuentaActiva.items.filter(
-          (i: any) => i.id_detalle_cuenta !== id_detalle
-        );
-
+        this.cuentaActiva.update(c => {
+          const items = c.items.filter((i: any) => i.id_detalle_cuenta !== id_detalle);
+          return { ...c, items, total_acumulado: res.total ?? totalPendiente(items) };
+        });
         if (itemQuitado) {
-          const prod = this.productos.find(p => p.id_producto === itemQuitado.id_producto);
-          if (prod) prod.stock_actual = Number(prod.stock_actual) + Number(itemQuitado.cantidad || 1);
+          const prod = this.productos().find(p => p.id_producto === itemQuitado.id_producto);
+          if (prod) this.fijarStock(Number(prod.id_producto), Number(prod.stock_actual) + Number(itemQuitado.cantidad || 1));
         }
-
-        this.cuentaActiva.total_acumulado = res.total ?? this.calcularTotalLocal();
-        this.cdr.detectChanges();
       },
       error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo quitar el producto.')
     });
   }
 
-  private calcularTotalLocal(): number {
-    return this.itemsPendientes.reduce((s: number, i: any) => s + centavos(i.subtotal), 0) / 100;
-  }
-
   irAPago(parte: GrupoCuenta | null = null) {
-    this.parteCobro  = parte;
-    this.montoPagado = 0;
-    this.metodoPago  = this.ajustes.config().pago_efectivo ? METODO_PAGO.efectivo : METODO_PAGO.qr;
-    this.vista       = 'pago';
+    this.parteCobro.set(parte);
+    this.montoPagado.set(0);
+    this.metodoPago.set(this.ajustes.config().pago_efectivo ? METODO_PAGO.efectivo : METODO_PAGO.qr);
+    this.vista.set('pago');
     setTimeout(() => {
       const el = this.inputMontoMesaRef?.nativeElement;
       if (el) { el.focus(); el.select(); }
@@ -329,65 +297,62 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   confirmarPago() {
-    const totalReq = this.totalCobro;
-    if (this.metodoPago === METODO_PAGO.efectivo && (!this.montoPagado || this.montoPagado < totalReq)) {
-      this.montoPagado = totalReq;
+    const totalReq = this.totalCobro();
+    const metodo = this.metodoPago();
+    if (metodo === METODO_PAGO.efectivo && (!this.montoPagado() || this.montoPagado() < totalReq)) {
+      this.montoPagado.set(totalReq);
     }
 
-    const parte = this.parteCobro;
-    this.cargando = true;
-    this.cuentaService.cerrarCuenta(this.cuentaActiva.id_cuenta, this.metodoPago, parte ? parte.clave : undefined).subscribe({
+    const parte = this.parteCobro();
+    this.cargando.set(true);
+    this.cuentaService.cerrarCuenta(this.cuentaActiva().id_cuenta, metodo, parte ? parte.clave : undefined).subscribe({
       next: (res: any) => {
-        this.cuentaCerrada = res.cuenta_cerrada !== false;
-        this.datosTicket = {
+        this.cuentaCerrada.set(res.cuenta_cerrada !== false);
+        this.datosTicket.set({
           id_venta:     res.id_venta,
           numero_mesa:  this.mesa.numero_mesa,
           cliente:      parte?.clave ? parte.nombre : undefined,
-          items:        parte ? parte.items.filter(i => !i.pagado) : this.itemsPendientes,
+          items:        parte ? parte.items.filter(i => !i.pagado) : this.itemsPendientes(),
           total:        res.total ?? totalReq,
-          metodo:       this.metodoPago,
-          cambio:       this.cambio
-        };
-        this.fechaTicket = new Date();
-        this.cargando    = false;
-        this.vista       = 'ticket';
+          metodo,
+          cambio:       this.cambio()
+        });
+        this.fechaTicket.set(new Date());
+        this.cargando.set(false);
+        this.vista.set('ticket');
         this.mesaActualizada.emit();
-        this.cdr.detectChanges();
       },
       error: (e: any) => {
         this.dialogo.error(e?.error?.error || 'No se pudo cerrar la cuenta.');
-        this.cargando = false;
-        this.cdr.detectChanges();
+        this.cargando.set(false);
       }
     });
   }
 
   verQR() {
-    this.vista = 'qr';
-    if (!this.qrData) {
+    this.vista.set('qr');
+    if (!this.qrData()) {
       this.cuentaService.getQR(this.mesa.id_mesa).subscribe({
-        next: (data) => { this.qrData = data; this.cdr.detectChanges(); }
+        next: (data) => this.qrData.set(data)
       });
     }
   }
 
   descargarQR() {
-    if (!this.qrData) return;
+    const qr = this.qrData();
+    if (!qr) return;
     const a = document.createElement('a');
-    a.href     = this.qrData.qr;
+    a.href     = qr.qr;
     a.download = `QR_Mesa_${this.mesa.numero_mesa}.png`;
     a.click();
   }
 
-  /** false tras cobrar solo una parte: la mesa sigue abierta */
-  cuentaCerrada = true;
-
   /** Después del comprobante de una parte se vuelve al consumo de la mesa */
   cerrarTicket() {
-    if (this.cuentaCerrada) { this.cerrarModal(); return; }
-    this.datosTicket = null;
-    this.parteCobro  = null;
-    this.vista       = 'comanda';
+    if (this.cuentaCerrada()) { this.cerrarModal(); return; }
+    this.datosTicket.set(null);
+    this.parteCobro.set(null);
+    this.vista.set('comanda');
     this.cargarEstadoMesa();
   }
 
@@ -396,11 +361,10 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   cerrarModal() {
-    const cuentaSinItems = this.cuentaActiva
-                        && this.itemsPendientes.length === 0
-                        && this.vista !== 'ticket';
+    const cuenta = this.cuentaActiva();
+    const cuentaSinItems = cuenta && this.itemsPendientes().length === 0 && this.vista() !== 'ticket';
     if (cuentaSinItems) {
-      this.cuentaService.cancelarSiVacia(this.cuentaActiva.id_cuenta).subscribe({
+      this.cuentaService.cancelarSiVacia(cuenta.id_cuenta).subscribe({
         next: () => { this.mesaActualizada.emit(); this.cerrado.emit(); },
         error: () => this.cerrado.emit()
       });

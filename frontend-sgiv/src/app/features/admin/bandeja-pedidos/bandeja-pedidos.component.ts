@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, input, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, OnDestroy, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { LucideAngularModule, Bell, X, Check, Minus, Plus, Trash2, Volume2, VolumeX, Truck } from 'lucide-angular';
@@ -9,6 +9,11 @@ import { DialogoService } from '../../../core/services/dialogo.service';
 import { sondeo } from '../../../core/utils/sondeo';
 
 type Pestana = 'pendientes' | 'entregar';
+
+const sinClave = <T>(o: Record<number, T>, clave: number): Record<number, T> => {
+  const { [clave]: _, ...resto } = o;
+  return resto;
+};
 
 // ─── Bandeja de pedidos QR (visible en todo el panel del cajero) ───
 @Component({
@@ -21,7 +26,6 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   private pedidoService = inject(PedidoService);
   private dialogo        = inject(DialogoService);
   private socketService = inject(SocketService);
-  private cdr           = inject(ChangeDetectorRef);
   readonly moneda        = inject(AjustesService).moneda;
 
   readonly icons = { bell: Bell, x: X, check: Check, minus: Minus, plus: Plus,
@@ -31,18 +35,18 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   private readonly RESPALDO_MS     = 30_000;
   private readonly CLAVE_SONIDO    = 'bandeja_sonido_sgiv';
 
-  abierta  = false;
+  readonly abierta = signal(false);
   /** false = el botón para abrirla lo pone el panel (barra lateral / superior) */
   flotante = input(true);
+  readonly pestana     = signal<Pestana>('pendientes');
+  readonly pendientes  = signal<any[]>([]);
+  readonly porEntregar = signal<any[]>([]);
   /** Lo muestra el botón del panel cuando la bandeja no es flotante */
-  readonly conteo = signal({ pendientes: 0, porEntregar: 0 });
-  pestana: Pestana = 'pendientes';
-  pendientes: any[] = [];
-  porEntregar: any[] = [];
-  ocupado: Record<number, boolean> = {};
-  errores: Record<number, string> = {};
-  sonidoActivo = true;
-  ahora = Date.now();
+  readonly conteo = computed(() => ({ pendientes: this.pendientes().length, porEntregar: this.porEntregar().length }));
+  readonly ocupado = signal<Record<number, boolean>>({});
+  readonly errores = signal<Record<number, string>>({});
+  readonly sonidoActivo = signal(true);
+  readonly ahora = signal(Date.now());
 
   private idSucursal = 1;
   private subs: Subscription[] = [];
@@ -55,7 +59,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   ngOnInit() {
     try {
       this.idSucursal   = Number(JSON.parse(localStorage.getItem('usuario_sgiv') || '{}').id_sucursal) || 1;
-      this.sonidoActivo = localStorage.getItem(this.CLAVE_SONIDO) !== 'no';
+      this.sonidoActivo.set(localStorage.getItem(this.CLAVE_SONIDO) !== 'no');
     } catch { /* valores por defecto */ }
 
     document.addEventListener('click', this.desbloquearAudio, { once: true });
@@ -74,9 +78,9 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
 
     this.detenerSondeo = sondeo(() => this.cargar(), this.RESPALDO_MS);
     this.timers.push(setInterval(() => {
-      if (this.pendientes.length > 0) this.sonar();
+      if (this.pendientes().length > 0) this.sonar();
     }, this.RECORDATORIO_MS));
-    this.timers.push(setInterval(() => { this.ahora = Date.now(); this.cdr.detectChanges(); }, 30_000));
+    this.timers.push(setInterval(() => this.ahora.set(Date.now()), 30_000));
   }
 
   ngOnDestroy() {
@@ -97,13 +101,10 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   cargar() {
     this.pedidoService.bandeja().subscribe({
       next: (lista) => {
-        this.pendientes  = lista.filter(p => p.estado_pedido === 'Pendiente_Cajero');
-        this.porEntregar = lista.filter(p => p.estado_pedido === 'Confirmado');
-        this.conteo.set({ pendientes: this.pendientes.length, porEntregar: this.porEntregar.length });
-        document.title = this.pendientes.length
-          ? `(${this.pendientes.length}) ${this.tituloOriginal}`
-          : this.tituloOriginal;
-        this.cdr.detectChanges();
+        const pendientes = lista.filter(p => p.estado_pedido === 'Pendiente_Cajero');
+        this.pendientes.set(pendientes);
+        this.porEntregar.set(lista.filter(p => p.estado_pedido === 'Confirmado'));
+        document.title = pendientes.length ? `(${pendientes.length}) ${this.tituloOriginal}` : this.tituloOriginal;
       },
       error: () => { /* sin permiso o sin conexión: la bandeja queda como estaba */ }
     });
@@ -116,24 +117,24 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
 
   // ─── Panel ───
   alternar() {
-    this.abierta = !this.abierta;
-    if (this.abierta) {
-      this.pestana = this.pendientes.length || !this.porEntregar.length ? 'pendientes' : 'entregar';
+    this.abierta.update(a => !a);
+    if (this.abierta()) {
+      this.pestana.set(this.pendientes().length || !this.porEntregar().length ? 'pendientes' : 'entregar');
       this.prepararAudio();
     }
   }
 
   alternarSonido() {
-    this.sonidoActivo = !this.sonidoActivo;
-    try { localStorage.setItem(this.CLAVE_SONIDO, this.sonidoActivo ? 'si' : 'no'); } catch { }
-    if (this.sonidoActivo) { this.prepararAudio(); this.sonar(); }
+    this.sonidoActivo.update(a => !a);
+    try { localStorage.setItem(this.CLAVE_SONIDO, this.sonidoActivo() ? 'si' : 'no'); } catch { }
+    if (this.sonidoActivo()) { this.prepararAudio(); this.sonar(); }
   }
 
   // ─── Acciones del cajero ───
   cambiarCantidad(pedido: any, item: any, cantidad: number) {
     if (cantidad < 0) return;
     if (cantidad === 0 && pedido.items.length === 1) {
-      this.errores[pedido.id_pedido] = 'Es el único producto: si no se puede atender, rechaza el pedido.';
+      this.errores.update(e => ({ ...e, [pedido.id_pedido]: 'Es el único producto: si no se puede atender, rechaza el pedido.' }));
       return;
     }
     this.ejecutar(pedido, this.pedidoService.ajustarCantidad(pedido.id_pedido, item.id_detalle, cantidad));
@@ -161,33 +162,32 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
 
   private ejecutar(pedido: any, accion: any, exito?: string) {
     const id = pedido.id_pedido;
-    if (this.ocupado[id]) return;
-    this.ocupado[id] = true;
-    delete this.errores[id];
+    if (this.ocupado()[id]) return;
+    this.ocupado.update(o => ({ ...o, [id]: true }));
+    this.errores.update(e => sinClave(e, id));
 
     accion.subscribe({
       next: () => {
-        delete this.ocupado[id];
+        this.ocupado.update(o => sinClave(o, id));
         if (exito) this.dialogo.avisar(exito);
         this.cargar();
       },
       error: (e: any) => {
-        delete this.ocupado[id];
-        this.errores[id] = e?.error?.error || 'No se pudo completar la acción. Intenta de nuevo.';
+        this.ocupado.update(o => sinClave(o, id));
+        this.errores.update(x => ({ ...x, [id]: e?.error?.error || 'No se pudo completar la acción. Intenta de nuevo.' }));
         if (e?.status === 409 || e?.status === 404) this.cargar();
-        this.cdr.detectChanges();
       }
     });
   }
 
   // ─── Utilidades de la vista ───
   minutos(fecha: string): string {
-    const min = Math.max(0, Math.floor((this.ahora - new Date(fecha).getTime()) / 60000));
+    const min = Math.max(0, Math.floor((this.ahora() - new Date(fecha).getTime()) / 60000));
     return min === 0 ? 'recién' : `hace ${min} min`;
   }
 
   minutosRestantes(pedido: any): number {
-    return Math.max(0, Math.ceil((new Date(pedido.fecha_expiracion).getTime() - this.ahora) / 60000));
+    return Math.max(0, Math.ceil((new Date(pedido.fecha_expiracion).getTime() - this.ahora()) / 60000));
   }
 
   porVencer(pedido: any): boolean {
@@ -211,7 +211,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   }
 
   private sonar() {
-    if (!this.sonidoActivo) return;
+    if (!this.sonidoActivo()) return;
     this.prepararAudio();
     const ctx = this.audio;
     if (!ctx) return;

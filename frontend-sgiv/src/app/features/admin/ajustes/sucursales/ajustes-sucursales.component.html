@@ -9,13 +9,13 @@
   </div>
 
   <div class="bloque-cuerpo">
-    @if (cargando) {
+    @if (cargando()) {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         @for (n of [1,2]; track n) { <div class="inf-esqueleto h-40"></div> }
       </div>
     } @else {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        @for (s of sucursales; track s.id_sucursal) {
+        @for (s of sucursales(); track s.id_sucursal) {
           <article class="sucursal" [class.inactiva]="!s.estado_activo">
             <div class="flex justify-between items-start gap-3">
               <div class="min-w-0">
@@ -55,31 +55,31 @@
 </section>
 
 <!-- ═══ CREAR / EDITAR ═══ -->
-@if (modalAbierto) {
+@if (modalAbierto()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModal()">
     <form class="inf-hoja ventana w-full max-w-2xl max-h-[92vh] flex flex-col" (ngSubmit)="guardar()" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId ? 'Editar sucursal' : 'Nueva sucursal' }}</h3>
+        <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId() ? 'Editar sucursal' : 'Nueva sucursal' }}</h3>
         <button type="button" class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
 
       <div class="flex-1 overflow-y-auto p-5 space-y-5">
-        @if (errorFormulario) { <p class="error-formulario" role="alert">{{ errorFormulario }}</p> }
+        @if (errorFormulario()) { <p class="error-formulario" role="alert">{{ errorFormulario() }}</p> }
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="grupo sm:col-span-2">
             <label class="inf-etiqueta" for="suc-nombre">Nombre</label>
-            <input id="suc-nombre" name="nombre" class="campo" [(ngModel)]="formulario.nombre_sucursal" maxlength="100" placeholder="Sucursal Norte">
+            <input id="suc-nombre" name="nombre" class="campo" [(ngModel)]="formulario().nombre_sucursal" maxlength="100" placeholder="Sucursal Norte">
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="suc-direccion">Dirección</label>
-            <input id="suc-direccion" name="direccion" class="campo" [(ngModel)]="formulario.direccion_fisica" maxlength="250" placeholder="Av. Principal #123">
+            <input id="suc-direccion" name="direccion" class="campo" [(ngModel)]="formulario().direccion_fisica" maxlength="250" placeholder="Av. Principal #123">
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="suc-telefono">Teléfono</label>
-            <input id="suc-telefono" name="telefono" type="tel" class="campo" [(ngModel)]="formulario.telefono_contacto" maxlength="15" placeholder="70000000">
+            <input id="suc-telefono" name="telefono" type="tel" class="campo" [(ngModel)]="formulario().telefono_contacto" maxlength="15" placeholder="70000000">
           </div>
         </div>
 
@@ -91,7 +91,7 @@
             </button>
           </div>
           <div class="horario">
-            @for (d of horario; track d.dia_semana; let i = $index) {
+            @for (d of horario(); track d.dia_semana; let i = $index) {
               <div class="dia">
                 <label class="flex items-center gap-2 w-32 cursor-pointer">
                   <input type="checkbox" [name]="'abierto' + i" [(ngModel)]="d.abierto">
@@ -112,15 +112,15 @@
 
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button type="button" class="inf-boton" (click)="cerrarModal()">Cancelar</button>
-        <button type="submit" class="boton-primario" [disabled]="guardando">{{ guardando ? 'Guardando…' : 'Guardar' }}</button>
+        <button type="submit" class="boton-primario" [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar' }}</button>
       </div>
     </form>
   </div>
 }
 
-@if (aDesactivar; as s) {
+@if (aDesactivar(); as s) {
   <app-confirmacion [titulo]="'¿Desactivar ' + s.nombre_sucursal + '?'"
                     mensaje="No se podrá abrir caja ni recibir pedidos del menú QR en ella. Su historial se conserva."
-                    textoConfirmar="Desactivar" [peligro]="true" [ocupado]="cambiandoEstado" [error]="errorEstado"
-                    (confirmar)="cambiarEstado(s)" (cancelar)="aDesactivar = cambiandoEstado ? aDesactivar : null" />
+                    textoConfirmar="Desactivar" [peligro]="true" [ocupado]="cambiandoEstado()" [error]="errorEstado()"
+                    (confirmar)="cambiarEstado(s)" (cancelar)="cancelarCambioEstado()" />
 }

@@ -3,8 +3,8 @@
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div>
       <p class="inf-antetitulo">
-        <span>{{ sucursalSeleccionada?.nombre_sucursal }}</span>
-        <span>{{ productos.length }} producto(s)</span>
+        <span>{{ sucursalSeleccionada()?.nombre_sucursal }}</span>
+        <span>{{ productos().length }} producto(s)</span>
       </p>
       <h1 class="inf-titulo">Inventario</h1>
     </div>
@@ -18,75 +18,75 @@
     </div>
   </header>
 
-  <app-selector-sucursal *ngIf="sucursalSeleccionada"
-                         [sucursales]="sucursales.length ? sucursales : [sucursalSeleccionada]"
-                         [seleccionada]="sucursalSeleccionada.id_sucursal"
-                         [soloLectura]="sucursales.length <= 1"
+  <app-selector-sucursal *ngIf="sucursalSeleccionada()"
+                         [sucursales]="sucursales().length ? sucursales() : [sucursalSeleccionada()]"
+                         [seleccionada]="sucursalSeleccionada().id_sucursal"
+                         [soloLectura]="sucursales().length <= 1"
                          (cambio)="cambiarSucursal($event)" />
 
   <section class="inf-hoja inf-tira overflow-hidden">
     <div>
       <p class="inf-etiqueta">Productos activos</p>
-      <p class="inf-valor">{{ resumen.activos }}</p>
+      <p class="inf-valor">{{ resumen().activos }}</p>
     </div>
     <div>
       <p class="inf-etiqueta">Stock bajo</p>
-      <p class="inf-valor" [class.inf-aviso]="resumen.bajos > 0">{{ resumen.bajos }}</p>
+      <p class="inf-valor" [class.inf-aviso]="resumen().bajos > 0">{{ resumen().bajos }}</p>
     </div>
     <div>
       <p class="inf-etiqueta">Sin stock</p>
-      <p class="inf-valor" [class.inf-baja]="resumen.agotados > 0">{{ resumen.agotados }}</p>
+      <p class="inf-valor" [class.inf-baja]="resumen().agotados > 0">{{ resumen().agotados }}</p>
     </div>
     <div>
       <p class="inf-etiqueta">Valor en stock</p>
-      <p class="inf-valor">{{ moneda() }} {{ cifra(resumen.valor) }}</p>
+      <p class="inf-valor">{{ moneda() }} {{ cifra(resumen().valor) }}</p>
     </div>
   </section>
 
   <nav class="inf-pestanas separador-inferior">
-    <button [class.activa]="vista === 'productos'" (click)="vista = 'productos'">Productos</button>
-    <button [class.activa]="vista === 'movimientos'" (click)="verMovimientos()">Movimientos</button>
+    <button [class.activa]="vista() === 'productos'" (click)="vista.set('productos')">Productos</button>
+    <button [class.activa]="vista() === 'movimientos'" (click)="verMovimientos()">Movimientos</button>
   </nav>
 
-  @if (vista === 'productos') {
+  @if (vista() === 'productos') {
   <section class="inf-hoja overflow-hidden">
     <div class="p-4 pb-3 separador-inferior space-y-3">
       <div class="flex flex-wrap items-center gap-3">
         <div class="buscador flex-1 min-w-[220px]">
           <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
-          <input type="text" [(ngModel)]="filtroBusqueda" (input)="aplicarFiltros()" placeholder="Buscar producto">
-          @if (filtroBusqueda) {
-            <button class="quitar" (click)="filtroBusqueda = ''; aplicarFiltros()" aria-label="Limpiar búsqueda">
+          <input type="text" [(ngModel)]="filtroBusqueda" placeholder="Buscar producto">
+          @if (filtroBusqueda()) {
+            <button class="quitar" (click)="filtroBusqueda.set('')" aria-label="Limpiar búsqueda">
               <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
             </button>
           }
         </div>
         <div class="inf-segmentos">
           @for (f of filtrosEstado; track f.valor) {
-            <button [class.activa]="filtroEstado === f.valor" (click)="filtroEstado = f.valor; aplicarFiltros()">{{ f.texto }}</button>
+            <button [class.activa]="filtroEstado() === f.valor" (click)="filtroEstado.set(f.valor)">{{ f.texto }}</button>
           }
         </div>
       </div>
       <div class="flex items-center gap-4">
         <nav class="inf-pestanas flex-1 min-w-0">
-          <button [class.activa]="!filtroCategoria" (click)="seleccionarCategoria(null)">Todas</button>
-          @for (cat of categorias; track cat.id_categoria) {
-            <button [class.activa]="filtroCategoria === cat.id_categoria" (click)="seleccionarCategoria(cat.id_categoria)">{{ cat.nombre_categoria }}</button>
+          <button [class.activa]="!filtroCategoria()" (click)="seleccionarCategoria(null)">Todas</button>
+          @for (cat of categorias(); track cat.id_categoria) {
+            <button [class.activa]="filtroCategoria() === cat.id_categoria" (click)="seleccionarCategoria(cat.id_categoria)">{{ cat.nombre_categoria }}</button>
           }
         </nav>
-        @if (categoriaActual) {
-          <button class="inf-enlace inf-baja flex-shrink-0" (click)="abrirModalBorrarCategoria(categoriaActual)">Eliminar categoría</button>
+        @if (categoriaActual()) {
+          <button class="inf-enlace inf-baja flex-shrink-0" (click)="abrirModalBorrarCategoria(categoriaActual())">Eliminar categoría</button>
         }
       </div>
     </div>
 
-    @if (cargando) {
+    @if (cargando()) {
       <div class="p-4 space-y-2">
         @for (n of [1,2,3,4,5]; track n) { <div class="inf-esqueleto h-12"></div> }
       </div>
-    } @else if (productos.length === 0) {
+    } @else if (productos().length === 0) {
       <p class="inf-vacio">No hay productos en esta sucursal. Crea el primero con «Nuevo producto».</p>
-    } @else if (productosFiltrados.length === 0) {
+    } @else if (productosFiltrados().length === 0) {
       <p class="inf-vacio">Ningún producto coincide con los filtros.</p>
     } @else {
       <div class="overflow-x-auto">
@@ -102,7 +102,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (prod of productosFiltrados; track prod.id_producto) {
+            @for (prod of productosFiltrados(); track prod.id_producto) {
               <tr [class.inactivo]="!prod.estado_activo">
                 <td>
                   <div class="flex items-center gap-3 min-w-[200px]">
@@ -155,43 +155,43 @@
           </tbody>
         </table>
       </div>
-      <div class="inf-pie-hoja">{{ productosFiltrados.length }} de {{ productos.length }} producto(s)</div>
+      <div class="inf-pie-hoja">{{ productosFiltrados().length }} de {{ productos().length }} producto(s)</div>
     }
   </section>
   }
 
   <!-- ═══ MOVIMIENTOS ═══ -->
-  @if (vista === 'movimientos') {
+  @if (vista() === 'movimientos') {
     <section class="inf-hoja overflow-hidden">
       <div class="p-4 separador-inferior flex flex-wrap items-center gap-3">
         <div class="inf-segmentos">
-          <button [class.activa]="periodoMov === 'hoy'" (click)="periodoMov = 'hoy'; cargarMovimientos()">Hoy</button>
-          <button [class.activa]="periodoMov === '7'" (click)="periodoMov = '7'; cargarMovimientos()">7 días</button>
-          <button [class.activa]="periodoMov === '30'" (click)="periodoMov = '30'; cargarMovimientos()">30 días</button>
+          <button [class.activa]="periodoMov() === 'hoy'" (click)="periodoMov.set('hoy'); cargarMovimientos()">Hoy</button>
+          <button [class.activa]="periodoMov() === '7'" (click)="periodoMov.set('7'); cargarMovimientos()">7 días</button>
+          <button [class.activa]="periodoMov() === '30'" (click)="periodoMov.set('30'); cargarMovimientos()">30 días</button>
         </div>
         <div class="inf-segmentos">
-          <button [class.activa]="!tipoMov" (click)="tipoMov = null; cargarMovimientos()">Todos</button>
-          <button [class.activa]="tipoMov === 'INGRESO'" (click)="tipoMov = 'INGRESO'; cargarMovimientos()">Entradas</button>
-          <button [class.activa]="tipoMov === 'SALIDA'" (click)="tipoMov = 'SALIDA'; cargarMovimientos()">Salidas</button>
+          <button [class.activa]="!tipoMov()" (click)="tipoMov.set(null); cargarMovimientos()">Todos</button>
+          <button [class.activa]="tipoMov() === 'INGRESO'" (click)="tipoMov.set('INGRESO'); cargarMovimientos()">Entradas</button>
+          <button [class.activa]="tipoMov() === 'SALIDA'" (click)="tipoMov.set('SALIDA'); cargarMovimientos()">Salidas</button>
         </div>
-        @if (productoFiltroMov) {
+        @if (productoFiltroMov(); as filtro) {
           <span class="inf-ficha inline-flex items-center gap-1.5">
-            {{ productoFiltroMov.nombre_producto }}
-            <button class="quitar p-0.5!" (click)="productoFiltroMov = null; cargarMovimientos()" aria-label="Ver todos los productos">
+            {{ filtro.nombre_producto }}
+            <button class="quitar p-0.5!" (click)="productoFiltroMov.set(null); cargarMovimientos()" aria-label="Ver todos los productos">
               <lucide-icon [img]="icons.cerrar" class="w-3 h-3"></lucide-icon>
             </button>
           </span>
         }
       </div>
 
-      @if (cargandoMov && !movimientos.length) {
+      @if (cargandoMov() && !movimientos().length) {
         <div class="p-4 space-y-2">
           @for (n of [1,2,3,4]; track n) { <div class="inf-esqueleto h-11"></div> }
         </div>
-      } @else if (!movimientos.length) {
+      } @else if (!movimientos().length) {
         <p class="inf-vacio">No hay movimientos en este período.</p>
       } @else {
-        <div class="overflow-x-auto" [class.inf-refrescando]="cargandoMov">
+        <div class="overflow-x-auto" [class.inf-refrescando]="cargandoMov()">
           <table class="inf-tabla">
             <thead>
               <tr>
@@ -204,7 +204,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (m of movimientos; track m.id_historial) {
+              @for (m of movimientos(); track m.id_historial) {
                 <tr>
                   <td class="whitespace-nowrap">{{ m.fecha_registro | date:'dd/MM HH:mm' }}</td>
                   <td class="fuerte">{{ m.nombre_producto }}</td>
@@ -225,7 +225,7 @@
           </table>
         </div>
         <div class="inf-pie-hoja">
-          {{ movimientos.length }} movimiento(s){{ movimientos.length >= 200 ? ' · se muestran los 200 más recientes' : '' }}
+          {{ movimientos().length }} movimiento(s){{ movimientos().length >= 200 ? ' · se muestran los 200 más recientes' : '' }}
         </div>
       }
     </section>
@@ -233,13 +233,13 @@
 </div>
 
 <!-- ═══ NUEVO / EDITAR PRODUCTO ═══ -->
-@if (mostrarModal) {
+@if (mostrarModal()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModal()">
     <div class="inf-hoja ventana w-full max-w-lg max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
         <div>
-          <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId ? 'Editar producto' : 'Nuevo producto' }}</h3>
-          <p class="inf-sub mt-0.5!">{{ sucursalSeleccionada?.nombre_sucursal }}</p>
+          <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId() ? 'Editar producto' : 'Nuevo producto' }}</h3>
+          <p class="inf-sub mt-0.5!">{{ sucursalSeleccionada()?.nombre_sucursal }}</p>
         </div>
         <button class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
@@ -247,16 +247,16 @@
       </div>
 
       <div class="flex-1 overflow-y-auto p-5 space-y-4">
-        @if (errorModal) { <p class="error-formulario">{{ errorModal }}</p> }
+        @if (errorModal()) { <p class="error-formulario">{{ errorModal() }}</p> }
 
         <div class="flex items-center gap-4">
           <div class="foto-campo">
-            @if (previewImagen) { <img [src]="previewImagen | imagenUrl" alt="Foto del producto"> }
+            @if (previewImagen()) { <img [src]="previewImagen() | imagenUrl" alt="Foto del producto"> }
             @else { <lucide-icon [img]="icons.imagen" class="w-6 h-6"></lucide-icon> }
           </div>
           <div>
             <label class="inf-boton cursor-pointer">
-              {{ previewImagen ? 'Cambiar foto' : 'Elegir foto' }}
+              {{ previewImagen() ? 'Cambiar foto' : 'Elegir foto' }}
               <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onArchivoSeleccionado($event)" class="hidden">
             </label>
           </div>
@@ -264,42 +264,42 @@
 
         <div class="grupo">
           <label class="inf-etiqueta" for="nombre-producto">Nombre</label>
-          <input id="nombre-producto" type="text" class="campo" [(ngModel)]="formulario.nombre_producto" placeholder="Ej.: Torta de chocolate">
+          <input id="nombre-producto" type="text" class="campo" [(ngModel)]="formulario().nombre_producto" placeholder="Ej.: Torta de chocolate">
         </div>
 
         <div class="grupo">
           <label class="inf-etiqueta" for="descripcion-producto">Descripción <span class="inf-sutil">(opcional)</span></label>
-          <textarea id="descripcion-producto" rows="2" class="campo" [(ngModel)]="formulario.descripcion_producto"></textarea>
+          <textarea id="descripcion-producto" rows="2" class="campo" [(ngModel)]="formulario().descripcion_producto"></textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div class="grupo">
             <label class="inf-etiqueta" for="precio-producto">Precio ({{ moneda() }})</label>
-            <input id="precio-producto" type="number" min="0" step="0.50" class="campo" [(ngModel)]="formulario.precio_unitario" placeholder="0.00">
+            <input id="precio-producto" type="number" min="0" step="0.50" class="campo" [(ngModel)]="formulario().precio_unitario" placeholder="0.00">
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="categoria-producto">Categoría</label>
-            <select id="categoria-producto" class="campo" [(ngModel)]="formulario.id_categoria">
+            <select id="categoria-producto" class="campo" [(ngModel)]="formulario().id_categoria">
               <option value="" disabled>Elegir…</option>
-              @for (cat of categorias; track cat.id_categoria) {
+              @for (cat of categorias(); track cat.id_categoria) {
                 <option [ngValue]="cat.id_categoria">{{ cat.nombre_categoria }}</option>
               }
             </select>
           </div>
         </div>
 
-        @if (!editandoId) {
+        @if (!editandoId()) {
           <div class="grupo">
             <label class="inf-etiqueta" for="stock-inicial">Stock inicial</label>
-            <input id="stock-inicial" type="number" min="0" class="campo" [(ngModel)]="formulario.stock_inicial" placeholder="0">
+            <input id="stock-inicial" type="number" min="0" class="campo" [(ngModel)]="formulario().stock_inicial" placeholder="0">
           </div>
         }
       </div>
 
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModal()">Cancelar</button>
-        <button class="boton-primario" (click)="guardarProducto()" [disabled]="guardando">
-          {{ guardando ? 'Guardando…' : (editandoId ? 'Guardar cambios' : 'Crear producto') }}
+        <button class="boton-primario" (click)="guardarProducto()" [disabled]="guardando()">
+          {{ guardando() ? 'Guardando…' : (editandoId() ? 'Guardar cambios' : 'Crear producto') }}
         </button>
       </div>
     </div>
@@ -307,13 +307,13 @@
 }
 
 <!-- ═══ MOVIMIENTO: ENTRADA O MERMA ═══ -->
-@if (productoMov) {
+@if (productoMov()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarMovimiento()">
     <div class="inf-hoja ventana w-full max-w-md max-h-[92vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
         <div class="min-w-0">
           <h3 class="inf-tinta font-semibold text-[15px]">Movimiento de inventario</h3>
-          <p class="inf-sub mt-0.5! truncate">{{ productoMov.nombre_producto }} · {{ sucursalSeleccionada?.nombre_sucursal }}</p>
+          <p class="inf-sub mt-0.5! truncate">{{ productoMov().nombre_producto }} · {{ sucursalSeleccionada()?.nombre_sucursal }}</p>
         </div>
         <button class="quitar" (click)="cerrarMovimiento()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
@@ -322,10 +322,10 @@
 
       <div class="flex-1 overflow-y-auto p-5 space-y-4">
         <div class="grid grid-cols-2 gap-2">
-          <button type="button" class="eleccion flex-col! items-start! gap-0.5!" [class.activa]="mov.tipo === 'INGRESO'" (click)="cambiarTipoMov('INGRESO')">
+          <button type="button" class="eleccion flex-col! items-start! gap-0.5!" [class.activa]="mov().tipo === 'INGRESO'" (click)="cambiarTipoMov('INGRESO')">
             <span class="font-semibold inf-tinta">Entrada</span>
           </button>
-          <button type="button" class="eleccion flex-col! items-start! gap-0.5!" [class.activa]="mov.tipo === 'SALIDA'" (click)="cambiarTipoMov('SALIDA')">
+          <button type="button" class="eleccion flex-col! items-start! gap-0.5!" [class.activa]="mov().tipo === 'SALIDA'" (click)="cambiarTipoMov('SALIDA')">
             <span class="font-semibold inf-tinta">Merma o salida</span>
           </button>
         </div>
@@ -334,41 +334,41 @@
           <div class="grupo">
             <label class="inf-etiqueta" for="mov-cantidad">Cantidad</label>
             <div class="campo-monto">
-              <span>{{ mov.tipo === 'INGRESO' ? '+' : '−' }}</span>
-              <input id="mov-cantidad" type="number" min="1" step="1" [(ngModel)]="mov.cantidad" placeholder="0">
+              <span>{{ mov().tipo === 'INGRESO' ? '+' : '−' }}</span>
+              <input id="mov-cantidad" type="number" min="1" step="1" [(ngModel)]="mov().cantidad" placeholder="0">
             </div>
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="mov-motivo">Motivo</label>
-            <select id="mov-motivo" class="campo h-[50px]" [(ngModel)]="mov.motivo">
-              @for (m of motivos[mov.tipo]; track m) { <option [value]="m">{{ m }}</option> }
+            <select id="mov-motivo" class="campo h-[50px]" [(ngModel)]="mov().motivo">
+              @for (m of motivos()[mov().tipo]; track m) { <option [value]="m">{{ m }}</option> }
             </select>
           </div>
         </div>
 
         <div class="grupo">
           <label class="inf-etiqueta" for="mov-detalle">
-            Observación <span class="inf-sutil">{{ mov.motivo === 'Otro' ? '(obligatoria)' : '(opcional)' }}</span>
+            Observación <span class="inf-sutil">{{ mov().motivo === 'Otro' ? '(obligatoria)' : '(opcional)' }}</span>
           </label>
-          <textarea id="mov-detalle" class="campo" rows="2" maxlength="200" [(ngModel)]="mov.detalle"
+          <textarea id="mov-detalle" class="campo" rows="2" maxlength="200" [(ngModel)]="mov().detalle"
                     placeholder="Ej.: hornada de la mañana"></textarea>
         </div>
 
         <dl class="inf-pares">
-          <div><dt>Stock actual</dt><dd>{{ productoMov.stock_actual || 0 }}</dd></div>
+          <div><dt>Stock actual</dt><dd>{{ productoMov().stock_actual || 0 }}</dd></div>
           <div>
             <dt>Queda en</dt>
             <dd class="inf-tinta" [class.inf-baja]="stockTrasMovimiento < 0">{{ stockTrasMovimiento }}</dd>
           </div>
         </dl>
-        @if (errorMov) { <p class="error-formulario">{{ errorMov }}</p> }
+        @if (errorMov()) { <p class="error-formulario">{{ errorMov() }}</p> }
       </div>
 
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarMovimiento()">Cancelar</button>
-        <button [class]="mov.tipo === 'SALIDA' ? 'boton-peligro' : 'boton-primario'" (click)="guardarMovimiento()"
-                [disabled]="guardando || !(mov.cantidad > 0) || stockTrasMovimiento < 0">
-          {{ guardando ? 'Guardando…' : (mov.tipo === 'INGRESO' ? 'Registrar entrada' : 'Registrar merma') }}
+        <button [class]="mov().tipo === 'SALIDA' ? 'boton-peligro' : 'boton-primario'" (click)="guardarMovimiento()"
+                [disabled]="guardando() || !(mov().cantidad > 0) || stockTrasMovimiento < 0">
+          {{ guardando() ? 'Guardando…' : (mov().tipo === 'INGRESO' ? 'Registrar entrada' : 'Registrar merma') }}
         </button>
       </div>
     </div>
@@ -376,7 +376,7 @@
 }
 
 <!-- ═══ NUEVA CATEGORÍA ═══ -->
-@if (mostrarModalCategoria) {
+@if (mostrarModalCategoria()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalCategoria()">
     <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
@@ -391,7 +391,7 @@
           <input id="nombre-categoria" type="text" class="campo" [(ngModel)]="nombreCategoria"
                  placeholder="Ej.: Tortas, Bebidas" (keyup.enter)="crearCategoria()">
         </div>
-        @if (errorCategoria) { <p class="error-formulario">{{ errorCategoria }}</p> }
+        @if (errorCategoria()) { <p class="error-formulario">{{ errorCategoria() }}</p> }
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalCategoria()">Cancelar</button>
@@ -402,24 +402,24 @@
 }
 
 <!-- ═══ ELIMINAR CATEGORÍA (doble confirmación) ═══ -->
-@if (mostrarModalBorrarCat && catABorrar) {
+@if (mostrarModalBorrarCat() && catABorrar()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalBorrarCategoria()">
     <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">Eliminar categoría «{{ catABorrar.nombre_categoria }}»</h3>
+        <h3 class="inf-tinta font-semibold text-[15px]">Eliminar categoría «{{ catABorrar().nombre_categoria }}»</h3>
         <button class="quitar" (click)="cerrarModalBorrarCategoria()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
 
-      @if (pasoBorradoCat === 1) {
+      @if (pasoBorradoCat() === 1) {
         <div class="p-5 space-y-3">
-          @if (productosBloqueantes.length > 0) {
+          @if (productosBloqueantes().length > 0) {
             <p class="error-formulario">
-              No se puede eliminar: tiene {{ productosBloqueantes.length }} producto(s). Cámbialos de categoría primero.
+              No se puede eliminar: tiene {{ productosBloqueantes().length }} producto(s). Cámbialos de categoría primero.
             </p>
             <ul class="text-[13px] space-y-1 max-h-36 overflow-y-auto pl-4 list-disc">
-              @for (p of productosBloqueantes; track p.id_producto) { <li>{{ p.nombre_producto }}</li> }
+              @for (p of productosBloqueantes(); track p.id_producto) { <li>{{ p.nombre_producto }}</li> }
             </ul>
           } @else {
             <p class="text-[13.5px]">La categoría está vacía y se eliminará de forma permanente. Las ventas registradas no cambian.</p>
@@ -427,23 +427,23 @@
         </div>
         <div class="inf-pie-hoja flex justify-end gap-2">
           <button class="inf-boton" (click)="cerrarModalBorrarCategoria()">Cancelar</button>
-          <button class="boton-peligro" (click)="avanzarBorradoCat()" [disabled]="productosBloqueantes.length > 0">Continuar</button>
+          <button class="boton-peligro" (click)="avanzarBorradoCat()" [disabled]="productosBloqueantes().length > 0">Continuar</button>
         </div>
       }
 
-      @if (pasoBorradoCat === 2) {
+      @if (pasoBorradoCat() === 2) {
         <div class="p-5 space-y-3">
           <div class="grupo">
-            <label class="inf-etiqueta" for="confirmar-categoria">Escribe <b class="inf-tinta">{{ catABorrar.nombre_categoria }}</b> para confirmar</label>
-            <input id="confirmar-categoria" type="text" class="campo" [(ngModel)]="inputConfirmacionCat" [placeholder]="catABorrar.nombre_categoria">
+            <label class="inf-etiqueta" for="confirmar-categoria">Escribe <b class="inf-tinta">{{ catABorrar().nombre_categoria }}</b> para confirmar</label>
+            <input id="confirmar-categoria" type="text" class="campo" [(ngModel)]="inputConfirmacionCat" [placeholder]="catABorrar().nombre_categoria">
           </div>
-          @if (errorBorrarCat) { <p class="error-formulario">{{ errorBorrarCat }}</p> }
+          @if (errorBorrarCat()) { <p class="error-formulario">{{ errorBorrarCat() }}</p> }
         </div>
         <div class="inf-pie-hoja flex justify-end gap-2">
-          <button class="inf-boton" (click)="cerrarModalBorrarCategoria()" [disabled]="cargandoBorrarCat">Cancelar</button>
+          <button class="inf-boton" (click)="cerrarModalBorrarCategoria()" [disabled]="cargandoBorrarCat()">Cancelar</button>
           <button class="boton-peligro" (click)="confirmarBorradoCategoria()"
-                  [disabled]="cargandoBorrarCat || inputConfirmacionCat.trim() !== catABorrar.nombre_categoria">
-            {{ cargandoBorrarCat ? 'Eliminando…' : 'Eliminar' }}
+                  [disabled]="cargandoBorrarCat() || inputConfirmacionCat().trim() !== catABorrar().nombre_categoria">
+            {{ cargandoBorrarCat() ? 'Eliminando…' : 'Eliminar' }}
           </button>
         </div>
       }

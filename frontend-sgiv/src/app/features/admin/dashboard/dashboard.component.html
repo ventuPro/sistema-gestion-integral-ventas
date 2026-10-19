@@ -1,10 +1,10 @@
 <div class="flex h-dvh bg-gray-50 font-sans">
 
   <!-- Fondo oscuro del menú en celular -->
-  @if (menuAbierto) { <div class="fondo-menu lg:hidden" (click)="cerrarMenu()"></div> }
+  @if (menuAbierto()) { <div class="fondo-menu lg:hidden" (click)="cerrarMenu()"></div> }
 
   <!-- ═══ BARRA LATERAL ═══ -->
-  <aside class="lateral bg-gray-900 text-white flex flex-col" [class.abierta]="menuAbierto" aria-label="Menú principal">
+  <aside class="lateral bg-gray-900 text-white flex flex-col" [class.abierta]="menuAbierto()" aria-label="Menú principal">
 
     <!-- Logo y nombre del negocio (Ajustes → Empresa / Apariencia) -->
     <div class="px-5 py-5 border-b border-gray-800 flex items-center gap-3">
@@ -66,10 +66,10 @@
       </div>
 
       @if (esCajero) {
-        <button (click)="recargarPermisos()" [disabled]="recargandoPermisos"
+        <button (click)="recargarPermisos()" [disabled]="recargandoPermisos()"
                 class="w-full flex items-center gap-3 px-3 py-2.5 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200 disabled:opacity-50 rounded-lg transition-colors text-sm font-medium">
-          <lucide-icon [img]="icons.refresh" class="w-5 h-5 flex-shrink-0" [class.animate-spin]="recargandoPermisos"></lucide-icon>
-          {{ recargandoPermisos ? 'Actualizando…' : 'Recargar permisos' }}
+          <lucide-icon [img]="icons.refresh" class="w-5 h-5 flex-shrink-0" [class.animate-spin]="recargandoPermisos()"></lucide-icon>
+          {{ recargandoPermisos() ? 'Actualizando…' : 'Recargar permisos' }}
         </button>
       }
 
@@ -89,7 +89,7 @@
     <ng-container *ngComponentOutlet="chat; inputs: {
       titulo: 'Asistente', subtitulo: 'Ventas, stock, caja y ayuda del sistema',
       saludo: '¡Hola' + (usuario?.nombre_completo ? ', ' + usuario.nombre_completo.split(' ')[0] : '') + '! Pregúntame por ventas, stock, pedidos o cómo hacer algo en el sistema.',
-      etiqueta: 'Asistente', sugerencias: sugerenciasAsistente, clave: 'panel_' + usuario?.id_usuario,
+      etiqueta: 'Asistente', sugerencias: sugerenciasAsistente(), clave: 'panel_' + usuario?.id_usuario,
       enviar: preguntarAsistente }" />
   }
 
@@ -98,7 +98,7 @@
 
     <!-- Barra superior (celular y tablet) -->
     <header class="lg:hidden flex items-center gap-3 h-14 px-3 bg-gray-900 text-white flex-shrink-0">
-      <button class="p-2 rounded-md hover:bg-gray-800" (click)="menuAbierto = true" aria-label="Abrir menú" [attr.aria-expanded]="menuAbierto">
+      <button class="p-2 rounded-md hover:bg-gray-800" (click)="menuAbierto.set(true)" aria-label="Abrir menú" [attr.aria-expanded]="menuAbierto()">
         <lucide-icon [img]="icons.menu" class="w-5 h-5"></lucide-icon>
       </button>
       @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="w-8 h-8 object-contain rounded-md bg-white/10 p-0.5"> }

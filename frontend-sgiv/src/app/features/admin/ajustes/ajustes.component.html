@@ -3,31 +3,31 @@
   <header>
     <p class="inf-antetitulo">
       <span>Solo administrador</span>
-      @if (fechaActualizacion) { <span>Última modificación: {{ fechaActualizacion | date:'dd/MM/yyyy HH:mm' }}</span> }
+      @if (fechaActualizacion()) { <span>Última modificación: {{ fechaActualizacion() | date:'dd/MM/yyyy HH:mm' }}</span> }
     </p>
     <h1 class="inf-titulo">Ajustes</h1>
   </header>
 
   <nav class="inf-pestanas separador-inferior">
     @for (p of pestanas; track p.id) {
-      <button class="inline-flex items-center gap-1.5" [class.activa]="pestana === p.id" (click)="pestana = p.id">
+      <button class="inline-flex items-center gap-1.5" [class.activa]="pestana() === p.id" (click)="pestana.set(p.id)">
         <lucide-icon [img]="p.icono" class="w-3.5 h-3.5"></lucide-icon> {{ p.nombre }}
       </button>
     }
   </nav>
 
-  @if (pestana === 'propietarios') { <app-ajustes-propietarios /> }
-  @if (pestana === 'sucursales') { <app-ajustes-sucursales /> }
-  @if (pestana === 'parametros') { <app-ajustes-parametros /> }
-  @if (pestana === 'ia') { <app-ajustes-ia /> }
+  @if (pestana() === 'propietarios') { <app-ajustes-propietarios /> }
+  @if (pestana() === 'sucursales') { <app-ajustes-sucursales /> }
+  @if (pestana() === 'parametros') { <app-ajustes-parametros /> }
+  @if (pestana() === 'ia') { <app-ajustes-ia /> }
 
-  @if (cargando && (pestana === 'empresa' || pestana === 'apariencia')) {
+  @if (cargando() && (pestana() === 'empresa' || pestana() === 'apariencia')) {
     <div class="inf-esqueleto h-40"></div>
     <div class="inf-esqueleto h-40"></div>
   }
 
   <!-- ═══ EMPRESA ═══ -->
-  @if (!cargando && pestana === 'empresa') {
+  @if (!cargando() && pestana() === 'empresa') {
     <form (ngSubmit)="guardarEmpresa()" class="space-y-5">
       @for (grupo of gruposEmpresa; track grupo.titulo) {
         <section class="inf-hoja">
@@ -39,23 +39,23 @@
               <div class="grupo" [ngClass]="{ 'md:col-span-2': c.ancho }">
                 <label class="inf-etiqueta" [for]="c.clave">{{ c.etiqueta }}</label>
                 <input class="campo" [id]="c.clave" [name]="c.clave" [type]="c.tipo || 'text'" [maxlength]="c.max"
-                       [(ngModel)]="empresa[c.clave]" [placeholder]="c.ejemplo">
+                       [(ngModel)]="empresa()[c.clave]" [placeholder]="c.ejemplo">
               </div>
             }
           </div>
         </section>
       }
       <div class="acciones-guardar">
-        <button type="submit" class="boton-primario" [disabled]="guardando">
+        <button type="submit" class="boton-primario" [disabled]="guardando()">
           <lucide-icon [img]="icons.guardar" class="w-4 h-4"></lucide-icon>
-          {{ guardando ? 'Guardando…' : 'Guardar datos de la empresa' }}
+          {{ guardando() ? 'Guardando…' : 'Guardar datos de la empresa' }}
         </button>
       </div>
     </form>
   }
 
   <!-- ═══ APARIENCIA ═══ -->
-  @if (!cargando && pestana === 'apariencia') {
+  @if (!cargando() && pestana() === 'apariencia') {
     <div class="space-y-5">
 
       <section class="inf-hoja">
@@ -65,17 +65,17 @@
         <div class="bloque-cuerpo grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="flex items-center gap-4">
             <div class="cuadro-imagen w-24 h-24">
-              @if (logoVista) { <img [src]="logoVista | imagenUrl" alt="Logo"> }
+              @if (logoVista()) { <img [src]="logoVista() | imagenUrl" alt="Logo"> }
               @else { <lucide-icon [img]="icons.imagen" class="w-8 h-8"></lucide-icon> }
             </div>
             <div class="space-y-2">
               <p class="inf-tinta text-[13.5px] font-medium">Logo del negocio</p>
               <div class="flex gap-2">
                 <label class="inf-boton cursor-pointer">
-                  <lucide-icon [img]="icons.subir" class="w-3.5 h-3.5"></lucide-icon> {{ logoVista ? 'Cambiar' : 'Subir' }}
+                  <lucide-icon [img]="icons.subir" class="w-3.5 h-3.5"></lucide-icon> {{ logoVista() ? 'Cambiar' : 'Subir' }}
                   <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" (change)="seleccionarImagen($event, 'logo')">
                 </label>
-                @if (logoVista) {
+                @if (logoVista()) {
                   <button type="button" class="inf-boton inf-baja" (click)="quitarImagen('logo')">Quitar</button>
                 }
               </div>
@@ -84,17 +84,17 @@
 
           <div class="flex items-center gap-4">
             <div class="cuadro-imagen w-16 h-16">
-              @if (faviconVista) { <img [src]="faviconVista | imagenUrl" alt="Ícono" class="w-8 h-8"> }
+              @if (faviconVista()) { <img [src]="faviconVista() | imagenUrl" alt="Ícono" class="w-8 h-8"> }
               @else { <lucide-icon [img]="icons.imagen" class="w-6 h-6"></lucide-icon> }
             </div>
             <div class="space-y-2">
               <p class="inf-tinta text-[13.5px] font-medium">Ícono de la pestaña</p>
               <div class="flex gap-2">
                 <label class="inf-boton cursor-pointer">
-                  <lucide-icon [img]="icons.subir" class="w-3.5 h-3.5"></lucide-icon> {{ faviconVista ? 'Cambiar' : 'Subir' }}
+                  <lucide-icon [img]="icons.subir" class="w-3.5 h-3.5"></lucide-icon> {{ faviconVista() ? 'Cambiar' : 'Subir' }}
                   <input type="file" accept="image/png,image/x-icon,.ico" class="hidden" (change)="seleccionarImagen($event, 'favicon')">
                 </label>
-                @if (faviconVista) {
+                @if (faviconVista()) {
                   <button type="button" class="inf-boton inf-baja" (click)="quitarImagen('favicon')">Quitar</button>
                 }
               </div>
@@ -124,11 +124,11 @@
               <div class="grupo">
                 <span class="inf-etiqueta">{{ c.nombre }}</span>
                 <div class="flex items-center gap-2">
-                  <input type="color" class="muestra-color" [value]="$any(apariencia)[c.campo] || c.original"
+                  <input type="color" class="muestra-color" [value]="$any(apariencia())[c.campo] || c.original"
                          (input)="cambiarColor($any(c.campo), $any($event.target).value)" [attr.aria-label]="c.nombre">
-                  <input type="text" maxlength="7" class="campo w-28! font-mono uppercase" [value]="$any(apariencia)[c.campo] || c.original"
+                  <input type="text" maxlength="7" class="campo w-28! font-mono uppercase" [value]="$any(apariencia())[c.campo] || c.original"
                          (change)="cambiarColor($any(c.campo), $any($event.target).value)" [attr.aria-label]="c.nombre + ' (hexadecimal)'">
-                  @if ($any(apariencia)[c.campo]) {
+                  @if ($any(apariencia())[c.campo]) {
                     <button type="button" class="inf-enlace inline-flex items-center gap-1" (click)="cambiarColor($any(c.campo), null)">
                       <lucide-icon [img]="icons.original" class="w-3.5 h-3.5"></lucide-icon> Original
                     </button>
@@ -146,8 +146,8 @@
         </div>
         <div class="bloque-cuerpo grid grid-cols-1 sm:grid-cols-3 gap-3">
           @for (t of temas; track t.valor) {
-            <button type="button" class="eleccion p-4!" [class.activa]="apariencia.tema === t.valor" (click)="elegirTema(t.valor)"
-                    [attr.aria-pressed]="apariencia.tema === t.valor">
+            <button type="button" class="eleccion p-4!" [class.activa]="apariencia().tema === t.valor" (click)="elegirTema(t.valor)"
+                    [attr.aria-pressed]="apariencia().tema === t.valor">
               <lucide-icon [img]="t.icono" class="w-5 h-5 flex-shrink-0" style="color: var(--i-acento)"></lucide-icon>
               <span>
                 <span class="block font-semibold inf-tinta">{{ t.nombre }}</span>
@@ -163,10 +163,10 @@
         </div>
         <div class="bloque-cuerpo flex flex-col md:flex-row gap-4 items-stretch">
           <div class="md:w-56 bg-gray-900 rounded-lg p-4 text-white flex items-center gap-3">
-            @if (logoVista) { <img [src]="logoVista | imagenUrl" alt="" class="w-10 h-10 object-contain rounded-md bg-white/10 p-1"> }
+            @if (logoVista()) { <img [src]="logoVista() | imagenUrl" alt="" class="w-10 h-10 object-contain rounded-md bg-white/10 p-1"> }
             <div class="min-w-0">
-              <p class="font-semibold text-sm truncate">{{ empresa['nombre_comercial'] || 'Nombre del negocio' }}</p>
-              <p class="text-xs text-blue-400 truncate">{{ empresa['eslogan'] || empresa['rubro'] }}</p>
+              <p class="font-semibold text-sm truncate">{{ empresa()['nombre_comercial'] || 'Nombre del negocio' }}</p>
+              <p class="text-xs text-blue-400 truncate">{{ empresa()['eslogan'] || empresa()['rubro'] }}</p>
             </div>
           </div>
           <div class="flex-1 rounded-lg border p-4 space-y-3" style="border-color: var(--i-linea); background: var(--i-fondo)">
@@ -182,14 +182,14 @@
       </section>
 
       <div class="acciones-guardar">
-        @if (hayCambiosApariencia) {
-          <button type="button" class="inf-boton" (click)="descartarApariencia()" [disabled]="guardando">
+        @if (hayCambiosApariencia()) {
+          <button type="button" class="inf-boton" (click)="descartarApariencia()" [disabled]="guardando()">
             <lucide-icon [img]="icons.descartar" class="w-3.5 h-3.5"></lucide-icon> Descartar cambios
           </button>
         }
-        <button type="button" class="boton-primario" (click)="guardarApariencia()" [disabled]="guardando || !hayCambiosApariencia">
+        <button type="button" class="boton-primario" (click)="guardarApariencia()" [disabled]="guardando() || !hayCambiosApariencia()">
           <lucide-icon [img]="icons.guardar" class="w-4 h-4"></lucide-icon>
-          {{ guardando ? 'Guardando…' : 'Guardar apariencia' }}
+          {{ guardando() ? 'Guardando…' : 'Guardar apariencia' }}
         </button>
       </div>
     </div>

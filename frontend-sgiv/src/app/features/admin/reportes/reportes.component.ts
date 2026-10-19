@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, effect, untracked, ElementRef, ViewChild } from '@angular/core';
+import { Component, computed, inject, Injector, OnInit, OnDestroy, afterNextRender, effect, signal, untracked, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
@@ -25,7 +25,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
   private sucursalService = inject(SucursalService);
   private ajustes         = inject(AjustesService);
-  private cdr             = inject(ChangeDetectorRef);
+  private injector        = inject(Injector);
   readonly moneda         = this.ajustes.moneda;
 
   @ViewChild('graficoDiario') graficoDiarioRef?: ElementRef<HTMLCanvasElement>;
@@ -49,29 +49,29 @@ export class ReportesComponent implements OnInit, OnDestroy {
     { id: 'mes', nombre: 'Este mes' }, { id: 'mes_anterior', nombre: 'Mes anterior' }, { id: 'personalizado', nombre: 'Personalizado' }
   ];
 
-  cargando    = false;
-  refrescando = false;
-  error       = '';
-  datos: any  = null;
-  periodo: Periodo = 'mes';
-  fechaInicio = '';
-  fechaFin    = '';
+  readonly cargando    = signal(false);
+  readonly refrescando = signal(false);
+  readonly error       = signal('');
+  readonly datos       = signal<any>(null);
+  readonly periodo     = signal<Periodo>('mes');
+  readonly fechaInicio = signal('');
+  readonly fechaFin    = signal('');
 
   esAdmin = false;
-  sucursales: any[] = [];
-  sucursalSeleccionada: number | null = 1;   // null = todas
+  readonly sucursales           = signal<any[]>([]);
+  readonly sucursalSeleccionada = signal<number | null>(1);   // null = todas
 
-  categoriasDisponibles: any[] = [];
-  categoriasSeleccionadas = new Set<number>();
-  mostrarFiltroCategorias = false;
+  readonly categoriasDisponibles   = signal<any[]>([]);
+  readonly categoriasSeleccionadas = signal(new Set<number>());
+  readonly mostrarFiltroCategorias = signal(false);
 
-  verTodosProductos = false;
-  verTodosTurnos    = false;
-  verSinVentas      = false;
+  readonly verTodosProductos = signal(false);
+  readonly verTodosTurnos    = signal(false);
+  readonly verSinVentas      = signal(false);
 
-  diasExpandidos = new Set<string>();
-  desglosePorDia: Record<string, any> = {};
-  cargandoDia: Record<string, boolean> = {};
+  readonly diasExpandidos = signal(new Set<string>());
+  readonly desglosePorDia = signal<Record<string, any>>({});
+  readonly cargandoDia    = signal<Record<string, boolean>>({});
 
   private reporteSub: Subscription | null = null;
   private debounceTimer: any = null;
@@ -89,13 +89,13 @@ export class ReportesComponent implements OnInit, OnDestroy {
     try {
       const u = JSON.parse(localStorage.getItem('usuario_sgiv') || 'null');
       this.esAdmin = u?.id_rol === 1;
-      this.sucursalSeleccionada = u?.id_sucursal || 1;
+      this.sucursalSeleccionada.set(u?.id_sucursal || 1);
     } catch { }
     this.sucursalService.listarSucursales().subscribe({
-      next: (s: any[]) => { this.sucursales = s || []; this.cdr.detectChanges(); }
+      next: (s: any[]) => this.sucursales.set(s || [])
     });
     this.productoService.obtenerCategorias().subscribe({
-      next: (c) => { this.categoriasDisponibles = c || []; this.cdr.detectChanges(); }
+      next: (c) => this.categoriasDisponibles.set(c || [])
     });
     this.seleccionarPeriodo('mes');
   }
@@ -112,7 +112,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
   }
 
   seleccionarPeriodo(p: Periodo) {
-    this.periodo = p;
+    this.periodo.set(p);
     const hoy = new Date();
     const y = hoy.getFullYear(), m = hoy.getMonth(), d = hoy.getDate();
     const rangos: Record<string, [Date, Date]> = {
@@ -123,24 +123,29 @@ export class ReportesComponent implements OnInit, OnDestroy {
       mes_anterior: [new Date(y, m - 1, 1), new Date(y, m, 0)]
     };
     if (p === 'personalizado') return;
-    [this.fechaInicio, this.fechaFin] = rangos[p].map(x => this.fmt(x));
+    const [inicio, fin] = rangos[p].map(x => this.fmt(x));
+    this.fechaInicio.set(inicio);
+    this.fechaFin.set(fin);
     this.cargarReporte();
   }
 
   cambiarSucursal(id: number | null) {
-    this.sucursalSeleccionada = id;
+    this.sucursalSeleccionada.set(id);
     this.cargarReporte();
   }
 
   toggleCategoria(id: number) {
-    if (this.categoriasSeleccionadas.has(id)) this.categoriasSeleccionadas.delete(id);
-    else this.categoriasSeleccionadas.add(id);
+    this.categoriasSeleccionadas.update(actual => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(id)) nuevo.delete(id); else nuevo.add(id);
+      return nuevo;
+    });
     this.programarRefresco();
   }
 
   limpiarCategorias() {
-    if (!this.categoriasSeleccionadas.size) return;
-    this.categoriasSeleccionadas.clear();
+    if (!this.categoriasSeleccionadas().size) return;
+    this.categoriasSeleccionadas.set(new Set());
     this.programarRefresco();
   }
 
@@ -149,46 +154,48 @@ export class ReportesComponent implements OnInit, OnDestroy {
     this.debounceTimer = setTimeout(() => this.cargarReporte(true), 150);
   }
 
-  get textoFiltroCategorias(): string {
-    const n = this.categoriasSeleccionadas.size;
-    if (n === 0) return 'Todas las categorías';
-    if (n === 1) {
-      const id = [...this.categoriasSeleccionadas][0];
-      return this.categoriasDisponibles.find(c => c.id_categoria === id)?.nombre_categoria || '1 categoría';
+  readonly textoFiltroCategorias = computed(() => {
+    const sel = this.categoriasSeleccionadas();
+    if (sel.size === 0) return 'Todas las categorías';
+    if (sel.size === 1) {
+      const id = [...sel][0];
+      return this.categoriasDisponibles().find(c => c.id_categoria === id)?.nombre_categoria || '1 categoría';
     }
-    return `${n} categorías`;
-  }
+    return `${sel.size} categorías`;
+  });
 
-  private get nombresCategorias(): string {
-    return this.categoriasSeleccionadas.size
-      ? this.categoriasDisponibles.filter(c => this.categoriasSeleccionadas.has(c.id_categoria)).map(c => c.nombre_categoria).join(', ')
+  private readonly nombresCategorias = computed(() => {
+    const sel = this.categoriasSeleccionadas();
+    return sel.size
+      ? this.categoriasDisponibles().filter(c => sel.has(c.id_categoria)).map(c => c.nombre_categoria).join(', ')
       : 'Todas';
-  }
+  });
 
   cargarReporte(silencioso = false) {
-    this.error = '';
-    if (!this.fechaInicio || !this.fechaFin) return;
-    if (this.fechaInicio > this.fechaFin) { this.error = 'La fecha de inicio no puede ser posterior a la fecha final.'; return; }
+    this.error.set('');
+    const inicio = this.fechaInicio(), fin = this.fechaFin();
+    if (!inicio || !fin) return;
+    if (inicio > fin) return this.error.set('La fecha de inicio no puede ser posterior a la fecha final.');
 
     this.reporteSub?.unsubscribe();
-    if (silencioso && this.datos) this.refrescando = true;
-    else this.cargando = true;
+    if (silencioso && this.datos()) this.refrescando.set(true);
+    else this.cargando.set(true);
 
     this.reporteSub = this.reporteService
-      .obtenerReportePeriodo(this.sucursalSeleccionada ?? 0, this.fechaInicio, this.fechaFin, [...this.categoriasSeleccionadas])
+      .obtenerReportePeriodo(this.sucursalSeleccionada() ?? 0, inicio, fin, [...this.categoriasSeleccionadas()])
       .subscribe({
         next: (d) => {
-          this.datos = d;
-          this.cargando = this.refrescando = false;
-          this.diasExpandidos.clear();
-          this.desglosePorDia = {};
-          this.cdr.detectChanges();
-          setTimeout(() => this.renderizarGraficos());
+          this.datos.set(d);
+          this.cargando.set(false);
+          this.refrescando.set(false);
+          this.diasExpandidos.set(new Set());
+          this.desglosePorDia.set({});
+          afterNextRender(() => this.renderizarGraficos(), { injector: this.injector });
         },
         error: (e) => {
-          this.cargando = this.refrescando = false;
-          this.error = e?.error?.error || 'No se pudo generar el informe.';
-          this.cdr.detectChanges();
+          this.cargando.set(false);
+          this.refrescando.set(false);
+          this.error.set(e?.error?.error || 'No se pudo generar el informe.');
         }
       });
   }
@@ -196,63 +203,69 @@ export class ReportesComponent implements OnInit, OnDestroy {
   // ─── Desglose por día ───
   toggleDia(d: any) {
     if (!d.ventas) return;
-    if (this.diasExpandidos.has(d.dia)) { this.diasExpandidos.delete(d.dia); return; }
-    this.diasExpandidos.add(d.dia);
-    if (this.desglosePorDia[d.dia]) return;
-    this.cargandoDia[d.dia] = true;
-    this.reporteService.obtenerDesgloseDia(this.sucursalSeleccionada ?? 0, d.dia).subscribe({
-      next: (r) => { this.desglosePorDia[d.dia] = r; this.cargandoDia[d.dia] = false; this.cdr.detectChanges(); },
-      error: () => { this.desglosePorDia[d.dia] = { desglose: [] }; this.cargandoDia[d.dia] = false; this.cdr.detectChanges(); }
+    const abierto = this.diasExpandidos().has(d.dia);
+    this.diasExpandidos.update(actual => {
+      const nuevo = new Set(actual);
+      if (abierto) nuevo.delete(d.dia); else nuevo.add(d.dia);
+      return nuevo;
+    });
+    if (abierto || this.desglosePorDia()[d.dia]) return;
+    this.cargandoDia.update(c => ({ ...c, [d.dia]: true }));
+    const listo = (r: any) => {
+      this.desglosePorDia.update(x => ({ ...x, [d.dia]: r }));
+      this.cargandoDia.update(c => ({ ...c, [d.dia]: false }));
+    };
+    this.reporteService.obtenerDesgloseDia(this.sucursalSeleccionada() ?? 0, d.dia).subscribe({
+      next: listo,
+      error: () => listo({ desglose: [] })
     });
   }
 
   // ─── Datos derivados ───
-  get r()   { return this.datos?.resumen  || {}; }
-  get ant() { return this.datos?.anterior || {}; }
-  get todas() { return this.sucursalSeleccionada === null; }
+  readonly r     = computed(() => this.datos()?.resumen  || {});
+  readonly ant   = computed(() => this.datos()?.anterior || {});
+  readonly todas = computed(() => this.sucursalSeleccionada() === null);
 
-  get nombreSucursal(): string {
-    if (this.todas) return 'Todas las sucursales';
-    return this.sucursales.find(s => s.id_sucursal === this.sucursalSeleccionada)?.nombre_sucursal || 'Sucursal';
-  }
+  readonly nombreSucursal = computed(() => {
+    if (this.todas()) return 'Todas las sucursales';
+    return this.sucursales().find(s => s.id_sucursal === this.sucursalSeleccionada())?.nombre_sucursal || 'Sucursal';
+  });
 
-  get diasPeriodo(): number {
-    return Math.round((Date.parse(this.fechaFin) - Date.parse(this.fechaInicio)) / 86400000) + 1;
-  }
+  readonly diasPeriodo = computed(() =>
+    Math.round((Date.parse(this.fechaFin()) - Date.parse(this.fechaInicio())) / 86400000) + 1);
 
-  get textoPeriodo(): string {
-    if (!this.fechaInicio) return '';
-    return this.fechaInicio === this.fechaFin
-      ? fechaLarga(this.fechaInicio)
-      : `${fechaCorta(this.fechaInicio)} – ${fechaCorta(this.fechaFin)} ${this.fechaFin.slice(0, 4)}`;
-  }
+  readonly textoPeriodo = computed(() => {
+    const inicio = this.fechaInicio(), fin = this.fechaFin();
+    if (!inicio) return '';
+    return inicio === fin ? fechaLarga(inicio) : `${fechaCorta(inicio)} – ${fechaCorta(fin)} ${fin.slice(0, 4)}`;
+  });
 
-  get textoPeriodoAnterior(): string {
-    const [a, b] = this.datos?.periodo_anterior || [];
+  readonly textoPeriodoAnterior = computed(() => {
+    const [a, b] = this.datos()?.periodo_anterior || [];
     if (!a) return '';
     return a === b ? fechaCorta(a) : `${fechaCorta(a)} – ${fechaCorta(b)}`;
-  }
+  });
 
-  get vsIngresos() { return variacion(this.r.ingresos_totales, this.ant.ingresos_totales); }
-  get vsVentas()   { return variacion(this.r.total_ventas, this.ant.total_ventas); }
-  get vsTicket()   { return variacion(this.r.ticket_promedio, this.ant.ticket_promedio); }
-  get vsUnidades() { return variacion(this.r.unidades, this.ant.unidades); }
-  get promedioDiario(): number { return (this.r.ingresos_totales || 0) / Math.max(1, this.diasPeriodo); }
+  readonly vsIngresos = computed(() => variacion(this.r().ingresos_totales, this.ant().ingresos_totales));
+  readonly vsVentas   = computed(() => variacion(this.r().total_ventas, this.ant().total_ventas));
+  readonly vsTicket   = computed(() => variacion(this.r().ticket_promedio, this.ant().ticket_promedio));
+  readonly vsUnidades = computed(() => variacion(this.r().unidades, this.ant().unidades));
+  readonly promedioDiario = computed(() => (this.r().ingresos_totales || 0) / Math.max(1, this.diasPeriodo()));
 
-  get mejorDia() {
-    const d = (this.datos?.ventas_diarias || []).filter((x: any) => x.ventas > 0);
+  readonly mejorDia = computed(() => {
+    const d = (this.datos()?.ventas_diarias || []).filter((x: any) => x.ventas > 0);
     return d.length ? d.reduce((a: any, b: any) => b.ingresos > a.ingresos ? b : a) : null;
-  }
+  });
 
-  get horaPico() {
-    const h = this.datos?.por_hora || [];
+  readonly horaPico = computed(() => {
+    const h = this.datos()?.por_hora || [];
     return h.length ? h.reduce((a: any, b: any) => b.ingresos > a.ingresos ? b : a) : null;
-  }
+  });
 
-  get mejorDiaSemana() {
-    const d = (this.datos?.por_dia_semana || []).filter((x: any) => x.ventas > 0);
+  readonly mejorDiaSemana = computed(() => {
+    const d = (this.datos()?.por_dia_semana || []).filter((x: any) => x.ventas > 0);
     return d.length ? d.reduce((a: any, b: any) => this.promedioDow(b) > this.promedioDow(a) ? b : a) : null;
-  }
+  });
 
   diaSemanaDe(dia: string): string {
     return DIAS_SEMANA[(new Date(dia + 'T00:00:00').getDay() + 6) % 7].slice(0, 3).toLowerCase();
@@ -260,28 +273,28 @@ export class ReportesComponent implements OnInit, OnDestroy {
 
   promedioDow(d: any): number { return d.dias ? d.ingresos / d.dias : 0; }
 
-  get productosVisibles(): any[] {
-    const p = this.datos?.productos || [];
-    return this.verTodosProductos ? p : p.slice(0, 10);
-  }
+  readonly productosVisibles = computed<any[]>(() => {
+    const p = this.datos()?.productos || [];
+    return this.verTodosProductos() ? p : p.slice(0, 10);
+  });
 
-  get turnosVisibles(): any[] {
-    const t = this.datos?.cierres || [];
-    return this.verTodosTurnos ? t : t.slice(0, 8);
-  }
+  readonly turnosVisibles = computed<any[]>(() => {
+    const t = this.datos()?.cierres || [];
+    return this.verTodosTurnos() ? t : t.slice(0, 8);
+  });
 
   /** Productos sin ventas agrupados por categoría */
-  get sinVentasPorCategoria(): { categoria: string; productos: any[] }[] {
+  readonly sinVentasPorCategoria = computed(() => {
     const grupos = new Map<string, any[]>();
-    for (const p of this.datos?.sin_ventas || []) {
+    for (const p of this.datos()?.sin_ventas || []) {
       if (!grupos.has(p.nombre_categoria)) grupos.set(p.nombre_categoria, []);
       grupos.get(p.nombre_categoria)!.push(p);
     }
     return [...grupos].map(([categoria, productos]) => ({ categoria, productos }));
-  }
+  });
 
-  get resumenSinVentas() {
-    const l = this.datos?.sin_ventas || [];
+  readonly resumenSinVentas = computed(() => {
+    const l = this.datos()?.sin_ventas || [];
     const conStock = l.filter((p: any) => p.stock > 0);
     return {
       conStock: conStock.length,
@@ -289,11 +302,11 @@ export class ReportesComponent implements OnInit, OnDestroy {
       valor:    conStock.reduce((s: number, p: any) => s + p.stock * p.precio, 0),
       agotados: l.length - conStock.length
     };
-  }
+  });
 
-  get totalTurnos(): number { return (this.datos?.cierres || []).reduce((s: number, t: any) => s + t.total, 0); }
-  get maxCategoria(): number { return Math.max(1, ...(this.datos?.por_categoria || []).map((c: any) => c.ingresos)); }
-  get tasaCancelacion(): number { return porcentaje(this.datos?.pedidos_qr?.cancelados, this.datos?.pedidos_qr?.total); }
+  readonly totalTurnos     = computed(() => (this.datos()?.cierres || []).reduce((s: number, t: any) => s + t.total, 0));
+  readonly maxCategoria    = computed(() => Math.max(1, ...(this.datos()?.por_categoria || []).map((c: any) => c.ingresos)));
+  readonly tasaCancelacion = computed(() => porcentaje(this.datos()?.pedidos_qr?.cancelados, this.datos()?.pedidos_qr?.total));
 
   colorSerie(i: number): string { return temaGrafico(this.ajustes).serie[i % 6]; }
 
@@ -315,15 +328,16 @@ export class ReportesComponent implements OnInit, OnDestroy {
   private renderizarGraficos() {
     this.graficos.forEach(g => g.destroy());
     this.graficos = [];
-    if (!this.datos) return;
+    const datos = this.datos();
+    if (!datos) return;
     const t = temaGrafico(this.ajustes);
     const fmt = (v: number) => cifra(v, 0);
     const mon = this.moneda();
 
     const diario = this.graficoDiarioRef?.nativeElement;
-    const dias = this.datos.ventas_diarias || [];
+    const dias = datos.ventas_diarias || [];
     if (diario && dias.length) {
-      const prom = this.promedioDiario;
+      const prom = this.promedioDiario();
       const base = opcionesBase(t, fmt);
       base.plugins.tooltip.callbacks = {
         title: (i: any) => fechaLarga(dias[i[0].dataIndex].dia),
@@ -351,12 +365,12 @@ export class ReportesComponent implements OnInit, OnDestroy {
     }
 
     const horas = this.graficoHorasRef?.nativeElement;
-    if (horas && this.datos.por_hora?.length) {
-      const mapa = new Map<number, any>(this.datos.por_hora.map((h: any) => [h.hora, h]));
+    if (horas && datos.por_hora?.length) {
+      const mapa = new Map<number, any>(datos.por_hora.map((h: any) => [h.hora, h]));
       const lista = [...mapa.keys()];
       const desde = Math.min(7, ...lista), hasta = Math.max(21, ...lista);
       const etiquetas = Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i);
-      const pico = this.horaPico?.hora;
+      const pico = this.horaPico()?.hora;
       const base = opcionesBase(t, fmt);
       base.plugins.tooltip.callbacks = {
         title: (i: any) => `${String(etiquetas[i[0].dataIndex]).padStart(2, '0')}:00 – ${String(etiquetas[i[0].dataIndex] + 1).padStart(2, '0')}:00`,
@@ -377,9 +391,9 @@ export class ReportesComponent implements OnInit, OnDestroy {
     }
 
     const semana = this.graficoSemanaRef?.nativeElement;
-    if (semana && this.datos.por_dia_semana?.length) {
-      const dow = this.datos.por_dia_semana;
-      const mejor = this.mejorDiaSemana?.dia_semana;
+    if (semana && datos.por_dia_semana?.length) {
+      const dow = datos.por_dia_semana;
+      const mejor = this.mejorDiaSemana()?.dia_semana;
       const base = opcionesBase(t, fmt);
       base.plugins.tooltip.callbacks = {
         title: (i: any) => DIAS_SEMANA[dow[i[0].dataIndex].dia_semana - 1],
@@ -402,9 +416,9 @@ export class ReportesComponent implements OnInit, OnDestroy {
 
   // ─── Exportar PDF ───
   async exportarPDF() {
-    if (!this.datos) return;
+    const d = this.datos();
+    if (!d) return;
     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
-    const d = this.datos;
     const doc = new jsPDF();
     const color = this.ajustes.colorPrimarioRgb();
     const nombre = this.ajustes.nombre();
@@ -427,9 +441,9 @@ export class ReportesComponent implements OnInit, OnDestroy {
     doc.setDrawColor(...color); doc.setLineWidth(0.8); doc.line(14, 30, 196, 30);
 
     doc.setFontSize(9); doc.setTextColor(51, 65, 85);
-    doc.text(`Período: ${this.fechaInicio} al ${this.fechaFin} (${this.diasPeriodo} días)`, 14, 37);
-    doc.text(`Sucursal: ${this.nombreSucursal}`, 14, 42);
-    doc.text(`Categorías: ${this.nombresCategorias}`, 14, 47);
+    doc.text(`Período: ${this.fechaInicio()} al ${this.fechaFin()} (${this.diasPeriodo()} días)`, 14, 37);
+    doc.text(`Sucursal: ${this.nombreSucursal()}`, 14, 42);
+    doc.text(`Categorías: ${this.nombresCategorias()}`, 14, 47);
 
     let y = 54;
     const seccion = (titulo: string) => {
@@ -452,14 +466,14 @@ export class ReportesComponent implements OnInit, OnDestroy {
     };
 
     seccion('Resumen del período');
-    tabla(['Indicador', 'Período', `Anterior (${this.textoPeriodoAnterior})`, 'Variación'], [
-      ['Ingresos', m(d.resumen.ingresos_totales), m(d.anterior.ingresos_totales), delta(this.vsIngresos)],
-      ['Ventas', entero(d.resumen.total_ventas), entero(d.anterior.total_ventas), delta(this.vsVentas)],
-      ['Ticket promedio', m(d.resumen.ticket_promedio), m(d.anterior.ticket_promedio), delta(this.vsTicket)],
-      ['Unidades vendidas', entero(d.resumen.unidades), entero(d.anterior.unidades), delta(this.vsUnidades)],
-      ['Promedio diario', m(this.promedioDiario), '', ''],
+    tabla(['Indicador', 'Período', `Anterior (${this.textoPeriodoAnterior()})`, 'Variación'], [
+      ['Ingresos', m(d.resumen.ingresos_totales), m(d.anterior.ingresos_totales), delta(this.vsIngresos())],
+      ['Ventas', entero(d.resumen.total_ventas), entero(d.anterior.total_ventas), delta(this.vsVentas())],
+      ['Ticket promedio', m(d.resumen.ticket_promedio), m(d.anterior.ticket_promedio), delta(this.vsTicket())],
+      ['Unidades vendidas', entero(d.resumen.unidades), entero(d.anterior.unidades), delta(this.vsUnidades())],
+      ['Promedio diario', m(this.promedioDiario()), '', ''],
       ['Venta más alta', m(d.resumen.venta_maxima), '', ''],
-      ['Días con venta', `${d.resumen.dias_con_venta} de ${this.diasPeriodo}`, '', '']
+      ['Días con venta', `${d.resumen.dias_con_venta} de ${this.diasPeriodo()}`, '', '']
     ], [1, 2, 3]);
 
     if (d.por_sucursal?.length) {
@@ -506,17 +520,17 @@ export class ReportesComponent implements OnInit, OnDestroy {
     for (let i = 1; i <= total; i++) {
       doc.setPage(i);
       doc.setFontSize(7.5); doc.setTextColor(148, 163, 184);
-      doc.text(`${nombre} · Informe de ventas ${this.fechaInicio} al ${this.fechaFin}`, 14, 289);
+      doc.text(`${nombre} · Informe de ventas ${this.fechaInicio()} al ${this.fechaFin()}`, 14, 289);
       doc.text(`Página ${i} de ${total}`, 196, 289, { align: 'right' });
     }
-    doc.save(`Informe_${this.nombreArchivo}_${this.fechaInicio}_${this.fechaFin}.pdf`);
+    doc.save(`Informe_${this.nombreArchivo}_${this.fechaInicio()}_${this.fechaFin()}.pdf`);
   }
 
   // ─── Exportar Excel ───
   async exportarExcel() {
-    if (!this.datos) return;
+    const d = this.datos();
+    if (!d) return;
     const XLSX = await import('xlsx');
-    const d = this.datos;
     const mon = this.moneda();
     const wb = XLSX.utils.book_new();
     const hoja = (nombre: string, filas: any[][], anchos: number[]) => {
@@ -525,21 +539,22 @@ export class ReportesComponent implements OnInit, OnDestroy {
       XLSX.utils.book_append_sheet(wb, ws, nombre);
     };
     const pct = (a: number) => +porcentaje(a, d.resumen.ingresos_totales).toFixed(2);
+    const variacionExcel = (v: number | null) => v === null ? '' : +v.toFixed(2);
 
     hoja('Resumen', [
       [`INFORME DE VENTAS — ${this.ajustes.nombre()}`],
-      ['Período', `${this.fechaInicio} al ${this.fechaFin}`],
-      ['Sucursal', this.nombreSucursal],
-      ['Categorías', this.nombresCategorias],
+      ['Período', `${this.fechaInicio()} al ${this.fechaFin()}`],
+      ['Sucursal', this.nombreSucursal()],
+      ['Categorías', this.nombresCategorias()],
       [],
       ['Indicador', 'Período', 'Período anterior', 'Variación %'],
-      [`Ingresos (${mon})`, d.resumen.ingresos_totales, d.anterior.ingresos_totales, this.vsIngresos === null ? '' : +this.vsIngresos.toFixed(2)],
-      ['Ventas', d.resumen.total_ventas, d.anterior.total_ventas, this.vsVentas === null ? '' : +this.vsVentas.toFixed(2)],
-      [`Ticket promedio (${mon})`, d.resumen.ticket_promedio, d.anterior.ticket_promedio, this.vsTicket === null ? '' : +this.vsTicket.toFixed(2)],
-      ['Unidades', d.resumen.unidades, d.anterior.unidades, this.vsUnidades === null ? '' : +this.vsUnidades.toFixed(2)],
-      [`Promedio diario (${mon})`, +this.promedioDiario.toFixed(2)],
+      [`Ingresos (${mon})`, d.resumen.ingresos_totales, d.anterior.ingresos_totales, variacionExcel(this.vsIngresos())],
+      ['Ventas', d.resumen.total_ventas, d.anterior.total_ventas, variacionExcel(this.vsVentas())],
+      [`Ticket promedio (${mon})`, d.resumen.ticket_promedio, d.anterior.ticket_promedio, variacionExcel(this.vsTicket())],
+      ['Unidades', d.resumen.unidades, d.anterior.unidades, variacionExcel(this.vsUnidades())],
+      [`Promedio diario (${mon})`, +this.promedioDiario().toFixed(2)],
       [`Venta más alta (${mon})`, d.resumen.venta_maxima],
-      ['Días con venta', d.resumen.dias_con_venta, `de ${this.diasPeriodo}`],
+      ['Días con venta', d.resumen.dias_con_venta, `de ${this.diasPeriodo()}`],
       [],
       ['Inventario actual'],
       ['Productos', d.inventario.productos], ['Unidades en stock', d.inventario.unidades],
@@ -567,7 +582,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
       ...d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal, fechaHora(c.fecha_hora_apertura), fechaHora(c.fecha_hora_cierre), c.monto_inicial, c.ventas, c.efectivo, c.total,
         c.efectivo_esperado ?? '', c.efectivo_contado ?? '', c.diferencia ?? ''])], [24, 18, 20, 20, 16, 8, 14, 14, 18, 14, 14]);
 
-    XLSX.writeFile(wb, `Informe_${this.nombreArchivo}_${this.fechaInicio}_${this.fechaFin}.xlsx`);
+    XLSX.writeFile(wb, `Informe_${this.nombreArchivo}_${this.fechaInicio()}_${this.fechaFin()}.xlsx`);
   }
 
   /** Nombre del negocio apto para archivo: "Pastelería Ricky's" → "Pasteleria_Rickys" */

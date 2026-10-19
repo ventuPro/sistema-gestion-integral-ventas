@@ -3,10 +3,10 @@
   <!-- Encabezado -->
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div>
-      <p class="inf-antetitulo">Informe de ventas · {{ nombreSucursal }}</p>
+      <p class="inf-antetitulo">Informe de ventas · {{ nombreSucursal() }}</p>
       <h1 class="inf-titulo">Informes</h1>
     </div>
-    <app-selector-sucursal [sucursales]="sucursales" [seleccionada]="sucursalSeleccionada"
+    <app-selector-sucursal [sucursales]="sucursales()" [seleccionada]="sucursalSeleccionada()"
                            [todas]="esAdmin" [soloLectura]="!esAdmin"
                            (cambio)="cambiarSucursal($event)" />
   </header>
@@ -15,40 +15,40 @@
   <section class="inf-hoja p-3 flex flex-wrap items-center gap-3">
     <nav class="inf-segmentos max-w-full">
       @for (p of periodos; track p.id) {
-        <button [class.activa]="periodo === p.id" (click)="seleccionarPeriodo(p.id)">{{ p.nombre }}</button>
+        <button [class.activa]="periodo() === p.id" (click)="seleccionarPeriodo(p.id)">{{ p.nombre }}</button>
       }
     </nav>
 
-    @if (periodo === 'personalizado') {
+    @if (periodo() === 'personalizado') {
       <div class="flex items-center gap-2">
         <input type="date" class="inf-campo" [(ngModel)]="fechaInicio" (change)="cargarReporte()" aria-label="Desde">
         <span class="inf-tenue text-xs">a</span>
         <input type="date" class="inf-campo" [(ngModel)]="fechaFin" (change)="cargarReporte()" aria-label="Hasta">
       </div>
     } @else {
-      <span class="inf-nota">{{ textoPeriodo }} · {{ diasPeriodo }} {{ diasPeriodo === 1 ? 'día' : 'días' }}</span>
+      <span class="inf-nota">{{ textoPeriodo() }} · {{ diasPeriodo() }} {{ diasPeriodo() === 1 ? 'día' : 'días' }}</span>
     }
 
     <div class="relative">
-      <button class="inf-boton" [class.activo]="categoriasSeleccionadas.size" (click)="mostrarFiltroCategorias = !mostrarFiltroCategorias">
+      <button class="inf-boton" [class.activo]="categoriasSeleccionadas().size" (click)="mostrarFiltroCategorias.set(!mostrarFiltroCategorias())">
         <lucide-icon [img]="icons.filtro" class="w-3.5 h-3.5"></lucide-icon>
-        {{ textoFiltroCategorias }}
+        {{ textoFiltroCategorias() }}
         <lucide-icon [img]="icons.abajo" class="w-3.5 h-3.5"></lucide-icon>
       </button>
-      @if (mostrarFiltroCategorias) {
-        <div class="fixed inset-0 z-10" (click)="mostrarFiltroCategorias = false"></div>
+      @if (mostrarFiltroCategorias()) {
+        <div class="fixed inset-0 z-10" (click)="mostrarFiltroCategorias.set(false)"></div>
         <div class="filtro-menu inf-hoja">
-          @for (c of categoriasDisponibles; track c.id_categoria) {
+          @for (c of categoriasDisponibles(); track c.id_categoria) {
             <button class="filtro-opcion" (click)="toggleCategoria(c.id_categoria)">
-              <span class="casilla" [class.marcada]="categoriasSeleccionadas.has(c.id_categoria)">
-                @if (categoriasSeleccionadas.has(c.id_categoria)) { <lucide-icon [img]="icons.check" class="w-3 h-3"></lucide-icon> }
+              <span class="casilla" [class.marcada]="categoriasSeleccionadas().has(c.id_categoria)">
+                @if (categoriasSeleccionadas().has(c.id_categoria)) { <lucide-icon [img]="icons.check" class="w-3 h-3"></lucide-icon> }
               </span>
               {{ c.nombre_categoria }}
             </button>
           } @empty {
             <p class="inf-vacio">Sin categorías.</p>
           }
-          @if (categoriasSeleccionadas.size) {
+          @if (categoriasSeleccionadas().size) {
             <button class="filtro-limpiar inf-enlace" (click)="limpiarCategorias()">Quitar filtro</button>
           }
         </div>
@@ -56,20 +56,20 @@
     </div>
 
     <div class="flex gap-2 ml-auto">
-      <button class="inf-boton" [disabled]="!datos" (click)="exportarExcel()">
+      <button class="inf-boton" [disabled]="!datos()" (click)="exportarExcel()">
         <lucide-icon [img]="icons.excel" class="w-3.5 h-3.5"></lucide-icon> Excel
       </button>
-      <button class="inf-boton" [disabled]="!datos" (click)="exportarPDF()">
+      <button class="inf-boton" [disabled]="!datos()" (click)="exportarPDF()">
         <lucide-icon [img]="icons.pdf" class="w-3.5 h-3.5"></lucide-icon> PDF
       </button>
     </div>
   </section>
 
-  @if (error) {
-    <p class="inf-hoja px-4 py-3 text-sm inf-baja">{{ error }}</p>
+  @if (error()) {
+    <p class="inf-hoja px-4 py-3 text-sm inf-baja">{{ error() }}</p>
   }
 
-  @if (cargando) {
+  @if (cargando()) {
     <div class="space-y-5">
       <div class="inf-esqueleto h-40"></div>
       <div class="inf-esqueleto h-64"></div>
@@ -77,51 +77,51 @@
     </div>
   }
 
-  @if (!cargando && datos) {
-  <div class="space-y-5" [class.inf-refrescando]="refrescando">
+  @if (!cargando() && datos()) {
+  <div class="space-y-5" [class.inf-refrescando]="refrescando()">
 
     <!-- 01 Resumen -->
     <section class="inf-hoja">
       <div class="grid lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
         <div class="p-6 lg:border-r bloque-linea">
           <p class="inf-etiqueta">Ingresos del período</p>
-          <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(r.ingresos_totales) }}</p>
+          <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(r().ingresos_totales) }}</p>
           <p class="inf-comparacion mt-3">
-            <span class="inf-delta" [ngClass]="claseDelta(vsIngresos)">
-              <lucide-icon [img]="iconoDelta(vsIngresos)" class="w-3 h-3"></lucide-icon>{{ textoDelta(vsIngresos) }}
+            <span class="inf-delta" [ngClass]="claseDelta(vsIngresos())">
+              <lucide-icon [img]="iconoDelta(vsIngresos())" class="w-3 h-3"></lucide-icon>{{ textoDelta(vsIngresos()) }}
             </span>
-            vs. {{ textoPeriodoAnterior }} ({{ moneda() }} {{ cifra(ant.ingresos_totales) }})
+            vs. {{ textoPeriodoAnterior() }} ({{ moneda() }} {{ cifra(ant().ingresos_totales) }})
           </p>
         </div>
         <div class="inf-tira tira-resumen">
           <div>
             <p class="inf-etiqueta">Ventas</p>
-            <p class="inf-valor">{{ entero(r.total_ventas) }}</p>
-            <p class="inf-sub"><span [ngClass]="'inf-' + claseDelta(vsVentas)">{{ textoDelta(vsVentas) }}</span> vs. anterior</p>
+            <p class="inf-valor">{{ entero(r().total_ventas) }}</p>
+            <p class="inf-sub"><span [ngClass]="'inf-' + claseDelta(vsVentas())">{{ textoDelta(vsVentas()) }}</span> vs. anterior</p>
           </div>
           <div>
             <p class="inf-etiqueta">Ticket promedio</p>
-            <p class="inf-valor">{{ moneda() }} {{ cifra(r.ticket_promedio) }}</p>
-            <p class="inf-sub"><span [ngClass]="'inf-' + claseDelta(vsTicket)">{{ textoDelta(vsTicket) }}</span> vs. anterior</p>
+            <p class="inf-valor">{{ moneda() }} {{ cifra(r().ticket_promedio) }}</p>
+            <p class="inf-sub"><span [ngClass]="'inf-' + claseDelta(vsTicket())">{{ textoDelta(vsTicket()) }}</span> vs. anterior</p>
           </div>
           <div>
             <p class="inf-etiqueta">Unidades vendidas</p>
-            <p class="inf-valor">{{ entero(r.unidades) }}</p>
-            <p class="inf-sub"><span [ngClass]="'inf-' + claseDelta(vsUnidades)">{{ textoDelta(vsUnidades) }}</span> vs. anterior</p>
+            <p class="inf-valor">{{ entero(r().unidades) }}</p>
+            <p class="inf-sub"><span [ngClass]="'inf-' + claseDelta(vsUnidades())">{{ textoDelta(vsUnidades()) }}</span> vs. anterior</p>
           </div>
           <div>
             <p class="inf-etiqueta">Promedio diario</p>
-            <p class="inf-valor">{{ moneda() }} {{ cifra(promedioDiario) }}</p>
-            <p class="inf-sub">{{ r.dias_con_venta }} de {{ diasPeriodo }} días con ventas</p>
+            <p class="inf-valor">{{ moneda() }} {{ cifra(promedioDiario()) }}</p>
+            <p class="inf-sub">{{ r().dias_con_venta }} de {{ diasPeriodo() }} días con ventas</p>
           </div>
           <div>
             <p class="inf-etiqueta">Mejor día</p>
-            <p class="inf-valor">{{ mejorDia ? fechaCorta(mejorDia.dia) : '—' }}</p>
-            <p class="inf-sub">{{ mejorDia ? moneda() + ' ' + cifra(mejorDia.ingresos) : 'sin ventas' }}</p>
+            <p class="inf-valor">{{ mejorDia() ? fechaCorta(mejorDia().dia) : '—' }}</p>
+            <p class="inf-sub">{{ mejorDia() ? moneda() + ' ' + cifra(mejorDia().ingresos) : 'sin ventas' }}</p>
           </div>
           <div>
             <p class="inf-etiqueta">Venta más alta</p>
-            <p class="inf-valor">{{ moneda() }} {{ cifra(r.venta_maxima) }}</p>
+            <p class="inf-valor">{{ moneda() }} {{ cifra(r().venta_maxima) }}</p>
           </div>
         </div>
       </div>
@@ -144,38 +144,38 @@
       <section class="inf-hoja p-5">
         <div class="inf-seccion">
           <span class="inf-indice">02</span><h2>Horas de mayor venta</h2>
-          @if (horaPico) { <span class="inf-nota">Pico: {{ horaPico.hora }}:00 – {{ horaPico.hora + 1 }}:00</span> }
+          @if (horaPico()) { <span class="inf-nota">Pico: {{ horaPico().hora }}:00 – {{ horaPico().hora + 1 }}:00</span> }
         </div>
-        @if (datos.por_hora?.length) {
+        @if (datos().por_hora?.length) {
           <div class="relative h-52"><canvas #graficoHoras></canvas></div>
         } @else { <p class="inf-vacio">Sin ventas en el período.</p> }
       </section>
       <section class="inf-hoja p-5">
         <div class="inf-seccion">
           <span class="inf-indice">03</span><h2>Promedio por día de la semana</h2>
-          @if (mejorDiaSemana) { <span class="inf-nota">Mejor: {{ diasSemana[mejorDiaSemana.dia_semana - 1] }}</span> }
+          @if (mejorDiaSemana()) { <span class="inf-nota">Mejor: {{ diasSemana[mejorDiaSemana().dia_semana - 1] }}</span> }
         </div>
-        @if (r.total_ventas) {
+        @if (r().total_ventas) {
           <div class="relative h-52"><canvas #graficoSemana></canvas></div>
         } @else { <p class="inf-vacio">Sin ventas en el período.</p> }
       </section>
     </div>
 
     <!-- Por sucursal -->
-    @if (todas && datos.por_sucursal?.length) {
+    @if (todas() && datos().por_sucursal?.length) {
       <section class="inf-hoja overflow-hidden">
         <div class="px-5 pt-5"><div class="inf-seccion mb-1!"><h2>Comparativo de sucursales</h2></div></div>
         <div class="overflow-x-auto">
           <table class="inf-tabla">
             <thead><tr><th>Sucursal</th><th class="num">Ventas</th><th class="num">Ticket promedio</th><th class="num">Ingresos</th><th class="w-1/4">Participación</th></tr></thead>
             <tbody>
-              @for (s of datos.por_sucursal; track s.nombre_sucursal) {
+              @for (s of datos().por_sucursal; track s.nombre_sucursal) {
                 <tr>
                   <td class="fuerte">{{ s.nombre_sucursal }}</td>
                   <td class="num">{{ entero(s.ventas) }}</td>
                   <td class="num">{{ moneda() }} {{ cifra(s.ticket) }}</td>
                   <td class="num fuerte">{{ moneda() }} {{ cifra(s.ingresos) }}</td>
-                  <td><div class="flex items-center gap-3"><div class="inf-barra flex-1"><span [style.width.%]="porcentaje(s.ingresos, r.ingresos_totales)"></span></div><span class="inf-tenue text-xs w-12 text-right">{{ porcentaje(s.ingresos, r.ingresos_totales).toFixed(1) }} %</span></div></td>
+                  <td><div class="flex items-center gap-3"><div class="inf-barra flex-1"><span [style.width.%]="porcentaje(s.ingresos, r().ingresos_totales)"></span></div><span class="inf-tenue text-xs w-12 text-right">{{ porcentaje(s.ingresos, r().ingresos_totales).toFixed(1) }} %</span></div></td>
                 </tr>
               }
             </tbody>
@@ -188,20 +188,20 @@
     <div class="grid lg:grid-cols-5 gap-5">
       <section class="inf-hoja p-5 lg:col-span-2">
         <div class="inf-seccion"><span class="inf-indice">04</span><h2>Cobros por método</h2></div>
-        @if (datos.metodos_pago?.length) {
+        @if (datos().metodos_pago?.length) {
           <div class="inf-apilada mb-4">
-            @for (m of datos.metodos_pago; track m.metodo_pago; let i = $index) {
-              <span [style.width.%]="porcentaje(m.ingresos, r.ingresos_totales)" [style.background]="colorSerie(i)"></span>
+            @for (m of datos().metodos_pago; track m.metodo_pago; let i = $index) {
+              <span [style.width.%]="porcentaje(m.ingresos, r().ingresos_totales)" [style.background]="colorSerie(i)"></span>
             }
           </div>
           <table class="inf-tabla">
             <tbody>
-              @for (m of datos.metodos_pago; track m.metodo_pago; let i = $index) {
+              @for (m of datos().metodos_pago; track m.metodo_pago; let i = $index) {
                 <tr>
                   <td class="pl-0!"><span class="flex items-center gap-2"><i class="inf-muestra" [style.background]="colorSerie(i)"></i>{{ m.metodo_pago }}</span></td>
                   <td class="num inf-tenue">{{ entero(m.ventas) }} vta.</td>
                   <td class="num fuerte">{{ moneda() }} {{ cifra(m.ingresos) }}</td>
-                  <td class="num inf-tenue pr-0!">{{ porcentaje(m.ingresos, r.ingresos_totales).toFixed(1) }} %</td>
+                  <td class="num inf-tenue pr-0!">{{ porcentaje(m.ingresos, r().ingresos_totales).toFixed(1) }} %</td>
                 </tr>
               }
             </tbody>
@@ -211,18 +211,18 @@
 
       <section class="inf-hoja lg:col-span-3 min-w-0">
         <div class="px-5 pt-5"><div class="inf-seccion mb-1!"><span class="inf-indice">05</span><h2>Desempeño por cajero</h2></div></div>
-        @if (datos.por_cajero?.length) {
+        @if (datos().por_cajero?.length) {
           <div class="overflow-x-auto">
             <table class="inf-tabla">
               <thead><tr><th>Cajero</th><th class="num">Ventas</th><th class="num">Ticket promedio</th><th class="num">Ingresos</th><th class="num">%</th></tr></thead>
               <tbody>
-                @for (c of datos.por_cajero; track c.cajero) {
+                @for (c of datos().por_cajero; track c.cajero) {
                   <tr>
                     <td class="fuerte">{{ c.cajero }}</td>
                     <td class="num">{{ entero(c.ventas) }}</td>
                     <td class="num">{{ moneda() }} {{ cifra(c.ticket) }}</td>
                     <td class="num fuerte">{{ moneda() }} {{ cifra(c.ingresos) }}</td>
-                    <td class="num inf-tenue">{{ porcentaje(c.ingresos, r.ingresos_totales).toFixed(1) }} %</td>
+                    <td class="num inf-tenue">{{ porcentaje(c.ingresos, r().ingresos_totales).toFixed(1) }} %</td>
                   </tr>
                 }
               </tbody>
@@ -236,14 +236,14 @@
     <div class="grid lg:grid-cols-5 gap-5">
       <section class="inf-hoja p-5 lg:col-span-2">
         <div class="inf-seccion"><span class="inf-indice">06</span><h2>Ventas por categoría</h2></div>
-        @for (c of datos.por_categoria; track c.id_categoria) {
+        @for (c of datos().por_categoria; track c.id_categoria) {
           <div class="categoria">
             <div class="flex items-baseline justify-between gap-3 text-[13px]">
               <span class="inf-tinta font-medium truncate">{{ c.nombre_categoria }}</span>
               <span class="inf-tinta font-semibold whitespace-nowrap">{{ moneda() }} {{ cifra(c.ingresos) }}</span>
             </div>
-            <div class="inf-barra mt-1.5"><span [style.width.%]="c.ingresos / maxCategoria * 100"></span></div>
-            <p class="inf-sub">{{ entero(c.unidades) }} unidades · {{ porcentaje(c.ingresos, r.ingresos_totales).toFixed(1) }} % de los ingresos</p>
+            <div class="inf-barra mt-1.5"><span [style.width.%]="c.ingresos / maxCategoria() * 100"></span></div>
+            <p class="inf-sub">{{ entero(c.unidades) }} unidades · {{ porcentaje(c.ingresos, r().ingresos_totales).toFixed(1) }} % de los ingresos</p>
           </div>
         } @empty {
           <p class="inf-vacio">Sin ventas en el período.</p>
@@ -254,31 +254,31 @@
         <div class="px-5 pt-5">
           <div class="inf-seccion mb-1!">
             <span class="inf-indice">07</span><h2>Productos vendidos</h2>
-            <span class="inf-nota">{{ datos.productos?.length || 0 }} productos</span>
+            <span class="inf-nota">{{ datos().productos?.length || 0 }} productos</span>
           </div>
         </div>
-        @if (datos.productos?.length) {
+        @if (datos().productos?.length) {
           <div class="overflow-x-auto">
             <table class="inf-tabla">
               <thead><tr><th class="rango">#</th><th>Producto</th><th class="num">Unidades</th><th class="num">Precio prom.</th><th class="num">Ingresos</th><th class="num">%</th></tr></thead>
               <tbody>
-                @for (p of productosVisibles; track p.id_producto; let i = $index) {
+                @for (p of productosVisibles(); track p.id_producto; let i = $index) {
                   <tr>
                     <td class="rango">{{ i + 1 }}</td>
                     <td><span class="fuerte">{{ p.nombre_producto }}</span><span class="inf-secundario">{{ p.nombre_categoria }}</span></td>
                     <td class="num">{{ entero(p.unidades) }}</td>
                     <td class="num inf-tenue">{{ cifra(p.ingresos / p.unidades) }}</td>
                     <td class="num fuerte">{{ moneda() }} {{ cifra(p.ingresos) }}</td>
-                    <td class="num inf-tenue">{{ porcentaje(p.ingresos, r.ingresos_totales).toFixed(1) }}</td>
+                    <td class="num inf-tenue">{{ porcentaje(p.ingresos, r().ingresos_totales).toFixed(1) }}</td>
                   </tr>
                 }
               </tbody>
             </table>
           </div>
-          @if (datos.productos.length > 10) {
+          @if (datos().productos.length > 10) {
             <div class="inf-pie-hoja">
-              <button class="inf-enlace" (click)="verTodosProductos = !verTodosProductos">
-                {{ verTodosProductos ? 'Mostrar solo los 10 primeros' : 'Ver los ' + datos.productos.length + ' productos' }}
+              <button class="inf-enlace" (click)="verTodosProductos.set(!verTodosProductos())">
+                {{ verTodosProductos() ? 'Mostrar solo los 10 primeros' : 'Ver los ' + datos().productos.length + ' productos' }}
               </button>
             </div>
           }
@@ -288,24 +288,24 @@
     </div>
 
     <!-- Productos sin ventas -->
-    @if (datos.sin_ventas?.length) {
+    @if (datos().sin_ventas?.length) {
       <section class="inf-hoja">
-        <button class="sin-ventas-cabecera" (click)="verSinVentas = !verSinVentas" [attr.aria-expanded]="verSinVentas">
-          <lucide-icon [img]="verSinVentas ? icons.abajo : icons.derecha" class="w-4 h-4 inf-tenue"></lucide-icon>
+        <button class="sin-ventas-cabecera" (click)="verSinVentas.set(!verSinVentas())" [attr.aria-expanded]="verSinVentas()">
+          <lucide-icon [img]="verSinVentas() ? icons.abajo : icons.derecha" class="w-4 h-4 inf-tenue"></lucide-icon>
           <span class="flex-1 text-left">
             <span class="inf-tinta font-semibold text-[13.5px]">
-              {{ datos.sin_ventas.length }} {{ datos.sin_ventas.length === 1 ? 'producto activo no se vendió' : 'productos activos no se vendieron' }}
+              {{ datos().sin_ventas.length }} {{ datos().sin_ventas.length === 1 ? 'producto activo no se vendió' : 'productos activos no se vendieron' }}
             </span>
             <span class="inf-sub block">
-              {{ resumenSinVentas.conStock }} con stock ({{ entero(resumenSinVentas.unidades) }} uds. · {{ moneda() }} {{ cifra(resumenSinVentas.valor) }} a precio de venta)
-              · {{ resumenSinVentas.agotados }} agotados
+              {{ resumenSinVentas().conStock }} con stock ({{ entero(resumenSinVentas().unidades) }} uds. · {{ moneda() }} {{ cifra(resumenSinVentas().valor) }} a precio de venta)
+              · {{ resumenSinVentas().agotados }} agotados
             </span>
           </span>
-          <span class="inf-enlace">{{ verSinVentas ? 'Ocultar' : 'Ver detalle' }}</span>
+          <span class="inf-enlace">{{ verSinVentas() ? 'Ocultar' : 'Ver detalle' }}</span>
         </button>
-        @if (verSinVentas) {
+        @if (verSinVentas()) {
           <div class="sin-ventas">
-            @for (g of sinVentasPorCategoria; track g.categoria) {
+            @for (g of sinVentasPorCategoria(); track g.categoria) {
               <div class="sin-ventas-grupo">
                 <p class="sin-ventas-categoria">{{ g.categoria }} <span>{{ g.productos.length }}</span></p>
                 @for (p of g.productos; track p.nombre_producto) {
@@ -331,17 +331,17 @@
         <div class="px-5 pt-5">
           <div class="inf-seccion mb-1!">
             <span class="inf-indice">08</span><h2>Turnos de caja cerrados</h2>
-            <span class="inf-nota">{{ datos.cierres?.length || 0 }} turnos · {{ moneda() }} {{ cifra(totalTurnos) }}</span>
+            <span class="inf-nota">{{ datos().cierres?.length || 0 }} turnos · {{ moneda() }} {{ cifra(totalTurnos()) }}</span>
           </div>
         </div>
-        @if (datos.cierres?.length) {
+        @if (datos().cierres?.length) {
           <div class="overflow-x-auto">
             <table class="inf-tabla">
               <thead><tr><th>Cajero</th><th>Turno</th><th class="num">Ventas</th><th class="num">Efectivo</th><th class="num">Total</th><th class="num">Arqueo</th></tr></thead>
               <tbody>
-                @for (c of turnosVisibles; track c.id_turno) {
+                @for (c of turnosVisibles(); track c.id_turno) {
                   <tr>
-                    <td><span class="fuerte">{{ c.cajero }}</span>@if (todas) { <span class="inf-secundario">{{ c.nombre_sucursal }}</span> }</td>
+                    <td><span class="fuerte">{{ c.cajero }}</span>@if (todas()) { <span class="inf-secundario">{{ c.nombre_sucursal }}</span> }</td>
                     <td class="inf-tenue text-[12.5px] whitespace-nowrap">{{ fechaHora(c.fecha_hora_apertura) }} → {{ hora(c.fecha_hora_cierre) }}</td>
                     <td class="num">{{ entero(c.ventas) }}</td>
                     <td class="num">{{ moneda() }} {{ cifra(c.efectivo) }}</td>
@@ -356,10 +356,10 @@
               </tbody>
             </table>
           </div>
-          @if (datos.cierres.length > 8) {
+          @if (datos().cierres.length > 8) {
             <div class="inf-pie-hoja">
-              <button class="inf-enlace" (click)="verTodosTurnos = !verTodosTurnos">
-                {{ verTodosTurnos ? 'Mostrar menos' : 'Ver los ' + datos.cierres.length + ' turnos' }}
+              <button class="inf-enlace" (click)="verTodosTurnos.set(!verTodosTurnos())">
+                {{ verTodosTurnos() ? 'Mostrar menos' : 'Ver los ' + datos().cierres.length + ' turnos' }}
               </button>
             </div>
           }
@@ -370,20 +370,20 @@
         <section class="inf-hoja p-5">
           <div class="inf-seccion"><span class="inf-indice">09</span><h2>Inventario actual</h2></div>
           <dl class="inf-pares">
-            <div><dt>Productos en stock</dt><dd>{{ entero(datos.inventario?.productos) }}</dd></div>
-            <div><dt>Unidades disponibles</dt><dd>{{ entero(datos.inventario?.unidades) }}</dd></div>
-            <div><dt>Valor a precio de venta</dt><dd>{{ moneda() }} {{ cifra(datos.inventario?.valor_venta) }}</dd></div>
-            <div><dt>Agotados</dt><dd [class.inf-baja]="datos.inventario?.agotados">{{ datos.inventario?.agotados || 0 }}</dd></div>
-            <div><dt>Bajo el mínimo</dt><dd [class.inf-aviso]="datos.inventario?.bajos">{{ datos.inventario?.bajos || 0 }}</dd></div>
+            <div><dt>Productos en stock</dt><dd>{{ entero(datos().inventario?.productos) }}</dd></div>
+            <div><dt>Unidades disponibles</dt><dd>{{ entero(datos().inventario?.unidades) }}</dd></div>
+            <div><dt>Valor a precio de venta</dt><dd>{{ moneda() }} {{ cifra(datos().inventario?.valor_venta) }}</dd></div>
+            <div><dt>Agotados</dt><dd [class.inf-baja]="datos().inventario?.agotados">{{ datos().inventario?.agotados || 0 }}</dd></div>
+            <div><dt>Bajo el mínimo</dt><dd [class.inf-aviso]="datos().inventario?.bajos">{{ datos().inventario?.bajos || 0 }}</dd></div>
           </dl>
         </section>
         <section class="inf-hoja p-5">
           <div class="inf-seccion"><span class="inf-indice">10</span><h2>Pedidos del menú QR</h2></div>
           <dl class="inf-pares">
-            <div><dt>Recibidos</dt><dd>{{ entero(datos.pedidos_qr?.total) }}</dd></div>
-            <div><dt>Atendidos</dt><dd>{{ entero(datos.pedidos_qr?.atendidos) }}</dd></div>
-            <div><dt>Cancelados</dt><dd>{{ entero(datos.pedidos_qr?.cancelados) }} <span class="inf-tenue font-normal">({{ tasaCancelacion.toFixed(0) }} %)</span></dd></div>
-            <div><dt>Monto pedido</dt><dd>{{ moneda() }} {{ cifra(datos.pedidos_qr?.monto) }}</dd></div>
+            <div><dt>Recibidos</dt><dd>{{ entero(datos().pedidos_qr?.total) }}</dd></div>
+            <div><dt>Atendidos</dt><dd>{{ entero(datos().pedidos_qr?.atendidos) }}</dd></div>
+            <div><dt>Cancelados</dt><dd>{{ entero(datos().pedidos_qr?.cancelados) }} <span class="inf-tenue font-normal">({{ tasaCancelacion().toFixed(0) }} %)</span></dd></div>
+            <div><dt>Monto pedido</dt><dd>{{ moneda() }} {{ cifra(datos().pedidos_qr?.monto) }}</dd></div>
           </dl>
         </section>
       </div>
@@ -400,22 +400,22 @@
         <table class="inf-tabla">
           <thead><tr><th class="w-8"></th><th>Fecha</th><th class="num">Ventas</th><th class="num">Ticket promedio</th><th class="num">Ingresos</th></tr></thead>
           <tbody>
-            @for (d of datos.ventas_diarias; track d.dia) {
-              <tr (click)="toggleDia(d)" [class.dia-vacio]="!d.ventas" [class.dia-abierto]="diasExpandidos.has(d.dia)" class="dia">
-                <td>@if (d.ventas) { <lucide-icon [img]="diasExpandidos.has(d.dia) ? icons.abajo : icons.derecha" class="w-3.5 h-3.5 inf-tenue"></lucide-icon> }</td>
+            @for (d of datos().ventas_diarias; track d.dia) {
+              <tr (click)="toggleDia(d)" [class.dia-vacio]="!d.ventas" [class.dia-abierto]="diasExpandidos().has(d.dia)" class="dia">
+                <td>@if (d.ventas) { <lucide-icon [img]="diasExpandidos().has(d.dia) ? icons.abajo : icons.derecha" class="w-3.5 h-3.5 inf-tenue"></lucide-icon> }</td>
                 <td class="fuerte">{{ fechaCorta(d.dia) }} <span class="inf-tenue font-normal text-xs ml-1">{{ diaSemanaDe(d.dia) }}</span></td>
                 <td class="num">{{ d.ventas || '—' }}</td>
                 <td class="num">{{ d.ventas ? moneda() + ' ' + cifra(d.ingresos / d.ventas) : '—' }}</td>
                 <td class="num fuerte">{{ d.ventas ? moneda() + ' ' + cifra(d.ingresos) : '—' }}</td>
               </tr>
-              @if (diasExpandidos.has(d.dia)) {
+              @if (diasExpandidos().has(d.dia)) {
                 <tr class="desglose">
                   <td></td>
                   <td colspan="4">
-                    @if (cargandoDia[d.dia]) {
+                    @if (cargandoDia()[d.dia]) {
                       <div class="inf-esqueleto h-16 my-1"></div>
                     } @else {
-                      @for (c of desglosePorDia[d.dia]?.desglose; track c.id_categoria) {
+                      @for (c of desglosePorDia()[d.dia]?.desglose; track c.id_categoria) {
                         <div class="flex items-center gap-3 py-1 text-[12.5px]">
                           <span class="w-40 truncate">{{ c.nombre_categoria }}</span>
                           <div class="inf-barra flex-1"><span [style.width.%]="c.porcentaje_dia"></span></div>
@@ -435,9 +435,9 @@
           <tfoot>
             <tr>
               <td></td><td>Total del período</td>
-              <td class="num">{{ entero(r.total_ventas) }}</td>
-              <td class="num">{{ moneda() }} {{ cifra(r.ticket_promedio) }}</td>
-              <td class="num">{{ moneda() }} {{ cifra(r.ingresos_totales) }}</td>
+              <td class="num">{{ entero(r().total_ventas) }}</td>
+              <td class="num">{{ moneda() }} {{ cifra(r().ticket_promedio) }}</td>
+              <td class="num">{{ moneda() }} {{ cifra(r().ingresos_totales) }}</td>
             </tr>
           </tfoot>
         </table>

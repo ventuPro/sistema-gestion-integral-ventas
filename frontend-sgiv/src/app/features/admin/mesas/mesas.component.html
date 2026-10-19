@@ -4,18 +4,18 @@
     <div>
       <p class="inf-antetitulo">
         <span>{{ hoyTexto }}</span>
-        @if (!verificandoCaja && cajaHabilitada) { <span class="inf-vivo">Actualización automática</span> }
-        @if (!verificandoCaja && !cajaHabilitada && estadoCaja === 'CERRADA') { <span class="inf-estado mal">Caja cerrada</span> }
-        @if (!verificandoCaja && !cajaHabilitada && estadoCaja === 'SIN_APERTURA') { <span class="inf-estado neutro">Caja sin abrir</span> }
+        @if (!verificandoCaja() && cajaHabilitada()) { <span class="inf-vivo">Actualización automática</span> }
+        @if (!verificandoCaja() && !cajaHabilitada() && estadoCaja() === 'CERRADA') { <span class="inf-estado mal">Caja cerrada</span> }
+        @if (!verificandoCaja() && !cajaHabilitada() && estadoCaja() === 'SIN_APERTURA') { <span class="inf-estado neutro">Caja sin abrir</span> }
       </p>
       <h1 class="inf-titulo">Mesas</h1>
     </div>
-    @if (!verificandoCaja && cajaHabilitada) {
+    @if (!verificandoCaja() && cajaHabilitada()) {
       <div class="flex flex-wrap items-center gap-2">
         <button class="inf-boton" (click)="cargarMesas()">
           <lucide-icon [img]="icons.refresh" class="w-3.5 h-3.5"></lucide-icon> Actualizar
         </button>
-        <button class="inf-boton" (click)="abrirModalQR()" [disabled]="mesas.length === 0">
+        <button class="inf-boton" (click)="abrirModalQR()" [disabled]="mesas().length === 0">
           <lucide-icon [img]="icons.qr" class="w-3.5 h-3.5"></lucide-icon> Códigos QR
         </button>
         <button class="boton-primario py-1.5! text-[12.5px]!" (click)="abrirModalMesa()">
@@ -25,13 +25,13 @@
     }
   </header>
 
-  @if (verificandoCaja) {
+  @if (verificandoCaja()) {
     <div class="inf-esqueleto h-24"></div>
     <div class="inf-esqueleto h-80"></div>
   }
 
   <!-- ═══ SIN ACCESO ═══ -->
-  @if (!verificandoCaja && !cajaHabilitada && estadoCaja === 'CERRADA') {
+  @if (!verificandoCaja() && !cajaHabilitada() && estadoCaja() === 'CERRADA') {
     <section class="inf-hoja max-w-lg p-6">
       <div class="flex items-start gap-4">
         <lucide-icon [img]="icons.shieldAlert" class="w-6 h-6 inf-baja flex-shrink-0 mt-0.5"></lucide-icon>
@@ -39,11 +39,11 @@
           <h2 class="inf-tinta font-semibold text-[15px]">Tu caja ya fue cerrada hoy</h2>
         </div>
       </div>
-      @if (turnoCajero) {
+      @if (turnoCajero()) {
         <dl class="inf-pares mt-5 pt-4 separador">
-          <div><dt>Turno</dt><dd>#{{ turnoCajero.id_turno }}</dd></div>
-          <div><dt>Apertura</dt><dd>{{ turnoCajero.fecha_hora_apertura | date:'dd/MM HH:mm' }}</dd></div>
-          <div><dt>Cierre</dt><dd>{{ turnoCajero.fecha_hora_cierre | date:'dd/MM HH:mm' }}</dd></div>
+          <div><dt>Turno</dt><dd>#{{ turnoCajero().id_turno }}</dd></div>
+          <div><dt>Apertura</dt><dd>{{ turnoCajero().fecha_hora_apertura | date:'dd/MM HH:mm' }}</dd></div>
+          <div><dt>Cierre</dt><dd>{{ turnoCajero().fecha_hora_cierre | date:'dd/MM HH:mm' }}</dd></div>
         </dl>
       }
       <button class="inf-boton mt-5" (click)="verificarAccesoCaja()">
@@ -52,7 +52,7 @@
     </section>
   }
 
-  @if (!verificandoCaja && !cajaHabilitada && estadoCaja === 'SIN_APERTURA') {
+  @if (!verificandoCaja() && !cajaHabilitada() && estadoCaja() === 'SIN_APERTURA') {
     <section class="inf-hoja max-w-lg p-6">
       <div class="flex items-start gap-4">
         <lucide-icon [img]="icons.landmark" class="w-6 h-6 flex-shrink-0 mt-0.5" style="color: var(--i-acento)"></lucide-icon>
@@ -65,20 +65,20 @@
   }
 
   <!-- ═══ PLANO ═══ -->
-  @if (!verificandoCaja && cajaHabilitada) {
+  @if (!verificandoCaja() && cajaHabilitada()) {
 
     <section class="inf-hoja inf-tira overflow-hidden">
       <div>
         <p class="inf-etiqueta">Libres</p>
-        <p class="inf-valor">{{ resumen.libres }} <span class="inf-tenue text-sm font-normal">de {{ mesas.length }}</span></p>
+        <p class="inf-valor">{{ resumen().libres }} <span class="inf-tenue text-sm font-normal">de {{ mesas().length }}</span></p>
       </div>
       <div>
         <p class="inf-etiqueta">Con cuenta abierta</p>
-        <p class="inf-valor">{{ resumen.conCuenta }}</p>
+        <p class="inf-valor">{{ resumen().conCuenta }}</p>
       </div>
       <div>
         <p class="inf-etiqueta">Consumo por cobrar</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(resumen.porCobrar) }}</p>
+        <p class="inf-valor">{{ moneda() }} {{ cifra(resumen().porCobrar) }}</p>
       </div>
     </section>
 
@@ -92,15 +92,15 @@
         </span>
       </div>
 
-      @if (cargando) {
+      @if (cargando()) {
         <div class="plano">
           @for (n of [1,2,3,4,5,6]; track n) { <div class="inf-esqueleto h-28"></div> }
         </div>
-      } @else if (mesas.length === 0) {
+      } @else if (mesas().length === 0) {
         <p class="inf-vacio">No hay mesas creadas. Crea la primera con «Nueva mesa».</p>
       } @else {
         <div class="plano">
-          @for (mesa of mesas; track mesa.id_mesa) {
+          @for (mesa of mesas(); track mesa.id_mesa) {
             <div class="contenedor-mesa relative">
               @if (!mesa.id_cuenta && mesa.estado_mesa === 'Libre') {
                 <button class="quitar eliminar" (click)="eliminarMesa(mesa, $event)" title="Eliminar mesa" aria-label="Eliminar mesa">
@@ -127,7 +127,7 @@
 </div>
 
 <!-- ═══ NUEVA MESA ═══ -->
-@if (mostrarModalMesa) {
+@if (mostrarModalMesa()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalMesa()">
     <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
@@ -142,7 +142,7 @@
           <span>N.º</span>
           <input type="number" min="1" [(ngModel)]="nuevaMesaNum" placeholder="1" (keyup.enter)="crearMesa()">
         </div>
-        @if (errorMesa) { <p class="text-sm inf-baja mt-3">{{ errorMesa }}</p> }
+        @if (errorMesa()) { <p class="text-sm inf-baja mt-3">{{ errorMesa() }}</p> }
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalMesa()">Cancelar</button>
@@ -153,7 +153,7 @@
 }
 
 <!-- ═══ CÓDIGOS QR ═══ -->
-@if (mostrarModalQR) {
+@if (mostrarModalQR()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalQR()">
     <div class="inf-hoja ventana w-full max-w-4xl max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
@@ -171,27 +171,27 @@
           <div class="buscador flex-1">
             <input type="text" [(ngModel)]="baseUrlQR" (keyup.enter)="generarCodigosQR()" placeholder="http://192.168.1.10:4200">
           </div>
-          <button class="boton-primario py-2!" (click)="generarCodigosQR()" [disabled]="generandoQR">
-            {{ generandoQR ? 'Generando…' : 'Generar' }}
+          <button class="boton-primario py-2!" (click)="generarCodigosQR()" [disabled]="generandoQR()">
+            {{ generandoQR() ? 'Generando…' : 'Generar' }}
           </button>
         </div>
-        @if (baseUrlEsLocal) {
+        @if (baseUrlEsLocal()) {
           <p class="aviso-local">
             Con <b>localhost</b> el QR solo funciona en esta computadora. Escribe la IP de esta computadora en la red
             del local (por ejemplo <b>http://192.168.1.10:4200</b>) para que funcione en el celular del cliente.
           </p>
         }
-        @if (errorQR) { <p class="text-[12.5px] inf-baja">{{ errorQR }}</p> }
+        @if (errorQR()) { <p class="text-[12.5px] inf-baja">{{ errorQR() }}</p> }
       </div>
 
       <div class="flex-1 overflow-y-auto p-5">
-        @if (generandoQR && !codigosQR.length) {
+        @if (generandoQR() && !codigosQR().length) {
           <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             @for (n of [1,2,3,4]; track n) { <div class="inf-esqueleto h-56"></div> }
           </div>
         }
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          @for (c of codigosQR; track c.id_mesa) {
+          @for (c of codigosQR(); track c.id_mesa) {
             <div class="tarjeta-qr">
               <img [src]="c.qr" [alt]="'QR Mesa ' + c.numero_mesa">
               <p class="inf-tinta font-semibold mt-2">Mesa {{ c.numero_mesa }}</p>
@@ -210,7 +210,7 @@
 
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalQR()">Cerrar</button>
-        <button class="boton-primario" (click)="imprimirQR()" [disabled]="!codigosQR.length || generandoQR">
+        <button class="boton-primario" (click)="imprimirQR()" [disabled]="!codigosQR().length || generandoQR()">
           <lucide-icon [img]="icons.printer" class="w-4 h-4"></lucide-icon> Imprimir todos
         </button>
       </div>
@@ -219,8 +219,8 @@
 }
 
 <app-mesa-modal
-  *ngIf="mesaSeleccionada"
-  [mesa]="mesaSeleccionada"
+  *ngIf="mesaSeleccionada()"
+  [mesa]="mesaSeleccionada()"
   (cerrado)="onModalCerrado()"
   (mesaActualizada)="onMesaActualizada()">
 </app-mesa-modal>

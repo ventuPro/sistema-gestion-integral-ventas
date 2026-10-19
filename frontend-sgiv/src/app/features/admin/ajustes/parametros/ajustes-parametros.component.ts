@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, Save, Undo2, RotateCcw, Upload, ImageIcon } from 'lucide-angular';
@@ -46,7 +46,6 @@ interface CampoNumero { clave: keyof Parametros; etiqueta: string; min: number; 
 export class AjustesParametrosComponent implements OnInit {
   private ajustes = inject(AjustesService);
   private dialogo = inject(DialogoService);
-  private cdr     = inject(ChangeDetectorRef);
 
   readonly icons = { guardar: Save, descartar: Undo2, original: RotateCcw, subir: Upload, imagen: ImageIcon };
 
@@ -70,19 +69,25 @@ export class AjustesParametrosComponent implements OnInit {
     { clave: 'sesion_horas', etiqueta: 'Duración de la sesión', unidad: 'horas', min: 1, max: 24 }
   ];
 
-  cargando = true;
-  guardando = false;
+  readonly cargando  = signal(true);
+  readonly guardando = signal(false);
 
-  p: Parametros = { ...ORIGINALES };
+  // Formulario: se reemplaza con set(); el template edita los campos del objeto actual
+  readonly p = signal<Parametros>({ ...ORIGINALES });
   private guardado: Parametros = { ...ORIGINALES };
-  qrGuardado: string | null = null;
+  readonly qrGuardado = signal<string | null>(null);
   /** undefined = sin cambios; null = quitar; data URI = imagen nueva */
-  qrNuevo: string | null | undefined = undefined;
+  readonly qrNuevo = signal<string | null | undefined>(undefined);
+
+  readonly qrVista = computed(() => {
+    const nuevo = this.qrNuevo();
+    return nuevo !== undefined ? nuevo : this.qrGuardado();
+  });
 
   ngOnInit() {
     this.ajustes.obtenerCompleto().subscribe({
-      next: (c) => { this.llenar(c); this.cargando = false; this.cdr.detectChanges(); },
-      error: () => { this.cargando = false; this.dialogo.error('No se pudieron cargar los parámetros.'); }
+      next: (c) => { this.llenar(c); this.cargando.set(false); },
+      error: () => { this.cargando.set(false); this.dialogo.error('No se pudieron cargar los parámetros.'); }
     });
   }
 
@@ -90,32 +95,31 @@ export class AjustesParametrosComponent implements OnInit {
     const p: any = {};
     (Object.keys(ORIGINALES) as (keyof Parametros)[]).forEach(k => p[k] = (c as any)[k] ?? ORIGINALES[k]);
     p.menu_mensaje_bienvenida = c.menu_mensaje_bienvenida || '';
-    this.p = p;
+    this.p.set(p);
     this.guardado = { ...p };
-    this.qrGuardado = c.url_qr_cobro;
-    this.qrNuevo = undefined;
-  }
-
-  get qrVista(): string | null {
-    return this.qrNuevo !== undefined ? this.qrNuevo : this.qrGuardado;
+    this.qrGuardado.set(c.url_qr_cobro);
+    this.qrNuevo.set(undefined);
   }
 
   get hayCambios(): boolean {
-    return this.qrNuevo !== undefined ||
-      (Object.keys(ORIGINALES) as (keyof Parametros)[]).some(k => String(this.p[k]) !== String(this.guardado[k]));
+    const p = this.p();
+    return this.qrNuevo() !== undefined ||
+      (Object.keys(ORIGINALES) as (keyof Parametros)[]).some(k => String(p[k]) !== String(this.guardado[k]));
   }
 
   get esOriginal(): boolean {
-    return !this.qrVista && (Object.keys(ORIGINALES) as (keyof Parametros)[])
-      .every(k => String(this.p[k]) === String(ORIGINALES[k]));
+    const p = this.p();
+    return !this.qrVista() && (Object.keys(ORIGINALES) as (keyof Parametros)[])
+      .every(k => String(p[k]) === String(ORIGINALES[k]));
   }
 
   /** Al menos un método de pago queda activo */
   cambiarPago(metodo: 'pago_efectivo' | 'pago_qr') {
     const otro = metodo === 'pago_efectivo' ? 'pago_qr' : 'pago_efectivo';
-    if (this.p[metodo] && !this.p[otro])
+    const p = this.p();
+    if (p[metodo] && !p[otro])
       return this.dialogo.error('Debe quedar al menos un método de pago habilitado.');
-    this.p[metodo] = !this.p[metodo];
+    p[metodo] = !p[metodo];
   }
 
   seleccionarQr(evento: Event) {
@@ -127,36 +131,36 @@ export class AjustesParametrosComponent implements OnInit {
       return this.dialogo.error('La imagen del QR debe ser PNG, JPG o WEBP.');
     if (archivo.size > 2 * 1024 * 1024) return this.dialogo.error('La imagen no debe superar 2 MB.');
     const lector = new FileReader();
-    lector.onload = () => { this.qrNuevo = lector.result as string; this.cdr.detectChanges(); };
+    lector.onload = () => this.qrNuevo.set(lector.result as string);
     lector.readAsDataURL(archivo);
   }
 
-  quitarQr() { this.qrNuevo = null; }
+  quitarQr() { this.qrNuevo.set(null); }
 
   restaurarOriginales() {
-    this.p = { ...ORIGINALES };
-    if (this.qrGuardado) this.qrNuevo = null;
+    this.p.set({ ...ORIGINALES });
+    if (this.qrGuardado()) this.qrNuevo.set(null);
   }
 
   descartar() {
-    this.p = { ...this.guardado };
-    this.qrNuevo = undefined;
+    this.p.set({ ...this.guardado });
+    this.qrNuevo.set(undefined);
   }
 
   guardar() {
     const fuera = [...this.camposMenu, ...this.camposSeguridad,
                    { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo por defecto', min: 0, max: 10000 } as CampoNumero]
-      .find(c => { const n = Number(this.p[c.clave]); return !Number.isInteger(n) || n < c.min || n > c.max; });
+      .find(c => { const n = Number(this.p()[c.clave]); return !Number.isInteger(n) || n < c.min || n > c.max; });
     if (fuera) return this.dialogo.error(`${fuera.etiqueta}: debe ser un número entero entre ${fuera.min} y ${fuera.max}.`);
-    if (!this.p.moneda_simbolo.trim()) return this.dialogo.error('El símbolo de moneda es obligatorio.');
-    if (!this.p.ticket_mensaje_pie.trim()) return this.dialogo.error('El mensaje del pie del ticket es obligatorio.');
+    if (!this.p().moneda_simbolo.trim()) return this.dialogo.error('El símbolo de moneda es obligatorio.');
+    if (!this.p().ticket_mensaje_pie.trim()) return this.dialogo.error('El mensaje del pie del ticket es obligatorio.');
 
-    const datos: any = { ...this.p };
-    if (this.qrNuevo !== undefined) datos.qr_cobro = this.qrNuevo;
-    this.guardando = true;
+    const datos: any = { ...this.p() };
+    if (this.qrNuevo() !== undefined) datos.qr_cobro = this.qrNuevo();
+    this.guardando.set(true);
     this.ajustes.guardarParametros(datos).subscribe({
-      next: (r) => { this.llenar(r.configuracion); this.guardando = false; this.dialogo.avisar('Parámetros guardados'); },
-      error: (e) => { this.guardando = false; this.dialogo.error(e?.error?.error || 'No se pudieron guardar los parámetros.'); }
+      next: (r) => { this.llenar(r.configuracion); this.guardando.set(false); this.dialogo.avisar('Parámetros guardados'); },
+      error: (e) => { this.guardando.set(false); this.dialogo.error(e?.error?.error || 'No se pudieron guardar los parámetros.'); }
     });
   }
 }

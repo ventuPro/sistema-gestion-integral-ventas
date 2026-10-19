@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -19,86 +19,78 @@ import { AjustesService } from '../../../core/services/ajustes.service';
 export class LoginComponent implements OnInit {
   readonly icons = { refrescar: RefreshCw, ver: Eye, ocultar: EyeOff };
 
-  correo     = '';
-  contrasena = '';
-  mensajeError = '';
-  cargando = false;
-  verContrasena = false;
+  readonly correo        = signal('');
+  readonly contrasena    = signal('');
+  readonly mensajeError  = signal('');
+  readonly cargando      = signal(false);
+  readonly verContrasena = signal(false);
 
   // ─── CAPTCHA ───
-  captchaId       = '';
-  captchaImagen   = '';
-  captchaTexto    = '';
-  cargandoCaptcha = false;
+  private captchaId       = '';
+  readonly captchaImagen   = signal('');
+  readonly captchaTexto    = signal('');
+  readonly cargandoCaptcha = signal(false);
 
   private authService    = inject(AuthService);
   private permisoService = inject(PermisoService);
   private router         = inject(Router);
   private route          = inject(ActivatedRoute);
-  private cdr            = inject(ChangeDetectorRef);
   readonly ajustes       = inject(AjustesService);
 
   constructor() {
     // Redirigido por el interceptor: token vencido o usuario desactivado
     if (this.route.snapshot.queryParamMap.get('sesion') === 'expirada') {
-      this.mensajeError = 'Tu sesión terminó o tu usuario fue desactivado. Inicia sesión nuevamente.';
+      this.mensajeError.set('Tu sesión terminó o tu usuario fue desactivado. Inicia sesión nuevamente.');
     }
   }
 
   /** El servidor pidió CAPTCHA aunque la copia local de los ajustes dijera que no */
-  private forzarCaptcha = false;
+  private readonly forzarCaptcha = signal(false);
 
-  get titulo(): string { return this.ajustes.config().login_titulo || this.ajustes.nombre(); }
+  readonly titulo = computed(() => this.ajustes.config().login_titulo || this.ajustes.nombre());
 
-  get usaCaptcha(): boolean { return this.ajustes.config().captcha_activo || this.forzarCaptcha; }
+  readonly usaCaptcha = computed(() => this.ajustes.config().captcha_activo || this.forzarCaptcha());
 
-  ngOnInit() { if (this.usaCaptcha) this.cargarCaptcha(); }
+  ngOnInit() { if (this.usaCaptcha()) this.cargarCaptcha(); }
 
   cargarCaptcha() {
-    this.cargandoCaptcha = true;
-    this.captchaTexto    = '';
+    this.cargandoCaptcha.set(true);
+    this.captchaTexto.set('');
     this.authService.obtenerCaptcha().subscribe({
       next: (c) => {
-        this.captchaId       = c.id_captcha;
-        this.captchaImagen   = c.imagen;
-        this.cargandoCaptcha = false;
-        this.cdr.detectChanges();
+        this.captchaId = c.id_captcha;
+        this.captchaImagen.set(c.imagen);
+        this.cargandoCaptcha.set(false);
       },
       error: () => {
-        this.captchaImagen   = '';
-        this.cargandoCaptcha = false;
-        this.mensajeError    = 'No se pudo conectar con el servidor.';
-        this.cdr.detectChanges();
+        this.captchaImagen.set('');
+        this.cargandoCaptcha.set(false);
+        this.mensajeError.set('No se pudo conectar con el servidor.');
       }
     });
   }
 
   iniciarSesion() {
-    if (this.cargando) return;
-    if (!this.correo || !this.contrasena) {
-      this.mensajeError = 'Ingresa tu correo y contraseña.'; return;
-    }
-    if (this.usaCaptcha && !this.captchaTexto.trim()) {
-      this.mensajeError = 'Escribe los caracteres de la imagen.'; return;
-    }
-    this.cargando = true;
-    this.mensajeError = '';
+    if (this.cargando()) return;
+    if (!this.correo() || !this.contrasena()) return this.mensajeError.set('Ingresa tu correo y contraseña.');
+    if (this.usaCaptcha() && !this.captchaTexto().trim()) return this.mensajeError.set('Escribe los caracteres de la imagen.');
+    this.cargando.set(true);
+    this.mensajeError.set('');
 
-    this.authService.login(this.correo, this.contrasena, this.captchaId, this.captchaTexto).subscribe({
+    this.authService.login(this.correo(), this.contrasena(), this.captchaId, this.captchaTexto()).subscribe({
       next: (res) => this.completarSesion(res),
       error: (e) => {
-        this.cargando = false;
+        this.cargando.set(false);
         const err = e.error || {};
-        if (err.codigo === 'CAPTCHA_INVALIDO') this.forzarCaptcha = true;
-        this.mensajeError = err.codigo === 'CAPTCHA_INVALIDO'
+        if (err.codigo === 'CAPTCHA_INVALIDO') this.forzarCaptcha.set(true);
+        this.mensajeError.set(err.codigo === 'CAPTCHA_INVALIDO'
           ? 'Los caracteres de la imagen no coinciden. Prueba con la nueva imagen.'
           : e.status === 401
             ? 'Correo o contraseña incorrectos.'
             : e.status === 429
               ? err.error
-              : 'Error al conectar con el servidor.';
-        if (this.usaCaptcha) this.cargarCaptcha();
-        this.cdr.detectChanges();
+              : 'Error al conectar con el servidor.');
+        if (this.usaCaptcha()) this.cargarCaptcha();
       }
     });
   }
@@ -113,7 +105,7 @@ export class LoginComponent implements OnInit {
     }));
 
     // Cargar permisos antes de redirigir (si falla, igual se redirige)
-    const ir = () => { this.cargando = false; this.router.navigate(['/dashboard']); };
+    const ir = () => { this.cargando.set(false); this.router.navigate(['/dashboard']); };
     this.permisoService.cargarMisPermisos().subscribe({ next: ir, error: ir });
   }
 }

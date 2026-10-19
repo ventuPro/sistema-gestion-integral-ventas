@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -15,6 +15,10 @@ import { LucideAngularModule, UtensilsCrossed, ShoppingBag, ReceiptText, Search,
          SearchX, WifiOff, PartyPopper, Pencil } from 'lucide-angular';
 
 type Vista = 'menu' | 'carrito' | 'pedidos';
+
+interface InfoMesa {
+  numero_mesa: number; nombre_sucursal: string; id_sucursal: number; recibe_pedidos: boolean; pedidos_desactivados?: boolean;
+}
 
 interface ItemCarrito {
   id_producto:     number;
@@ -68,7 +72,6 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   private route = inject(ActivatedRoute);
   private http  = inject(HttpClient);
-  private cdr   = inject(ChangeDetectorRef);
   readonly moneda = inject(AjustesService).moneda;
   readonly ajustes = inject(AjustesService);
 
@@ -77,36 +80,52 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   // ─── Cada celular: código propio y nombre opcional ───
   readonly celular = codigoCelular();
-  nombreCliente  = leerNombre();
-  nombreEditado  = '';
-  editandoNombre = false;
-  bienvenida     = false;
+  readonly nombreCliente  = signal(leerNombre());
+  readonly nombreEditado  = signal('');
+  readonly editandoNombre = signal(false);
+  readonly bienvenida     = signal(false);
 
   codigo = '';
-  estadoCarga: 'cargando' | 'invalido' | 'error' | 'listo' = 'cargando';
-  info: { numero_mesa: number; nombre_sucursal: string; id_sucursal: number; recibe_pedidos: boolean; pedidos_desactivados?: boolean } | null = null;
-  vista: Vista = 'menu';
+  readonly estadoCarga = signal<'cargando' | 'invalido' | 'error' | 'listo'>('cargando');
+  readonly info        = signal<InfoMesa | null>(null);
+  readonly vista       = signal<Vista>('menu');
 
   // ─── Catálogo ───
-  catalogo:   any[] = [];
-  categorias: { id: number; nombre: string }[] = [];
-  categoriaActiva: number | null = null;
-  busqueda = '';
+  readonly catalogo        = signal<any[]>([]);
+  readonly categorias      = signal<{ id: number; nombre: string }[]>([]);
+  readonly categoriaActiva = signal<number | null>(null);
+  readonly busqueda        = signal('');
+
+  /** Los agotados van al final para que el cliente vea primero lo que puede pedir */
+  readonly catalogoFiltrado = computed(() => {
+    const texto = this.busqueda().trim().toLowerCase(), cat = this.categoriaActiva();
+    return this.catalogo().filter(p =>
+      (!cat || Number(p.id_categoria) === cat) &&
+      (!texto || p.nombre_producto.toLowerCase().includes(texto))
+    ).sort((a, b) => Number(a.stock_actual <= 0) - Number(b.stock_actual <= 0));
+  });
 
   // ─── Carrito ───
-  carrito: ItemCarrito[] = [];
-  observacionGeneral = '';
-  enviando   = false;
-  errorEnvio = '';
+  readonly carrito            = signal<ItemCarrito[]>([]);
+  readonly observacionGeneral = signal('');
+  readonly enviando           = signal(false);
+  readonly errorEnvio         = signal('');
+
+  readonly totalCarrito    = computed(() => this.carrito().reduce((s, i) => s + i.precio_unitario * i.cantidad, 0));
+  readonly cantidadCarrito = computed(() => this.carrito().reduce((s, i) => s + i.cantidad, 0));
 
   // ─── Mis pedidos y mi consumo en la cuenta de la mesa ───
-  pedidos: any[] = [];
-  cuenta: MiConsumo | null = null;
-  cancelando: Record<number, boolean> = {};
-  pedidoACancelar: any = null;
-  gracias = false;
+  readonly pedidos         = signal<any[]>([]);
+  readonly cuenta          = signal<MiConsumo | null>(null);
+  readonly cancelando      = signal<Record<number, boolean>>({});
+  readonly pedidoACancelar = signal<any>(null);
+  readonly gracias         = signal(false);
 
-  aviso: string | null = null;
+  readonly miConsumo      = computed(() => this.cuenta()?.items ?? []);
+  readonly pedidosActivos = computed(() =>
+    this.pedidos().filter(p => ['Pendiente_Cajero', 'Confirmado'].includes(p.estado_pedido)).length);
+
+  readonly aviso = signal<string | null>(null);
 
   // ─── Asistente con IA (se descarga solo si está disponible) ───
   readonly chatAsistente = componenteDiferido(() => this.ajustes.config().ia_cliente_disponible,
@@ -123,7 +142,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.codigo = this.route.snapshot.paramMap.get('codigo') || '';
     if (!/^[0-9a-f]{32}$/i.test(this.codigo)) {
-      this.estadoCarga = 'invalido';
+      this.estadoCarga.set('invalido');
       return;
     }
     this.cargarTodo();
@@ -142,54 +161,50 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   // ─── Carga ───
   cargarTodo() {
-    this.estadoCarga = 'cargando';
-    this.http.get<any>(`${this.api}/${this.codigo}`).subscribe({
+    this.estadoCarga.set('cargando');
+    this.http.get<InfoMesa>(`${this.api}/${this.codigo}`).subscribe({
       next: (info) => {
-        this.info = info;
+        this.info.set(info);
         this.cargarCatalogo(() => {
-          this.estadoCarga = 'listo';
-          this.bienvenida  = !this.yaSeDioBienvenida();
-          this.nombreEditado = this.nombreCliente;
-          this.cdr.detectChanges();
+          this.estadoCarga.set('listo');
+          this.bienvenida.set(!this.yaSeDioBienvenida());
+          this.nombreEditado.set(this.nombreCliente());
         });
         this.refrescarEstado();
       },
-      error: (e) => {
-        this.estadoCarga = e.status === 404 ? 'invalido' : 'error';
-        this.cdr.detectChanges();
-      }
+      error: (e) => this.estadoCarga.set(e.status === 404 ? 'invalido' : 'error')
     });
   }
 
   private cargarInfo() {
-    this.http.get<any>(`${this.api}/${this.codigo}`).subscribe({
-      next: (info) => { this.info = info; this.cdr.detectChanges(); }
+    this.http.get<InfoMesa>(`${this.api}/${this.codigo}`).subscribe({
+      next: (info) => this.info.set(info)
     });
   }
 
   cargarCatalogo(alTerminar?: () => void) {
     this.http.get<any[]>(`${this.api}/${this.codigo}/catalogo`).subscribe({
       next: (items) => {
-        this.catalogo = items.map(p => ({ ...p, stock_actual: Number(p.stock_actual) || 0 }));
+        const catalogo = items.map(p => ({ ...p, stock_actual: Number(p.stock_actual) || 0 }));
         const cats = new Map<number, string>();
-        this.catalogo.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
-        this.categorias = [...cats.entries()].map(([id, nombre]) => ({ id, nombre }));
+        catalogo.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
+        this.catalogo.set(catalogo);
+        this.categorias.set([...cats.entries()].map(([id, nombre]) => ({ id, nombre })));
 
+        // Precios al día; lo que ya no está en el menú sale del carrito
         const retirados: string[] = [];
-        this.carrito = this.carrito.filter(item => {
-          const p = this.catalogo.find(c => c.id_producto === item.id_producto);
-          if (!p) { retirados.push(item.nombre_producto); return false; }
-          item.precio_unitario = Number(p.precio_unitario);
-          return true;
-        });
+        this.carrito.update(carrito => carrito.flatMap(item => {
+          const p = catalogo.find(c => c.id_producto === item.id_producto);
+          if (!p) { retirados.push(item.nombre_producto); return []; }
+          return [{ ...item, precio_unitario: Number(p.precio_unitario) }];
+        }));
         if (retirados.length) this.mostrarAviso(`Ya no está disponible: ${retirados.join(', ')}`);
         this.ajustarCarritoAlStock();
 
         alTerminar?.();
-        this.cdr.detectChanges();
       },
       error: () => {
-        if (alTerminar) { this.estadoCarga = 'error'; this.cdr.detectChanges(); }
+        if (alTerminar) this.estadoCarga.set('error');
       }
     });
   }
@@ -203,18 +218,15 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     });
 
     this.socket.on('actualizacion_stock_global', (d: any) => {
-      if (!this.info || Number(d?.id_sucursal) !== Number(this.info.id_sucursal)) return;
-      const prod = this.catalogo.find(p => p.id_producto === Number(d.id_producto));
-      if (!prod) return;
-      prod.stock_actual = Math.max(0, Number(d.nueva_cantidad_disponible) || 0);
-      this.ajustarCarritoAlStock();
-      this.cdr.detectChanges();
+      if (!this.info() || Number(d?.id_sucursal) !== Number(this.info()!.id_sucursal)) return;
+      if (this.fijarStock(Number(d.id_producto), Math.max(0, Number(d.nueva_cantidad_disponible) || 0)))
+        this.ajustarCarritoAlStock();
     });
 
     this.socket.on('catalogo:actualizado', () => this.cargarCatalogo());
 
     this.socket.on('pedido:estado', (d: any) => {
-      if (!this.pedidos.some(p => p.id_pedido === Number(d?.id_pedido))) return;
+      if (!this.pedidos().some(p => p.id_pedido === Number(d?.id_pedido))) return;
       if (d.estado === 'Confirmado') this.notificar('✅ ¡Tu pedido fue confirmado! Ya lo estamos preparando.');
       if (d.estado === 'Entregado')  this.notificar('🍰 Tu pedido fue entregado. ¡Buen provecho!');
       if (d.estado === 'Cancelado')  this.notificar('Tu pedido no pudo ser atendido. Consulta en caja.');
@@ -225,9 +237,16 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.socket.on('cuenta:cerrada',     () => this.refrescarEstado(true));
   }
 
+  /** Cambia el stock de un producto del catálogo; false si no está en él */
+  private fijarStock(id_producto: number, stock: number): boolean {
+    if (!this.catalogo().some(p => p.id_producto === id_producto)) return false;
+    this.catalogo.update(c => c.map(p => p.id_producto === id_producto ? { ...p, stock_actual: stock } : p));
+    return true;
+  }
+
   // ─── Disponibilidad ───
   enCarrito(id_producto: number): number {
-    return this.carrito.find(i => i.id_producto === id_producto)?.cantidad || 0;
+    return this.carrito().find(i => i.id_producto === id_producto)?.cantidad || 0;
   }
 
   /** Stock real menos lo que ya está en el carrito */
@@ -237,116 +256,88 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   private ajustarCarritoAlStock() {
     const ajustes: string[] = [];
-    for (const item of [...this.carrito]) {
-      const prod  = this.catalogo.find(p => p.id_producto === item.id_producto);
-      const stock = Number(prod?.stock_actual) || 0;
-      if (item.cantidad <= stock) continue;
-      if (stock === 0) {
-        this.carrito = this.carrito.filter(i => i !== item);
-        ajustes.push(`${item.nombre_producto} se agotó`);
-      } else {
-        item.cantidad = stock;
-        ajustes.push(`${item.nombre_producto}: solo quedan ${stock}`);
-      }
-    }
-    if (ajustes.length) this.mostrarAviso(`Actualizamos tu carrito — ${ajustes.join('; ')}`);
-  }
-
-  // ─── Catálogo filtrado ───
-  get catalogoFiltrado(): any[] {
-    const texto = this.busqueda.trim().toLowerCase();
-    // Los agotados van al final para que el cliente vea primero lo que puede pedir
-    return this.catalogo.filter(p =>
-      (!this.categoriaActiva || Number(p.id_categoria) === this.categoriaActiva) &&
-      (!texto || p.nombre_producto.toLowerCase().includes(texto))
-    ).sort((a, b) => Number(a.stock_actual <= 0) - Number(b.stock_actual <= 0));
+    const catalogo = this.catalogo();
+    const carrito = this.carrito().flatMap(item => {
+      const stock = Number(catalogo.find(p => p.id_producto === item.id_producto)?.stock_actual) || 0;
+      if (item.cantidad <= stock) return [item];
+      if (stock === 0) { ajustes.push(`${item.nombre_producto} se agotó`); return []; }
+      ajustes.push(`${item.nombre_producto}: solo quedan ${stock}`);
+      return [{ ...item, cantidad: stock }];
+    });
+    if (!ajustes.length) return;
+    this.carrito.set(carrito);
+    this.mostrarAviso(`Actualizamos tu carrito — ${ajustes.join('; ')}`);
   }
 
   // ─── Carrito ───
   agregar(prod: any) {
     if (this.disponible(prod) <= 0) return;
-    const item = this.carrito.find(i => i.id_producto === prod.id_producto);
-    if (item) item.cantidad++;
-    else this.carrito.push({
-      id_producto:     prod.id_producto,
-      nombre_producto: prod.nombre_producto,
-      precio_unitario: Number(prod.precio_unitario),
-      url_imagen:      prod.url_imagen,
-      cantidad:        1
-    });
-    this.cdr.detectChanges();
+    this.carrito.update(c => c.some(i => i.id_producto === prod.id_producto)
+      ? c.map(i => i.id_producto === prod.id_producto ? { ...i, cantidad: i.cantidad + 1 } : i)
+      : [...c, {
+          id_producto:     prod.id_producto,
+          nombre_producto: prod.nombre_producto,
+          precio_unitario: Number(prod.precio_unitario),
+          url_imagen:      prod.url_imagen,
+          cantidad:        1
+        }]);
   }
 
   quitarUno(id_producto: number) {
-    const item = this.carrito.find(i => i.id_producto === id_producto);
-    if (!item) return;
-    if (item.cantidad > 1) item.cantidad--;
-    else this.carrito = this.carrito.filter(i => i !== item);
-    this.cdr.detectChanges();
+    this.carrito.update(c => c.flatMap(i =>
+      i.id_producto !== id_producto ? [i] : i.cantidad > 1 ? [{ ...i, cantidad: i.cantidad - 1 }] : []));
   }
 
   agregarUno(item: ItemCarrito) {
-    const prod = this.catalogo.find(p => p.id_producto === item.id_producto);
+    const prod = this.catalogo().find(p => p.id_producto === item.id_producto);
     if (prod) this.agregar(prod);
   }
 
   puedeSumar(item: ItemCarrito): boolean {
-    const prod = this.catalogo.find(p => p.id_producto === item.id_producto);
+    const prod = this.catalogo().find(p => p.id_producto === item.id_producto);
     return !!prod && this.disponible(prod) > 0;
   }
 
   eliminar(item: ItemCarrito) {
-    this.carrito = this.carrito.filter(i => i !== item);
-    this.cdr.detectChanges();
-  }
-
-  get totalCarrito(): number {
-    return this.carrito.reduce((s, i) => s + i.precio_unitario * i.cantidad, 0);
-  }
-
-  get cantidadCarrito(): number {
-    return this.carrito.reduce((s, i) => s + i.cantidad, 0);
+    this.carrito.update(c => c.filter(i => i.id_producto !== item.id_producto));
   }
 
   // ─── Enviar pedido ───
   enviarPedido() {
-    if (!this.carrito.length || this.enviando) return;
-    if (!this.info?.recibe_pedidos) {
-      this.errorEnvio = 'En este momento no estamos recibiendo pedidos desde el menú. Consulta en caja.';
-      return;
-    }
-    this.enviando   = true;
-    this.errorEnvio = '';
+    const carrito = this.carrito();
+    if (!carrito.length || this.enviando()) return;
+    if (!this.info()?.recibe_pedidos)
+      return this.errorEnvio.set('En este momento no estamos recibiendo pedidos desde el menú. Consulta en caja.');
+    this.enviando.set(true);
+    this.errorEnvio.set('');
 
     const body = {
       cliente_mesa:        this.celular,
-      nombre_cliente:      this.nombreCliente.trim() || null,
-      observacion_general: this.observacionGeneral.trim() || null,
-      items: this.carrito.map(i => ({ id_producto: i.id_producto, cantidad: i.cantidad }))
+      nombre_cliente:      this.nombreCliente().trim() || null,
+      observacion_general: this.observacionGeneral().trim() || null,
+      items: carrito.map(i => ({ id_producto: i.id_producto, cantidad: i.cantidad }))
     };
 
     this.http.post<any>(`${this.api}/${this.codigo}/pedidos`, body).subscribe({
       next: () => {
-        this.carrito            = [];
-        this.observacionGeneral = '';
-        this.enviando           = false;
-        this.gracias            = false;
-        this.vista              = 'pedidos';
+        this.carrito.set([]);
+        this.observacionGeneral.set('');
+        this.enviando.set(false);
+        this.gracias.set(false);
+        this.vista.set('pedidos');
         this.mostrarAviso('📨 Pedido enviado. El cajero lo confirmará en breve.');
         this.refrescarEstado();
       },
       error: (e) => {
-        this.enviando = false;
+        this.enviando.set(false);
         const err = e?.error || {};
-        this.errorEnvio = err.error || 'No se pudo enviar el pedido. Revisa tu conexión e intenta de nuevo.';
+        this.errorEnvio.set(err.error || 'No se pudo enviar el pedido. Revisa tu conexión e intenta de nuevo.');
         if (err.codigo === 'STOCK_INSUFICIENTE' && err.id_producto) {
-          const prod = this.catalogo.find(p => p.id_producto === err.id_producto);
-          if (prod) prod.stock_actual = Number(err.disponible) || 0;
+          this.fijarStock(err.id_producto, Number(err.disponible) || 0);
           this.ajustarCarritoAlStock();
         }
         if (err.codigo === 'PRODUCTO_NO_DISPONIBLE') this.cargarCatalogo();
-        if (err.codigo === 'NO_RECIBE_PEDIDOS' && this.info) this.info.recibe_pedidos = false;
-        this.cdr.detectChanges();
+        if (err.codigo === 'NO_RECIBE_PEDIDOS') this.info.update(i => i && { ...i, recibe_pedidos: false });
       }
     });
   }
@@ -358,15 +349,21 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   entrar() {
     this.guardarNombre();
-    this.bienvenida = false;
+    this.bienvenida.set(false);
     try { sessionStorage.setItem(`sgiv_bienvenida_${this.codigo}`, '1'); } catch { }
   }
 
+  editarNombre() {
+    this.nombreEditado.set(this.nombreCliente());
+    this.editandoNombre.set(true);
+  }
+
   guardarNombre() {
-    this.nombreCliente  = this.nombreEditado.replace(/\s+/g, ' ').trim().slice(0, 40);
-    this.nombreEditado  = this.nombreCliente;
-    this.editandoNombre = false;
-    try { localStorage.setItem(CLAVE_NOMBRE, this.nombreCliente); } catch { }
+    const nombre = this.nombreEditado().replace(/\s+/g, ' ').trim().slice(0, 40);
+    this.nombreCliente.set(nombre);
+    this.nombreEditado.set(nombre);
+    this.editandoNombre.set(false);
+    try { localStorage.setItem(CLAVE_NOMBRE, nombre); } catch { }
   }
 
   // ─── Mis pedidos y mi consumo (por el código de este celular) ───
@@ -374,41 +371,32 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.http.get<{ pedidos: any[]; cuenta: MiConsumo | null }>(`${this.api}/${this.codigo}/estado`,
                                                                  { params: { cliente: this.celular } }).subscribe({
       next: (res) => {
-        const antes = this.cuenta;
+        const antes = this.cuenta();
         const yaConsumia = !!antes?.items.length;
-        if (cuentaCerrada && yaConsumia && !res.cuenta) this.gracias = true;
+        if (cuentaCerrada && yaConsumia && !res.cuenta) this.gracias.set(true);
         // Pagó su parte y la mesa sigue abierta
         if (Number(antes?.mi_pendiente) > 0 && res.cuenta && Number(res.cuenta.mi_pendiente) === 0
             && Number(res.cuenta.mi_pagado) > 0) this.notificar('✅ Tu parte ya está pagada. ¡Gracias!');
 
-        this.cuenta  = res.cuenta;
-        this.pedidos = res.pedidos || [];
-        this.cdr.detectChanges();
+        this.cuenta.set(res.cuenta);
+        this.pedidos.set(res.pedidos || []);
       }
     });
   }
-
-  get miConsumo() { return this.cuenta?.items ?? []; }
 
   cancelar(pedido: any) {
-    this.pedidoACancelar = null;
-    this.cancelando[pedido.id_pedido] = true;
-    this.http.post<any>(`${this.api}/${this.codigo}/pedidos/${pedido.id_pedido}/cancelar`, { cliente_mesa: this.celular }).subscribe({
-      next: () => {
-        delete this.cancelando[pedido.id_pedido];
-        this.mostrarAviso('Pedido cancelado');
-        this.refrescarEstado();
-      },
-      error: (e) => {
-        delete this.cancelando[pedido.id_pedido];
-        this.mostrarAviso(e?.error?.error || 'No se pudo cancelar el pedido');
-        this.refrescarEstado();
-      }
+    const id = pedido.id_pedido;
+    const listo = (mensaje: string) => {
+      this.cancelando.update(c => { const { [id]: _, ...resto } = c; return resto; });
+      this.mostrarAviso(mensaje);
+      this.refrescarEstado();
+    };
+    this.pedidoACancelar.set(null);
+    this.cancelando.update(c => ({ ...c, [id]: true }));
+    this.http.post<any>(`${this.api}/${this.codigo}/pedidos/${id}/cancelar`, { cliente_mesa: this.celular }).subscribe({
+      next: () => listo('Pedido cancelado'),
+      error: (e) => listo(e?.error?.error || 'No se pudo cancelar el pedido')
     });
-  }
-
-  get pedidosActivos(): number {
-    return this.pedidos.filter(p => ['Pendiente_Cajero', 'Confirmado'].includes(p.estado_pedido)).length;
   }
 
   // ─── Presentación de estados ───
@@ -440,9 +428,8 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   }
 
   private mostrarAviso(msg: string) {
-    this.aviso = msg;
+    this.aviso.set(msg);
     clearTimeout(this.avisoTimer);
-    this.avisoTimer = setTimeout(() => { this.aviso = null; this.cdr.detectChanges(); }, 4500);
-    this.cdr.detectChanges();
+    this.avisoTimer = setTimeout(() => this.aviso.set(null), 4500);
   }
 }

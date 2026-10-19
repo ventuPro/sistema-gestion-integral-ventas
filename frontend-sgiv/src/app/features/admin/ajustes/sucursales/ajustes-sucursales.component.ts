@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, Plus, Pencil, X, MapPin, Phone, Clock, Copy } from 'lucide-angular';
@@ -23,32 +23,32 @@ const DIAS_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 export class AjustesSucursalesComponent implements OnInit {
   private sucursalService = inject(SucursalService);
   private dialogo         = inject(DialogoService);
-  private cdr             = inject(ChangeDetectorRef);
 
   readonly icons = { nuevo: Plus, editar: Pencil, cerrar: X, direccion: MapPin,
                      telefono: Phone, horario: Clock, copiar: Copy };
   readonly DIAS = DIAS;
 
-  sucursales: any[] = [];
-  cargando = true;
-  guardando = false;
+  readonly sucursales = signal<any[]>([]);
+  readonly cargando   = signal(true);
+  readonly guardando  = signal(false);
 
-  modalAbierto = false;
-  editandoId: number | null = null;
-  formulario = { nombre_sucursal: '', direccion_fisica: '', telefono_contacto: '' };
-  horario: DiaHorario[] = [];
-  errorFormulario = '';
+  readonly modalAbierto = signal(false);
+  readonly editandoId   = signal<number | null>(null);
+  // Formulario y horario: se reemplazan con set(); el template edita los campos del objeto actual
+  readonly formulario   = signal({ nombre_sucursal: '', direccion_fisica: '', telefono_contacto: '' });
+  readonly horario      = signal<DiaHorario[]>([]);
+  readonly errorFormulario = signal('');
 
-  aDesactivar: any = null;
-  cambiandoEstado = false;
-  errorEstado     = '';
+  readonly aDesactivar     = signal<any>(null);
+  readonly cambiandoEstado = signal(false);
+  readonly errorEstado     = signal('');
 
   ngOnInit() { this.cargar(); }
 
   cargar() {
     this.sucursalService.listarSucursales().subscribe({
-      next: (s) => { this.sucursales = s; this.cargando = false; this.cdr.detectChanges(); },
-      error: () => { this.cargando = false; this.dialogo.error('No se pudieron cargar las sucursales.'); }
+      next: (s) => { this.sucursales.set(s); this.cargando.set(false); },
+      error: () => { this.cargando.set(false); this.dialogo.error('No se pudieron cargar las sucursales.'); }
     });
   }
 
@@ -72,81 +72,83 @@ export class AjustesSucursalesComponent implements OnInit {
   }
 
   abrirNueva() {
-    this.editandoId = null;
-    this.formulario = { nombre_sucursal: '', direccion_fisica: '', telefono_contacto: '' };
-    this.horario = this.armarHorario([]);
-    this.errorFormulario = '';
-    this.modalAbierto = true;
+    this.abrir(null, { nombre_sucursal: '', direccion_fisica: '', telefono_contacto: '' }, []);
   }
 
   abrirEdicion(s: any) {
-    this.editandoId = s.id_sucursal;
-    this.formulario = {
+    this.abrir(s.id_sucursal, {
       nombre_sucursal:   s.nombre_sucursal || '',
       direccion_fisica:  s.direccion_fisica || '',
       telefono_contacto: s.telefono_contacto || ''
-    };
-    this.horario = this.armarHorario(s.horario || []);
-    this.errorFormulario = '';
-    this.modalAbierto = true;
+    }, s.horario || []);
   }
 
-  cerrarModal() { this.modalAbierto = false; }
+  private abrir(id: number | null, formulario: { nombre_sucursal: string; direccion_fisica: string; telefono_contacto: string },
+                horario: any[]) {
+    this.editandoId.set(id);
+    this.formulario.set(formulario);
+    this.horario.set(this.armarHorario(horario));
+    this.errorFormulario.set('');
+    this.modalAbierto.set(true);
+  }
+
+  cerrarModal() { this.modalAbierto.set(false); }
 
   /** Copia el horario del lunes a todos los días */
   copiarLunes() {
-    const lunes = this.horario[0];
-    this.horario = this.horario.map(d => ({ ...lunes, dia_semana: d.dia_semana }));
+    this.horario.update(h => h.map(d => ({ ...h[0], dia_semana: d.dia_semana })));
   }
 
   guardar() {
-    if (!this.formulario.nombre_sucursal.trim()) { this.errorFormulario = 'El nombre es obligatorio.'; return; }
-    const incompleto = this.horario.find(d => d.abierto && (!d.hora_apertura || !d.hora_cierre || d.hora_apertura === d.hora_cierre));
-    if (incompleto) {
-      this.errorFormulario = `Revisa el horario del ${DIAS[incompleto.dia_semana - 1].toLowerCase()}: apertura y cierre deben ser distintas.`;
-      return;
-    }
-    const datos = { ...this.formulario, horario: this.horario };
-    this.guardando = true;
-    const peticion = this.editandoId
-      ? this.sucursalService.actualizarSucursal(this.editandoId, datos)
+    const horario = this.horario();
+    if (!this.formulario().nombre_sucursal.trim()) return this.errorFormulario.set('El nombre es obligatorio.');
+    const incompleto = horario.find(d => d.abierto && (!d.hora_apertura || !d.hora_cierre || d.hora_apertura === d.hora_cierre));
+    if (incompleto)
+      return this.errorFormulario.set(`Revisa el horario del ${DIAS[incompleto.dia_semana - 1].toLowerCase()}: apertura y cierre deben ser distintas.`);
+    const datos = { ...this.formulario(), horario };
+    const id = this.editandoId();
+    this.guardando.set(true);
+    const peticion = id
+      ? this.sucursalService.actualizarSucursal(id, datos)
       : this.sucursalService.crearSucursal(datos);
     peticion.subscribe({
       next: (r) => {
-        this.guardando = false;
-        this.modalAbierto = false;
+        this.guardando.set(false);
+        this.modalAbierto.set(false);
         this.dialogo.avisar(r.mensaje);
         this.cargar();
       },
       error: (e) => {
-        this.guardando = false;
-        this.errorFormulario = e?.error?.error || 'No se pudo guardar la sucursal.';
-        this.cdr.detectChanges();
+        this.guardando.set(false);
+        this.errorFormulario.set(e?.error?.error || 'No se pudo guardar la sucursal.');
       }
     });
   }
 
   // Activar es directo; desactivar pide confirmación
   pedirCambioEstado(s: any) {
-    if (s.estado_activo) { this.aDesactivar = s; this.errorEstado = ''; }
+    if (s.estado_activo) { this.aDesactivar.set(s); this.errorEstado.set(''); }
     else this.cambiarEstado(s);
   }
 
+  cancelarCambioEstado() {
+    if (!this.cambiandoEstado()) this.aDesactivar.set(null);
+  }
+
   cambiarEstado(s: any) {
-    this.cambiandoEstado = true;
+    this.cambiandoEstado.set(true);
     this.sucursalService.cambiarEstado(s.id_sucursal, !s.estado_activo).subscribe({
       next: (r) => {
-        this.cambiandoEstado = false;
-        this.aDesactivar     = null;
+        this.cambiandoEstado.set(false);
+        this.aDesactivar.set(null);
         this.dialogo.avisar(r.mensaje);
         this.cargar();
       },
       error: (e) => {
-        this.cambiandoEstado = false;
+        this.cambiandoEstado.set(false);
         const msg = e?.error?.error || 'No se pudo cambiar el estado.';
-        if (this.aDesactivar) this.errorEstado = msg;
+        if (this.aDesactivar()) this.errorEstado.set(msg);
         else this.dialogo.error(msg);
-        this.cdr.detectChanges();
       }
     });
   }

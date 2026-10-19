@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, HostListener, viewChild } from '@angular/core';
+import { Component, computed, inject, OnInit, OnDestroy, HostListener, signal, viewChild } from '@angular/core';
 import { Router, RouterOutlet, RouterModule, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule,
@@ -33,7 +33,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private permisoService = inject(PermisoService);
   private authService    = inject(AuthService);
   private socketService  = inject(SocketService);
-  private cdr            = inject(ChangeDetectorRef);
   readonly ajustes       = inject(AjustesService);
   private http           = inject(HttpClient);
 
@@ -49,14 +48,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
   nombreSucursal  = '';
 
   /** Cache reactivo de permisos — se actualiza con permisos$ del service */
-  permisosActuales: Record<string, boolean> = {};
-  recargandoPermisos = false;
+  readonly permisosActuales   = signal<Record<string, boolean>>({});
+  readonly recargandoPermisos = signal(false);
 
   private subPermisos?: Subscription;
   private subRuta?: Subscription;
 
   /** Menú lateral abierto (solo en celular y tablet) */
-  menuAbierto = false;
+  readonly menuAbierto = signal(false);
   readonly bandeja = viewChild(BandejaPedidosComponent);
   secciones: { titulo: string; enlaces: Enlace[] }[] = [];
 
@@ -94,16 +93,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     // Inicializar cache con lo que haya en localStorage
     try {
-      this.permisosActuales = JSON.parse(localStorage.getItem('permisos_sgiv') || '{}');
-    } catch { this.permisosActuales = {}; }
+      this.permisosActuales.set(JSON.parse(localStorage.getItem('permisos_sgiv') || '{}'));
+    } catch { this.permisosActuales.set({}); }
 
     // Suscribirse a cambios de permisos (re-renderiza el sidebar)
     this.subPermisos = this.permisoService.permisos$.subscribe(p => {
       if (!p || Object.keys(p).length === 0) return;
-      const previo = JSON.stringify(this.permisosActuales);
+      const previo = JSON.stringify(this.permisosActuales());
       const nuevo  = JSON.stringify(p);
-      this.permisosActuales = p;
-      this.cdr.detectChanges();
+      this.permisosActuales.set(p);
       if (previo !== nuevo && !this.esAdmin) {
         this.dialogo.avisar('Tus permisos fueron actualizados por el administrador.');
         this.salirSiPerdioAcceso();
@@ -149,7 +147,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   /** Preguntas de ejemplo según lo que el usuario puede ver */
-  get sugerenciasAsistente(): string[] {
+  readonly sugerenciasAsistente = computed<string[]>(() => {
     if (this.esAdmin) return ['¿Cómo van las ventas hoy?', '¿Qué productos tienen stock bajo?',
                               '¿Cuánto vendimos este mes?', '¿Cómo registro una merma?'];
     return [
@@ -159,7 +157,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       (this.tiene('inventario') || this.tiene('punto_venta')) && '¿Qué productos están por agotarse?',
       this.tiene('mesas') ? '¿Cómo cobro una mesa?' : '¿Cómo cierro mi caja?'
     ].filter((s): s is string => !!s).slice(0, 4);
-  }
+  });
 
   abrirBandeja() {
     this.cerrarMenu();
@@ -167,9 +165,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   cerrarMenu() {
-    if (!this.menuAbierto) return;
-    this.menuAbierto = false;
-    this.cdr.detectChanges();
+    this.menuAbierto.set(false);
   }
 
   @HostListener('document:keydown.escape')
@@ -178,9 +174,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   tiene(modulo: string): boolean {
     if (this.esAdmin) return true;
     // Usar el cache reactivo si está poblado, sino fallback al service
-    if (Object.keys(this.permisosActuales).length > 0) {
-      return this.permisosActuales[modulo] === true;
-    }
+    const permisos = this.permisosActuales();
+    if (Object.keys(permisos).length > 0) return permisos[modulo] === true;
     return this.permisoService.tienePermiso(modulo);
   }
 
@@ -192,18 +187,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   /** Botón manual de recarga (cajero) */
   recargarPermisos() {
-    if (this.recargandoPermisos) return;
-    this.recargandoPermisos = true;
+    if (this.recargandoPermisos()) return;
+    this.recargandoPermisos.set(true);
     this.permisoService.recargarPermisos().subscribe({
       next: () => {
-        this.recargandoPermisos = false;
+        this.recargandoPermisos.set(false);
         this.dialogo.avisar('Permisos actualizados.');
-        this.cdr.detectChanges();
       },
       error: () => {
-        this.recargandoPermisos = false;
+        this.recargandoPermisos.set(false);
         this.dialogo.error('No se pudieron recargar los permisos.');
-        this.cdr.detectChanges();
       }
     });
   }

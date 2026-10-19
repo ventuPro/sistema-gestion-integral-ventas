@@ -3,7 +3,7 @@
   <!-- Marca (solo en pantallas grandes) -->
   <aside class="marca bg-gradient-to-br from-blue-600 to-indigo-600">
     @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="h-28 w-28 object-contain rounded-2xl bg-white/15 p-2"> }
-    <p class="text-white text-4xl font-semibold leading-tight tracking-tight text-center">{{ titulo }}</p>
+    <p class="text-white text-4xl font-semibold leading-tight tracking-tight text-center">{{ titulo() }}</p>
   </aside>
 
   <!-- Formulario -->
@@ -12,13 +12,13 @@
 
       <div class="lg:hidden flex flex-col items-center text-center mb-8">
         @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="h-16 w-16 object-contain mb-3"> }
-        <p class="inf-tinta font-semibold text-lg">{{ titulo }}</p>
+        <p class="inf-tinta font-semibold text-lg">{{ titulo() }}</p>
       </div>
 
       <h1 class="inf-titulo">Iniciar sesión</h1>
 
 
-      @if (mensajeError) { <p class="error-formulario mb-4" role="alert">{{ mensajeError }}</p> }
+      @if (mensajeError()) { <p class="error-formulario mb-4" role="alert">{{ mensajeError() }}</p> }
 
       <form (ngSubmit)="iniciarSesion()" autocomplete="on" class="space-y-4">
         <div class="grupo">
@@ -30,27 +30,27 @@
         <div class="grupo">
           <label class="inf-etiqueta" for="contrasena">Contraseña</label>
           <div class="relative">
-            <input class="campo pr-10!" [type]="verContrasena ? 'text' : 'password'" id="contrasena" name="contrasena"
+            <input class="campo pr-10!" [type]="verContrasena() ? 'text' : 'password'" id="contrasena" name="contrasena"
                    [(ngModel)]="contrasena" autocomplete="current-password">
-            <button type="button" class="ojo" (click)="verContrasena = !verContrasena"
-                    [attr.aria-label]="verContrasena ? 'Ocultar contraseña' : 'Mostrar contraseña'">
-              <lucide-icon [img]="verContrasena ? icons.ocultar : icons.ver" class="w-4 h-4"></lucide-icon>
+            <button type="button" class="ojo" (click)="verContrasena.set(!verContrasena())"
+                    [attr.aria-label]="verContrasena() ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+              <lucide-icon [img]="verContrasena() ? icons.ocultar : icons.ver" class="w-4 h-4"></lucide-icon>
             </button>
           </div>
         </div>
 
-        @if (usaCaptcha) {
+        @if (usaCaptcha()) {
           <div class="grupo">
             <label class="inf-etiqueta" for="captcha">Escribe los caracteres de la imagen</label>
             <div class="flex items-center gap-2">
               <div class="captcha">
-                @if (captchaImagen && !cargandoCaptcha) {
-                  <img [src]="captchaImagen" alt="Caracteres de verificación" draggable="false">
+                @if (captchaImagen() && !cargandoCaptcha()) {
+                  <img [src]="captchaImagen()" alt="Caracteres de verificación" draggable="false">
                 } @else {
                   <span class="inf-esqueleto w-full h-full"></span>
                 }
               </div>
-              <button type="button" class="inf-boton h-16" (click)="cargarCaptcha()" [disabled]="cargandoCaptcha"
+              <button type="button" class="inf-boton h-16" (click)="cargarCaptcha()" [disabled]="cargandoCaptcha()"
                       title="Mostrar otra imagen" aria-label="Mostrar otra imagen">
                 <lucide-icon [img]="icons.refrescar" class="w-4 h-4"></lucide-icon>
               </button>
@@ -60,8 +60,8 @@
           </div>
         }
 
-        <button type="submit" class="boton-primario w-full mt-2" [disabled]="cargando || (usaCaptcha && cargandoCaptcha)">
-          {{ cargando ? 'Verificando…' : 'Ingresar' }}
+        <button type="submit" class="boton-primario w-full mt-2" [disabled]="cargando() || (usaCaptcha() && cargandoCaptcha())">
+          {{ cargando() ? 'Verificando…' : 'Ingresar' }}
         </button>
       </form>
     </div>

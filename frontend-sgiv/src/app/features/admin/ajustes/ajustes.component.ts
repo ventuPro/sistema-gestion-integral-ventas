@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule,
@@ -38,7 +38,6 @@ const IMAGENES = {
 export class AjustesComponent implements OnInit, OnDestroy {
   private ajustes = inject(AjustesService);
   private dialogo = inject(DialogoService);
-  private cdr     = inject(ChangeDetectorRef);
 
   readonly icons = {
     subir: Upload, original: RotateCcw, guardar: Save, imagen: ImageIcon, descartar: Undo2
@@ -109,95 +108,98 @@ export class AjustesComponent implements OnInit, OnDestroy {
     { id: 'ia',           nombre: 'Chatbot',      icono: Sparkles }
   ];
 
-  pestana: Pestana = 'empresa';
-  cargando = true;
-  guardando = false;
-  fechaActualizacion: string | null = null;
+  readonly pestana            = signal<Pestana>('empresa');
+  readonly cargando           = signal(true);
+  readonly guardando          = signal(false);
+  readonly fechaActualizacion = signal<string | null>(null);
 
-  empresa: Record<string, string> = {};
-  apariencia = { color_primario: null as string | null, color_secundario: null as string | null, tema: 'claro' as Tema };
+  readonly empresa    = signal<Record<string, string>>({});
+  readonly apariencia = signal({ color_primario: null as string | null, color_secundario: null as string | null, tema: 'claro' as Tema });
   /** undefined = sin cambios; null = quitar; data URI = imagen nueva */
-  logoNuevo: string | null | undefined = undefined;
-  faviconNuevo: string | null | undefined = undefined;
-  private guardado!: Configuracion;
+  readonly logoNuevo    = signal<string | null | undefined>(undefined);
+  readonly faviconNuevo = signal<string | null | undefined>(undefined);
+  private readonly guardado = signal<Configuracion | null>(null);
+
+  readonly logoVista = computed(() => {
+    const nuevo = this.logoNuevo();
+    return nuevo !== undefined ? nuevo : this.guardado()?.url_logo ?? null;
+  });
+
+  readonly faviconVista = computed(() => {
+    const nuevo = this.faviconNuevo();
+    return nuevo !== undefined ? nuevo : this.guardado()?.url_favicon ?? null;
+  });
+
+  readonly hayCambiosApariencia = computed(() => {
+    const g = this.guardado(), a = this.apariencia();
+    return !!g && (this.logoNuevo() !== undefined || this.faviconNuevo() !== undefined ||
+      a.color_primario !== g.color_primario || a.color_secundario !== g.color_secundario || a.tema !== g.tema);
+  });
 
   ngOnInit() { this.cargar(); }
 
   ngOnDestroy() { this.ajustes.restaurarVista(); }
 
   cargar() {
-    this.cargando = true;
+    this.cargando.set(true);
     this.ajustes.obtenerCompleto().subscribe({
-      next: (c) => { this.llenar(c); this.cargando = false; this.cdr.detectChanges(); },
+      next: (c) => { this.llenar(c); this.cargando.set(false); },
       error: () => {
-        this.cargando = false;
+        this.cargando.set(false);
         this.dialogo.error('No se pudieron cargar los ajustes.');
       }
     });
   }
 
   private llenar(c: Configuracion) {
-    this.guardado = c;
-    this.fechaActualizacion = c.fecha_actualizacion || null;
-    this.empresa = {};
-    CAMPOS_EMPRESA.forEach(k => this.empresa[k] = (c as any)[k] ?? '');
-    this.apariencia = { color_primario: c.color_primario, color_secundario: c.color_secundario, tema: c.tema };
-    this.logoNuevo = this.faviconNuevo = undefined;
+    this.guardado.set(c);
+    this.fechaActualizacion.set(c.fecha_actualizacion || null);
+    const empresa: Record<string, string> = {};
+    CAMPOS_EMPRESA.forEach(k => empresa[k] = (c as any)[k] ?? '');
+    this.empresa.set(empresa);
+    this.apariencia.set({ color_primario: c.color_primario, color_secundario: c.color_secundario, tema: c.tema });
+    this.logoNuevo.set(undefined);
+    this.faviconNuevo.set(undefined);
   }
 
   // ─── Empresa ───
   guardarEmpresa() {
-    if (!this.empresa['nombre_comercial']?.trim()) return this.dialogo.error('El nombre comercial es obligatorio.');
-    this.guardando = true;
-    this.ajustes.guardarEmpresa(this.empresa).subscribe({
+    if (!this.empresa()['nombre_comercial']?.trim()) return this.dialogo.error('El nombre comercial es obligatorio.');
+    this.guardando.set(true);
+    this.ajustes.guardarEmpresa(this.empresa()).subscribe({
       next: (r) => { this.llenar(r.configuracion); this.terminar('Datos de la empresa guardados'); },
-      error: (e) => { this.guardando = false; this.dialogo.error(e?.error?.error || 'No se pudieron guardar los datos.'); }
+      error: (e) => { this.guardando.set(false); this.dialogo.error(e?.error?.error || 'No se pudieron guardar los datos.'); }
     });
   }
 
   // ─── Apariencia (con vista previa en vivo) ───
-  get logoVista(): string | null {
-    return this.logoNuevo !== undefined ? this.logoNuevo : this.guardado?.url_logo ?? null;
-  }
-
-  get faviconVista(): string | null {
-    return this.faviconNuevo !== undefined ? this.faviconNuevo : this.guardado?.url_favicon ?? null;
-  }
-
-  get hayCambiosApariencia(): boolean {
-    const g = this.guardado;
-    return !!g && (this.logoNuevo !== undefined || this.faviconNuevo !== undefined ||
-      this.apariencia.color_primario !== g.color_primario ||
-      this.apariencia.color_secundario !== g.color_secundario || this.apariencia.tema !== g.tema);
-  }
-
   previsualizar() {
     this.ajustes.previsualizar({
-      ...this.apariencia,
-      url_logo: this.logoVista,
-      url_favicon: this.faviconVista
+      ...this.apariencia(),
+      url_logo: this.logoVista(),
+      url_favicon: this.faviconVista()
     });
   }
 
   cambiarColor(campo: 'color_primario' | 'color_secundario', valor: string | null) {
     const hex = valor?.trim().toLowerCase() || null;
     if (hex && !/^#[0-9a-f]{6}$/.test(hex)) return;
-    this.apariencia[campo] = hex;
+    this.apariencia.update(a => ({ ...a, [campo]: hex }));
     this.previsualizar();
   }
 
   elegirPaleta(p: { primario: string | null; secundario: string | null }) {
-    this.apariencia.color_primario = p.primario;
-    this.apariencia.color_secundario = p.secundario;
+    this.apariencia.update(a => ({ ...a, color_primario: p.primario, color_secundario: p.secundario }));
     this.previsualizar();
   }
 
   esPaletaActual(p: { primario: string | null; secundario: string | null }): boolean {
-    return this.apariencia.color_primario === p.primario && this.apariencia.color_secundario === p.secundario;
+    const a = this.apariencia();
+    return a.color_primario === p.primario && a.color_secundario === p.secundario;
   }
 
   elegirTema(t: Tema) {
-    this.apariencia.tema = t;
+    this.apariencia.update(a => ({ ...a, tema: t }));
     this.previsualizar();
   }
 
@@ -214,39 +216,37 @@ export class AjustesComponent implements OnInit, OnDestroy {
 
     const lector = new FileReader();
     lector.onload = () => {
-      if (tipo === 'logo') this.logoNuevo = lector.result as string;
-      else this.faviconNuevo = lector.result as string;
+      (tipo === 'logo' ? this.logoNuevo : this.faviconNuevo).set(lector.result as string);
       this.previsualizar();
-      this.cdr.detectChanges();
     };
     lector.readAsDataURL(archivo);
   }
 
   quitarImagen(tipo: 'logo' | 'favicon') {
-    if (tipo === 'logo') this.logoNuevo = null;
-    else this.faviconNuevo = null;
+    (tipo === 'logo' ? this.logoNuevo : this.faviconNuevo).set(null);
     this.previsualizar();
   }
 
   descartarApariencia() {
-    this.llenar(this.guardado);
+    const g = this.guardado();
+    if (g) this.llenar(g);
     this.ajustes.restaurarVista();
   }
 
   guardarApariencia() {
-    const datos: any = { ...this.apariencia };
-    if (this.logoNuevo !== undefined) datos.logo = this.logoNuevo;
-    if (this.faviconNuevo !== undefined) datos.favicon = this.faviconNuevo;
-    this.guardando = true;
+    const datos: any = { ...this.apariencia() };
+    if (this.logoNuevo() !== undefined) datos.logo = this.logoNuevo();
+    if (this.faviconNuevo() !== undefined) datos.favicon = this.faviconNuevo();
+    this.guardando.set(true);
     this.ajustes.guardarApariencia(datos).subscribe({
       next: (r) => { this.llenar(r.configuracion); this.terminar('Apariencia guardada'); },
-      error: (e) => { this.guardando = false; this.dialogo.error(e?.error?.error || 'No se pudo guardar la apariencia.'); }
+      error: (e) => { this.guardando.set(false); this.dialogo.error(e?.error?.error || 'No se pudo guardar la apariencia.'); }
     });
   }
 
   // ─── Mensajes ───
   private terminar(mensaje: string) {
-    this.guardando = false;
+    this.guardando.set(false);
     this.dialogo.avisar(mensaje);
   }
 }

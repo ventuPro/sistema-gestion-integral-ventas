@@ -1,16 +1,16 @@
 <div class="pagina">
 
-  @if (aviso) { <div class="aviso-menu" role="status">{{ aviso }}</div> }
+  @if (aviso()) { <div class="aviso-menu" role="status">{{ aviso() }}</div> }
 
   <!-- ═══ QR NO VÁLIDO / ERROR / CARGANDO ═══ -->
-  @if (estadoCarga === 'invalido') {
+  @if (estadoCarga() === 'invalido') {
     <div class="estado-pantalla">
       <lucide-icon [img]="icons.qrInvalido" class="w-10 h-10 inf-sutil"></lucide-icon>
       <h2 class="inf-tinta text-lg font-semibold mt-3">Código QR no válido</h2>
       <p class="inf-tenue text-sm mt-1">Este código ya no funciona. Pide ayuda en caja.</p>
     </div>
   }
-  @if (estadoCarga === 'error') {
+  @if (estadoCarga() === 'error') {
     <div class="estado-pantalla">
       <lucide-icon [img]="icons.sinConexion" class="w-10 h-10 inf-sutil"></lucide-icon>
       <h2 class="inf-tinta text-lg font-semibold mt-3">No pudimos cargar el menú</h2>
@@ -18,7 +18,7 @@
       <button class="boton-primario mt-6" (click)="cargarTodo()">Reintentar</button>
     </div>
   }
-  @if (estadoCarga === 'cargando') {
+  @if (estadoCarga() === 'cargando') {
     <div class="p-4 space-y-3">
       <div class="inf-esqueleto h-28"></div>
       <div class="grid grid-cols-2 gap-3">
@@ -27,16 +27,16 @@
     </div>
   }
 
-  @if (estadoCarga === 'listo' && info) {
+  @if (estadoCarga() === 'listo' && info(); as mesa) {
 
     <!-- ═══ BIENVENIDA (una vez por visita) ═══ -->
-    @if (bienvenida) {
+    @if (bienvenida()) {
       <div class="bienvenida bg-gradient-to-br from-blue-600 to-indigo-600" role="dialog" aria-modal="true" aria-labelledby="titulo-bienvenida">
         <div class="bienvenida-contenido">
           @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="bienvenida-logo"> }
           <p class="text-white/80 text-sm">¡Bienvenido a</p>
           <h1 id="titulo-bienvenida" class="text-2xl font-semibold leading-tight">{{ ajustes.nombre() }}!</h1>
-          <p class="bienvenida-mesa">Mesa {{ info.numero_mesa }} · {{ info.nombre_sucursal }}</p>
+          <p class="bienvenida-mesa">Mesa {{ mesa.numero_mesa }} · {{ mesa.nombre_sucursal }}</p>
           @if (ajustes.config().menu_mensaje_bienvenida) {
             <p class="text-white/90 text-[15px] mt-4">{{ ajustes.config().menu_mensaje_bienvenida }}</p>
           }
@@ -54,7 +54,7 @@
             <button type="submit" class="boton-primario w-full py-3! text-base! mt-4">Ver el menú</button>
           </form>
 
-          @if (!info.recibe_pedidos || !ajustes.config().menu_activo) {
+          @if (!mesa.recibe_pedidos || !ajustes.config().menu_activo) {
             <p class="text-white/85 text-[13px] mt-4">Ahora no recibimos pedidos desde el celular: puedes ver el menú y pedir en caja.</p>
           }
         </div>
@@ -67,34 +67,34 @@
         @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="w-11 h-11 object-contain rounded-lg bg-white/15 p-1 flex-shrink-0"> }
         <div class="min-w-0">
           <h1 class="text-lg font-semibold truncate">{{ ajustes.nombre() }}</h1>
-          <p class="text-white/75 text-[13px]">Mesa {{ info.numero_mesa }} · {{ info.nombre_sucursal }}</p>
+          <p class="text-white/75 text-[13px]">Mesa {{ mesa.numero_mesa }} · {{ mesa.nombre_sucursal }}</p>
         </div>
       </div>
 
       <nav class="pestanas-menu" aria-label="Secciones">
-        <button [class.activa]="vista === 'menu'" (click)="vista = 'menu'">
+        <button [class.activa]="vista() === 'menu'" (click)="vista.set('menu')">
           <lucide-icon [img]="icons.menu" class="w-4 h-4"></lucide-icon> Menú
         </button>
-        <button [class.activa]="vista === 'carrito'" (click)="vista = 'carrito'">
+        <button [class.activa]="vista() === 'carrito'" (click)="vista.set('carrito')">
           <lucide-icon [img]="icons.carrito" class="w-4 h-4"></lucide-icon> Carrito
-          @if (cantidadCarrito > 0) { <span class="globo">{{ cantidadCarrito }}</span> }
+          @if (cantidadCarrito() > 0) { <span class="globo">{{ cantidadCarrito() }}</span> }
         </button>
-        <button [class.activa]="vista === 'pedidos'" (click)="vista = 'pedidos'; refrescarEstado()">
+        <button [class.activa]="vista() === 'pedidos'" (click)="vista.set('pedidos'); refrescarEstado()">
           <lucide-icon [img]="icons.mesa" class="w-4 h-4"></lucide-icon> Mi mesa
-          @if (pedidosActivos > 0) { <span class="globo aviso">{{ pedidosActivos }}</span> }
+          @if (pedidosActivos() > 0) { <span class="globo aviso">{{ pedidosActivos() }}</span> }
         </button>
       </nav>
     </header>
 
     <div class="px-4 space-y-3 mt-3 empty:hidden">
-      @if (!info.recibe_pedidos || !ajustes.config().menu_activo) {
+      @if (!mesa.recibe_pedidos || !ajustes.config().menu_activo) {
         <p class="aviso-suave">
-          {{ info.pedidos_desactivados || !ajustes.config().menu_activo
+          {{ mesa.pedidos_desactivados || !ajustes.config().menu_activo
              ? 'Los pedidos desde el celular están desactivados. Puedes ver el menú y pedir en caja.'
              : 'En este momento no estamos recibiendo pedidos desde el menú. Puedes verlo y pedir en caja.' }}
         </p>
       }
-      @if (gracias) {
+      @if (gracias()) {
         <div class="inf-hoja p-4 text-center">
           <lucide-icon [img]="icons.gracias" class="w-8 h-8 mx-auto inf-sube"></lucide-icon>
           <p class="inf-tinta font-semibold mt-2">¡Gracias por tu visita!</p>
@@ -103,27 +103,27 @@
     </div>
 
     <!-- ════════ MENÚ ════════ -->
-    @if (vista === 'menu') {
+    @if (vista() === 'menu') {
       <section class="pb-28">
         <div class="filtros">
           <div class="buscador">
             <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
             <input type="search" [(ngModel)]="busqueda" placeholder="Buscar productos" aria-label="Buscar productos">
-            @if (busqueda) {
-              <button class="quitar" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+            @if (busqueda()) {
+              <button class="quitar" (click)="busqueda.set('')" aria-label="Limpiar búsqueda">
                 <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
               </button>
             }
           </div>
           <div class="chips">
-            <button [class.activa]="categoriaActiva === null" (click)="categoriaActiva = null">Todos</button>
-            @for (cat of categorias; track cat.id) {
-              <button [class.activa]="categoriaActiva === cat.id" (click)="categoriaActiva = cat.id">{{ cat.nombre }}</button>
+            <button [class.activa]="categoriaActiva() === null" (click)="categoriaActiva.set(null)">Todos</button>
+            @for (cat of categorias(); track cat.id) {
+              <button [class.activa]="categoriaActiva() === cat.id" (click)="categoriaActiva.set(cat.id)">{{ cat.nombre }}</button>
             }
           </div>
         </div>
 
-        @if (catalogoFiltrado.length === 0) {
+        @if (catalogoFiltrado().length === 0) {
           <div class="estado-vacio">
             <lucide-icon [img]="icons.sinResultados" class="w-8 h-8 inf-sutil"></lucide-icon>
             <p>No encontramos productos</p>
@@ -131,7 +131,7 @@
         }
 
         <div class="grid grid-cols-2 gap-3 px-4">
-          @for (prod of catalogoFiltrado; track prod.id_producto) {
+          @for (prod of catalogoFiltrado(); track prod.id_producto) {
             <article class="plato" [class.agotado]="prod.stock_actual <= 0">
               <div class="foto">
                 @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
@@ -168,19 +168,19 @@
     }
 
     <!-- ════════ CARRITO ════════ -->
-    @if (vista === 'carrito') {
+    @if (vista() === 'carrito') {
       <section class="pb-28 p-4 space-y-3">
-        @if (carrito.length === 0) {
+        @if (carrito().length === 0) {
           <div class="estado-vacio">
             <lucide-icon [img]="icons.carrito" class="w-8 h-8 inf-sutil"></lucide-icon>
             <p>Tu carrito está vacío</p>
-            <button class="inf-enlace mt-2" (click)="vista = 'menu'">Ver el menú</button>
+            <button class="inf-enlace mt-2" (click)="vista.set('menu')">Ver el menú</button>
           </div>
         } @else {
           <h2 class="inf-titulo text-xl!">Tu pedido</h2>
 
           <div class="inf-hoja">
-            @for (item of carrito; track item.id_producto) {
+            @for (item of carrito(); track item.id_producto) {
               <div class="linea">
                 <div class="miniatura">
                   @if (item.url_imagen) { <img [src]="item.url_imagen | imagenUrl" alt=""> }
@@ -212,31 +212,31 @@
           <div class="inf-hoja p-4 space-y-3">
             <div class="flex justify-between items-baseline">
               <span class="inf-etiqueta">Total del pedido</span>
-              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ totalCarrito.toFixed(2) }}</span>
+              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ totalCarrito().toFixed(2) }}</span>
             </div>
-            @if (errorEnvio) { <p class="error-formulario">{{ errorEnvio }}</p> }
+            @if (errorEnvio()) { <p class="error-formulario">{{ errorEnvio() }}</p> }
             <button class="boton-primario w-full py-3.5! text-base!" (click)="enviarPedido()"
-                    [disabled]="enviando || !info.recibe_pedidos || !ajustes.config().menu_activo">
-              {{ enviando ? 'Enviando…' : 'Enviar pedido' }}
+                    [disabled]="enviando() || !mesa.recibe_pedidos || !ajustes.config().menu_activo">
+              {{ enviando() ? 'Enviando…' : 'Enviar pedido' }}
             </button>
-            @if (nombreCliente) { <p class="text-center ayuda">A nombre de <b class="inf-tinta">{{ nombreCliente }}</b></p> }
+            @if (nombreCliente()) { <p class="text-center ayuda">A nombre de <b class="inf-tinta">{{ nombreCliente() }}</b></p> }
           </div>
         }
       </section>
     }
 
     <!-- ════════ MI MESA: lo de este celular ════════ -->
-    @if (vista === 'pedidos') {
+    @if (vista() === 'pedidos') {
       <section class="pb-28 p-4 space-y-3">
         <div class="inf-hoja px-4 py-3">
-          @if (!editandoNombre) {
+          @if (!editandoNombre()) {
             <div class="flex items-center justify-between gap-3">
               <p class="text-[13.5px] inf-tenue min-w-0 truncate">
-                @if (nombreCliente) { <b class="inf-tinta">{{ nombreCliente }}</b> }
+                @if (nombreCliente()) { <b class="inf-tinta">{{ nombreCliente() }}</b> }
                 @else { Sin nombre }
               </p>
-              <button class="inf-enlace text-[13px] shrink-0 inline-flex items-center gap-1" (click)="editandoNombre = true; nombreEditado = nombreCliente">
-                <lucide-icon [img]="icons.editar" class="w-3.5 h-3.5"></lucide-icon> {{ nombreCliente ? 'Cambiar' : 'Agregar' }}
+              <button class="inf-enlace text-[13px] shrink-0 inline-flex items-center gap-1" (click)="editarNombre()">
+                <lucide-icon [img]="icons.editar" class="w-3.5 h-3.5"></lucide-icon> {{ nombreCliente() ? 'Cambiar' : 'Agregar' }}
               </button>
             </div>
           } @else {
@@ -248,15 +248,15 @@
           }
         </div>
 
-        @if (pedidos.length === 0 && miConsumo.length === 0) {
+        @if (pedidos().length === 0 && miConsumo().length === 0) {
           <div class="estado-vacio">
             <lucide-icon [img]="icons.mesa" class="w-8 h-8 inf-sutil"></lucide-icon>
             <p>Aún no hiciste pedidos desde este celular</p>
-            <button class="inf-enlace mt-2" (click)="vista = 'menu'">Ver el menú</button>
+            <button class="inf-enlace mt-2" (click)="vista.set('menu')">Ver el menú</button>
           </div>
         }
 
-        @for (p of pedidos; track p.id_pedido) {
+        @for (p of pedidos(); track p.id_pedido) {
           <article class="inf-hoja overflow-hidden">
             <div class="px-4 py-3 flex items-center justify-between separador-inferior">
               <span class="inf-tinta font-semibold">Pedido #{{ p.id_pedido }}</span>
@@ -289,19 +289,19 @@
 
             @if (p.estado_pedido === 'Pendiente_Cajero') {
               <div class="px-4 pb-4">
-                <button class="inf-boton inf-baja w-full justify-center py-2!" (click)="pedidoACancelar = p" [disabled]="cancelando[p.id_pedido]">
-                  {{ cancelando[p.id_pedido] ? 'Cancelando…' : 'Cancelar pedido' }}
+                <button class="inf-boton inf-baja w-full justify-center py-2!" (click)="pedidoACancelar.set(p)" [disabled]="cancelando()[p.id_pedido]">
+                  {{ cancelando()[p.id_pedido] ? 'Cancelando…' : 'Cancelar pedido' }}
                 </button>
               </div>
             }
           </article>
         }
 
-        @if (cuenta && miConsumo.length) {
+        @if (miConsumo().length && cuenta(); as consumo) {
           <article class="inf-hoja p-4">
             <h3 class="inf-tinta font-semibold mb-2">Tu consumo</h3>
             <ul class="text-[13.5px]">
-              @for (it of miConsumo; track $index) {
+              @for (it of miConsumo(); track $index) {
                 <li class="flex justify-between gap-3 py-1.5 separador-inferior last:border-b-0" [class.opacity-60]="it.pagado">
                   <span>
                     <b class="inf-tinta">{{ it.cantidad }}×</b> {{ it.nombre_producto }}
@@ -313,21 +313,21 @@
             </ul>
             <div class="flex justify-between items-baseline pt-3 mt-2 separador">
               <span class="inf-etiqueta">Tu parte por pagar</span>
-              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ Number(cuenta.mi_pendiente).toFixed(2) }}</span>
+              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ Number(consumo.mi_pendiente).toFixed(2) }}</span>
             </div>
-            @if (Number(cuenta.mi_pagado) > 0) {
+            @if (Number(consumo.mi_pagado) > 0) {
               <p class="flex justify-between text-[13px] inf-sube mt-1">
-                <span>Ya pagaste</span><span>{{ moneda() }} {{ Number(cuenta.mi_pagado).toFixed(2) }}</span>
+                <span>Ya pagaste</span><span>{{ moneda() }} {{ Number(consumo.mi_pagado).toFixed(2) }}</span>
               </p>
             }
             <p class="flex justify-between text-[13px] inf-tenue mt-1">
-              <span>Total de la mesa por pagar</span><span>{{ moneda() }} {{ Number(cuenta.total_mesa).toFixed(2) }}</span>
+              <span>Total de la mesa por pagar</span><span>{{ moneda() }} {{ Number(consumo.total_mesa).toFixed(2) }}</span>
             </p>
           </article>
         }
 
-        @if (pedidos.length > 0 || miConsumo.length) {
-          <button class="boton-primario w-full py-3.5!" (click)="vista = 'menu'">
+        @if (pedidos().length > 0 || miConsumo().length) {
+          <button class="boton-primario w-full py-3.5!" (click)="vista.set('menu')">
             <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon> Pedir algo más
           </button>
         }
@@ -336,28 +336,28 @@
   }
 
   <!-- Asistente con IA -->
-  @if (estadoCarga === 'listo' && !bienvenida && ajustes.config().ia_cliente_disponible && chatAsistente() && vista !== 'carrito') {
+  @if (estadoCarga() === 'listo' && !bienvenida() && ajustes.config().ia_cliente_disponible && chatAsistente() && vista() !== 'carrito') {
     <ng-container *ngComponentOutlet="chatAsistente(); inputs: {
-      titulo: 'Asistente virtual', subtitulo: ajustes.nombre() + ' · Mesa ' + info?.numero_mesa,
+      titulo: 'Asistente virtual', subtitulo: ajustes.nombre() + ' · Mesa ' + info()?.numero_mesa,
       saludo: '¡Hola! Te ayudo a elegir: pregúntame por productos, precios o recomendaciones.',
       etiqueta: '¿Qué pido?', sugerencias: sugerenciasAsistente, clave: 'menu_' + codigo,
-      elevado: vista === 'menu' && cantidadCarrito > 0, enviar: preguntarAsistente }" />
+      elevado: vista() === 'menu' && cantidadCarrito() > 0, enviar: preguntarAsistente }" />
   }
 
   <!-- Botón flotante del carrito -->
-  @if (estadoCarga === 'listo' && vista === 'menu' && cantidadCarrito > 0) {
+  @if (estadoCarga() === 'listo' && vista() === 'menu' && cantidadCarrito() > 0) {
     <div class="flotante">
-      <button (click)="vista = 'carrito'">
-        <span class="cuenta-items">{{ cantidadCarrito }}</span>
+      <button (click)="vista.set('carrito')">
+        <span class="cuenta-items">{{ cantidadCarrito() }}</span>
         <span>Ver carrito</span>
-        <span>{{ moneda() }} {{ totalCarrito.toFixed(2) }}</span>
+        <span>{{ moneda() }} {{ totalCarrito().toFixed(2) }}</span>
       </button>
     </div>
   }
 </div>
 
-@if (pedidoACancelar; as p) {
+@if (pedidoACancelar(); as p) {
   <app-confirmacion titulo="¿Cancelar este pedido?" mensaje="Aún no fue confirmado por el cajero."
                     textoConfirmar="Sí, cancelar" [peligro]="true"
-                    (confirmar)="cancelar(p)" (cancelar)="pedidoACancelar = null" />
+                    (confirmar)="cancelar(p)" (cancelar)="pedidoACancelar.set(null)" />
 }

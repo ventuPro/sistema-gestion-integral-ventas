@@ -1,4 +1,4 @@
-@if (verificandoCaja) {
+@if (verificandoCaja()) {
   <div class="space-y-5">
     <div class="inf-esqueleto h-12 w-64"></div>
     <div class="grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-5">
@@ -9,7 +9,7 @@
 }
 
 <!-- ═══ CAJA CERRADA ═══ -->
-@if (!verificandoCaja && estadoCaja === 'CERRADA') {
+@if (!verificandoCaja() && estadoCaja() === 'CERRADA') {
   <div class="space-y-5">
     <header>
       <p class="inf-antetitulo"><span>{{ hoyTexto }}</span><span class="inf-estado mal">Caja cerrada</span></p>
@@ -22,11 +22,11 @@
           <h2 class="inf-tinta font-semibold text-[15px]">Tu caja ya fue cerrada hoy</h2>
         </div>
       </div>
-      @if (turnoActivo) {
+      @if (turnoActivo()) {
         <dl class="inf-pares mt-5 pt-4 separador">
-          <div><dt>Turno</dt><dd>#{{ turnoActivo.id_turno }}</dd></div>
-          <div><dt>Apertura</dt><dd>{{ turnoActivo.fecha_hora_apertura | date:'dd/MM HH:mm' }}</dd></div>
-          <div><dt>Cierre</dt><dd>{{ turnoActivo.fecha_hora_cierre | date:'dd/MM HH:mm' }}</dd></div>
+          <div><dt>Turno</dt><dd>#{{ turnoActivo().id_turno }}</dd></div>
+          <div><dt>Apertura</dt><dd>{{ turnoActivo().fecha_hora_apertura | date:'dd/MM HH:mm' }}</dd></div>
+          <div><dt>Cierre</dt><dd>{{ turnoActivo().fecha_hora_cierre | date:'dd/MM HH:mm' }}</dd></div>
         </dl>
       }
       <button class="inf-boton mt-5" (click)="verificarAccesoCaja()">
@@ -37,7 +37,7 @@
 }
 
 <!-- ═══ APERTURA DEL DÍA ═══ -->
-@if (!verificandoCaja && estadoCaja === 'SIN_APERTURA' && mostrarAbrirTurno) {
+@if (!verificandoCaja() && estadoCaja() === 'SIN_APERTURA' && mostrarAbrirTurno()) {
   <div class="space-y-5">
     <header>
       <p class="inf-antetitulo"><span>{{ hoyTexto }}</span><span class="inf-estado neutro">Sin abrir</span></p>
@@ -57,12 +57,12 @@
           <input type="number" min="0" step="0.01" [(ngModel)]="montoInicial" placeholder="0.00"
                  (keyup.enter)="confirmarAbrirTurno()">
         </div>
-        @if (errorTurno) { <p class="text-sm inf-baja mt-3">{{ errorTurno }}</p> }
+        @if (errorTurno()) { <p class="text-sm inf-baja mt-3">{{ errorTurno() }}</p> }
       </div>
       <div class="inf-pie-hoja flex justify-end">
-        <button class="boton-primario" (click)="confirmarAbrirTurno()" [disabled]="abriendoTurno">
-          @if (!abriendoTurno) { <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> }
-          {{ abriendoTurno ? 'Abriendo…' : 'Abrir caja y comenzar' }}
+        <button class="boton-primario" (click)="confirmarAbrirTurno()" [disabled]="abriendoTurno()">
+          @if (!abriendoTurno()) { <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> }
+          {{ abriendoTurno() ? 'Abriendo…' : 'Abrir caja y comenzar' }}
         </button>
       </div>
     </section>
@@ -70,7 +70,7 @@
 }
 
 <!-- ═══ POS ACTIVO ═══ -->
-@if (!verificandoCaja && estadoCaja === 'ABIERTA') {
+@if (!verificandoCaja() && estadoCaja() === 'ABIERTA') {
   <div class="pos flex flex-col gap-5">
 
     <header class="flex flex-wrap items-end justify-between gap-4 flex-shrink-0">
@@ -78,14 +78,14 @@
         <p class="inf-antetitulo">
           <span>{{ hoyTexto }}</span>
           <span class="inf-vivo">Caja abierta</span>
-          @if (turnoActivo) { <span>Turno #{{ turnoActivo.id_turno }}</span> }
+          @if (turnoActivo()) { <span>Turno #{{ turnoActivo().id_turno }}</span> }
         </p>
         <h1 class="inf-titulo">Punto de venta</h1>
       </div>
-      <button class="inf-boton" [class.activo]="mostrarHistorial" (click)="toggleHistorial()">
+      <button class="inf-boton" [class.activo]="mostrarHistorial()" (click)="toggleHistorial()">
         <lucide-icon [img]="icons.historial" class="w-3.5 h-3.5"></lucide-icon>
         Ventas de hoy
-        <span class="inf-ficha">{{ ventasHoy.length }}</span>
+        <span class="inf-ficha">{{ ventasHoy().length }}</span>
       </button>
     </header>
 
@@ -97,32 +97,32 @@
           <div class="buscador">
             <lucide-icon [img]="icons.search" class="w-4 h-4 inf-tenue"></lucide-icon>
             <input type="text" [(ngModel)]="busqueda" placeholder="Buscar producto o categoría">
-            @if (busqueda) {
-              <button class="quitar" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+            @if (busqueda()) {
+              <button class="quitar" (click)="busqueda.set('')" aria-label="Limpiar búsqueda">
                 <lucide-icon [img]="icons.close" class="w-3.5 h-3.5"></lucide-icon>
               </button>
             }
           </div>
           <nav class="inf-pestanas">
-            <button [class.activa]="!categoriaFiltro" (click)="categoriaFiltro = null">Todos</button>
-            @for (cat of categorias; track cat.id) {
-              <button [class.activa]="categoriaFiltro === cat.id" (click)="categoriaFiltro = cat.id">{{ cat.nombre }}</button>
+            <button [class.activa]="!categoriaFiltro()" (click)="categoriaFiltro.set(null)">Todos</button>
+            @for (cat of categorias(); track cat.id) {
+              <button [class.activa]="categoriaFiltro() === cat.id" (click)="categoriaFiltro.set(cat.id)">{{ cat.nombre }}</button>
             }
           </nav>
         </div>
 
         <div class="flex-1 overflow-y-auto p-4">
-          @if (cargando) {
+          @if (cargando()) {
             <div class="catalogo">
               @for (n of [1,2,3,4,5,6]; track n) { <div class="inf-esqueleto h-48"></div> }
             </div>
-          } @else if (productosDisponibles.length === 0) {
+          } @else if (productosDisponibles().length === 0) {
             <p class="inf-vacio">No hay productos con stock en esta sucursal.</p>
-          } @else if (productosFiltrados.length === 0) {
-            <p class="inf-vacio">Sin resultados para «{{ busqueda }}».</p>
+          } @else if (productosFiltrados().length === 0) {
+            <p class="inf-vacio">Sin resultados para «{{ busqueda() }}».</p>
           } @else {
             <div class="catalogo">
-              @for (prod of productosFiltrados; track prod.id_producto) {
+              @for (prod of productosFiltrados(); track prod.id_producto) {
                 <button class="producto" (click)="agregarAlCarrito(prod)" [disabled]="prod.stock_actual <= 0">
                   <div class="foto">
                     @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
@@ -140,12 +140,12 @@
         </div>
 
         <!-- Ventas de hoy (sobre el catálogo) -->
-        @if (mostrarHistorial) {
+        @if (mostrarHistorial()) {
           <div class="historial">
             <div class="flex items-center justify-between px-5 py-4 separador-inferior flex-shrink-0">
               <div>
                 <h2 class="inf-tinta font-semibold text-[15px]">Ventas de hoy</h2>
-                <p class="inf-sub">{{ ventasHoy.length }} venta(s) · {{ moneda() }} {{ cifra(totalVentasHoy) }}</p>
+                <p class="inf-sub">{{ ventasHoy().length }} venta(s) · {{ moneda() }} {{ cifra(totalVentasHoy()) }}</p>
               </div>
               <button class="quitar" (click)="toggleHistorial()" aria-label="Cerrar">
                 <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
@@ -153,11 +153,11 @@
             </div>
 
             <div class="flex-1 overflow-y-auto">
-              @if (cargandoVentas) {
+              @if (cargandoVentas()) {
                 <div class="p-5 space-y-3">
                   <div class="inf-esqueleto h-14"></div><div class="inf-esqueleto h-14"></div><div class="inf-esqueleto h-14"></div>
                 </div>
-              } @else if (ventasHoy.length === 0) {
+              } @else if (ventasHoy().length === 0) {
                 <p class="inf-vacio">Todavía no hay ventas hoy.</p>
               } @else {
                 <table class="inf-tabla">
@@ -165,7 +165,7 @@
                     <tr><th>Venta</th><th>Detalle</th><th>Método</th><th class="num">Total</th></tr>
                   </thead>
                   <tbody>
-                    @for (venta of ventasHoy; track venta.id_venta) {
+                    @for (venta of ventasHoy(); track venta.id_venta) {
                       <tr>
                         <td class="align-top">
                           <span class="fuerte">#{{ venta.id_venta }}</span>
@@ -187,14 +187,14 @@
               }
             </div>
 
-            @if (!cargandoVentas && ventasHoy.length > 0) {
+            @if (!cargandoVentas() && ventasHoy().length > 0) {
               <div class="inf-pie-hoja flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
                 <span class="flex flex-wrap gap-4">
-                  @for (m of metodosHoy; track m.metodo) {
+                  @for (m of metodosHoy(); track m.metodo) {
                     <span>{{ m.metodo }}: <strong class="inf-tinta">{{ moneda() }} {{ cifra(m.total) }}</strong></span>
                   }
                 </span>
-                <strong class="inf-tinta text-[13px]">Total {{ moneda() }} {{ cifra(totalVentasHoy) }}</strong>
+                <strong class="inf-tinta text-[13px]">Total {{ moneda() }} {{ cifra(totalVentasHoy()) }}</strong>
               </div>
             }
           </div>
@@ -205,13 +205,13 @@
       <section class="inf-hoja flex flex-col min-h-0 overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 separador-inferior flex-shrink-0">
           <h2 class="inf-tinta font-semibold text-[15px]">Venta actual</h2>
-          @if (carrito.length) {
-            <span class="inf-nota">{{ unidades }} producto(s)</span>
+          @if (carrito().length) {
+            <span class="inf-nota">{{ unidades() }} producto(s)</span>
           }
         </div>
 
         <div class="flex-1 overflow-y-auto">
-          @for (item of carrito; track item.id_producto; let i = $index) {
+          @for (item of carrito(); track item.id_producto; let i = $index) {
             <div class="linea-carrito">
               <div class="min-w-0">
                 <p class="inf-tinta text-[13.5px] font-medium truncate">{{ item.nombre_producto }}</p>
@@ -236,9 +236,9 @@
         <div class="p-5 separador flex-shrink-0">
           <div class="flex items-end justify-between gap-3 mb-4">
             <span class="inf-etiqueta">Total</span>
-            <span class="inf-valor mt-0! text-[28px]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total) }}</span>
+            <span class="inf-valor mt-0! text-[28px]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total()) }}</span>
           </div>
-          <button class="boton-primario w-full py-3!" [disabled]="carrito.length === 0" (click)="abrirModalCobro()">
+          <button class="boton-primario w-full py-3!" [disabled]="carrito().length === 0" (click)="abrirModalCobro()">
             Cobrar
           </button>
         </div>
@@ -248,7 +248,7 @@
 }
 
 <!-- ═══ COBRO ═══ -->
-@if (mostrarModalCobro) {
+@if (mostrarModalCobro()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalCobro()">
     <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
@@ -261,26 +261,26 @@
       <div class="p-5 space-y-5">
         <div>
           <p class="inf-etiqueta">Total a cobrar</p>
-          <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total) }}</p>
+          <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total()) }}</p>
         </div>
 
         <div>
           <p class="inf-etiqueta mb-2">Método de pago</p>
           <div class="metodos">
             @if (ajustes.config().pago_efectivo) {
-              <button class="metodo" [class.activo]="metodoPago === metodo.efectivo" (click)="metodoPago = metodo.efectivo">
+              <button class="metodo" [class.activo]="metodoPago() === metodo.efectivo" (click)="metodoPago.set(metodo.efectivo)">
                 <lucide-icon [img]="icons.efectivo" class="w-4 h-4"></lucide-icon> Efectivo
               </button>
             }
             @if (ajustes.config().pago_qr) {
-              <button class="metodo" [class.activo]="metodoPago === metodo.qr" (click)="metodoPago = metodo.qr">
+              <button class="metodo" [class.activo]="metodoPago() === metodo.qr" (click)="metodoPago.set(metodo.qr)">
                 <lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon> QR
               </button>
             }
           </div>
         </div>
 
-        @if (metodoPago === metodo.efectivo) {
+        @if (metodoPago() === metodo.efectivo) {
           <div>
             <p class="inf-etiqueta mb-2">Monto recibido <span class="inf-sutil font-normal">· opcional</span></p>
             <div class="campo-monto">
@@ -288,19 +288,19 @@
               <input #inputMonto type="number" inputmode="decimal" [(ngModel)]="montoPagado"
                      (focus)="inputMonto.select()" (keyup.enter)="confirmarVenta()">
             </div>
-            @if (montoPagado > 0) {
+            @if (montoPagado() > 0) {
               <dl class="inf-pares mt-3">
-                @if (montoPagado >= total) {
-                  <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio) }}</dd></div>
+                @if (montoPagado() >= total()) {
+                  <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio()) }}</dd></div>
                 } @else {
-                  <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(total - montoPagado) }}</dd></div>
+                  <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(total() - montoPagado()) }}</dd></div>
                 }
               </dl>
             }
           </div>
         }
 
-        @if (metodoPago === metodo.qr) {
+        @if (metodoPago() === metodo.qr) {
           <div class="flex flex-col items-center gap-3 text-center">
             @if (ajustes.qrCobro()) { <img [src]="ajustes.qrCobro()" alt="QR de cobro" class="qr-cobro"> }
           </div>
@@ -318,20 +318,20 @@
 }
 
 <!-- ═══ COMPROBANTE ═══ -->
-@if (mostrarTicket) {
+@if (mostrarTicket()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarTicket()">
     <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[90vh]" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <div>
           <h3 class="inf-tinta font-semibold text-[15px]">Venta registrada</h3>
-          <p class="inf-sub mt-0!">Comprobante #{{ datosTicket?.id_venta }}</p>
+          <p class="inf-sub mt-0!">Comprobante #{{ datosTicket()?.id_venta }}</p>
         </div>
         <button class="quitar" (click)="cerrarTicket()" aria-label="Cerrar">
           <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
         </button>
       </div>
       <div #zonaTicket class="overflow-y-auto p-4 flex justify-center" style="background: var(--i-fondo)">
-        @if (datosTicket) { <div class="shadow-sm"><app-ticket [datos]="datosTicket" [fecha]="fechaTicket" /></div> }
+        @if (datosTicket()) { <div class="shadow-sm"><app-ticket [datos]="datosTicket()" [fecha]="fechaTicket()" /></div> }
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarTicket()">Cerrar</button>

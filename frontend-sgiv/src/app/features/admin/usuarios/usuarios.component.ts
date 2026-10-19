@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
@@ -32,7 +32,6 @@ export class UsuariosComponent implements OnInit {
   private usuarioService = inject(UsuarioService);
   private dialogo        = inject(DialogoService);
   private permisoService = inject(PermisoService);
-  private cdr            = inject(ChangeDetectorRef);
   private cajaService    = inject(CajaService);
 
   readonly icons = {
@@ -50,114 +49,107 @@ export class UsuariosComponent implements OnInit {
 
   private idActual = Number(JSON.parse(localStorage.getItem('usuario_sgiv') || 'null')?.id_usuario) || 0;
 
-  listaUsuarios:   any[] = [];
-  listaRoles:      any[] = [];
-  listaSucursales: any[] = [];
-  cargando      = true;
-  guardando     = false;
-  busqueda      = '';
-  filtroEstado: 'todos' | 'activos' | 'inactivos' = 'activos';
-  resumen       = { activos: 0, admins: 0, cajeros: 0, cajasAbiertas: 0 };
+  readonly listaUsuarios   = signal<any[]>([]);
+  readonly listaRoles      = signal<any[]>([]);
+  readonly listaSucursales = signal<any[]>([]);
+  readonly cargando     = signal(true);
+  readonly guardando    = signal(false);
+  readonly busqueda     = signal('');
+  readonly filtroEstado = signal<'todos' | 'activos' | 'inactivos'>('activos');
 
-  // Modal CRUD
-  mostrarModal  = false;
-  editandoId: number | null = null;
-  mensajeError  = '';
-  formulario: any = { nombre_completo: '', correo_electronico: '', contrasena: '', id_rol: '', id_sucursal: '' };
-
-  // Modal cambio contraseña
-  mostrarModalContrasena = false;
-  usuarioContrasena: any = null;
-  cambioContrasena       = { nueva: '', confirmar: '' };
-  errorContrasena        = '';
-  cargandoContrasena     = false;
-
-  // Modal permisos
-  mostrarModalPermisos   = false;
-  usuarioPermisos: any   = null;
-  permisosEdicion: Record<string, boolean> = {};
-  cargandoPermisos       = false;
-  modulosCargados        = false;
-  errorPermisos          = '';
-  modulosSistema         = MODULOS;
-
-  // Confirmaciones (desactivar, reactivar, caja)
-  confirmacion: Confirmacion | null = null;
-  confirmando       = false;
-  errorConfirmacion = '';
-
-
-  ngOnInit() { this.cargarDatos(); }
-
-  cargarDatos() {
-    this.cargando = true;
-    this.usuarioService.obtenerDatosFormulario().subscribe({
-      next: (d) => { this.listaRoles = d.roles; this.listaSucursales = d.sucursales; this.cdr.detectChanges(); }
-    });
-    this.usuarioService.listarUsuarios().subscribe({
-      next: (u) => {
-        this.listaUsuarios = u;
-        this.cargando      = false;
-        this.calcularResumen();
-        this.cdr.detectChanges();
-      },
-      error: () => { this.cargando = false; this.cdr.detectChanges(); }
-    });
-  }
-
-  private calcularResumen() {
-    const activos = this.listaUsuarios.filter(u => u.estado_activo);
+  readonly resumen = computed(() => {
+    const activos = this.listaUsuarios().filter(u => u.estado_activo);
     const cajeros = activos.filter(u => +u.id_rol === 2);
-    this.resumen = {
+    return {
       activos:       activos.length,
       admins:        activos.filter(u => +u.id_rol === 1).length,
       cajeros:       cajeros.length,
       cajasAbiertas: cajeros.filter(u => u.caja_habilitada).length
     };
-  }
+  });
 
-  get usuariosFiltrados() {
-    const texto = this.busqueda.trim().toLowerCase();
-    return this.listaUsuarios.filter(u =>
-      (this.filtroEstado === 'todos' || (this.filtroEstado === 'activos') === !!u.estado_activo) &&
+  readonly usuariosFiltrados = computed(() => {
+    const texto = this.busqueda().trim().toLowerCase(), estado = this.filtroEstado();
+    return this.listaUsuarios().filter(u =>
+      (estado === 'todos' || (estado === 'activos') === !!u.estado_activo) &&
       (!texto || `${u.nombre_completo} ${u.correo_electronico}`.toLowerCase().includes(texto))
     );
+  });
+
+  // Formularios de los modales: se reemplazan con set(); el template edita los campos del objeto actual
+
+  // Modal CRUD
+  readonly mostrarModal = signal(false);
+  readonly editandoId   = signal<number | null>(null);
+  readonly mensajeError = signal('');
+  readonly formulario   = signal<any>({ nombre_completo: '', correo_electronico: '', contrasena: '', id_rol: '', id_sucursal: '' });
+
+  // Modal cambio contraseña
+  readonly mostrarModalContrasena = signal(false);
+  readonly usuarioContrasena      = signal<any>(null);
+  readonly cambioContrasena       = signal({ nueva: '', confirmar: '' });
+  readonly errorContrasena        = signal('');
+  readonly cargandoContrasena     = signal(false);
+
+  // Modal permisos
+  readonly mostrarModalPermisos = signal(false);
+  readonly usuarioPermisos      = signal<any>(null);
+  readonly permisosEdicion      = signal<Record<string, boolean>>({});
+  readonly cargandoPermisos     = signal(false);
+  readonly modulosCargados      = signal(false);
+  readonly errorPermisos        = signal('');
+  readonly modulosSistema       = MODULOS;
+
+  // Confirmaciones (desactivar, reactivar, caja)
+  readonly confirmacion      = signal<Confirmacion | null>(null);
+  readonly confirmando       = signal(false);
+  readonly errorConfirmacion = signal('');
+
+  ngOnInit() { this.cargarDatos(); }
+
+  cargarDatos() {
+    this.cargando.set(true);
+    this.usuarioService.obtenerDatosFormulario().subscribe({
+      next: (d) => { this.listaRoles.set(d.roles); this.listaSucursales.set(d.sucursales); }
+    });
+    this.usuarioService.listarUsuarios().subscribe({
+      next: (u) => { this.listaUsuarios.set(u); this.cargando.set(false); },
+      error: () => this.cargando.set(false)
+    });
   }
 
   esYo(usr: any): boolean { return Number(usr.id_usuario) === this.idActual; }
 
   // ─── Modal CRUD ───
   abrirModalNuevo() {
-    this.editandoId = null; this.mensajeError = ''; this.guardando = false;
-    this.formulario = { nombre_completo: '', correo_electronico: '', contrasena: '', id_rol: '', id_sucursal: '' };
-    this.mostrarModal = true;
+    this.editandoId.set(null); this.mensajeError.set(''); this.guardando.set(false);
+    this.formulario.set({ nombre_completo: '', correo_electronico: '', contrasena: '', id_rol: '', id_sucursal: '' });
+    this.mostrarModal.set(true);
   }
 
   abrirModalEditar(usr: any) {
-    this.editandoId = usr.id_usuario; this.mensajeError = ''; this.guardando = false;
-    this.formulario = {
+    this.editandoId.set(usr.id_usuario); this.mensajeError.set(''); this.guardando.set(false);
+    this.formulario.set({
       nombre_completo: usr.nombre_completo, correo_electronico: usr.correo_electronico,
       contrasena: '', id_rol: Number(usr.id_rol), id_sucursal: Number(usr.id_sucursal)
-    };
-    this.mostrarModal = true;
+    });
+    this.mostrarModal.set(true);
   }
 
-  cerrarModal() { this.mostrarModal = false; this.editandoId = null; this.mensajeError = ''; }
+  cerrarModal() { this.mostrarModal.set(false); this.editandoId.set(null); this.mensajeError.set(''); }
 
   guardarUsuario() {
-    const f = this.formulario;
-    if (!f.nombre_completo || !f.correo_electronico || !f.id_rol || !f.id_sucursal) {
-      this.mensajeError = 'Completa todos los campos.'; return;
-    }
-    if (!this.editandoId && (f.contrasena || '').length < 6) {
-      this.mensajeError = 'La contraseña debe tener al menos 6 caracteres.'; return;
-    }
-    this.guardando = true; this.mensajeError = '';
-    const fallo = (e: any, msg: string) => { this.mensajeError = e?.error?.error || msg; this.guardando = false; this.cdr.detectChanges(); };
+    const f = this.formulario(), id = this.editandoId();
+    if (!f.nombre_completo || !f.correo_electronico || !f.id_rol || !f.id_sucursal)
+      return this.mensajeError.set('Completa todos los campos.');
+    if (!id && (f.contrasena || '').length < 6)
+      return this.mensajeError.set('La contraseña debe tener al menos 6 caracteres.');
+    this.guardando.set(true); this.mensajeError.set('');
+    const fallo = (e: any, msg: string) => { this.mensajeError.set(e?.error?.error || msg); this.guardando.set(false); };
 
-    if (this.editandoId) {
+    if (id) {
       const d = { nombre_completo: f.nombre_completo, correo_electronico: f.correo_electronico, id_rol: f.id_rol, id_sucursal: f.id_sucursal };
-      this.usuarioService.actualizarUsuario(this.editandoId, d).subscribe({
+      this.usuarioService.actualizarUsuario(id, d).subscribe({
         next:  () => { this.cerrarModal(); this.dialogo.avisar('Usuario actualizado'); this.cargarDatos(); },
         error: (e) => fallo(e, 'No se pudo actualizar el usuario.')
       });
@@ -196,104 +188,99 @@ export class UsuariosComponent implements OnInit {
   }
 
   private abrirConfirmacion(c: Confirmacion) {
-    this.confirmacion      = c;
-    this.confirmando       = false;
-    this.errorConfirmacion = '';
+    this.confirmacion.set(c);
+    this.confirmando.set(false);
+    this.errorConfirmacion.set('');
   }
 
-  cerrarConfirmacion() { if (!this.confirmando) this.confirmacion = null; }
+  cerrarConfirmacion() { if (!this.confirmando()) this.confirmacion.set(null); }
 
   ejecutarConfirmacion() {
-    const c = this.confirmacion;
+    const c = this.confirmacion();
     if (!c) return;
-    this.confirmando = true;
+    this.confirmando.set(true);
     c.accion().subscribe({
       next: (res) => {
-        this.confirmando  = false;
-        this.confirmacion = null;
+        this.confirmando.set(false);
+        this.confirmacion.set(null);
         this.dialogo.avisar(c.exito(res));
         this.cargarDatos();
       },
       error: (e: any) => {
-        this.confirmando       = false;
-        this.errorConfirmacion = e?.error?.error || 'No se pudo completar la acción.';
-        this.cdr.detectChanges();
+        this.confirmando.set(false);
+        this.errorConfirmacion.set(e?.error?.error || 'No se pudo completar la acción.');
       }
     });
   }
 
   // ─── Modal contraseña ───
   abrirModalContrasena(usr: any) {
-    this.usuarioContrasena  = usr;
-    this.cambioContrasena   = { nueva: '', confirmar: '' };
-    this.errorContrasena    = '';
-    this.cargandoContrasena = false;
-    this.mostrarModalContrasena = true;
+    this.usuarioContrasena.set(usr);
+    this.cambioContrasena.set({ nueva: '', confirmar: '' });
+    this.errorContrasena.set('');
+    this.cargandoContrasena.set(false);
+    this.mostrarModalContrasena.set(true);
   }
-  cerrarModalContrasena() { this.mostrarModalContrasena = false; }
+  cerrarModalContrasena() { this.mostrarModalContrasena.set(false); }
 
   confirmarCambioContrasena() {
-    if (this.cambioContrasena.nueva.length < 6) { this.errorContrasena = 'Mínimo 6 caracteres.'; return; }
-    if (this.cambioContrasena.nueva !== this.cambioContrasena.confirmar) { this.errorContrasena = 'Las contraseñas no coinciden.'; return; }
-    this.cargandoContrasena = true;
-    this.usuarioService.cambiarContrasena(this.usuarioContrasena.id_usuario, this.cambioContrasena.nueva).subscribe({
+    if (this.cambioContrasena().nueva.length < 6) return this.errorContrasena.set('Mínimo 6 caracteres.');
+    if (this.cambioContrasena().nueva !== this.cambioContrasena().confirmar) return this.errorContrasena.set('Las contraseñas no coinciden.');
+    this.cargandoContrasena.set(true);
+    this.usuarioService.cambiarContrasena(this.usuarioContrasena().id_usuario, this.cambioContrasena().nueva).subscribe({
       next: () => {
         this.cerrarModalContrasena();
-        this.cargandoContrasena = false;
-        this.dialogo.avisar(`Contraseña de ${this.usuarioContrasena.nombre_completo} actualizada`);
+        this.cargandoContrasena.set(false);
+        this.dialogo.avisar(`Contraseña de ${this.usuarioContrasena().nombre_completo} actualizada`);
       },
       error: (e: any) => {
-        this.errorContrasena    = e?.error?.error || 'No se pudo cambiar la contraseña.';
-        this.cargandoContrasena = false;
-        this.cdr.detectChanges();
+        this.errorContrasena.set(e?.error?.error || 'No se pudo cambiar la contraseña.');
+        this.cargandoContrasena.set(false);
       }
     });
   }
 
   // ─── Modal permisos ───
   abrirModalPermisos(usr: any) {
-    this.usuarioPermisos  = usr;
-    this.permisosEdicion  = {};
-    this.errorPermisos    = '';
-    this.cargandoPermisos = true;
-    this.modulosCargados  = false;
-    this.mostrarModalPermisos = true;
+    this.usuarioPermisos.set(usr);
+    this.permisosEdicion.set({});
+    this.errorPermisos.set('');
+    this.cargandoPermisos.set(true);
+    this.modulosCargados.set(false);
+    this.mostrarModalPermisos.set(true);
 
     this.permisoService.obtenerPermisosUsuario(Number(usr.id_usuario)).subscribe({
       next: (res: any) => {
-        this.modulosSistema.forEach(m => { this.permisosEdicion[m.key] = res?.permisos?.[m.key] === true; });
-        this.cargandoPermisos = false;
-        this.modulosCargados  = true;
-        this.cdr.detectChanges();
+        this.permisosEdicion.set(Object.fromEntries(this.modulosSistema.map(m => [m.key, res?.permisos?.[m.key] === true])));
+        this.cargandoPermisos.set(false);
+        this.modulosCargados.set(true);
       },
       error: (e: any) => {
-        this.cargandoPermisos = false;
-        this.errorPermisos    = e?.error?.error || 'No se pudieron cargar los permisos.';
-        this.cdr.detectChanges();
+        this.cargandoPermisos.set(false);
+        this.errorPermisos.set(e?.error?.error || 'No se pudieron cargar los permisos.');
       }
     });
   }
 
-  cerrarModalPermisos() { this.mostrarModalPermisos = false; this.usuarioPermisos = null; }
+  cerrarModalPermisos() { this.mostrarModalPermisos.set(false); this.usuarioPermisos.set(null); }
 
   guardarPermisos() {
-    if (!this.usuarioPermisos) return;
-    const nombre = this.usuarioPermisos.nombre_completo;
+    if (!this.usuarioPermisos()) return;
+    const nombre = this.usuarioPermisos().nombre_completo;
     const permisos: Record<string, boolean> = {};
-    this.modulosSistema.forEach(m => { permisos[m.key] = this.permisosEdicion[m.key] === true; });
+    this.modulosSistema.forEach(m => { permisos[m.key] = this.permisosEdicion()[m.key] === true; });
 
-    this.cargandoPermisos = true;
-    this.errorPermisos    = '';
-    this.permisoService.guardarPermisosUsuario(Number(this.usuarioPermisos.id_usuario), permisos).subscribe({
+    this.cargandoPermisos.set(true);
+    this.errorPermisos.set('');
+    this.permisoService.guardarPermisosUsuario(Number(this.usuarioPermisos().id_usuario), permisos).subscribe({
       next: () => {
-        this.cargandoPermisos = false;
+        this.cargandoPermisos.set(false);
         this.cerrarModalPermisos();
         this.dialogo.avisar(`Permisos de ${nombre} guardados`);
       },
       error: (e: any) => {
-        this.cargandoPermisos = false;
-        this.errorPermisos    = e?.error?.detalle || e?.error?.error || 'No se pudieron guardar los permisos.';
-        this.cdr.detectChanges();
+        this.cargandoPermisos.set(false);
+        this.errorPermisos.set(e?.error?.detalle || e?.error?.error || 'No se pudieron guardar los permisos.');
       }
     });
   }

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef, effect, untracked, ElementRef, ViewChild } from '@angular/core';
+import { Component, computed, inject, Injector, OnInit, OnDestroy, afterNextRender, effect, signal, untracked, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Chart } from '../../../core/utils/graficos';
@@ -23,7 +23,7 @@ export class ResumenComponent implements OnInit, OnDestroy {
   private sucursalService = inject(SucursalService);
   private productoService = inject(ProductoService);
   private ajustes         = inject(AjustesService);
-  private cdr             = inject(ChangeDetectorRef);
+  private injector        = inject(Injector);
   readonly moneda         = this.ajustes.moneda;
 
   @ViewChild('graficoHoras') graficoHorasRef?: ElementRef<HTMLCanvasElement>;
@@ -35,29 +35,24 @@ export class ResumenComponent implements OnInit, OnDestroy {
   readonly hora = hora;
   readonly porcentaje = porcentaje;
 
-  cargando    = true;
-  refrescando = false;
-  esAdmin     = false;
-  datos: any  = null;
-  actualizado: Date | null = null;
+  readonly cargando    = signal(true);
+  readonly refrescando = signal(false);
+  esAdmin              = false;
+  readonly datos       = signal<any>(null);
+  readonly actualizado = signal<Date | null>(null);
   readonly hoyTexto = fechaLarga(new Date());
 
-  sucursales: any[] = [];
-  sucursalActual: number | null = 1;   // null = todas
-  private cajasCache: { clave: any[]; valor: Record<number, boolean> } = { clave: [], valor: {} };
+  readonly sucursales     = signal<any[]>([]);
+  readonly sucursalActual = signal<number | null>(1);   // null = todas
 
-  /** Sucursal → caja abierta (para los puntos del selector); se recalcula solo si cambian los datos */
-  get cajasAbiertas(): Record<number, boolean> {
-    const abiertas = this.datos?.cajas_abiertas;
-    if (this.cajasCache.clave[0] !== abiertas || this.cajasCache.clave[1] !== this.sucursales) {
-      const valor = Object.fromEntries(this.sucursales.map(s => [s.id_sucursal, !!abiertas?.includes(s.id_sucursal)]));
-      this.cajasCache = { clave: [abiertas, this.sucursales], valor };
-    }
-    return this.cajasCache.valor;
-  }
+  /** Sucursal → caja abierta (para los puntos del selector) */
+  readonly cajasAbiertas = computed(() => {
+    const abiertas = this.datos()?.cajas_abiertas;
+    return Object.fromEntries(this.sucursales().map(s => [s.id_sucursal, !!abiertas?.includes(s.id_sucursal)])) as Record<number, boolean>;
+  });
 
-  categorias: any[] = [];
-  categoriaFiltro: number | null = null;
+  readonly categorias      = signal<any[]>([]);
+  readonly categoriaFiltro = signal<number | null>(null);
 
   private graficos: Chart[] = [];
   private detenerSondeo?: () => void;
@@ -74,15 +69,15 @@ export class ResumenComponent implements OnInit, OnDestroy {
   ngOnInit() {
     try {
       const u = JSON.parse(localStorage.getItem('usuario_sgiv') || 'null');
-      this.esAdmin        = u?.id_rol === 1;
-      this.sucursalActual = u?.id_sucursal || 1;
+      this.esAdmin = u?.id_rol === 1;
+      this.sucursalActual.set(u?.id_sucursal || 1);
     } catch { }
 
     this.sucursalService.listarSucursales().subscribe({
-      next: (s: any[]) => { this.sucursales = s || []; this.cdr.detectChanges(); }
+      next: (s: any[]) => this.sucursales.set(s || [])
     });
     this.productoService.obtenerCategorias().subscribe({
-      next: (c) => { this.categorias = c || []; this.cdr.detectChanges(); }
+      next: (c) => this.categorias.set(c || [])
     });
     this.cargarDatos();
     this.detenerSondeo = sondeo(() => this.cargarDatos(true), 30000);
@@ -94,69 +89,64 @@ export class ResumenComponent implements OnInit, OnDestroy {
   }
 
   cargarDatos(silencioso = false) {
-    if (silencioso && this.datos) this.refrescando = true;
-    this.reporteService.obtenerDashboardCompleto(this.sucursalActual ?? 0, this.categoriaFiltro).subscribe({
+    if (silencioso && this.datos()) this.refrescando.set(true);
+    this.reporteService.obtenerDashboardCompleto(this.sucursalActual() ?? 0, this.categoriaFiltro()).subscribe({
       next: (d) => {
-        this.datos = d;
-        this.cargando = this.refrescando = false;
-        this.actualizado = new Date();
-        this.cdr.detectChanges();
-        setTimeout(() => this.renderizarGraficos());
+        this.datos.set(d);
+        this.cargando.set(false);
+        this.refrescando.set(false);
+        this.actualizado.set(new Date());
+        afterNextRender(() => this.renderizarGraficos(), { injector: this.injector });
       },
-      error: () => { this.cargando = this.refrescando = false; this.cdr.detectChanges(); }
+      error: () => { this.cargando.set(false); this.refrescando.set(false); }
     });
   }
 
   cambiarSucursal(id: number | null) {
-    this.sucursalActual = id;
-    this.cargando = true;
+    this.sucursalActual.set(id);
+    this.cargando.set(true);
     this.destruirGraficos();
     this.cargarDatos();
   }
 
   filtrarCategoria(id: number | null) {
-    this.categoriaFiltro = id;
+    this.categoriaFiltro.set(id);
     this.cargarDatos(true);
   }
 
   // ─── Datos derivados ───
-  get hoy()    { return this.datos?.hoy || {}; }
-  get comp()   { return this.datos?.comparativo || {}; }
-  get todas()  { return this.sucursalActual === null; }
+  readonly hoy   = computed(() => this.datos()?.hoy || {});
+  readonly comp  = computed(() => this.datos()?.comparativo || {});
+  readonly todas = computed(() => this.sucursalActual() === null);
 
-  get vsAyer()    { return variacion(this.hoy.ingresos, this.comp.ayer_misma_hora?.ingresos); }
-  get vsSemana()  { return variacion(this.hoy.ingresos, this.comp.semana_pasada_misma_hora?.ingresos); }
+  readonly vsAyer   = computed(() => variacion(this.hoy().ingresos, this.comp().ayer_misma_hora?.ingresos));
+  readonly vsSemana = computed(() => variacion(this.hoy().ingresos, this.comp().semana_pasada_misma_hora?.ingresos));
   get diaSemanaPasada(): string {
     return DIAS_SEMANA[(new Date().getDay() + 6) % 7].toLowerCase();
   }
 
-  get totalMetodos(): number {
-    return (this.datos?.metodos_pago || []).reduce((s: number, m: any) => s + m.ingresos, 0);
-  }
+  readonly totalMetodos = computed(() =>
+    (this.datos()?.metodos_pago || []).reduce((s: number, m: any) => s + m.ingresos, 0));
 
-  get alertasStock(): number {
-    return (this.datos?.stock?.agotados || 0) + (this.datos?.stock?.bajos || 0);
-  }
+  readonly alertasStock = computed(() =>
+    (this.datos()?.stock?.agotados || 0) + (this.datos()?.stock?.bajos || 0));
 
-  get efectivoEsperado(): number {
-    return (this.datos?.turnos_abiertos || []).reduce((s: number, t: any) => s + t.monto_inicial + t.efectivo, 0);
-  }
+  readonly efectivoEsperado = computed(() =>
+    (this.datos()?.turnos_abiertos || []).reduce((s: number, t: any) => s + t.monto_inicial + t.efectivo, 0));
 
-  get maxProducto(): number {
-    return Math.max(1, ...(this.datos?.top_productos || []).map((p: any) => p.unidades));
-  }
+  readonly maxProducto = computed(() =>
+    Math.max(1, ...(this.datos()?.top_productos || []).map((p: any) => p.unidades)));
 
-  get totalSucursales(): number {
-    return (this.datos?.sucursales || []).reduce((s: number, x: any) => s + x.ingresos, 0);
-  }
+  readonly totalSucursales = computed(() =>
+    (this.datos()?.sucursales || []).reduce((s: number, x: any) => s + x.ingresos, 0));
 
   /** Últimos 7 días contra los 7 anteriores */
-  get semanas() {
-    const d = this.datos?.ultimos_dias || [];
+  readonly semanas = computed(() => {
+    const d = this.datos()?.ultimos_dias || [];
     const suma = (a: any[]) => a.reduce((s, x) => s + x.ingresos, 0);
     const actual = suma(d.slice(7)), previa = suma(d.slice(0, 7));
     return { actual, previa, delta: variacion(actual, previa) };
-  }
+  });
 
   /** "desde 17:36", o con fecha si el turno se abrió otro día */
   desde(f: string): string {
@@ -190,15 +180,16 @@ export class ResumenComponent implements OnInit, OnDestroy {
   }
 
   private renderizarGraficos() {
-    if (!this.datos) return;
+    const datos = this.datos();
+    if (!datos) return;
     this.destruirGraficos();
     const t = temaGrafico(this.ajustes);
     const fmt = (v: number) => cifra(v, 0);
 
     const lienzoHoras = this.graficoHorasRef?.nativeElement;
     if (lienzoHoras) {
-      const hoy  = new Map<number, number>(this.datos.por_hora.map((h: any) => [h.hora, h.ingresos]));
-      const prom = new Map<number, number>(this.datos.por_hora_promedio.map((h: any) => [h.hora, h.ingresos]));
+      const hoy  = new Map<number, number>(datos.por_hora.map((h: any) => [h.hora, h.ingresos]));
+      const prom = new Map<number, number>(datos.por_hora_promedio.map((h: any) => [h.hora, h.ingresos]));
       const horas = [...hoy.keys(), ...prom.keys()];
       const desde = Math.min(7, ...horas), hasta = Math.max(21, ...horas);
       const etiquetas = Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i);
@@ -231,8 +222,8 @@ export class ResumenComponent implements OnInit, OnDestroy {
     }
 
     const lienzoDias = this.graficoDiasRef?.nativeElement;
-    if (lienzoDias && this.datos.ultimos_dias?.length) {
-      const dias = this.datos.ultimos_dias;
+    if (lienzoDias && datos.ultimos_dias?.length) {
+      const dias = datos.ultimos_dias;
       const base = opcionesBase(t, fmt);
       base.plugins.tooltip.callbacks = {
         title: (i: any) => fechaLarga(dias[i[0].dataIndex].fecha),

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, Plus, Pencil, Trash2, X } from 'lucide-angular';
@@ -22,98 +22,107 @@ const VACIO: Propietario = {
 export class AjustesPropietariosComponent implements OnInit {
   private ajustes = inject(AjustesService);
   private dialogo = inject(DialogoService);
-  private cdr     = inject(ChangeDetectorRef);
 
   readonly icons = { nuevo: Plus, editar: Pencil, eliminar: Trash2, cerrar: X };
 
-  propietarios: Propietario[] = [];
-  cargando = true;
-  guardando = false;
+  readonly propietarios = signal<Propietario[]>([]);
+  readonly cargando     = signal(true);
+  readonly guardando    = signal(false);
 
-  modalAbierto = false;
-  formulario: Propietario = { ...VACIO };
-  errorFormulario = '';
+  readonly modalAbierto    = signal(false);
+  // Formulario: se reemplaza con set(); el template edita los campos del objeto actual
+  readonly formulario      = signal<Propietario>({ ...VACIO });
+  readonly errorFormulario = signal('');
 
-  aEliminar: Propietario | null = null;
-  eliminando    = false;
-  errorEliminar = '';
+  readonly aEliminar     = signal<Propietario | null>(null);
+  readonly eliminando    = signal(false);
+  readonly errorEliminar = signal('');
+
+  readonly totalParticipacion = computed(() => {
+    const suma = this.propietarios().reduce((s, p) => s + Number(p.porcentaje_participacion || 0), 0);
+    return Math.round(suma * 100) / 100;
+  });
+
+  /** Lo que puede tener el propietario del formulario sin pasar el 100 % */
+  readonly disponible = computed(() => {
+    const id = this.formulario().id_propietario;
+    const otros = this.propietarios()
+      .filter(p => p.id_propietario !== id)
+      .reduce((s, p) => s + Number(p.porcentaje_participacion || 0), 0);
+    return Math.max(0, Math.round((100 - otros) * 100) / 100);
+  });
 
   ngOnInit() { this.cargar(); }
 
   cargar() {
     this.ajustes.listarPropietarios().subscribe({
-      next: (p) => { this.propietarios = p; this.cargando = false; this.cdr.detectChanges(); },
-      error: () => { this.cargando = false; this.dialogo.error('No se pudieron cargar los propietarios.'); }
+      next: (p) => { this.propietarios.set(p); this.cargando.set(false); },
+      error: () => { this.cargando.set(false); this.dialogo.error('No se pudieron cargar los propietarios.'); }
     });
   }
 
-  get totalParticipacion(): number {
-    const suma = this.propietarios.reduce((s, p) => s + Number(p.porcentaje_participacion || 0), 0);
-    return Math.round(suma * 100) / 100;
-  }
-
-  /** Lo que puede tener el propietario del formulario sin pasar el 100 % */
-  get disponible(): number {
-    const otros = this.propietarios
-      .filter(p => p.id_propietario !== this.formulario.id_propietario)
-      .reduce((s, p) => s + Number(p.porcentaje_participacion || 0), 0);
-    return Math.max(0, Math.round((100 - otros) * 100) / 100);
-  }
-
   abrirNuevo() {
-    this.formulario = { ...VACIO, porcentaje_participacion: this.disponibleParaNuevo() };
-    this.errorFormulario = '';
-    this.modalAbierto = true;
+    this.abrir({ ...VACIO, porcentaje_participacion: this.disponibleParaNuevo() });
   }
 
   abrirEdicion(p: Propietario) {
-    this.formulario = { ...p, porcentaje_participacion: Number(p.porcentaje_participacion) };
-    this.errorFormulario = '';
-    this.modalAbierto = true;
+    this.abrir({ ...p, porcentaje_participacion: Number(p.porcentaje_participacion) });
   }
 
-  cerrarModal() { this.modalAbierto = false; }
+  private abrir(formulario: Propietario) {
+    this.formulario.set(formulario);
+    this.errorFormulario.set('');
+    this.modalAbierto.set(true);
+  }
+
+  cerrarModal() { this.modalAbierto.set(false); }
+
+  pedirEliminar(p: Propietario) {
+    this.aEliminar.set(p);
+    this.errorEliminar.set('');
+  }
+
+  cancelarEliminar() {
+    if (!this.eliminando()) this.aEliminar.set(null);
+  }
 
   guardar() {
-    if (!this.formulario.nombre_completo?.trim()) { this.errorFormulario = 'El nombre es obligatorio.'; return; }
-    if (Number(this.formulario.porcentaje_participacion) > this.disponible) {
-      this.errorFormulario = `La participación no puede pasar de ${this.disponible} % (el total sería mayor a 100 %).`;
-      return;
-    }
-    this.guardando = true;
-    this.ajustes.guardarPropietario(this.formulario).subscribe({
+    const f = this.formulario();
+    if (!f.nombre_completo?.trim()) return this.errorFormulario.set('El nombre es obligatorio.');
+    if (Number(f.porcentaje_participacion) > this.disponible())
+      return this.errorFormulario.set(`La participación no puede pasar de ${this.disponible()} % (el total sería mayor a 100 %).`);
+    this.guardando.set(true);
+    this.ajustes.guardarPropietario(f).subscribe({
       next: (r) => {
-        this.guardando = false;
-        this.modalAbierto = false;
+        this.guardando.set(false);
+        this.modalAbierto.set(false);
         this.dialogo.avisar(r.mensaje);
         this.cargar();
       },
       error: (e) => {
-        this.guardando = false;
-        this.errorFormulario = e?.error?.error || 'No se pudo guardar.';
-        this.cdr.detectChanges();
+        this.guardando.set(false);
+        this.errorFormulario.set(e?.error?.error || 'No se pudo guardar.');
       }
     });
   }
 
   eliminar(p: Propietario) {
-    this.eliminando = true;
+    this.eliminando.set(true);
     this.ajustes.eliminarPropietario(p.id_propietario!).subscribe({
       next: () => {
-        this.eliminando = false;
-        this.aEliminar  = null;
+        this.eliminando.set(false);
+        this.aEliminar.set(null);
         this.dialogo.avisar('Propietario eliminado');
         this.cargar();
       },
       error: (e) => {
-        this.eliminando    = false;
-        this.errorEliminar = e?.error?.error || 'No se pudo eliminar.';
-        this.cdr.detectChanges();
+        this.eliminando.set(false);
+        this.errorEliminar.set(e?.error?.error || 'No se pudo eliminar.');
       }
     });
   }
 
   private disponibleParaNuevo(): number {
-    return Math.max(0, Math.round((100 - this.totalParticipacion) * 100) / 100);
+    return Math.max(0, Math.round((100 - this.totalParticipacion()) * 100) / 100);
   }
 }

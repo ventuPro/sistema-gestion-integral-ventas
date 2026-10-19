@@ -5,19 +5,19 @@
     <div>
       <p class="inf-antetitulo">
         <span>{{ hoyTexto }}</span>
-        @if (actualizado) {
-          <span class="inf-vivo">En vivo · {{ hora(actualizado) }}</span>
+        @if (actualizado(); as act) {
+          <span class="inf-vivo">En vivo · {{ hora(act) }}</span>
         }
       </p>
       <h1 class="inf-titulo">Panel del día</h1>
     </div>
-    <app-selector-sucursal [sucursales]="sucursales" [seleccionada]="sucursalActual"
+    <app-selector-sucursal [sucursales]="sucursales()" [seleccionada]="sucursalActual()"
                            [todas]="esAdmin" [soloLectura]="!esAdmin"
-                           [estados]="esAdmin ? cajasAbiertas : null"
+                           [estados]="esAdmin ? cajasAbiertas() : null"
                            (cambio)="cambiarSucursal($event)" />
   </header>
 
-  @if (cargando) {
+  @if (cargando()) {
     <div class="space-y-5">
       <div class="inf-hoja p-6 grid lg:grid-cols-2 gap-6">
         <div class="space-y-3">
@@ -34,36 +34,36 @@
     </div>
   }
 
-  @if (!cargando && datos) {
+  @if (!cargando() && datos()) {
   <div class="space-y-5">
 
     <!-- Cifra principal y ritmo por hora -->
     <section class="inf-hoja grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <div class="p-6 lg:border-r panel-linea">
         <p class="inf-etiqueta">Ingresos de hoy</p>
-        <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(hoy.ingresos) }}</p>
+        <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(hoy().ingresos) }}</p>
 
         <div class="mt-4 space-y-1.5">
           <p class="inf-comparacion">
-            <span class="inf-delta" [ngClass]="claseDelta(vsAyer)">
-              <lucide-icon [img]="iconoDelta(vsAyer)" class="w-3 h-3"></lucide-icon>
-              {{ textoDelta(vsAyer) }}
+            <span class="inf-delta" [ngClass]="claseDelta(vsAyer())">
+              <lucide-icon [img]="iconoDelta(vsAyer())" class="w-3 h-3"></lucide-icon>
+              {{ textoDelta(vsAyer()) }}
             </span>
-            vs. ayer a esta hora ({{ moneda() }} {{ cifra(comp.ayer_misma_hora?.ingresos) }})
+            vs. ayer a esta hora ({{ moneda() }} {{ cifra(comp().ayer_misma_hora?.ingresos) }})
           </p>
           <p class="inf-comparacion">
-            <span class="inf-delta" [ngClass]="claseDelta(vsSemana)">
-              <lucide-icon [img]="iconoDelta(vsSemana)" class="w-3 h-3"></lucide-icon>
-              {{ textoDelta(vsSemana) }}
+            <span class="inf-delta" [ngClass]="claseDelta(vsSemana())">
+              <lucide-icon [img]="iconoDelta(vsSemana())" class="w-3 h-3"></lucide-icon>
+              {{ textoDelta(vsSemana()) }}
             </span>
             vs. el {{ diaSemanaPasada }} pasado a esta hora
           </p>
         </div>
 
         <dl class="inf-pares mt-6 pt-5 panel-separador">
-          <div><dt>Ayer cerró en</dt><dd>{{ moneda() }} {{ cifra(comp.ayer_total?.ingresos) }}</dd></div>
-          <div><dt>Venta más alta de hoy</dt><dd>{{ moneda() }} {{ cifra(hoy.venta_maxima) }}</dd></div>
-          <div><dt>Primera venta</dt><dd>{{ hoy.primera_venta ? hora(hoy.primera_venta) : '—' }}</dd></div>
+          <div><dt>Ayer cerró en</dt><dd>{{ moneda() }} {{ cifra(comp().ayer_total?.ingresos) }}</dd></div>
+          <div><dt>Venta más alta de hoy</dt><dd>{{ moneda() }} {{ cifra(hoy().venta_maxima) }}</dd></div>
+          <div><dt>Primera venta</dt><dd>{{ hoy().primera_venta ? hora(hoy().primera_venta) : '—' }}</dd></div>
         </dl>
       </div>
 
@@ -85,32 +85,32 @@
     <section class="inf-hoja inf-tira overflow-hidden">
       <div>
         <p class="inf-etiqueta">Ventas</p>
-        <p class="inf-valor">{{ entero(hoy.ventas) }}</p>
-        <p class="inf-sub">{{ entero(hoy.unidades) }} unidades</p>
+        <p class="inf-valor">{{ entero(hoy().ventas) }}</p>
+        <p class="inf-sub">{{ entero(hoy().unidades) }} unidades</p>
       </div>
       <div>
         <p class="inf-etiqueta">Ticket promedio</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(hoy.ticket) }}</p>
+        <p class="inf-valor">{{ moneda() }} {{ cifra(hoy().ticket) }}</p>
       </div>
       <div>
         <p class="inf-etiqueta">Por cobrar en mesas</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(datos.mesas?.por_cobrar) }}</p>
-        <p class="inf-sub">{{ datos.mesas?.ocupadas || 0 }} de {{ datos.mesas?.total || 0 }} mesas ocupadas</p>
+        <p class="inf-valor">{{ moneda() }} {{ cifra(datos().mesas?.por_cobrar) }}</p>
+        <p class="inf-sub">{{ datos().mesas?.ocupadas || 0 }} de {{ datos().mesas?.total || 0 }} mesas ocupadas</p>
       </div>
       <div>
         <p class="inf-etiqueta">Pedidos del menú QR</p>
-        <p class="inf-valor" [class.inf-aviso]="datos.pedidos_qr?.pendientes > 0">{{ datos.pedidos_qr?.pendientes || 0 }} por confirmar</p>
-        <p class="inf-sub">{{ datos.pedidos_qr?.por_entregar || 0 }} por entregar · {{ datos.pedidos_qr?.hoy || 0 }} hoy</p>
+        <p class="inf-valor" [class.inf-aviso]="datos().pedidos_qr?.pendientes > 0">{{ datos().pedidos_qr?.pendientes || 0 }} por confirmar</p>
+        <p class="inf-sub">{{ datos().pedidos_qr?.por_entregar || 0 }} por entregar · {{ datos().pedidos_qr?.hoy || 0 }} hoy</p>
       </div>
       <div>
         <p class="inf-etiqueta">Alertas de stock</p>
-        <p class="inf-valor" [class.inf-baja]="datos.stock?.agotados > 0">{{ alertasStock }}</p>
-        <p class="inf-sub">{{ datos.stock?.agotados || 0 }} agotados · {{ datos.stock?.bajos || 0 }} bajo mínimo</p>
+        <p class="inf-valor" [class.inf-baja]="datos().stock?.agotados > 0">{{ alertasStock() }}</p>
+        <p class="inf-sub">{{ datos().stock?.agotados || 0 }} agotados · {{ datos().stock?.bajos || 0 }} bajo mínimo</p>
       </div>
     </section>
 
     <!-- Comparativo de sucursales -->
-    @if (todas && datos.sucursales?.length) {
+    @if (todas() && datos().sucursales?.length) {
       <section class="inf-hoja overflow-hidden">
         <div class="px-5 pt-5"><div class="inf-seccion"><h2>Sucursales hoy</h2></div></div>
         <div class="overflow-x-auto">
@@ -119,7 +119,7 @@
               <tr><th>Sucursal</th><th>Caja</th><th class="num">Ventas</th><th class="num">Ingresos</th><th class="w-1/3">Participación</th></tr>
             </thead>
             <tbody>
-              @for (s of datos.sucursales; track s.id_sucursal) {
+              @for (s of datos().sucursales; track s.id_sucursal) {
                 <tr>
                   <td class="fuerte">{{ s.nombre_sucursal }} @if (!s.estado_activo) { <span class="inf-ficha ml-1">inactiva</span> }</td>
                   <td><span class="inf-estado" [ngClass]="s.caja_abierta ? 'ok' : 'neutro'">{{ s.caja_abierta ? 'Abierta' : 'Cerrada' }}</span></td>
@@ -127,8 +127,8 @@
                   <td class="num fuerte">{{ moneda() }} {{ cifra(s.ingresos) }}</td>
                   <td>
                     <div class="flex items-center gap-3">
-                      <div class="inf-barra flex-1"><span [style.width.%]="porcentaje(s.ingresos, totalSucursales)"></span></div>
-                      <span class="inf-tenue text-xs w-12 text-right">{{ porcentaje(s.ingresos, totalSucursales).toFixed(1) }} %</span>
+                      <div class="inf-barra flex-1"><span [style.width.%]="porcentaje(s.ingresos, totalSucursales())"></span></div>
+                      <span class="inf-tenue text-xs w-12 text-right">{{ porcentaje(s.ingresos, totalSucursales()).toFixed(1) }} %</span>
                     </div>
                   </td>
                 </tr>
@@ -144,20 +144,20 @@
       <!-- Cobros por método -->
       <section class="inf-hoja p-5">
         <div class="inf-seccion"><h2>Cobros por método</h2></div>
-        @if (datos.metodos_pago?.length) {
+        @if (datos().metodos_pago?.length) {
           <div class="inf-apilada mb-4">
-            @for (m of datos.metodos_pago; track m.metodo_pago; let i = $index) {
-              <span [style.width.%]="porcentaje(m.ingresos, totalMetodos)" [style.background]="colorMetodo(i)"></span>
+            @for (m of datos().metodos_pago; track m.metodo_pago; let i = $index) {
+              <span [style.width.%]="porcentaje(m.ingresos, totalMetodos())" [style.background]="colorMetodo(i)"></span>
             }
           </div>
           <table class="inf-tabla">
             <tbody>
-              @for (m of datos.metodos_pago; track m.metodo_pago; let i = $index) {
+              @for (m of datos().metodos_pago; track m.metodo_pago; let i = $index) {
                 <tr>
                   <td class="pl-0!"><span class="flex items-center gap-2"><i class="inf-muestra" [style.background]="colorMetodo(i)"></i>{{ m.metodo_pago }}</span></td>
                   <td class="num inf-tenue">{{ m.ventas }} vta.</td>
                   <td class="num fuerte">{{ moneda() }} {{ cifra(m.ingresos) }}</td>
-                  <td class="num inf-tenue pr-0!">{{ porcentaje(m.ingresos, totalMetodos).toFixed(0) }} %</td>
+                  <td class="num inf-tenue pr-0!">{{ porcentaje(m.ingresos, totalMetodos()).toFixed(0) }} %</td>
                 </tr>
               }
             </tbody>
@@ -172,18 +172,18 @@
         <div class="inf-seccion">
           <h2>Caja</h2>
           <span class="inf-nota">
-            <span class="inf-estado" [ngClass]="datos.turnos_abiertos?.length ? 'ok' : 'neutro'">
-              {{ datos.turnos_abiertos?.length ? (datos.turnos_abiertos.length + (datos.turnos_abiertos.length === 1 ? ' turno abierto' : ' turnos abiertos')) : 'Cerrada' }}
+            <span class="inf-estado" [ngClass]="datos().turnos_abiertos?.length ? 'ok' : 'neutro'">
+              {{ datos().turnos_abiertos?.length ? (datos().turnos_abiertos.length + (datos().turnos_abiertos.length === 1 ? ' turno abierto' : ' turnos abiertos')) : 'Cerrada' }}
             </span>
           </span>
         </div>
-        @for (t of datos.turnos_abiertos; track t.id_turno) {
+        @for (t of datos().turnos_abiertos; track t.id_turno) {
           <div class="turno">
             <div class="flex items-baseline justify-between gap-2">
               <p class="inf-tinta font-semibold text-[13.5px] truncate">{{ t.cajero }}</p>
               <p class="inf-tenue text-xs whitespace-nowrap">desde {{ desde(t.fecha_hora_apertura) }}</p>
             </div>
-            @if (todas) { <p class="inf-sub mt-0!">{{ t.nombre_sucursal }}</p> }
+            @if (todas()) { <p class="inf-sub mt-0!">{{ t.nombre_sucursal }}</p> }
             <dl class="inf-pares mt-2.5">
               <div><dt>Fondo inicial</dt><dd>{{ moneda() }} {{ cifra(t.monto_inicial) }}</dd></div>
               <div><dt>Cobrado en efectivo</dt><dd>{{ moneda() }} {{ cifra(t.efectivo) }}</dd></div>
@@ -193,10 +193,10 @@
         } @empty {
           <p class="inf-vacio">No hay turnos abiertos.<br>Para vender, un cajero debe abrir caja.</p>
         }
-        @if (datos.turnos_abiertos?.length) {
+        @if (datos().turnos_abiertos?.length) {
           <div class="flex items-baseline justify-between mt-3 pt-3 panel-separador">
             <span class="inf-etiqueta">Efectivo que debería haber en caja</span>
-            <span class="inf-tinta font-semibold">{{ moneda() }} {{ cifra(efectivoEsperado) }}</span>
+            <span class="inf-tinta font-semibold">{{ moneda() }} {{ cifra(efectivoEsperado()) }}</span>
           </div>
         }
       </section>
@@ -207,11 +207,11 @@
           <h2>Stock por reponer</h2>
           <a routerLink="/dashboard/inventario" class="inf-nota inf-enlace">Ver inventario</a>
         </div>
-        @for (p of datos.stock_critico; track $index) {
+        @for (p of datos().stock_critico; track $index) {
           <div class="flex items-center gap-3 py-2 fila-stock">
             <div class="min-w-0 flex-1">
               <p class="text-[13px] inf-tinta truncate">{{ p.nombre_producto }}</p>
-              @if (todas) { <p class="inf-sub mt-0!">{{ p.nombre_sucursal }}</p> }
+              @if (todas()) { <p class="inf-sub mt-0!">{{ p.nombre_sucursal }}</p> }
             </div>
             @if (p.cantidad_actual <= 0) {
               <span class="inf-estado mal">Agotado</span>
@@ -234,30 +234,30 @@
         <div class="px-5 pt-5">
           <div class="inf-seccion mb-2!"><h2>Lo más vendido hoy</h2></div>
           <nav class="inf-pestanas">
-            <button [class.activa]="categoriaFiltro === null" (click)="filtrarCategoria(null)">Todas</button>
-            @for (c of categorias; track c.id_categoria) {
-              <button [class.activa]="categoriaFiltro === c.id_categoria" (click)="filtrarCategoria(c.id_categoria)">{{ c.nombre_categoria }}</button>
+            <button [class.activa]="categoriaFiltro() === null" (click)="filtrarCategoria(null)">Todas</button>
+            @for (c of categorias(); track c.id_categoria) {
+              <button [class.activa]="categoriaFiltro() === c.id_categoria" (click)="filtrarCategoria(c.id_categoria)">{{ c.nombre_categoria }}</button>
             }
           </nav>
         </div>
-        <div class="overflow-x-auto" [class.inf-refrescando]="refrescando">
-          @if (datos.top_productos?.length) {
+        <div class="overflow-x-auto" [class.inf-refrescando]="refrescando()">
+          @if (datos().top_productos?.length) {
             <table class="inf-tabla">
               <thead><tr><th class="rango">#</th><th>Producto</th><th class="num">Unidades</th><th class="num">Ingresos</th><th class="w-1/4"></th></tr></thead>
               <tbody>
-                @for (p of datos.top_productos; track p.nombre_producto; let i = $index) {
+                @for (p of datos().top_productos; track p.nombre_producto; let i = $index) {
                   <tr>
                     <td class="rango">{{ i + 1 }}</td>
                     <td><span class="fuerte">{{ p.nombre_producto }}</span><span class="inf-secundario">{{ p.nombre_categoria }}</span></td>
                     <td class="num">{{ entero(p.unidades) }}</td>
                     <td class="num fuerte">{{ moneda() }} {{ cifra(p.ingresos) }}</td>
-                    <td><div class="inf-barra"><span [style.width.%]="p.unidades / maxProducto * 100"></span></div></td>
+                    <td><div class="inf-barra"><span [style.width.%]="p.unidades / maxProducto() * 100"></span></div></td>
                   </tr>
                 }
               </tbody>
             </table>
           } @else {
-            <p class="inf-vacio">{{ categoriaFiltro ? 'Sin ventas hoy en esta categoría.' : 'Sin ventas hoy.' }}</p>
+            <p class="inf-vacio">{{ categoriaFiltro() ? 'Sin ventas hoy en esta categoría.' : 'Sin ventas hoy.' }}</p>
           }
         </div>
       </section>
@@ -265,14 +265,14 @@
       <!-- Últimas ventas -->
       <section class="inf-hoja lg:col-span-2 min-w-0">
         <div class="px-5 pt-5"><div class="inf-seccion mb-1!"><h2>Últimas ventas</h2></div></div>
-        @if (datos.ultimas_ventas?.length) {
+        @if (datos().ultimas_ventas?.length) {
           <ul class="px-5 pb-3">
-            @for (v of datos.ultimas_ventas; track v.id_venta) {
+            @for (v of datos().ultimas_ventas; track v.id_venta) {
               <li class="venta">
                 <span class="venta-hora">{{ hora(v.fecha_venta) }}</span>
                 <div class="min-w-0 flex-1">
                   <p class="text-[13px] inf-tinta truncate">{{ v.cajero || 'Sin cajero' }}</p>
-                  <p class="inf-sub mt-0! truncate">{{ v.unidades }} uds. · {{ v.metodo_pago }}@if (todas) { · {{ v.nombre_sucursal }} }</p>
+                  <p class="inf-sub mt-0! truncate">{{ v.unidades }} uds. · {{ v.metodo_pago }}@if (todas()) { · {{ v.nombre_sucursal }} }</p>
                 </div>
                 <span class="inf-tinta font-semibold text-[13.5px] whitespace-nowrap">{{ moneda() }} {{ cifra(v.monto) }}</span>
               </li>
@@ -290,10 +290,10 @@
         <h2>Últimos 7 días vs. 7 anteriores</h2>
       </div>
       <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 mb-4">
-        <p class="inf-valor mt-0!">{{ moneda() }} {{ cifra(semanas.actual) }}</p>
+        <p class="inf-valor mt-0!">{{ moneda() }} {{ cifra(semanas().actual) }}</p>
         <p class="inf-comparacion">
-          <span class="inf-delta" [ngClass]="claseDelta(semanas.delta)">{{ textoDelta(semanas.delta) }}</span>
-          frente a {{ moneda() }} {{ cifra(semanas.previa) }} la semana anterior
+          <span class="inf-delta" [ngClass]="claseDelta(semanas().delta)">{{ textoDelta(semanas().delta) }}</span>
+          frente a {{ moneda() }} {{ cifra(semanas().previa) }} la semana anterior
         </p>
       </div>
       <div class="relative h-52"><canvas #graficoDias></canvas></div>
@@ -302,7 +302,7 @@
   </div>
   }
 
-  @if (!cargando && !datos) {
+  @if (!cargando() && !datos()) {
     <div class="inf-hoja inf-vacio">No se pudo cargar el panel. Revisa la conexión con el servidor.</div>
   }
 </div>

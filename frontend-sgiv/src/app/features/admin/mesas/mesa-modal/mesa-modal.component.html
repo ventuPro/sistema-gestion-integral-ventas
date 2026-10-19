@@ -32,20 +32,20 @@
     <div class="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 separador-inferior flex-shrink-0">
       <div class="pb-3">
         <h2 class="inf-tinta font-semibold text-[17px]">Mesa {{ mesa?.numero_mesa }}</h2>
-        @if (cuentaActiva) { <span class="inf-estado aviso">Cuenta abierta</span> }
+        @if (cuentaActiva()) { <span class="inf-estado aviso">Cuenta abierta</span> }
         @else { <span class="inf-estado ok">Disponible</span> }
       </div>
       <div class="flex items-end gap-5 self-end">
-        @if (vista !== 'ticket') {
+        @if (vista() !== 'ticket') {
           <nav class="inf-pestanas">
-            @if (cuentaActiva) {
-              <button [class.activa]="vista === 'comanda' || vista === 'pago'" (click)="vista = 'comanda'">Consumo</button>
+            @if (cuentaActiva()) {
+              <button [class.activa]="vista() === 'comanda' || vista() === 'pago'" (click)="vista.set('comanda')">Consumo</button>
             }
-            <button [class.activa]="vista === 'qr'" (click)="verQR()">Código QR</button>
+            <button [class.activa]="vista() === 'qr'" (click)="verQR()">Código QR</button>
           </nav>
         }
         <div class="flex items-center gap-1 pb-2.5">
-          @if (esAdmin && (cuentaActiva || mesa?.estado_mesa === 'Ocupada')) {
+          @if (esAdmin && (cuentaActiva() || mesa?.estado_mesa === 'Ocupada')) {
             <button class="inf-boton inf-baja py-1!" (click)="forzarReset()" title="Cancela la cuenta y libera la mesa">Reiniciar mesa</button>
           }
           <button class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
@@ -55,14 +55,14 @@
       </div>
     </div>
 
-    @if (cargando && vista !== 'pago') {
+    @if (cargando() && vista() !== 'pago') {
       <div class="flex-1 grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4 p-5">
         <div class="inf-esqueleto"></div><div class="inf-esqueleto"></div>
       </div>
     }
 
     <!-- Consumo -->
-    @if ((!cargando || vista === 'pago') && (vista === 'comanda' || vista === 'pago')) {
+    @if ((!cargando() || vista() === 'pago') && (vista() === 'comanda' || vista() === 'pago')) {
       <div class="flex-1 min-h-0 grid lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
 
         <div class="flex flex-col min-h-0 lg:border-r" style="border-color: var(--i-linea)">
@@ -70,26 +70,26 @@
             <div class="buscador">
               <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
               <input type="text" [(ngModel)]="busqueda" placeholder="Buscar producto">
-              @if (busqueda) {
-                <button class="quitar" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+              @if (busqueda()) {
+                <button class="quitar" (click)="busqueda.set('')" aria-label="Limpiar búsqueda">
                   <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
                 </button>
               }
             </div>
             <nav class="inf-pestanas">
-              <button [class.activa]="!categoriaFiltro" (click)="categoriaFiltro = null">Todos</button>
-              @for (cat of categorias; track cat.id) {
-                <button [class.activa]="categoriaFiltro === cat.id" (click)="categoriaFiltro = cat.id">{{ cat.nombre }}</button>
+              <button [class.activa]="!categoriaFiltro()" (click)="categoriaFiltro.set(null)">Todos</button>
+              @for (cat of categorias(); track cat.id) {
+                <button [class.activa]="categoriaFiltro() === cat.id" (click)="categoriaFiltro.set(cat.id)">{{ cat.nombre }}</button>
               }
             </nav>
           </div>
 
           <div class="flex-1 overflow-y-auto p-4">
-            @if (productosFiltrados.length === 0) {
-              <p class="inf-vacio">{{ busqueda ? 'Sin resultados para «' + busqueda + '».' : 'No hay productos con stock.' }}</p>
+            @if (productosFiltrados().length === 0) {
+              <p class="inf-vacio">{{ busqueda() ? 'Sin resultados para «' + busqueda() + '».' : 'No hay productos con stock.' }}</p>
             } @else {
               <div class="catalogo">
-                @for (prod of productosFiltrados; track prod.id_producto) {
+                @for (prod of productosFiltrados(); track prod.id_producto) {
                   <button class="producto" (click)="agregarProducto(prod)" [disabled]="prod.stock_actual <= 0">
                     <div class="foto">
                       @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
@@ -110,18 +110,18 @@
         <div class="flex flex-col min-h-0">
           <div class="flex items-center justify-between px-5 py-3 separador-inferior flex-shrink-0">
             <h3 class="inf-tinta font-semibold text-[14px]">Consumo actual</h3>
-            <span class="inf-nota">{{ itemsPendientes.length }} por cobrar</span>
+            <span class="inf-nota">{{ itemsPendientes().length }} por cobrar</span>
           </div>
 
           <div class="flex-1 overflow-y-auto">
-            @if (!cuentaActiva?.items?.length) {
+            @if (!cuentaActiva()?.items?.length) {
               <div class="h-full flex flex-col items-center justify-center gap-2 py-12 inf-sutil">
                 <lucide-icon [img]="icons.carrito" class="w-7 h-7"></lucide-icon>
                 <p class="text-[13px]">Agrega productos del catálogo.</p>
               </div>
-            } @else if (porCliente) {
+            } @else if (porCliente()) {
               <!-- Por cliente: cada uno puede pagar lo suyo -->
-              @for (g of grupos; track g.clave) {
+              @for (g of grupos(); track g.clave) {
                 <div class="grupo-cliente">
                   <div class="grupo-cliente-cabeza">
                     <lucide-icon [img]="icons.cliente" class="w-4 h-4 inf-tenue shrink-0"></lucide-icon>
@@ -143,7 +143,7 @@
                 </div>
               }
             } @else {
-              @for (item of cuentaActiva?.items; track item.id_detalle_cuenta ?? $index) {
+              @for (item of cuentaActiva()?.items; track item.id_detalle_cuenta ?? $index) {
                 <ng-container *ngTemplateOutlet="lineaConsumo; context: { $implicit: item }" />
               }
             }
@@ -151,11 +151,11 @@
 
           <div class="p-5 separador flex-shrink-0">
             <div class="flex items-end justify-between gap-3 mb-4">
-              <span class="inf-etiqueta">{{ porCliente ? 'Total por cobrar' : 'Total' }}</span>
-              <span class="inf-valor mt-0! text-[28px]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCuenta) }}</span>
+              <span class="inf-etiqueta">{{ porCliente() ? 'Total por cobrar' : 'Total' }}</span>
+              <span class="inf-valor mt-0! text-[28px]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCuenta()) }}</span>
             </div>
-            <button class="boton-primario w-full py-3!" (click)="irAPago()" [disabled]="!itemsPendientes.length">
-              {{ porCliente ? 'Cobrar todo y cerrar mesa' : 'Cobrar y cerrar mesa' }}
+            <button class="boton-primario w-full py-3!" (click)="irAPago()" [disabled]="!itemsPendientes().length">
+              {{ porCliente() ? 'Cobrar todo y cerrar mesa' : 'Cobrar y cerrar mesa' }}
             </button>
           </div>
         </div>
@@ -163,39 +163,39 @@
     }
 
     <!-- Cobro -->
-    @if (vista === 'pago') {
-      <div class="absolute inset-0 z-10 flex items-center justify-center p-4 fondo-modal" (click)="vista = 'comanda'">
+    @if (vista() === 'pago') {
+      <div class="absolute inset-0 z-10 flex items-center justify-center p-4 fondo-modal" (click)="vista.set('comanda')">
         <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
           <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-            <h3 class="inf-tinta font-semibold text-[15px]">Cobrar · {{ parteCobro ? parteCobro.nombre : 'Mesa ' + mesa?.numero_mesa }}</h3>
-            <button class="quitar" (click)="vista = 'comanda'" aria-label="Cancelar">
+            <h3 class="inf-tinta font-semibold text-[15px]">Cobrar · {{ parteCobro()?.nombre ?? 'Mesa ' + mesa?.numero_mesa }}</h3>
+            <button class="quitar" (click)="vista.set('comanda')" aria-label="Cancelar">
               <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
             </button>
           </div>
 
           <div class="p-5 space-y-5">
             <div>
-              <p class="inf-etiqueta">{{ parteCobro ? 'Su parte' : 'Total a cobrar' }}</p>
-              <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCobro) }}</p>
+              <p class="inf-etiqueta">{{ parteCobro() ? 'Su parte' : 'Total a cobrar' }}</p>
+              <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCobro()) }}</p>
             </div>
 
             <div>
               <p class="inf-etiqueta mb-2">Método de pago</p>
               <div class="metodos">
                 @if (ajustes.config().pago_efectivo) {
-                  <button class="metodo" [class.activo]="metodoPago === metodo.efectivo" (click)="metodoPago = metodo.efectivo">
+                  <button class="metodo" [class.activo]="metodoPago() === metodo.efectivo" (click)="metodoPago.set(metodo.efectivo)">
                     <lucide-icon [img]="icons.efectivo" class="w-4 h-4"></lucide-icon> Efectivo
                   </button>
                 }
                 @if (ajustes.config().pago_qr) {
-                  <button class="metodo" [class.activo]="metodoPago === metodo.qr" (click)="metodoPago = metodo.qr">
+                  <button class="metodo" [class.activo]="metodoPago() === metodo.qr" (click)="metodoPago.set(metodo.qr)">
                     <lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon> QR
                   </button>
                 }
               </div>
             </div>
 
-            @if (metodoPago === metodo.efectivo) {
+            @if (metodoPago() === metodo.efectivo) {
               <div>
                 <p class="inf-etiqueta mb-2">Monto recibido <span class="inf-sutil font-normal">· opcional</span></p>
                 <div class="campo-monto">
@@ -203,19 +203,19 @@
                   <input #inputMontoMesa type="number" inputmode="decimal" [(ngModel)]="montoPagado"
                          (focus)="inputMontoMesa.select()" (keyup.enter)="confirmarPago()">
                 </div>
-                @if (montoPagado > 0) {
+                @if (montoPagado() > 0) {
                   <dl class="inf-pares mt-3">
-                    @if (montoPagado >= totalCobro) {
-                      <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio) }}</dd></div>
+                    @if (montoPagado() >= totalCobro()) {
+                      <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio()) }}</dd></div>
                     } @else {
-                      <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(totalCobro - montoPagado) }}</dd></div>
+                      <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(totalCobro() - montoPagado()) }}</dd></div>
                     }
                   </dl>
                 }
               </div>
             }
 
-            @if (metodoPago === metodo.qr) {
+            @if (metodoPago() === metodo.qr) {
               <div class="flex flex-col items-center gap-3 text-center">
                 @if (ajustes.qrCobro()) { <img [src]="ajustes.qrCobro()" alt="QR de cobro" class="qr-cobro"> }
               </div>
@@ -223,10 +223,10 @@
           </div>
 
           <div class="inf-pie-hoja flex justify-end gap-2">
-            <button class="inf-boton" (click)="vista = 'comanda'">Cancelar</button>
-            <button class="boton-primario" (click)="confirmarPago()" [disabled]="cargando">
+            <button class="inf-boton" (click)="vista.set('comanda')">Cancelar</button>
+            <button class="boton-primario" (click)="confirmarPago()" [disabled]="cargando()">
               <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon>
-              {{ cargando ? 'Procesando…' : 'Confirmar pago' }}
+              {{ cargando() ? 'Procesando…' : 'Confirmar pago' }}
             </button>
           </div>
         </div>
@@ -234,23 +234,23 @@
     }
 
     <!-- Comprobante -->
-    @if (vista === 'ticket') {
+    @if (vista() === 'ticket') {
       <div class="absolute inset-0 z-10 flex items-center justify-center p-4 fondo-modal">
         <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[85vh]">
           <div class="flex items-center justify-between px-5 py-4 separador-inferior">
             <div>
-              <h3 class="inf-tinta font-semibold text-[15px]">{{ cuentaCerrada ? 'Mesa cerrada' : 'Cobro registrado' }}</h3>
-              <p class="inf-sub mt-0!">Comprobante #{{ datosTicket?.id_venta }}</p>
+              <h3 class="inf-tinta font-semibold text-[15px]">{{ cuentaCerrada() ? 'Mesa cerrada' : 'Cobro registrado' }}</h3>
+              <p class="inf-sub mt-0!">Comprobante #{{ datosTicket()?.id_venta }}</p>
             </div>
             <button class="quitar" (click)="cerrarTicket()" aria-label="Cerrar">
               <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
             </button>
           </div>
           <div #zonaTicket class="overflow-y-auto p-4 flex justify-center" style="background: var(--i-fondo)">
-            @if (datosTicket) { <div class="shadow-sm"><app-ticket [datos]="datosTicket" [fecha]="fechaTicket" /></div> }
+            @if (datosTicket()) { <div class="shadow-sm"><app-ticket [datos]="datosTicket()" [fecha]="fechaTicket()" /></div> }
           </div>
           <div class="inf-pie-hoja flex justify-end gap-2">
-            <button class="inf-boton" (click)="cerrarTicket()">{{ cuentaCerrada ? 'Cerrar' : 'Volver a la mesa' }}</button>
+            <button class="inf-boton" (click)="cerrarTicket()">{{ cuentaCerrada() ? 'Cerrar' : 'Volver a la mesa' }}</button>
             <button class="boton-primario" (click)="imprimirTicket()">
               <lucide-icon [img]="icons.imprimir" class="w-4 h-4"></lucide-icon> Imprimir
             </button>
@@ -260,13 +260,13 @@
     }
 
     <!-- Código QR de la mesa -->
-    @if (vista === 'qr') {
+    @if (vista() === 'qr') {
       <div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
-        @if (!qrData) {
+        @if (!qrData()) {
           <div class="inf-esqueleto w-56 h-56"></div>
         } @else {
-          <img [src]="qrData.qr" [alt]="'QR Mesa ' + mesa?.numero_mesa" class="w-56 h-56 bg-white rounded-lg p-2" style="border: 1px solid var(--i-linea)">
-          <p class="inf-sub break-all px-4 mt-3 mb-5">{{ qrData.url }}</p>
+          <img [src]="qrData().qr" [alt]="'QR Mesa ' + mesa?.numero_mesa" class="w-56 h-56 bg-white rounded-lg p-2" style="border: 1px solid var(--i-linea)">
+          <p class="inf-sub break-all px-4 mt-3 mb-5">{{ qrData().url }}</p>
           <button class="boton-primario" (click)="descargarQR()">
             <lucide-icon [img]="icons.descargar" class="w-4 h-4"></lucide-icon> Descargar para imprimir
           </button>

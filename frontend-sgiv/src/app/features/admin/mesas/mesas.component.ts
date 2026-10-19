@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -28,7 +28,6 @@ export class MesasComponent implements OnInit, OnDestroy {
   private cajaService   = inject(CajaService);
   private mesaService   = inject(MesaService);
   private socketService = inject(SocketService);
-  private cdr           = inject(ChangeDetectorRef);
   readonly moneda        = inject(AjustesService).moneda;
   private ajustes       = inject(AjustesService);
 
@@ -48,32 +47,32 @@ export class MesasComponent implements OnInit, OnDestroy {
   readonly hoyTexto = fechaLarga(new Date());
 
   // ─── Control de acceso (basado en estado real del turno) ───
-  verificandoCaja  = true;
-  cajaHabilitada   = false;   // se mantiene por compatibilidad con el HTML
-  estadoCaja: EstadoCajaCompleto['estado'] = 'SIN_APERTURA';
-  turnoCajero: any = null;
-  usuarioActual:   any = null;
-  esAdmin          = false;
+  readonly verificandoCaja = signal(true);
+  readonly cajaHabilitada  = signal(false);
+  readonly estadoCaja      = signal<EstadoCajaCompleto['estado']>('SIN_APERTURA');
+  readonly turnoCajero     = signal<any>(null);
+  usuarioActual: any = null;
+  esAdmin            = false;
 
   // ─── Estado ───
-  mesas:            any[] = [];
-  cargando          = true;
+  readonly mesas    = signal<any[]>([]);
+  readonly cargando = signal(true);
 
   // ─── Modal nueva mesa ───
-  mostrarModalMesa  = false;
-  nuevaMesaNum      = '';
-  errorMesa         = '';
+  readonly mostrarModalMesa = signal(false);
+  readonly nuevaMesaNum     = signal('');
+  readonly errorMesa        = signal('');
 
   // ─── Modal mesa seleccionada ───
-  mesaSeleccionada: any = null;
+  readonly mesaSeleccionada = signal<any>(null);
 
   // ─── Códigos QR ───
   private readonly CLAVE_URL_QR = 'qr_base_url_sgiv';
-  mostrarModalQR  = false;
-  baseUrlQR       = '';
-  generandoQR     = false;
-  errorQR         = '';
-  codigosQR: { id_mesa: number; numero_mesa: number; qr: string; url: string }[] = [];
+  readonly mostrarModalQR = signal(false);
+  readonly baseUrlQR      = signal('');
+  readonly generandoQR    = signal(false);
+  readonly errorQR        = signal('');
+  readonly codigosQR      = signal<{ id_mesa: number; numero_mesa: number; qr: string; url: string }[]>([]);
 
   // ─── Auto-refresh ───
   private detenerSondeo?: () => void;
@@ -98,19 +97,19 @@ export class MesasComponent implements OnInit, OnDestroy {
   verificarAccesoCaja() {
     // Admin siempre tiene acceso
     if (this.esAdmin) {
-      this.cajaHabilitada  = true;
-      this.estadoCaja      = 'ABIERTA';
-      this.verificandoCaja = false;
+      this.cajaHabilitada.set(true);
+      this.estadoCaja.set('ABIERTA');
+      this.verificandoCaja.set(false);
       this.inicializar();
       return;
     }
 
     this.cajaService.obtenerEstadoCompleto().subscribe({
       next: (res) => {
-        this.estadoCaja     = res.estado;
-        this.cajaHabilitada = res.puede_vender;
-        this.turnoCajero    = res.turno;
-        this.verificandoCaja = false;
+        this.estadoCaja.set(res.estado);
+        this.cajaHabilitada.set(res.puede_vender);
+        this.turnoCajero.set(res.turno);
+        this.verificandoCaja.set(false);
 
         // Sincronizar localStorage
         if (this.usuarioActual) {
@@ -119,15 +118,13 @@ export class MesasComponent implements OnInit, OnDestroy {
         }
 
         if (res.puede_vender) this.inicializar();
-        else this.cargando = false;
-        this.cdr.detectChanges();
+        else this.cargando.set(false);
       },
       error: () => {
-        this.cajaHabilitada  = false;
-        this.estadoCaja      = 'SIN_APERTURA';
-        this.verificandoCaja = false;
-        this.cargando        = false;
-        this.cdr.detectChanges();
+        this.cajaHabilitada.set(false);
+        this.estadoCaja.set('SIN_APERTURA');
+        this.verificandoCaja.set(false);
+        this.cargando.set(false);
       }
     });
   }
@@ -165,14 +162,14 @@ export class MesasComponent implements OnInit, OnDestroy {
   cargarMesas() {
     const id_sucursal = this.usuarioActual?.id_sucursal || 1;
     this.cuentaService.getMesasConCuenta(id_sucursal).subscribe({
-      next: (m) => { this.mesas = m; this.cargando = false; this.cdr.detectChanges(); },
-      error: ()  => { this.cargando = false; this.cdr.detectChanges(); }
+      next: (m) => { this.mesas.set(m); this.cargando.set(false); },
+      error: ()  => { this.cargando.set(false); }
     });
   }
 
   // ─── SELECCIONAR MESA ───
-  seleccionarMesa(mesa: any) { this.mesaSeleccionada = mesa; }
-  onModalCerrado()           { this.mesaSeleccionada = null; }
+  seleccionarMesa(mesa: any) { this.mesaSeleccionada.set(mesa); }
+  onModalCerrado()           { this.mesaSeleccionada.set(null); }
   onMesaActualizada()        { this.cargarMesas(); }
 
   // ─── ESTILOS ───
@@ -181,25 +178,27 @@ export class MesasComponent implements OnInit, OnDestroy {
     return mesa.estado_mesa === 'Ocupada' ? 'ocupada' : 'libre';
   }
 
-  get resumen() {
-    const conCuenta = this.mesas.filter(m => m.id_cuenta);
+  readonly resumen = computed(() => {
+    const mesas = this.mesas();
+    const conCuenta = mesas.filter(m => m.id_cuenta);
     return {
-      libres:    this.mesas.filter(m => this.claseMesa(m) === 'libre').length,
+      libres:    mesas.filter(m => this.claseMesa(m) === 'libre').length,
       conCuenta: conCuenta.length,
       porCobrar: conCuenta.reduce((s, m) => s + (Number(m.total_acumulado) || 0), 0)
     };
-  }
+  });
 
   // ─── NUEVA MESA ───
-  abrirModalMesa()  { this.nuevaMesaNum = ''; this.errorMesa = ''; this.mostrarModalMesa = true; }
-  cerrarModalMesa() { this.mostrarModalMesa = false; }
+  abrirModalMesa()  { this.nuevaMesaNum.set(''); this.errorMesa.set(''); this.mostrarModalMesa.set(true); }
+  cerrarModalMesa() { this.mostrarModalMesa.set(false); }
 
   crearMesa() {
-    if (!this.nuevaMesaNum || isNaN(+this.nuevaMesaNum)) { this.errorMesa = 'Número inválido'; return; }
+    const numero = this.nuevaMesaNum();
+    if (!numero || isNaN(+numero)) return this.errorMesa.set('Número inválido');
     const id_sucursal = this.usuarioActual?.id_sucursal || 1;
-    this.mesaService.crearMesa({ id_sucursal, numero_mesa: +this.nuevaMesaNum }).subscribe({
+    this.mesaService.crearMesa({ id_sucursal, numero_mesa: +numero }).subscribe({
       next: () => { this.cerrarModalMesa(); this.cargarMesas(); },
-      error: (e: any) => { this.errorMesa = e?.error?.error || 'Error al crear la mesa'; this.cdr.detectChanges(); }
+      error: (e: any) => this.errorMesa.set(e?.error?.error || 'Error al crear la mesa')
     });
   }
 
@@ -234,44 +233,41 @@ export class MesasComponent implements OnInit, OnDestroy {
   abrirModalQR() {
     let guardada = '';
     try { guardada = localStorage.getItem(this.CLAVE_URL_QR) || ''; } catch { }
-    this.baseUrlQR      = guardada || window.location.origin;
-    this.codigosQR      = [];
-    this.errorQR        = '';
-    this.mostrarModalQR = true;
+    this.baseUrlQR.set(guardada || window.location.origin);
+    this.codigosQR.set([]);
+    this.errorQR.set('');
+    this.mostrarModalQR.set(true);
     this.generarCodigosQR();
   }
 
-  cerrarModalQR() { this.mostrarModalQR = false; }
+  cerrarModalQR() { this.mostrarModalQR.set(false); }
 
-  get baseUrlEsLocal(): boolean {
+  readonly baseUrlEsLocal = computed(() => {
     try {
-      const host = new URL(this.baseUrlQR).hostname;
+      const host = new URL(this.baseUrlQR()).hostname;
       return host === 'localhost' || host.startsWith('127.') || host === '[::1]';
     } catch { return false; }
-  }
+  });
 
   generarCodigosQR() {
-    const base = this.baseUrlQR.trim().replace(/\/+$/, '');
+    const base = this.baseUrlQR().trim().replace(/\/+$/, '');
     if (!/^https?:\/\/[^/\s]+$/i.test(base)) {
-      this.errorQR = 'Escribe la dirección completa, por ejemplo http://192.168.1.10:4200';
-      return;
+      return this.errorQR.set('Escribe la dirección completa, por ejemplo http://192.168.1.10:4200');
     }
-    this.baseUrlQR = base;
+    this.baseUrlQR.set(base);
     try { localStorage.setItem(this.CLAVE_URL_QR, base); } catch { }
 
-    if (!this.mesas.length) { this.codigosQR = []; return; }
-    this.generandoQR = true;
-    this.errorQR     = '';
+    if (!this.mesas().length) return this.codigosQR.set([]);
+    this.generandoQR.set(true);
+    this.errorQR.set('');
     this.mesaService.obtenerQRSucursal(this.usuarioActual?.id_sucursal || 1, base).subscribe({
       next: (codigos) => {
-        this.codigosQR   = codigos;
-        this.generandoQR = false;
-        this.cdr.detectChanges();
+        this.codigosQR.set(codigos);
+        this.generandoQR.set(false);
       },
       error: (e: any) => {
-        this.errorQR     = e?.error?.error || 'No se pudieron generar los códigos.';
-        this.generandoQR = false;
-        this.cdr.detectChanges();
+        this.errorQR.set(e?.error?.error || 'No se pudieron generar los códigos.');
+        this.generandoQR.set(false);
       }
     });
   }
@@ -301,7 +297,7 @@ export class MesasComponent implements OnInit, OnDestroy {
     const nombre = this.escaparHtml(this.ajustes.nombre());
     const logo   = this.ajustes.logo() ? `<img class="logo" src="${this.ajustes.logo()}" alt="">` : '';
     const color  = `rgb(${this.ajustes.colorPrimarioRgb().join(',')})`;
-    const tarjetas = this.codigosQR.map(c => `
+    const tarjetas = this.codigosQR().map(c => `
       <div class="tarjeta">
         ${logo}<p class="marca">${nombre}</p>
         <img src="${c.qr}" alt="QR Mesa ${c.numero_mesa}">

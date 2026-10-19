@@ -2,12 +2,12 @@
 
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div>
-      <p class="inf-antetitulo">Historial de turnos cerrados · {{ sucursalFiltro?.nombre_sucursal || 'Todas las sucursales' }}</p>
+      <p class="inf-antetitulo">Historial de turnos cerrados · {{ sucursalFiltro()?.nombre_sucursal || 'Todas las sucursales' }}</p>
       <h1 class="inf-titulo">Cierres de caja</h1>
     </div>
     <div class="flex flex-wrap items-center gap-3">
-      <app-selector-sucursal [sucursales]="sucursales" [todas]="true"
-                             [seleccionada]="sucursalFiltro?.id_sucursal ?? null"
+      <app-selector-sucursal [sucursales]="sucursales()" [todas]="true"
+                             [seleccionada]="sucursalFiltro()?.id_sucursal ?? null"
                              (cambio)="cambiarSucursal($event)" />
       <button class="inf-boton" (click)="cargar()">
         <lucide-icon [img]="icons.actualizar" class="w-3.5 h-3.5"></lucide-icon> Actualizar
@@ -15,36 +15,36 @@
     </div>
   </header>
 
-  @if (cargando) {
+  @if (cargando()) {
     <div class="space-y-5"><div class="inf-esqueleto h-24"></div><div class="inf-esqueleto h-72"></div></div>
   } @else {
 
     <section class="inf-hoja inf-tira overflow-hidden">
       <div>
         <p class="inf-etiqueta">Turnos cerrados</p>
-        <p class="inf-valor">{{ entero(cierresFiltrados.length) }}</p>
-        <p class="inf-sub">{{ entero(totales.ventas) }} ventas</p>
+        <p class="inf-valor">{{ entero(cierresFiltrados().length) }}</p>
+        <p class="inf-sub">{{ entero(totales().ventas) }} ventas</p>
       </div>
       <div>
         <p class="inf-etiqueta">Total recaudado</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(totales.total) }}</p>
+        <p class="inf-valor">{{ moneda() }} {{ cifra(totales().total) }}</p>
       </div>
       <div>
         <p class="inf-etiqueta">Efectivo</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(totales.efectivo) }}</p>
-        <p class="inf-sub">QR {{ moneda() }} {{ cifra(totales.qr) }}</p>
+        <p class="inf-valor">{{ moneda() }} {{ cifra(totales().efectivo) }}</p>
+        <p class="inf-sub">QR {{ moneda() }} {{ cifra(totales().qr) }}</p>
       </div>
       <div>
         <p class="inf-etiqueta">Diferencias de arqueo</p>
-        <p class="inf-valor" [ngClass]="totales.diferencia < 0 ? 'inf-baja' : totales.diferencia > 0 ? 'inf-aviso' : ''">
-          {{ totales.contados ? moneda() + ' ' + cifra(totales.diferencia) : '—' }}
+        <p class="inf-valor" [ngClass]="totales().diferencia < 0 ? 'inf-baja' : totales().diferencia > 0 ? 'inf-aviso' : ''">
+          {{ totales().contados ? moneda() + ' ' + cifra(totales().diferencia) : '—' }}
         </p>
-        <p class="inf-sub">{{ totales.contados }} de {{ cierresFiltrados.length }} turnos contados</p>
+        <p class="inf-sub">{{ totales().contados }} de {{ cierresFiltrados().length }} turnos contados</p>
       </div>
     </section>
 
     <section class="inf-hoja overflow-hidden">
-      @if (cierresFiltrados.length) {
+      @if (cierresFiltrados().length) {
         <div class="overflow-x-auto">
           <table class="inf-tabla">
             <thead>
@@ -54,7 +54,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (c of cierresFiltrados; track c.id_turno) {
+              @for (c of cierresFiltrados(); track c.id_turno) {
                 <tr>
                   <td><span class="fuerte">{{ c.nombre_cajero }}</span><span class="inf-secundario">{{ c.nombre_sucursal }}</span></td>
                   <td class="inf-tenue text-[12.5px] whitespace-nowrap">{{ fechaHora(c.fecha_hora_apertura) }} → {{ mismoDia(c) ? hora(c.fecha_hora_cierre) : fechaHora(c.fecha_hora_cierre) }}</td>
@@ -80,10 +80,10 @@
             <tfoot>
               <tr>
                 <td colspan="2">Total</td>
-                <td class="num">{{ entero(totales.ventas) }}</td>
-                <td class="num">{{ moneda() }} {{ cifra(totales.efectivo) }}</td>
-                <td class="num">{{ moneda() }} {{ cifra(totales.qr) }}</td>
-                <td class="num">{{ moneda() }} {{ cifra(totales.total) }}</td>
+                <td class="num">{{ entero(totales().ventas) }}</td>
+                <td class="num">{{ moneda() }} {{ cifra(totales().efectivo) }}</td>
+                <td class="num">{{ moneda() }} {{ cifra(totales().qr) }}</td>
+                <td class="num">{{ moneda() }} {{ cifra(totales().total) }}</td>
                 <td></td>
               </tr>
             </tfoot>
