@@ -1,5 +1,9 @@
 const pedidoModel = require('../models/pedidoModel');
 const ajusteModel = require('../models/ajusteModel');
+const promocionModel = require('../models/promocionModel');
+const cuentaModel = require('../models/cuentaModel');
+const { calcularItemsVenta } = require('../models/cajaModel');
+const db = require('../config/db');
 const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
 
 // ─── Menú digital público: la mesa se identifica por su código QR ───
@@ -75,9 +79,42 @@ const obtenerMesa = async (req, res) => {
 // GET /api/menu/m/:codigo/catalogo
 const obtenerCatalogo = async (req, res) => {
     try {
-        res.json(await pedidoModel.obtenerCatalogoMenu(req.mesa.id_sucursal));
+        const [catalogo, vigentes] = await Promise.all([
+            pedidoModel.obtenerCatalogoMenu(req.mesa.id_sucursal),
+            promocionModel.vigentes(db, req.mesa.id_sucursal)
+        ]);
+        res.json(catalogo.map(p => ({ ...p, promocion: promocionModel.promocionDeProducto(p, vigentes) })));
     } catch (e) {
         responderError(res, e, 'obtenerCatalogo');
+    }
+};
+
+// GET /api/menu/m/:codigo/promociones  las vigentes ahora, con texto para el cliente
+const obtenerPromociones = async (req, res) => {
+    try {
+        const { moneda_simbolo } = await ajusteModel.parametros();
+        const lista = await promocionModel.vigentesDetalle(req.mesa.id_sucursal);
+        res.json(lista.map(v => ({ nombre: v.nombre, tipo: v.tipo, valor: v.valor, lleva: v.lleva, paga: v.paga,
+                                   texto: promocionModel.textoPromocion(v, moneda_simbolo) })));
+    } catch (e) {
+        responderError(res, e, 'obtenerPromociones');
+    }
+};
+
+// POST /api/menu/m/:codigo/cotizar { items: [{ id_producto, cantidad }] }  total estimado del carrito
+const cotizarCarrito = async (req, res) => {
+    try {
+        const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 50) : [];
+        const lineas = await calcularItemsVenta(db, items);
+        const cot = await promocionModel.cotizar(db, {
+            id_sucursal: req.mesa.id_sucursal,
+            lineas: lineas.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria,
+                                       cantidad: i.cantidad, precioCentavos: Math.round(i.precio * 100) }))
+        });
+        res.json(promocionModel.enBolivianos(cot));
+    } catch (e) {
+        if (e.code === 'VENTA_INVALIDA') return res.status(400).json({ error: e.message });
+        responderError(res, e, 'cotizarCarrito');
     }
 };
 
@@ -142,10 +179,23 @@ const cancelarPedido = async (req, res) => {
 // GET /api/menu/m/:codigo/estado?cliente=<código del celular>
 const obtenerEstado = async (req, res) => {
     try {
-        res.json(await pedidoModel.obtenerEstadoMesa(req.mesa.id_mesa, clienteMesa(req.query.cliente)));
+        const cliente = clienteMesa(req.query.cliente);
+        const estado = await pedidoModel.obtenerEstadoMesa(req.mesa.id_mesa, cliente);
+        // Lo que falta pagar, con las promociones vigentes (igual que se cobrará en caja)
+        const c = estado.cuenta;
+        if (c) {
+            const [mio, mesa] = await Promise.all([
+                cuentaModel.cotizarCuenta(c.id_cuenta, { cliente_mesa: cliente }),
+                cuentaModel.cotizarCuenta(c.id_cuenta)
+            ]);
+            if (mio)  { c.mi_pendiente = mio.total; c.mi_descuento = mio.descuento_promociones; }
+            if (mesa) c.total_mesa = mesa.total;
+            delete c.id_cuenta;
+        }
+        res.json(estado);
     } catch (e) {
         responderError(res, e, 'obtenerEstado');
     }
 };
 
-module.exports = { cargarMesa, obtenerMesa, obtenerCatalogo, crearPedido, cancelarPedido, obtenerEstado };
+module.exports = { cargarMesa, obtenerMesa, obtenerCatalogo, obtenerPromociones, cotizarCarrito, crearPedido, cancelarPedido, obtenerEstado };

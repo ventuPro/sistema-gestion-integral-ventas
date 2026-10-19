@@ -118,9 +118,9 @@ export class PromocionService {
     return this.http.post<Cotizacion>(`${environment.apiUrl}/caja/cotizar`, { detalles, descuento });
   }
 
-  /** Mesas: lo pendiente de la cuenta (o de una persona) con promociones */
-  cotizarCuenta(id_cuenta: number, cliente_mesa?: string | null): Observable<Cotizacion> {
-    const params = cliente_mesa === undefined ? undefined : new HttpParams().set('cliente_mesa', cliente_mesa ?? '');
-    return this.http.get<Cotizacion>(`${environment.apiUrl}/cuentas/${id_cuenta}/cotizacion`, { params });
+  /** Mesas: lo pendiente de la cuenta (o de una persona; undefined = toda) con promociones y descuento manual */
+  cotizarCuenta(id_cuenta: number, cliente_mesa?: string | null, descuento: DescuentoManual | null = null): Observable<Cotizacion> {
+    const body = cliente_mesa === undefined ? { descuento } : { cliente_mesa, descuento };
+    return this.http.post<Cotizacion>(`${environment.apiUrl}/cuentas/${id_cuenta}/cotizar`, body);
   }
 }

@@ -7,6 +7,8 @@ const asistente = require('../controllers/asistenteController');
 router.get  ('/m/:codigo',                              ctrl.cargarMesa, ctrl.obtenerMesa);
 router.get  ('/m/:codigo/catalogo',                     ctrl.cargarMesa, ctrl.obtenerCatalogo);
 router.get  ('/m/:codigo/estado',                       ctrl.cargarMesa, ctrl.obtenerEstado);
+router.get  ('/m/:codigo/promociones',                  ctrl.cargarMesa, ctrl.obtenerPromociones);
+router.post ('/m/:codigo/cotizar',                      ctrl.cargarMesa, ctrl.cotizarCarrito);
 router.post ('/m/:codigo/pedidos',                      ctrl.cargarMesa, ctrl.crearPedido);
 router.post ('/m/:codigo/pedidos/:id_pedido/cancelar',  ctrl.cargarMesa, ctrl.cancelarPedido);
 router.post ('/m/:codigo/asistente',                    ctrl.cargarMesa, asistente.cliente);

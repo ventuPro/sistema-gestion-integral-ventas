@@ -343,7 +343,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
 };
 
 // ─── Lo que falta cobrar de una cuenta, con las promociones vigentes (solo lectura) ───
-const cotizarCuenta = async (id_cuenta, parte = null) => {
+const cotizarCuenta = async (id_cuenta, parte = null, { descuento = null, maxDescuentoPct = null } = {}) => {
     const client = await db.connect();
     try {
         const rCuenta = await client.query(`
@@ -359,7 +359,8 @@ const cotizarCuenta = async (id_cuenta, parte = null) => {
         const cot = await promocionModel.cotizar(client, {
             id_sucursal: rCuenta.rows[0].id_sucursal,
             lineas: rItems.rows.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria, cantidad: Number(i.cantidad),
-                                             precioCentavos: Math.round(Number(i.precio_unitario) * 100) }))
+                                             precioCentavos: Math.round(Number(i.precio_unitario) * 100) })),
+            descuento, maxManualPct: maxDescuentoPct
         });
         return promocionModel.enBolivianos(cot);
     } finally {

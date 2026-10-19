@@ -453,7 +453,7 @@ const obtenerEstadoMesa = async (id_mesa, cliente_mesa) => {
 
     // Lo consumido por este celular en la cuenta abierta (pagado o por pagar)
     const rCuenta = await db.query(`
-        SELECT c.total_acumulado AS total_mesa,
+        SELECT c.id_cuenta, c.total_acumulado AS total_mesa,
                COALESCE(SUM(dc.subtotal) FILTER (WHERE dc.id_venta IS NULL), 0) AS mi_pendiente,
                COALESCE(SUM(dc.subtotal) FILTER (WHERE dc.id_venta IS NOT NULL), 0) AS mi_pagado,
                COALESCE(json_agg(json_build_object(

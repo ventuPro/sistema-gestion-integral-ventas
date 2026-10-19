@@ -156,6 +156,52 @@ const vigentes = async (client, id_sucursal) => {
     return r.rows;
 };
 
+/** Vigentes con nombres de productos y categorías (menú QR y asistentes) */
+const vigentesDetalle = async (id_sucursal) => {
+    const r = await db.query(`
+        SELECT p.id_promocion, p.nombre, p.tipo, p.valor::float8 AS valor, p.lleva, p.paga,
+               to_char(p.hora_inicio, 'HH24:MI') AS hora_inicio, to_char(p.hora_fin, 'HH24:MI') AS hora_fin,
+               to_char(p.fecha_fin, 'YYYY-MM-DD') AS fecha_fin,
+               COALESCE((SELECT json_agg(json_build_object('id_producto', pp.id_producto, 'cantidad', pp.cantidad,
+                                                           'nombre_producto', pr.nombre_producto) ORDER BY pr.nombre_producto)
+                         FROM promocion_producto pp JOIN producto pr ON pr.id_producto = pp.id_producto
+                         WHERE pp.id_promocion = p.id_promocion), '[]') AS productos,
+               COALESCE((SELECT json_agg(json_build_object('id_categoria', c.id_categoria, 'nombre_categoria', c.nombre_categoria))
+                         FROM promocion_categoria pc JOIN categoria_producto c ON c.id_categoria = pc.id_categoria
+                         WHERE pc.id_promocion = p.id_promocion), '[]') AS categorias
+        FROM promocion p
+        WHERE (p.id_sucursal IS NULL OR p.id_sucursal = $1) AND ${CONDICION_VIGENTE}
+        ORDER BY p.nombre
+    `, [id_sucursal]);
+    return r.rows;
+};
+
+/** «−20 % en Tortas, Queques (18:00 a 21:00)» */
+const textoPromocion = (v, moneda) => {
+    const que = [...v.categorias.map(c => c.nombre_categoria),
+                 ...v.productos.map(x => (v.tipo === 'COMBO' && x.cantidad > 1 ? `${x.cantidad} ` : '') + x.nombre_producto)].join(', ');
+    const tipo = v.tipo === 'PORCENTAJE' ? `−${v.valor} % en ${que}`
+               : v.tipo === 'PRECIO'     ? `${que} a ${moneda} ${v.valor.toFixed(2)} c/u`
+               : v.tipo === 'NXM'        ? `lleva ${v.lleva} y paga ${v.paga} en ${que}`
+               :                           `combo ${que} a ${moneda} ${v.valor.toFixed(2)}`;
+    return `${v.nombre}: ${tipo}${v.hora_inicio ? ` (${v.hora_inicio} a ${v.hora_fin})` : ''}`;
+};
+
+/** La promoción que se muestra en un producto del catálogo; precio_promocional solo si baja el precio por unidad */
+const promocionDeProducto = (prod, vigentes) => {
+    const precio = Math.round(Number(prod.precio_unitario) * 100);
+    const aplica = vigentes.filter(v => v.productos.some(x => x.id_producto === prod.id_producto) ||
+                                        v.categorias.some(c => c.id_categoria === prod.id_categoria));
+    if (!aplica.length) return null;
+    const unidad = (v) => v.tipo === 'PORCENTAJE' ? Math.round(precio * (100 - v.valor) / 100)
+                        : v.tipo === 'PRECIO'     ? Math.min(precio, Math.round(v.valor * 100)) : null;
+    const rebajas = aplica.filter(v => unidad(v) !== null).sort((a, b) => unidad(a) - unidad(b));
+    const orden = { NXM: 1, COMBO: 2 };
+    const v = rebajas[0] ?? aplica.sort((a, b) => (orden[a.tipo] || 3) - (orden[b.tipo] || 3))[0];
+    return { nombre: v.nombre, tipo: v.tipo, valor: v.valor, lleva: v.lleva, paga: v.paga,
+             precio_promocional: unidad(v) !== null ? unidad(v) / 100 : null };
+};
+
 /** Precios finales de un carrito: promociones vigentes de la sucursal + descuento manual */
 const cotizar = async (client, { id_sucursal, lineas, descuento = null, maxManualPct = null }) => {
     const conPromo = aplicarPromociones(lineas, await vigentes(client, id_sucursal));
@@ -357,5 +403,5 @@ const eliminar = async (id) => {
 
 module.exports = {
     TIPOS, repartir, aplicarPromociones, descuentoManual, normalizar,
-    vigentes, cotizar, enBolivianos, listar, obtener, guardar, cambiarEstado, eliminar
+    vigentes, vigentesDetalle, textoPromocion, promocionDeProducto, cotizar, enBolivianos, listar, obtener, guardar, cambiarEstado, eliminar
 };

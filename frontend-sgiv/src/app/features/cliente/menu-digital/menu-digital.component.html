@@ -123,6 +123,14 @@
           </div>
         </div>
 
+        @if (promociones().length) {
+          <div class="promos" aria-label="Promociones de hoy">
+            @for (p of promociones(); track p.nombre) {
+              <p class="promo"><lucide-icon [img]="icons.promo" class="w-4 h-4 flex-shrink-0"></lucide-icon> {{ p.texto }}</p>
+            }
+          </div>
+        }
+
         @if (catalogoFiltrado().length === 0) {
           <div class="estado-vacio">
             <lucide-icon [img]="icons.sinResultados" class="w-8 h-8 inf-sutil"></lucide-icon>
@@ -136,6 +144,7 @@
               <div class="foto">
                 @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
                 @else { <span>{{ prod.nombre_producto?.charAt(0) }}</span> }
+                @if (etiquetaPromo(prod); as e) { <span class="etiqueta-promo">{{ e }}</span> }
                 @if (prod.stock_actual <= 0) { <span class="etiqueta mal">Agotado</span> }
                 @else if (disponible(prod) === 0) { <span class="etiqueta">En tu carrito</span> }
                 @else if (disponible(prod) <= 5) { <span class="etiqueta aviso">Quedan {{ disponible(prod) }}</span> }
@@ -143,7 +152,14 @@
               <div class="datos">
                 <p class="nombre">{{ prod.nombre_producto }}</p>
                 @if (prod.descripcion_producto) { <p class="descripcion">{{ prod.descripcion_producto }}</p> }
-                <p class="precio">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</p>
+                @if (prod.promocion?.precio_promocional !== null && prod.promocion?.precio_promocional !== undefined) {
+                  <p class="precio">
+                    <s class="precio-antes">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</s>
+                    {{ moneda() }} {{ Number(prod.promocion.precio_promocional).toFixed(2) }}
+                  </p>
+                } @else {
+                  <p class="precio">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</p>
+                }
 
                 @if (enCarrito(prod.id_producto) === 0) {
                   <button class="agregar" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0">
@@ -210,9 +226,17 @@
           </div>
 
           <div class="inf-hoja p-4 space-y-3">
+            @if (cotizacion()?.descuento_promociones) {
+              <p class="flex justify-between text-[13px] inf-tenue">
+                <span>Subtotal</span><span>{{ moneda() }} {{ cotizacion()!.subtotal_bruto.toFixed(2) }}</span>
+              </p>
+              <p class="flex justify-between text-[13px] inf-sube">
+                <span>Promociones</span><span>−{{ moneda() }} {{ cotizacion()!.descuento_promociones.toFixed(2) }}</span>
+              </p>
+            }
             <div class="flex justify-between items-baseline">
               <span class="inf-etiqueta">Total del pedido</span>
-              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ totalCarrito().toFixed(2) }}</span>
+              <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ totalEstimado().toFixed(2) }}</span>
             </div>
             @if (errorEnvio()) { <p class="error-formulario">{{ errorEnvio() }}</p> }
             <button class="boton-primario w-full py-3.5! text-base!" (click)="enviarPedido()"
@@ -311,6 +335,11 @@
                 </li>
               }
             </ul>
+            @if (Number(consumo.mi_descuento) > 0) {
+              <p class="flex justify-between text-[13px] inf-sube pt-3 mt-2 separador">
+                <span>Promociones</span><span>−{{ moneda() }} {{ Number(consumo.mi_descuento).toFixed(2) }}</span>
+              </p>
+            }
             <div class="flex justify-between items-baseline pt-3 mt-2 separador">
               <span class="inf-etiqueta">Tu parte por pagar</span>
               <span class="inf-tinta text-2xl font-semibold">{{ moneda() }} {{ Number(consumo.mi_pendiente).toFixed(2) }}</span>
@@ -350,7 +379,7 @@
       <button (click)="vista.set('carrito')">
         <span class="cuenta-items">{{ cantidadCarrito() }}</span>
         <span>Ver carrito</span>
-        <span>{{ moneda() }} {{ totalCarrito().toFixed(2) }}</span>
+        <span>{{ moneda() }} {{ totalEstimado().toFixed(2) }}</span>
       </button>
     </div>
   }

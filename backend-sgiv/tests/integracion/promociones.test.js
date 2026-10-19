@@ -247,6 +247,29 @@ describe('Promociones en mesas', () => {
         assert.deepEqual(v, { t: 10, p: 10 });
     });
 
+    test('descuento manual en mesas: se valida al cotizar y se guarda al cobrar', async () => {
+        const cat = await crearCategoria('Mesa descuento');
+        const id = await crearProducto('Té', 20, cat);
+        const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
+                                     VALUES (1, 78, md5(random()::text)) RETURNING id_mesa`);
+        const cuenta = (await api('POST', '/cuentas/abrir', { token: tCajero, body: { id_mesa: mesa.id_mesa } })).body.cuenta;
+        await api('POST', `/cuentas/${cuenta.id_cuenta}/producto`, { token: tCajero, body: { id_producto: id, cantidad: 5 } });
+
+        const mucho = await api('POST', `/cuentas/${cuenta.id_cuenta}/cotizar`, { token: tCajero,
+            body: { descuento: { tipo: 'PORCENTAJE', valor: 30, motivo: 'Mucho' } } });
+        assert.equal(mucho.status, 400);
+        const ok = await api('POST', `/cuentas/${cuenta.id_cuenta}/cotizar`, { token: tCajero,
+            body: { descuento: { tipo: 'MONTO', valor: 10, motivo: 'Cumpleaños' } } });
+        assert.equal(ok.body.total, 90);
+
+        const cierre = await api('POST', `/cuentas/${cuenta.id_cuenta}/cerrar`, { token: tCajero,
+            body: { metodo_pago: 'Efectivo', descuento: { tipo: 'MONTO', valor: 10, motivo: 'Cumpleaños' } } });
+        assert.equal(cierre.status, 200, JSON.stringify(cierre.body));
+        const [v] = await bd.sql(`SELECT monto_total_venta::float8 AS t, descuento_manual::float8 AS d, motivo_descuento AS m
+                                  FROM venta_caja WHERE id_venta = $1`, [cierre.body.id_venta]);
+        assert.deepEqual(v, { t: 90, d: 10, m: 'Cumpleaños' });
+    });
+
     test('una promoción usada no se elimina: se desactiva', async () => {
         const usada = (await api('GET', '/promociones', { token: tAdmin })).body.find(p => p.usos > 0);
         assert.ok(usada);
@@ -254,5 +277,47 @@ describe('Promociones en mesas', () => {
         const cat = await crearCategoria('Borrable');
         const nueva = await crearPromo(tAdmin, { categorias: [cat] });
         assert.equal((await api('DELETE', `/promociones/${nueva.id_promocion}`, { token: tAdmin })).status, 200);
+    });
+});
+
+describe('Promociones en el menú QR', () => {
+    test('catálogo con la promoción de cada producto, lista de hoy y total estimado del carrito', async () => {
+        const cat = await crearCategoria('Menú QR');
+        const torta = await crearProducto('Torta QR', 40, cat), jugo = await crearProducto('Jugo QR', 10, cat);
+        await crearPromo(tAdmin, { nombre: 'Tortas -25 %', valor: 25, productos: [{ id_producto: torta }] });
+        await crearPromo(tAdmin, { nombre: 'Jugos 2x1', tipo: 'NXM', lleva: 2, paga: 1, productos: [{ id_producto: jugo }] });
+        const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
+                                     VALUES (1, 80, md5(random()::text)) RETURNING id_mesa, codigo_qr`);
+
+        const catalogo = (await api('GET', `/menu/m/${mesa.codigo_qr}/catalogo`)).body;
+        const t = catalogo.find(p => p.id_producto === torta), j = catalogo.find(p => p.id_producto === jugo);
+        assert.deepEqual([t.promocion.nombre, t.promocion.precio_promocional], ['Tortas -25 %', 30]);
+        assert.deepEqual([j.promocion.tipo, j.promocion.precio_promocional], ['NXM', null]);
+
+        const lista = (await api('GET', `/menu/m/${mesa.codigo_qr}/promociones`)).body;
+        assert.ok(lista.some(v => v.texto === 'Jugos 2x1: lleva 2 y paga 1 en Jugo QR'));
+
+        const c = await api('POST', `/menu/m/${mesa.codigo_qr}/cotizar`, { body: { items: [{ id_producto: torta, cantidad: 1 }, { id_producto: jugo, cantidad: 2 }] } });
+        assert.equal(c.status, 200);
+        assert.equal(c.body.total, 30 + 10);
+    });
+
+    test('«Mi mesa» muestra lo pendiente con las promociones', async () => {
+        const cat = await crearCategoria('Mi mesa');
+        const id = await crearProducto('Empanada QR', 6, cat);
+        await crearPromo(tAdmin, { nombre: 'Empanadas 3x2', tipo: 'NXM', lleva: 3, paga: 2, productos: [{ id_producto: id }] });
+        const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
+                                     VALUES (1, 81, md5(random()::text)) RETURNING id_mesa, codigo_qr`);
+        const cuenta = (await api('POST', '/cuentas/abrir', { token: tCajero, body: { id_mesa: mesa.id_mesa } })).body.cuenta;
+        const cliente = 'a'.repeat(32);
+        await bd.sql(`INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, subtotal, origen, cliente_mesa)
+                      VALUES ($1, $2, 3, 6, 18, 'qr', $3)`, [cuenta.id_cuenta, id, cliente]);
+        await bd.sql(`UPDATE cuenta_mesa SET total_acumulado = 18 WHERE id_cuenta = $1`, [cuenta.id_cuenta]);
+
+        const e = (await api('GET', `/menu/m/${mesa.codigo_qr}/estado?cliente=${cliente}`)).body;
+        assert.equal(e.cuenta.mi_pendiente, 12);
+        assert.equal(e.cuenta.mi_descuento, 6);
+        assert.equal(e.cuenta.total_mesa, 12);
+        assert.equal(e.cuenta.id_cuenta, undefined);
     });
 });

@@ -1,6 +1,7 @@
 const ajusteModel   = require('../models/ajusteModel');
 const pedidoModel   = require('../models/pedidoModel');
 const sucursalModel = require('../models/sucursalModel');
+const promocionModel = require('../models/promocionModel');
 const groq          = require('./groq');
 
 // ─── Asistente del menú QR ───
@@ -31,9 +32,10 @@ const ahoraLaPaz = () => new Date().toLocaleString('es-BO', {
 });
 
 const instrucciones = async (mesa, p) => {
-    const [productos, sucursales] = await Promise.all([
+    const [productos, sucursales, promociones] = await Promise.all([
         pedidoModel.obtenerCatalogoMenu(mesa.id_sucursal),
-        sucursalModel.obtenerSucursales()
+        sucursalModel.obtenerSucursales(),
+        promocionModel.vigentesDetalle(mesa.id_sucursal)
     ]);
     const sucursal = sucursales.find(s => s.id_sucursal === mesa.id_sucursal) || {};
     const pagos = [p.pago_efectivo && 'efectivo', p.pago_qr && 'QR'].filter(Boolean).join(' y ');
@@ -52,6 +54,7 @@ REGLAS:
 - Si un producto está AGOTADO dilo y sugiere uno parecido que esté disponible.
 - Nunca sugieras más unidades de las que quedan (las marcadas "últimas N").
 - Para recomendar, elige de la carta según lo que pida el cliente (cantidad de personas, ocasión, gustos, presupuesto) y menciona el precio.
+- Puedes mencionar las PROMOCIONES DE AHORA (se aplican solas al pagar en caja); no hay otras.
 - Tú no tomas pedidos ni cobras. Para pedir, el cliente toca "+" en el producto, revisa su carrito y toca "Enviar pedido"; el cajero lo confirma. La cuenta se paga en caja.
 - Si quieren pagar por separado: cada persona escanea el QR y pide desde su propio celular; en "Mi mesa" ve lo que consumió y en caja le cobran solo lo suyo.
 - Si el cliente pregunta algo que responde la INFORMACIÓN DEL PROPIETARIO, úsala tal como está escrita.
@@ -67,6 +70,9 @@ ${contacto}
 ${p.ia_info_negocio ? `\nINFORMACIÓN DEL PROPIETARIO (respuestas que quiere dar a los clientes):\n${p.ia_info_negocio}\n` : ''}
 CARTA (producto y precio en ${p.moneda_simbolo}; los que no dicen AGOTADO están disponibles):
 ${textoCarta(productos) || '(sin productos)'}
+
+PROMOCIONES DE AHORA:
+${promociones.length ? promociones.map(v => '- ' + promocionModel.textoPromocion(v, p.moneda_simbolo)).join('\n') : '(ninguna)'}
 
 SUCURSAL: ${sucursal.nombre_sucursal || ''}${sucursal.direccion ? `, ${sucursal.direccion}` : ''}
 Horario: ${sucursal.horario?.length ? textoHorario(sucursal.horario) : 'consultar en caja'}

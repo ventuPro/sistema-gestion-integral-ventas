@@ -186,7 +186,46 @@
               @if (cotizacionPago()?.descuento_promociones) {
                 <p class="inf-sub inf-sube">Promociones −{{ moneda() }} {{ cifra(cotizacionPago()!.descuento_promociones) }}</p>
               }
+              @if (descuento(); as d) {
+                <p class="inf-sub inf-sube flex items-center gap-1">
+                  Descuento · {{ d.motivo }} −{{ moneda() }} {{ cifra(cotizacionPago()?.descuento_manual || 0) }}
+                  <button class="quitar p-0.5!" (click)="aplicarDescuento(null)" aria-label="Quitar descuento">
+                    <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
+                  </button>
+                </p>
+              } @else if (!editandoDescuento()) {
+                <button class="inf-enlace inline-flex items-center gap-1 mt-2" (click)="abrirDescuento()" [disabled]="!cotizacionPago()">
+                  <lucide-icon [img]="icons.descuento" class="w-3.5 h-3.5"></lucide-icon> Descuento
+                </button>
+              }
             </div>
+
+            @if (editandoDescuento()) {
+              <form class="descuento-mesa space-y-3" (ngSubmit)="aplicarDescuento(formDescuento())">
+                @if (errorDescuento()) { <p class="error-descuento" role="alert">{{ errorDescuento() }}</p> }
+                <div class="flex items-end gap-2">
+                  <div class="metodos flex-shrink-0">
+                    <button type="button" class="metodo" [class.activo]="formDescuento().tipo === 'PORCENTAJE'"
+                            (click)="formDescuento().tipo = 'PORCENTAJE'">%</button>
+                    <button type="button" class="metodo" [class.activo]="formDescuento().tipo === 'MONTO'"
+                            (click)="formDescuento().tipo = 'MONTO'">{{ moneda() }}</button>
+                  </div>
+                  <div class="flex-1">
+                    <p class="inf-etiqueta mb-1">
+                      Descuento @if (descuentoMax() !== null) { <span class="inf-sutil font-normal">· máx. {{ descuentoMax() }} %</span> }
+                    </p>
+                    <input type="number" name="valor" min="0" class="campo-texto" [(ngModel)]="formDescuento().valor" aria-label="Descuento">
+                  </div>
+                </div>
+                <input name="motivo" class="campo-texto" maxlength="120" [(ngModel)]="formDescuento().motivo" placeholder="Motivo" aria-label="Motivo">
+                <div class="flex justify-end gap-2">
+                  <button type="button" class="inf-boton" (click)="editandoDescuento.set(false)">Cancelar</button>
+                  <button type="submit" class="boton-primario py-1.5!" [disabled]="aplicandoDescuento()">
+                    {{ aplicandoDescuento() ? 'Aplicando…' : 'Aplicar' }}
+                  </button>
+                </div>
+              </form>
+            }
 
             <div>
               <p class="inf-etiqueta mb-2">Método de pago</p>
@@ -233,7 +272,7 @@
 
           <div class="inf-pie-hoja flex justify-end gap-2">
             <button class="inf-boton" (click)="vista.set('comanda')">Cancelar</button>
-            <button class="boton-primario" (click)="confirmarPago()" [disabled]="cargando() || !cotizacionPago()">
+            <button class="boton-primario" (click)="confirmarPago()" [disabled]="cargando() || !cotizacionPago() || editandoDescuento()">
               <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon>
               {{ cargando() ? 'Procesando…' : 'Confirmar pago' }}
             </button>

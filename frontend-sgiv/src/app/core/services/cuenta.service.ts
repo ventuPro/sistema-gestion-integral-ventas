@@ -29,8 +29,8 @@ export class CuentaService {
   }
 
   /** cliente_mesa: sin enviar = toda la cuenta; código o null = solo la parte de ese cliente */
-  cerrarCuenta(id_cuenta: number, metodo_pago: string, cliente_mesa?: string | null): Observable<any> {
-    const body = cliente_mesa === undefined ? { metodo_pago } : { metodo_pago, cliente_mesa };
+  cerrarCuenta(id_cuenta: number, metodo_pago: string, cliente_mesa?: string | null, descuento: any = null): Observable<any> {
+    const body = cliente_mesa === undefined ? { metodo_pago, descuento } : { metodo_pago, cliente_mesa, descuento };
     return this.http.post(`${this.apiUrl}/cuentas/${id_cuenta}/cerrar`, body);
   }
 

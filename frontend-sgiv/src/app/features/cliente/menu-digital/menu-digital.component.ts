@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnInit, OnDestroy, signal, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -11,8 +11,9 @@ import { sondeo } from '../../../core/utils/sondeo';
 import { ConfirmacionComponent } from '../../shared/confirmacion/confirmacion.component';
 import type { MensajeChat } from '../../shared/asistente/asistente-chat.component';
 import { componenteDiferido } from '../../../core/utils/diferido';
+import { Cotizacion, etiquetaPromocion } from '../../../core/services/promocion.service';
 import { LucideAngularModule, UtensilsCrossed, ShoppingBag, ReceiptText, Search, X, Minus, Plus, Check,
-         SearchX, WifiOff, PartyPopper, Pencil } from 'lucide-angular';
+         SearchX, WifiOff, PartyPopper, Pencil, BadgePercent } from 'lucide-angular';
 
 type Vista = 'menu' | 'carrito' | 'pedidos';
 
@@ -32,6 +33,7 @@ interface MiConsumo {
   total_mesa:   number;
   mi_pendiente: number;
   mi_pagado:    number;
+  mi_descuento?: number;
   items: { nombre_producto: string; cantidad: number; subtotal: number; pagado: boolean }[];
 }
 
@@ -68,7 +70,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly Number = Number;
   readonly icons  = { menu: UtensilsCrossed, carrito: ShoppingBag, mesa: ReceiptText, buscar: Search, cerrar: X,
                       menos: Minus, mas: Plus, listo: Check, sinResultados: SearchX, sinConexion: WifiOff,
-                      qrInvalido: SearchX, gracias: PartyPopper, editar: Pencil };
+                      qrInvalido: SearchX, gracias: PartyPopper, editar: Pencil, promo: BadgePercent };
 
   private route = inject(ActivatedRoute);
   private http  = inject(HttpClient);
@@ -112,6 +114,21 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly errorEnvio         = signal('');
 
   readonly totalCarrito    = computed(() => this.carrito().reduce((s, i) => s + i.precio_unitario * i.cantidad, 0));
+
+  // ─── Promociones: las de hoy y el total estimado del carrito (las calcula el backend) ───
+  readonly promociones = signal<{ nombre: string; texto: string }[]>([]);
+  private readonly cotizacionGuardada = signal<{ clave: string; datos: Cotizacion } | null>(null);
+  private readonly claveCarrito = computed(() => JSON.stringify(this.carrito().map(i => [i.id_producto, i.cantidad])));
+  readonly cotizacion = computed(() => {
+    const c = this.cotizacionGuardada();
+    return c && c.clave === this.claveCarrito() ? c.datos : null;
+  });
+  readonly totalEstimado = computed(() => this.cotizacion()?.total ?? this.totalCarrito());
+  private esperaCotizacion: any;
+
+  etiquetaPromo(prod: any): string | null {
+    return prod.promocion ? etiquetaPromocion(prod.promocion, this.moneda()) : null;
+  }
   readonly cantidadCarrito = computed(() => this.carrito().reduce((s, i) => s + i.cantidad, 0));
 
   // ─── Mis pedidos y mi consumo en la cuenta de la mesa ───
@@ -138,6 +155,23 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   private timers: (() => void)[] = [];
   private avisoTimer: any;
 
+  constructor() {
+    effect(() => {
+      const clave = this.claveCarrito();
+      untracked(() => this.cotizarCarrito(clave));
+    });
+  }
+
+  private cotizarCarrito(clave: string) {
+    clearTimeout(this.esperaCotizacion);
+    const items = this.carrito().map(i => ({ id_producto: i.id_producto, cantidad: i.cantidad }));
+    if (!items.length || !this.codigo) return;
+    this.esperaCotizacion = setTimeout(() =>
+      this.http.post<Cotizacion>(`${this.api}/${this.codigo}/cotizar`, { items }).subscribe({
+        next: (datos) => this.cotizacionGuardada.set({ clave, datos })
+      }), 250);
+  }
+
   // ─── Ciclo de vida ───
   ngOnInit() {
     this.codigo = this.route.snapshot.paramMap.get('codigo') || '';
@@ -157,6 +191,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.socket?.disconnect();
     this.timers.forEach(detener => detener());
     clearTimeout(this.avisoTimer);
+    clearTimeout(this.esperaCotizacion);
   }
 
   // ─── Carga ───
@@ -183,6 +218,9 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   }
 
   cargarCatalogo(alTerminar?: () => void) {
+    this.http.get<{ nombre: string; texto: string }[]>(`${this.api}/${this.codigo}/promociones`).subscribe({
+      next: (p) => this.promociones.set(p)
+    });
     this.http.get<any[]>(`${this.api}/${this.codigo}/catalogo`).subscribe({
       next: (items) => {
         const catalogo = items.map(p => ({ ...p, stock_actual: Number(p.stock_actual) || 0 }));
@@ -200,6 +238,8 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
         }));
         if (retirados.length) this.mostrarAviso(`Ya no está disponible: ${retirados.join(', ')}`);
         this.ajustarCarritoAlStock();
+        this.cotizacionGuardada.set(null);
+        this.cotizarCarrito(this.claveCarrito());
 
         alTerminar?.();
       },

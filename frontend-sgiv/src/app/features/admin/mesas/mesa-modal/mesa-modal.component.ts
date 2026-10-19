@@ -9,10 +9,10 @@ import { TicketComponent } from '../../../shared/ticket/ticket.component';
 import { AjustesService } from '../../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../../core/services/impresion.service';
 import { cifra } from '../../../../core/utils/informe';
-import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User } from 'lucide-angular';
+import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent } from 'lucide-angular';
 import { DialogoService } from '../../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
-import { Cotizacion, PromocionService } from '../../../../core/services/promocion.service';
+import { Cotizacion, DescuentoManual, PromocionService } from '../../../../core/services/promocion.service';
 import { SesionService } from '../../../../core/services/sesion.service';
 
 /** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
@@ -54,7 +54,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   readonly icons = {
     cerrar: X, buscar: Search, quitar: Trash2, carrito: ShoppingCart, efectivo: Banknote,
-    qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User
+    qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User, descuento: BadgePercent
   };
 
   readonly esAdmin = this.sesion.esAdmin;
@@ -87,6 +87,14 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   /** Lo que se cobra en este momento (toda la cuenta o la parte de una persona) */
   readonly cotizacionPago = signal<Cotizacion | null>(null);
+
+  // ─── Descuento manual al cobrar ───
+  readonly descuento          = signal<DescuentoManual | null>(null);
+  readonly editandoDescuento  = signal(false);
+  readonly formDescuento      = signal<DescuentoManual>({ tipo: 'PORCENTAJE', valor: 0, motivo: '' });
+  readonly errorDescuento     = signal('');
+  readonly aplicandoDescuento = signal(false);
+  readonly descuentoMax = computed(() => this.cotizacionPago()?.descuento_max ?? null);
 
   // ─── Cobro por separado ───
   /** null = cobrar todo lo pendiente */
@@ -321,6 +329,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   irAPago(parte: GrupoCuenta | null = null) {
     this.parteCobro.set(parte);
     this.cotizacionPago.set(null);
+    this.descuento.set(null);
+    this.editandoDescuento.set(false);
     this.promociones.cotizarCuenta(this.cuentaActiva().id_cuenta, parte ? parte.clave : undefined).subscribe({
       next: (c) => { if (this.parteCobro() === parte) this.cotizacionPago.set(c); }
     });
@@ -333,6 +343,35 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     }, 60);
   }
 
+  abrirDescuento() {
+    this.formDescuento.set({ tipo: 'PORCENTAJE', valor: 0, motivo: '' });
+    this.errorDescuento.set('');
+    this.editandoDescuento.set(true);
+  }
+
+  /** Se valida con el backend (tope del cajero, total) antes de aplicarlo */
+  aplicarDescuento(d: DescuentoManual | null) {
+    if (d) {
+      d = { ...d, valor: Number(d.valor) };
+      if (!(d.valor > 0)) return this.errorDescuento.set('Indica el descuento.');
+      if (d.motivo.trim().length < 3) return this.errorDescuento.set('Indica el motivo del descuento.');
+    }
+    const parte = this.parteCobro();
+    this.aplicandoDescuento.set(true);
+    this.promociones.cotizarCuenta(this.cuentaActiva().id_cuenta, parte ? parte.clave : undefined, d).subscribe({
+      next: (c) => {
+        this.aplicandoDescuento.set(false);
+        this.descuento.set(d);
+        this.cotizacionPago.set(c);
+        this.editandoDescuento.set(false);
+      },
+      error: (e) => {
+        this.aplicandoDescuento.set(false);
+        this.errorDescuento.set(e?.error?.detalle || e?.error?.error || 'No se pudo aplicar el descuento.');
+      }
+    });
+  }
+
   confirmarPago() {
     const totalReq = this.totalCobro();
     const metodo = this.metodoPago();
@@ -342,7 +381,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
     const parte = this.parteCobro();
     this.cargando.set(true);
-    this.cuentaService.cerrarCuenta(this.cuentaActiva().id_cuenta, metodo, parte ? parte.clave : undefined).subscribe({
+    this.cuentaService.cerrarCuenta(this.cuentaActiva().id_cuenta, metodo, parte ? parte.clave : undefined, this.descuento()).subscribe({
       next: (res: any) => {
         this.cuentaCerrada.set(res.cuenta_cerrada !== false);
         const cot: Cotizacion | undefined = res.cotizacion;
@@ -358,6 +397,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
             : (parte ? parte.items.filter(i => !i.pagado) : this.itemsPendientes()),
           total:        res.total ?? totalReq,
           descuento_promociones: cot?.descuento_promociones || 0,
+          descuento_manual:      cot?.descuento_manual || 0,
+          motivo_descuento:      this.descuento()?.motivo ?? null,
           metodo,
           cambio:       this.cambio()
         });
@@ -367,7 +408,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         this.mesaActualizada.emit();
       },
       error: (e: any) => {
-        this.dialogo.error(e?.error?.error || 'No se pudo cerrar la cuenta.');
+        this.dialogo.error(e?.error?.detalle || e?.error?.error || 'No se pudo cerrar la cuenta.');
         this.cargando.set(false);
       }
     });

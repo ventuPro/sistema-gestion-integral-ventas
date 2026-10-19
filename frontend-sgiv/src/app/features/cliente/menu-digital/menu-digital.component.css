@@ -379,3 +379,31 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   color: #0f172a;
   background: #fff;
 }
+
+/* ─── Promociones ─── */
+.promos { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 12px; }
+.promo {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--i-tinta);
+  background: color-mix(in oklab, var(--i-baja) 9%, var(--i-papel));
+  border: 1px solid color-mix(in oklab, var(--i-baja) 25%, transparent);
+}
+.promo lucide-icon { color: var(--i-baja); margin-top: 1px; }
+.etiqueta-promo {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--i-baja);
+}
+.precio-antes { font-size: 12px; font-weight: 500; color: var(--i-sutil); margin-right: 4px; }

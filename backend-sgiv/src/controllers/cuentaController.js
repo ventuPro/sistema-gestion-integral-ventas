@@ -165,15 +165,21 @@ const cerrarCuenta = async (req, res) => {
     }
 };
 
-// GET /api/cuentas/:id_cuenta/cotizacion?cliente_mesa=  lo pendiente con promociones (no registra nada)
+// GET  /api/cuentas/:id_cuenta/cotizacion?cliente_mesa=
+// POST /api/cuentas/:id_cuenta/cotizar { cliente_mesa?, descuento? }
+// Lo pendiente con promociones y descuento manual (no registra nada)
 const cotizarCuenta = async (req, res) => {
     try {
-        const parte = leerParte(req.query);
+        const datos = req.method === 'POST' ? (req.body || {}) : req.query;
+        const parte = leerParte(datos);
         if (parte === false) return res.status(400).json({ error: 'Cliente inválido' });
-        const r = await cuentaModel.cotizarCuenta(Number(req.params.id_cuenta), parte);
+        const descuento_max = await ajusteModel.topeDescuento(req.usuario);
+        const r = await cuentaModel.cotizarCuenta(Number(req.params.id_cuenta), parte,
+                                                  { descuento: datos.descuento || null, maxDescuentoPct: descuento_max });
         if (!r) return res.status(404).json({ error: 'No hay cuenta activa en esta mesa' });
-        res.json({ ...r, descuento_max: await ajusteModel.topeDescuento(req.usuario) });
+        res.json({ ...r, descuento_max });
     } catch (e) {
+        if (e.code === 'DESCUENTO_INVALIDO') return res.status(400).json({ error: e.code, detalle: e.message });
         console.error('cotizarCuenta:', e);
         res.status(500).json({ error: 'No se pudo calcular el total.' });
     }
