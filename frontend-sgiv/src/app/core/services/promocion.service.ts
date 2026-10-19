@@ -73,8 +73,6 @@ export interface Cotizacion {
   descuento_promociones: number;
   descuento_manual:      number;
   total:                 number;
-  /** Tope del descuento manual en %; null = sin tope (administrador) */
-  descuento_max?:        number | null;
 }
 
 // ─── Promociones: gestión y cotización de carritos ───

@@ -350,8 +350,6 @@ CREATE TABLE configuracion (
     menu_max_pedidos_ip      INT NOT NULL DEFAULT 10 CHECK (menu_max_pedidos_ip BETWEEN 1 AND 100),
     -- Parámetros: inventario
     stock_minimo_defecto     INT NOT NULL DEFAULT 5  CHECK (stock_minimo_defecto BETWEEN 0 AND 10000),
-    -- Parámetros: descuento manual máximo del cajero (% de la venta)
-    descuento_max_cajero     INT NOT NULL DEFAULT 10 CHECK (descuento_max_cajero BETWEEN 0 AND 100),
     -- Parámetros: seguridad
     captcha_activo           BOOLEAN NOT NULL DEFAULT TRUE,
     login_max_intentos       INT NOT NULL DEFAULT 5  CHECK (login_max_intentos BETWEEN 3 AND 20),

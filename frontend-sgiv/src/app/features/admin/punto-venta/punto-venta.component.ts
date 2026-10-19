@@ -120,7 +120,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   });
   readonly cotizando = computed(() => this.carrito().length > 0 && !this.cotizacion());
   readonly total = computed(() => this.cotizacion()?.total ?? this.subtotal());
-  readonly descuentoMax = computed(() => this.cotizacionGuardada()?.datos.descuento_max ?? null);
 
   /** Línea cotizada por producto */
   readonly lineas = computed(() => new Map((this.cotizacion()?.items || []).map(l => [l.id_producto, l])));

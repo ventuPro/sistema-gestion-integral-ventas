@@ -18,19 +18,31 @@ const tocaAdmin = async (id_usuario_objetivo, id_rol_nuevo) => {
     return Number(r.rows[0]?.id_rol) === 1;
 };
 
+const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizarCorreo = (correo) => String(correo || '').trim().toLowerCase();
+
+/** Mensaje si el correo ya lo usa otro usuario (también los desactivados: la BD no admite repetidos) */
+const motivoCorreoOcupado = async (correo, excluir = null) => {
+    const otro = await userModel.correoEnUso(correo, excluir);
+    if (!otro) return null;
+    return `El correo ${correo} ya lo usa ${otro.nombre_completo}${otro.estado_activo ? '' : ' (usuario desactivado)'}.`;
+};
+
 const registrarUsuario = async (req, res) => {
     try {
-        const { id_sucursal, id_rol, nombre_completo, correo_electronico, contrasena } = req.body || {};
-        if (!nombre_completo || !correo_electronico || !contrasena || !id_rol)
+        const { id_sucursal, id_rol, nombre_completo, contrasena } = req.body || {};
+        const correo_electronico = normalizarCorreo(req.body?.correo_electronico);
+        if (!String(nombre_completo || '').trim() || !correo_electronico || !contrasena || !id_rol)
             return res.status(400).json({ error: 'Faltan datos obligatorios' });
+        if (!CORREO.test(correo_electronico)) return res.status(400).json({ error: 'El correo no es válido' });
         if (!esAdmin(req) && await tocaAdmin(null, id_rol))
             return res.status(403).json({ error: 'Solo un administrador puede crear administradores' });
-        const existente = await userModel.obtenerUsuarioPorCorreo(correo_electronico);
-        if (existente) return res.status(400).json({ error: 'El correo ya está registrado' });
+        const ocupado = await motivoCorreoOcupado(correo_electronico);
+        if (ocupado) return res.status(409).json({ error: ocupado });
 
         const salt           = await bcrypt.genSalt(10);
         const contrasena_hash = await bcrypt.hash(contrasena, salt);
-        const nuevoUsuario   = await userModel.crearUsuario({ id_sucursal, id_rol, nombre_completo, correo_electronico, contrasena_hash });
+        const nuevoUsuario   = await userModel.crearUsuario({ id_sucursal, id_rol, nombre_completo: String(nombre_completo).trim(), correo_electronico, contrasena_hash });
         res.status(201).json({ mensaje: 'Usuario creado', usuario: nuevoUsuario });
     } catch (e) {
         console.error('Error en registrarUsuario:', e);
@@ -75,7 +87,7 @@ const loginUsuario = async (req, res) => {
         if (!correo_electronico || !contrasena)
             return res.status(400).json({ error: 'Ingrese correo y contraseña' });
 
-        const correo = String(correo_electronico).toLowerCase();
+        const correo = normalizarCorreo(correo_electronico);
         const p = await ajusteModel.parametros();
         const limite = { maxIntentos: p.login_max_intentos, ventanaMs: p.login_minutos_bloqueo * 60 * 1000 };
         if (p.captcha_activo && !captcha.verificar(id_captcha, respuestaCaptcha)) {
@@ -89,7 +101,7 @@ const loginUsuario = async (req, res) => {
             return res.status(429).json({ error: `Demasiados intentos fallidos. Intente de nuevo en ${p.login_minutos_bloqueo} minutos.` });
         }
 
-        const u = await userModel.obtenerUsuarioPorCorreo(correo_electronico);
+        const u = await userModel.obtenerUsuarioPorCorreo(correo);
         const valida = await bcrypt.compare(String(contrasena), u ? u.contrasena_hash : HASH_FICTICIO);
         if (!u || !valida) {
             registrarFallo(clave, limite);
@@ -161,11 +173,26 @@ const listarUsuarios = async (req, res) => {
 
 const actualizarUsuario = async (req, res) => {
     try {
-        if (!esAdmin(req) && await tocaAdmin(req.params.id, req.body?.id_rol))
+        const id = Number(req.params.id);
+        const nombre_completo = String(req.body?.nombre_completo || '').trim();
+        const correo_electronico = normalizarCorreo(req.body?.correo_electronico);
+        const { id_rol, id_sucursal } = req.body || {};
+        if (!nombre_completo || !correo_electronico || !id_rol || !id_sucursal)
+            return res.status(400).json({ error: 'Completa todos los campos' });
+        if (!CORREO.test(correo_electronico)) return res.status(400).json({ error: 'El correo no es válido' });
+        if (!esAdmin(req) && await tocaAdmin(id, id_rol))
             return res.status(403).json({ error: 'Solo un administrador puede modificar administradores' });
-        const usuario = await userModel.actualizarUsuario(req.params.id, req.body);
+        if (id === Number(req.usuario.id_usuario) && Number(id_rol) !== Number(req.usuario.id_rol))
+            return res.status(400).json({ error: 'No puedes cambiar tu propio rol' });
+        const ocupado = await motivoCorreoOcupado(correo_electronico, id);
+        if (ocupado) return res.status(409).json({ error: ocupado });
+        const usuario = await userModel.actualizarUsuario(id, { nombre_completo, correo_electronico, id_rol, id_sucursal });
+        if (!usuario) return res.status(404).json({ error: 'El usuario no existe' });
         res.json({ mensaje: 'Usuario actualizado', usuario });
     } catch (e) {
+        if (e.code === '23505') return res.status(409).json({ error: 'Ese correo ya lo usa otro usuario.' });
+        if (e.code === '23503') return res.status(400).json({ error: 'El rol o la sucursal no existen.' });
+        console.error('actualizarUsuario:', e);
         res.status(500).json({ error: 'Error al actualizar usuario' });
     }
 };

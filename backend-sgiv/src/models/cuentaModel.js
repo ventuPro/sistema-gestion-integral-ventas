@@ -248,8 +248,8 @@ const devolverStockCuenta = async (client, id_cuenta, id_usuario = null) => {
 // (cliente_mesa null = lo que cargó el cajero). Si ya no queda nada pendiente se
 // cierra la cuenta y se libera la mesa.
 // Las promociones vigentes se aplican al cobrar, sobre lo que se paga en este momento.
-// descuento: { tipo, valor, motivo } opcional; maxDescuentoPct = null → sin tope (administrador)
-const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = null, { descuento = null, maxDescuentoPct = null } = {}) => {
+// descuento: { tipo, valor, motivo } opcional
+const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = null, { descuento = null } = {}) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
@@ -281,7 +281,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
             id_sucursal: cuenta.id_sucursal,
             lineas: rItems.rows.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria, cantidad: Number(i.cantidad),
                                              precioCentavos: Math.round(Number(i.precio_unitario) * 100) })),
-            descuento, maxManualPct: maxDescuentoPct
+            descuento
         });
         const total = cot.totalCentavos / 100;
 
@@ -343,7 +343,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
 };
 
 // ─── Lo que falta cobrar de una cuenta, con las promociones vigentes (solo lectura) ───
-const cotizarCuenta = async (id_cuenta, parte = null, { descuento = null, maxDescuentoPct = null } = {}) => {
+const cotizarCuenta = async (id_cuenta, parte = null, { descuento = null } = {}) => {
     const client = await db.connect();
     try {
         const rCuenta = await client.query(`
@@ -360,7 +360,7 @@ const cotizarCuenta = async (id_cuenta, parte = null, { descuento = null, maxDes
             id_sucursal: rCuenta.rows[0].id_sucursal,
             lineas: rItems.rows.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria, cantidad: Number(i.cantidad),
                                              precioCentavos: Math.round(Number(i.precio_unitario) * 100) })),
-            descuento, maxManualPct: maxDescuentoPct
+            descuento
         });
         return promocionModel.enBolivianos(cot);
     } finally {

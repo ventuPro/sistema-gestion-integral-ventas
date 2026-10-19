@@ -191,24 +191,21 @@ describe('Promociones: precios al cobrar', () => {
 });
 
 describe('Descuento manual', () => {
-    test('el cajero tiene tope (10 % por defecto) y motivo obligatorio; el administrador no', async () => {
+    test('el cajero descuenta sin tope (90 % o casi todo en bolivianos) con motivo obligatorio', async () => {
         const cat = await crearCategoria('Manual');
         const id = await crearProducto('Alfajor', 100, cat);
         const det = [{ id_producto: id, cantidad: 1 }];
 
-        const ok = await cotizar(tCajero, det, { tipo: 'PORCENTAJE', valor: 10, motivo: 'Cliente frecuente' });
-        assert.equal(ok.status, 200);
-        assert.equal(ok.body.total, 90);
-        assert.equal(ok.body.descuento_max, 10);
-        assert.equal((await cotizar(tCajero, det, { tipo: 'PORCENTAJE', valor: 15, motivo: 'Mucho' })).status, 400);
+        const pct = await cotizar(tCajero, det, { tipo: 'PORCENTAJE', valor: 90, motivo: 'Cliente frecuente' });
+        assert.equal(pct.status, 200);
+        assert.equal(pct.body.total, 10);
+        const bs = await cotizar(tCajero, det, { tipo: 'MONTO', valor: 99.5, motivo: 'Casi todo' });
+        assert.equal(bs.body.total, 0.5);
+        assert.equal((await cotizar(tCajero, det, { tipo: 'MONTO', valor: 101, motivo: 'Más que el total' })).status, 400);
         assert.equal((await cotizar(tCajero, det, { tipo: 'MONTO', valor: 5, motivo: '' })).status, 400);
-
-        const admin = await cotizar(tAdmin, det, { tipo: 'PORCENTAJE', valor: 50, motivo: 'Autorizado' });
-        assert.equal(admin.body.total, 50);
-        assert.equal(admin.body.descuento_max, null);
     });
 
-    test('se guarda en la venta con su motivo y el tope sale de Ajustes', async () => {
+    test('se guarda en la venta con su motivo', async () => {
         const cat = await crearCategoria('Manual venta');
         const id = await crearProducto('Brazo gitano', 40, cat);
         const venta = await api('POST', '/caja/cobrar', { token: tCajero, body: {
@@ -218,10 +215,6 @@ describe('Descuento manual', () => {
         const [v] = await bd.sql(`SELECT descuento_manual::float8 AS d, motivo_descuento AS m FROM venta_caja WHERE id_venta = $1`, [venta.body.id_venta]);
         assert.deepEqual(v, { d: 4, m: 'Producto golpeado' });
 
-        assert.equal((await api('PUT', '/ajustes/parametros', { token: tAdmin, body: { descuento_max_cajero: 20 } })).status, 200);
-        const r = await cotizar(tCajero, [{ id_producto: id, cantidad: 1 }], { tipo: 'PORCENTAJE', valor: 20, motivo: 'Nuevo tope' });
-        assert.equal(r.status, 200);
-        await api('PUT', '/ajustes/parametros', { token: tAdmin, body: { descuento_max_cajero: 10 } });
     });
 });
 
@@ -256,8 +249,11 @@ describe('Promociones en mesas', () => {
         await api('POST', `/cuentas/${cuenta.id_cuenta}/producto`, { token: tCajero, body: { id_producto: id, cantidad: 5 } });
 
         const mucho = await api('POST', `/cuentas/${cuenta.id_cuenta}/cotizar`, { token: tCajero,
-            body: { descuento: { tipo: 'PORCENTAJE', valor: 30, motivo: 'Mucho' } } });
+            body: { descuento: { tipo: 'MONTO', valor: 150, motivo: 'Más que el total' } } });
         assert.equal(mucho.status, 400);
+        const casi = await api('POST', `/cuentas/${cuenta.id_cuenta}/cotizar`, { token: tCajero,
+            body: { descuento: { tipo: 'PORCENTAJE', valor: 90, motivo: 'Cumpleaños' } } });
+        assert.equal(casi.body.total, 10);
         const ok = await api('POST', `/cuentas/${cuenta.id_cuenta}/cotizar`, { token: tCajero,
             body: { descuento: { tipo: 'MONTO', valor: 10, motivo: 'Cumpleaños' } } });
         assert.equal(ok.body.total, 90);

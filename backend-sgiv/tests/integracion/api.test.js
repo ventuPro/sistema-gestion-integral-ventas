@@ -333,3 +333,41 @@ describe('Mesas y cuentas', () => {
         assert.equal(mesa.estado_mesa, 'Libre');
     });
 });
+
+// ─── Usuarios: correos repetidos y datos inválidos dan un mensaje claro ───
+describe('Usuarios: edición y correos', () => {
+    test('editar con el correo de otro usuario explica el motivo (409) y con uno libre funciona', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        const id = await crearUsuario('editar.correo@prueba.com', 2);
+        await crearUsuario('ocupado@prueba.com', 2);
+        const datos = (correo) => ({ nombre_completo: 'Editar Correo', correo_electronico: correo, id_rol: 2, id_sucursal: 1 });
+
+        const repetido = await api('PUT', `/usuarios/${id}`, { token: tAdmin, body: datos('OCUPADO@prueba.com') });
+        assert.equal(repetido.status, 409);
+        assert.match(repetido.body.error, /ocupado@prueba\.com ya lo usa/);
+
+        assert.equal((await api('PUT', `/usuarios/${id}`, { token: tAdmin, body: datos('no-es-correo') })).status, 400);
+        const ok = await api('PUT', `/usuarios/${id}`, { token: tAdmin, body: datos('  Nuevo.Correo@Prueba.com ') });
+        assert.equal(ok.status, 200);
+        assert.equal(ok.body.usuario.correo_electronico, 'nuevo.correo@prueba.com');
+        assert.ok(await login('NUEVO.correo@prueba.com'), 'el login no distingue mayúsculas');
+    });
+
+    test('crear con el correo de un usuario desactivado explica el motivo', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        const id = await crearUsuario('desactivado.correo@prueba.com', 2);
+        await api('PATCH', `/usuarios/${id}/desactivar`, { token: tAdmin });
+        const r = await api('POST', '/usuarios/registro', { token: tAdmin, body: {
+            nombre_completo: 'Otro', correo_electronico: 'desactivado.correo@prueba.com', contrasena: 'Clave123', id_rol: 2, id_sucursal: 1 } });
+        assert.equal(r.status, 409);
+        assert.match(r.body.error, /usuario desactivado/);
+    });
+
+    test('nadie puede cambiar su propio rol', async () => {
+        const id = await crearUsuario('admin.propio@prueba.com', 1);
+        const t = await login('admin.propio@prueba.com');
+        const r = await api('PUT', `/usuarios/${id}`, { token: t, body: {
+            nombre_completo: 'Admin propio', correo_electronico: 'admin.propio@prueba.com', id_rol: 2, id_sucursal: 1 } });
+        assert.equal(r.status, 400);
+    });
+});

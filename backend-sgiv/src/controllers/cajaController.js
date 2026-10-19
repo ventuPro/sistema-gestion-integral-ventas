@@ -170,8 +170,7 @@ const getCierresCaja = async (req, res) => {
 
 const cobrarVenta = async (req, res) => {
     try {
-        const datos = { ...req.body, id_usuario_cajero: req.usuario.id_usuario,
-                        maxDescuentoPct: await ajusteModel.topeDescuento(req.usuario) };
+        const datos = { ...req.body, id_usuario_cajero: req.usuario.id_usuario };
         const motivo = await ajusteModel.motivoMetodoPago(datos.metodo_pago);
         if (motivo) return res.status(400).json({ error: 'VENTA_INVALIDA', detalle: motivo });
         const { id_venta, cambiosStock, cotizacion } = await cajaModel.registrarVenta(datos);
@@ -226,15 +225,14 @@ const cotizarVenta = async (req, res) => {
     const client = await db.connect();
     try {
         const id_sucursal = sucursalDe(req, req.body?.id_sucursal);
-        const descuento_max = await ajusteModel.topeDescuento(req.usuario);
         const items = await cajaModel.calcularItemsVenta(client, req.body?.detalles);
         const cot = await promocionModel.cotizar(client, {
             id_sucursal,
             lineas: items.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria,
                                       cantidad: i.cantidad, precioCentavos: Math.round(i.precio * 100) })),
-            descuento: req.body?.descuento || null, maxManualPct: descuento_max
+            descuento: req.body?.descuento || null
         });
-        res.json({ ...promocionModel.enBolivianos(cot), descuento_max });
+        res.json(promocionModel.enBolivianos(cot));
     } catch (e) {
         if (e.code === 'VENTA_INVALIDA' || e.code === 'DESCUENTO_INVALIDO')
             return res.status(400).json({ error: e.code, detalle: e.message });

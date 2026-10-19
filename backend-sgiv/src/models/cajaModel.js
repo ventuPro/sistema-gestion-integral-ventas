@@ -471,11 +471,11 @@ const calcularItemsVenta = async (client, detalles) => {
     });
 };
 
-// descuento: { tipo, valor, motivo } opcional; maxDescuentoPct = null → sin tope (administrador)
+// descuento: { tipo, valor, motivo } opcional
 const registrarVenta = async ({
     id_sucursal, id_usuario_cajero, id_cliente,
     id_pedido_mesa, monto_total_venta, metodo_pago, detalles,
-    descuento = null, maxDescuentoPct = null
+    descuento = null
 }) => {
     const client = await db.connect();
     try {
@@ -499,7 +499,7 @@ const registrarVenta = async ({
             id_sucursal: Number(id_sucursal),
             lineas: items.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria,
                                       cantidad: i.cantidad, precioCentavos: Math.round(i.precio * 100) })),
-            descuento, maxManualPct: maxDescuentoPct
+            descuento
         });
         const totalCentavos = cot.totalCentavos;
         const totalCliente  = Math.round(Number(monto_total_venta) * 100);

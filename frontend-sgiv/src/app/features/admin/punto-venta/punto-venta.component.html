@@ -307,7 +307,6 @@
         <div>
           <p class="inf-etiqueta mb-2">
             {{ formDescuento().tipo === 'PORCENTAJE' ? 'Porcentaje' : 'Monto' }}
-            @if (descuentoMax() !== null) { <span class="inf-sutil font-normal">· máx. {{ descuentoMax() }} %</span> }
           </p>
           <div class="campo-monto">
             <span>{{ formDescuento().tipo === 'PORCENTAJE' ? '%' : moneda() }}</span>

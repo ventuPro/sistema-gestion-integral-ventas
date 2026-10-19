@@ -94,7 +94,6 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly formDescuento      = signal<DescuentoManual>({ tipo: 'PORCENTAJE', valor: 0, motivo: '' });
   readonly errorDescuento     = signal('');
   readonly aplicandoDescuento = signal(false);
-  readonly descuentoMax = computed(() => this.cotizacionPago()?.descuento_max ?? null);
 
   // ─── Cobro por separado ───
   /** null = cobrar todo lo pendiente */

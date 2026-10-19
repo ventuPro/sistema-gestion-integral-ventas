@@ -172,8 +172,8 @@ const MIGRACIONES = [
         ADD COLUMN IF NOT EXISTS descuento_promocion DECIMAL(10, 2) NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS descuento_manual    DECIMAL(10, 2) NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS id_promocion        INT REFERENCES promocion(id_promocion);
-    ALTER TABLE configuracion
-        ADD COLUMN IF NOT EXISTS descuento_max_cajero INT NOT NULL DEFAULT 10 CHECK (descuento_max_cajero BETWEEN 0 AND 100);
+    -- Sin tope para el descuento manual (el parámetro existió unos días)
+    ALTER TABLE configuracion DROP COLUMN IF EXISTS descuento_max_cajero;
     CREATE INDEX IF NOT EXISTS idx_promocion_vigencia      ON promocion (estado_activo, fecha_inicio, fecha_fin);
     CREATE INDEX IF NOT EXISTS idx_promocion_sucursal      ON promocion (id_sucursal);
     CREATE INDEX IF NOT EXISTS idx_promocion_producto_prod ON promocion_producto (id_producto);

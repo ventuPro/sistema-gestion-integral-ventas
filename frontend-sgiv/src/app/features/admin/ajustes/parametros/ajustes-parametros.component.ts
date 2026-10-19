@@ -18,7 +18,6 @@ interface Parametros {
   menu_max_pendientes_mesa: number;
   menu_max_pedidos_ip: number;
   stock_minimo_defecto: number;
-  descuento_max_cajero: number;
   captcha_activo: boolean;
   login_max_intentos: number;
   login_minutos_bloqueo: number;
@@ -29,7 +28,7 @@ interface Parametros {
 const ORIGINALES: Parametros = {
   moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80',
   menu_activo: true, menu_mensaje_bienvenida: '', menu_minutos_expiracion: 15, menu_max_pendientes_mesa: 3,
-  menu_max_pedidos_ip: 10, stock_minimo_defecto: 5, descuento_max_cajero: 10, captcha_activo: true, login_max_intentos: 5,
+  menu_max_pedidos_ip: 10, stock_minimo_defecto: 5, captcha_activo: true, login_max_intentos: 5,
   login_minutos_bloqueo: 15, sesion_horas: 8
 };
 
@@ -150,8 +149,7 @@ export class AjustesParametrosComponent implements OnInit {
 
   guardar() {
     const fuera = [...this.camposMenu, ...this.camposSeguridad,
-                   { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo por defecto', min: 0, max: 10000 } as CampoNumero,
-                   { clave: 'descuento_max_cajero', etiqueta: 'Descuento máximo del cajero', min: 0, max: 100 } as CampoNumero]
+                   { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo por defecto', min: 0, max: 10000 } as CampoNumero]
       .find(c => { const n = Number(this.p()[c.clave]); return !Number.isInteger(n) || n < c.min || n > c.max; });
     if (fuera) return this.dialogo.error(`${fuera.etiqueta}: debe ser un número entero entre ${fuera.min} y ${fuera.max}.`);
     if (!this.p().moneda_simbolo.trim()) return this.dialogo.error('El símbolo de moneda es obligatorio.');

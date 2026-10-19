@@ -117,8 +117,8 @@ const aplicarPromociones = (lineas, promos) => {
 };
 
 // ─── Descuento manual del cajero ───
-// descuento: { tipo: 'PORCENTAJE' | 'MONTO', valor, motivo }; maxPct = null → sin tope (administrador)
-const descuentoManual = (totalCentavos, descuento, maxPct) => {
+// descuento: { tipo: 'PORCENTAJE' | 'MONTO', valor, motivo }; sin tope: nunca más que el total
+const descuentoManual = (totalCentavos, descuento) => {
     if (!descuento || !Number(descuento.valor)) return { centavos: 0, motivo: null };
     const valor  = Number(descuento.valor);
     const motivo = String(descuento.motivo || '').replace(/\s+/g, ' ').trim();
@@ -129,8 +129,6 @@ const descuentoManual = (totalCentavos, descuento, maxPct) => {
     if (motivo.length > 120) throw invalido('El motivo admite hasta 120 caracteres.');
     const centavos = descuento.tipo === 'PORCENTAJE' ? Math.round(totalCentavos * valor / 100) : Math.round(valor * 100);
     if (centavos > totalCentavos) throw invalido('El descuento no puede superar el total de la venta.');
-    if (maxPct !== null && maxPct !== undefined && centavos > Math.round(totalCentavos * maxPct / 100))
-        throw invalido(`El descuento máximo permitido es ${maxPct} % de la venta.`);
     return { centavos, motivo };
 };
 
@@ -203,11 +201,11 @@ const promocionDeProducto = (prod, vigentes) => {
 };
 
 /** Precios finales de un carrito: promociones vigentes de la sucursal + descuento manual */
-const cotizar = async (client, { id_sucursal, lineas, descuento = null, maxManualPct = null }) => {
+const cotizar = async (client, { id_sucursal, lineas, descuento = null }) => {
     const conPromo = aplicarPromociones(lineas, await vigentes(client, id_sucursal));
     const bruto  = conPromo.reduce((s, l) => s + l.brutoCentavos, 0);
     const promo  = conPromo.reduce((s, l) => s + l.descuentoPromoCentavos, 0);
-    const manual = descuentoManual(bruto - promo, descuento, maxManualPct);
+    const manual = descuentoManual(bruto - promo, descuento);
     const partes = repartir(manual.centavos, conPromo.map(l => l.brutoCentavos - l.descuentoPromoCentavos));
     conPromo.forEach((l, i) => {
         l.descuentoManualCentavos = partes[i] || 0;

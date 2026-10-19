@@ -12,10 +12,20 @@ const crearUsuario = async (userData) => {
 
 const obtenerUsuarioPorCorreo = async (correo) => {
     const result = await db.query(
-        `SELECT * FROM usuario WHERE correo_electronico=$1 AND estado_activo=TRUE`,
+        `SELECT * FROM usuario WHERE lower(correo_electronico) = lower($1) AND estado_activo=TRUE`,
         [correo]
     );
     return result.rows[0];
+};
+
+/** Usuario (activo o no) que ya usa ese correo, sin contar a `excluir` */
+const correoEnUso = async (correo, excluir = null) => {
+    const r = await db.query(
+        `SELECT id_usuario, nombre_completo, estado_activo FROM usuario
+         WHERE lower(correo_electronico) = lower($1) AND ($2::int IS NULL OR id_usuario <> $2)`,
+        [correo, excluir]
+    );
+    return r.rows[0] || null;
 };
 
 /** Nombre y sucursal (sin datos de acceso) */
@@ -100,7 +110,7 @@ const obtenerSucursales = async () => {
 };
 
 module.exports = {
-    crearUsuario, obtenerUsuarioPorCorreo, obtenerPerfil, listarUsuarios,
+    crearUsuario, obtenerUsuarioPorCorreo, correoEnUso, obtenerPerfil, listarUsuarios,
     actualizarUsuario, desactivarUsuario, reactivarUsuario,
     cambiarContrasena, obtenerRoles, obtenerSucursales
 };

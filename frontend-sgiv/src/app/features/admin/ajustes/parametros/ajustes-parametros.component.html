@@ -45,9 +45,6 @@
           <input id="pie" name="pie" class="campo" [(ngModel)]="p().ticket_mensaje_pie" maxlength="150">
         </div>
 
-        <ng-container *ngTemplateOutlet="numero; context: { $implicit: { clave: 'descuento_max_cajero', etiqueta: 'Descuento máximo del cajero',
-                       unidad: '% de la venta', min: 0, max: 100 } }"></ng-container>
-
         <div class="grupo">
           <span class="inf-etiqueta">Ancho del ticket</span>
           <div class="grid grid-cols-3 gap-2">

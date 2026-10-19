@@ -134,9 +134,8 @@ const cerrarCuenta = async (req, res) => {
         const parte = leerParte(req.body);
         if (parte === false) return res.status(400).json({ error: 'Cliente inválido' });
 
-        const resultado = await cuentaModel.cerrarCuenta(id_cuenta, metodo_pago, req.usuario.id_usuario, parte, {
-            descuento: req.body?.descuento || null, maxDescuentoPct: await ajusteModel.topeDescuento(req.usuario)
-        });
+        const resultado = await cuentaModel.cerrarCuenta(id_cuenta, metodo_pago, req.usuario.id_usuario, parte,
+                                                         { descuento: req.body?.descuento || null });
         const { id_mesa } = resultado;
 
         if (resultado.cuenta_cerrada) {
@@ -173,11 +172,9 @@ const cotizarCuenta = async (req, res) => {
         const datos = req.method === 'POST' ? (req.body || {}) : req.query;
         const parte = leerParte(datos);
         if (parte === false) return res.status(400).json({ error: 'Cliente inválido' });
-        const descuento_max = await ajusteModel.topeDescuento(req.usuario);
-        const r = await cuentaModel.cotizarCuenta(Number(req.params.id_cuenta), parte,
-                                                  { descuento: datos.descuento || null, maxDescuentoPct: descuento_max });
+        const r = await cuentaModel.cotizarCuenta(Number(req.params.id_cuenta), parte, { descuento: datos.descuento || null });
         if (!r) return res.status(404).json({ error: 'No hay cuenta activa en esta mesa' });
-        res.json({ ...r, descuento_max });
+        res.json(r);
     } catch (e) {
         if (e.code === 'DESCUENTO_INVALIDO') return res.status(400).json({ error: e.code, detalle: e.message });
         console.error('cotizarCuenta:', e);

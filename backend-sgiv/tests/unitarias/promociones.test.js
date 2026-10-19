@@ -71,19 +71,18 @@ test('el descuento nunca supera el precio', () => {
 });
 
 // ─── Descuento manual ───
-test('descuento manual con tope del cajero', () => {
-    assert.deepEqual(descuentoManual(10000, { tipo: 'PORCENTAJE', valor: 10, motivo: 'Cliente frecuente' }, 10),
-                     { centavos: 1000, motivo: 'Cliente frecuente' });
-    assert.equal(descuentoManual(10000, { tipo: 'MONTO', valor: 5, motivo: 'Torta golpeada' }, 10).centavos, 500);
-    assert.throws(() => descuentoManual(10000, { tipo: 'PORCENTAJE', valor: 15, motivo: 'Mucho' }, 10), { code: 'DESCUENTO_INVALIDO' });
-    assert.throws(() => descuentoManual(10000, { tipo: 'MONTO', valor: 20, motivo: 'Mucho' }, 10), { code: 'DESCUENTO_INVALIDO' });
+test('descuento manual sin tope: en % o en bolivianos, hasta casi todo', () => {
+    assert.deepEqual(descuentoManual(10000, { tipo: 'PORCENTAJE', valor: 90, motivo: 'Cliente frecuente' }),
+                     { centavos: 9000, motivo: 'Cliente frecuente' });
+    assert.equal(descuentoManual(10000, { tipo: 'MONTO', valor: 99.5, motivo: 'Torta golpeada' }).centavos, 9950);
+    assert.equal(descuentoManual(10000, { tipo: 'PORCENTAJE', valor: 100, motivo: 'Cortesía' }).centavos, 10000);
 });
 
-test('descuento manual: motivo obligatorio, sin tope para el administrador, nunca más que el total', () => {
-    assert.throws(() => descuentoManual(10000, { tipo: 'PORCENTAJE', valor: 5, motivo: '' }, 10), { code: 'DESCUENTO_INVALIDO' });
-    assert.equal(descuentoManual(10000, { tipo: 'PORCENTAJE', valor: 50, motivo: 'Autorizado' }, null).centavos, 5000);
-    assert.throws(() => descuentoManual(1000, { tipo: 'MONTO', valor: 11, motivo: 'Exceso' }, null), { code: 'DESCUENTO_INVALIDO' });
-    assert.deepEqual(descuentoManual(1000, null, 10), { centavos: 0, motivo: null });
+test('descuento manual: motivo obligatorio y nunca más que el total', () => {
+    assert.throws(() => descuentoManual(10000, { tipo: 'PORCENTAJE', valor: 5, motivo: '' }), { code: 'DESCUENTO_INVALIDO' });
+    assert.throws(() => descuentoManual(1000, { tipo: 'MONTO', valor: 11, motivo: 'Exceso' }), { code: 'DESCUENTO_INVALIDO' });
+    assert.throws(() => descuentoManual(1000, { tipo: 'PORCENTAJE', valor: 101, motivo: 'Exceso' }), { code: 'DESCUENTO_INVALIDO' });
+    assert.deepEqual(descuentoManual(1000, null), { centavos: 0, motivo: null });
 });
 
 // ─── Validación ───
