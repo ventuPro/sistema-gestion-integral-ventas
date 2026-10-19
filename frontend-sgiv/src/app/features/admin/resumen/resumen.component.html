@@ -107,6 +107,11 @@
         <p class="inf-valor" [class.inf-baja]="datos().stock?.agotados > 0">{{ alertasStock() }}</p>
         <p class="inf-sub">{{ datos().stock?.agotados || 0 }} agotados · {{ datos().stock?.bajos || 0 }} bajo mínimo</p>
       </div>
+      <div>
+        <p class="inf-etiqueta">Promociones</p>
+        <p class="inf-valor">{{ datos().promociones?.vigentes || 0 }} vigentes</p>
+        <p class="inf-sub">ahorro {{ moneda() }} {{ cifra(datos().promociones?.ahorro) }} · descuentos {{ moneda() }} {{ cifra(datos().promociones?.descuentos) }}</p>
+      </div>
     </section>
 
     <!-- Comparativo de sucursales -->

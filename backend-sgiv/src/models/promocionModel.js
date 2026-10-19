@@ -402,6 +402,6 @@ const eliminar = async (id) => {
 };
 
 module.exports = {
-    TIPOS, repartir, aplicarPromociones, descuentoManual, normalizar,
+    TIPOS, CONDICION_VIGENTE, repartir, aplicarPromociones, descuentoManual, normalizar,
     vigentes, vigentesDetalle, textoPromocion, promocionDeProducto, cotizar, enBolivianos, listar, obtener, guardar, cambiarEstado, eliminar
 };

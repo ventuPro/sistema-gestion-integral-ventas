@@ -389,11 +389,94 @@
       </div>
     </div>
 
+    <!-- 11 Promociones y descuentos -->
+    <section class="inf-hoja overflow-hidden">
+      <div class="px-5 pt-5">
+        <div class="inf-seccion mb-1!"><span class="inf-indice">11</span><h2>Promociones y descuentos</h2></div>
+      </div>
+      @if (hayDescuentos()) {
+        @let desc = descuentos();
+        <div class="inf-tira separador-inferior">
+          <div>
+            <p class="inf-etiqueta">Ahorro por promociones</p>
+            <p class="inf-valor">{{ moneda() }} {{ cifra(desc.resumen.promociones) }}</p>
+            <p class="inf-sub">{{ entero(desc.resumen.ventas_con_promocion) }} ventas</p>
+          </div>
+          <div>
+            <p class="inf-etiqueta">Descuentos manuales</p>
+            <p class="inf-valor">{{ moneda() }} {{ cifra(desc.resumen.manual) }}</p>
+            <p class="inf-sub">{{ entero(desc.resumen.ventas_con_descuento) }} ventas</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+          <div class="lg:col-span-3 min-w-0 lg:border-r separador-inferior lg:border-b-0">
+            @if (desc.promociones.length) {
+              <div class="overflow-x-auto">
+                <table class="inf-tabla">
+                  <thead><tr><th>Promoción</th><th class="num">Ventas</th><th class="num">Unidades</th><th class="num">Ahorro</th><th class="num">Ingresos</th></tr></thead>
+                  <tbody>
+                    @for (x of desc.promociones; track x.id_promocion) {
+                      <tr>
+                        <td><span class="fuerte">{{ x.nombre }}</span> <span class="inf-ficha ml-1">{{ etiquetaPromo(x) }}</span></td>
+                        <td class="num">{{ entero(x.ventas) }}</td>
+                        <td class="num">{{ entero(x.unidades) }}</td>
+                        <td class="num inf-sube">{{ moneda() }} {{ cifra(x.ahorro) }}</td>
+                        <td class="num fuerte">{{ moneda() }} {{ cifra(x.ingresos) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else { <p class="inf-vacio">Ninguna promoción se aplicó en el período.</p> }
+          </div>
+          <div class="lg:col-span-2 min-w-0">
+            @if (desc.por_cajero.length) {
+              <div class="overflow-x-auto">
+                <table class="inf-tabla">
+                  <thead><tr><th>Cajero</th><th class="num">Ventas</th><th class="num">Descontado</th></tr></thead>
+                  <tbody>
+                    @for (c of desc.por_cajero; track c.cajero) {
+                      <tr>
+                        <td class="fuerte">{{ c.cajero }}</td>
+                        <td class="num">{{ entero(c.ventas) }}</td>
+                        <td class="num">{{ moneda() }} {{ cifra(c.descuento) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else { <p class="inf-vacio">Sin descuentos manuales.</p> }
+          </div>
+        </div>
+        @if (desc.manuales.length) {
+          <div class="overflow-x-auto separador">
+            <table class="inf-tabla">
+              <thead><tr><th>Fecha</th><th>Cajero</th>@if (todas()) { <th>Sucursal</th> }<th>Motivo</th><th class="num">Descuento</th><th class="num">Cobrado</th></tr></thead>
+              <tbody>
+                @for (x of desc.manuales.slice(0, 20); track x.id_venta) {
+                  <tr>
+                    <td class="inf-tenue whitespace-nowrap">{{ fechaHora(x.fecha_venta) }}</td>
+                    <td>{{ x.cajero }}</td>
+                    @if (todas()) { <td>{{ x.nombre_sucursal }}</td> }
+                    <td class="max-w-[260px] truncate" [title]="x.motivo">{{ x.motivo }}</td>
+                    <td class="num">{{ moneda() }} {{ cifra(x.descuento) }}</td>
+                    <td class="num fuerte">{{ moneda() }} {{ cifra(x.cobrado) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      } @else {
+        <p class="inf-vacio">Sin promociones ni descuentos en el período.</p>
+      }
+    </section>
+
     <!-- 07 Detalle por día -->
     <section class="inf-hoja overflow-hidden">
       <div class="px-5 pt-5">
         <div class="inf-seccion mb-1!">
-          <span class="inf-indice">11</span><h2>Detalle por día</h2>
+          <span class="inf-indice">12</span><h2>Detalle por día</h2>
         </div>
       </div>
       <div class="overflow-x-auto">

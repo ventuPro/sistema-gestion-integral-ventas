@@ -9,6 +9,7 @@ import { ProductoService } from '../../../core/services/producto.service';
 import { SucursalService } from '../../../core/services/sucursal.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
+import { etiquetaPromocion } from '../../../core/services/promocion.service';
 import { cifra, entero, variacion, porcentaje, fechaCorta, fechaLarga, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
 import { SesionService } from '../../../core/services/sesion.service';
 
@@ -302,6 +303,14 @@ export class ReportesComponent implements OnInit, OnDestroy {
     };
   });
 
+  /** Promociones aplicadas y descuentos manuales del período */
+  readonly descuentos = computed(() => this.datos()?.descuentos ?? null);
+  readonly hayDescuentos = computed(() => {
+    const r = this.descuentos()?.resumen;
+    return !!r && (r.promociones > 0 || r.manual > 0);
+  });
+  etiquetaPromo(p: any): string { return etiquetaPromocion(p, this.moneda()); }
+
   readonly totalTurnos     = computed(() => (this.datos()?.cierres || []).reduce((s: number, t: any) => s + t.total, 0));
   readonly maxCategoria    = computed(() => Math.max(1, ...(this.datos()?.por_categoria || []).map((c: any) => c.ingresos)));
   readonly tasaCancelacion = computed(() => porcentaje(this.datos()?.pedidos_qr?.cancelados, this.datos()?.pedidos_qr?.total));
@@ -508,6 +517,24 @@ export class ReportesComponent implements OnInit, OnDestroy {
         d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal, fechaHora(c.fecha_hora_cierre), c.ventas, m(c.efectivo), m(c.total),
           c.diferencia === null ? 'sin conteo' : m(c.diferencia)]), [3, 4, 5, 6]);
     }
+    const desc = d.descuentos;
+    if (desc && (desc.resumen.promociones > 0 || desc.resumen.manual > 0)) {
+      seccion('Promociones y descuentos');
+      tabla(['Concepto', 'Ventas', 'Monto'], [
+        ['Ahorro por promociones', desc.resumen.ventas_con_promocion, m(desc.resumen.promociones)],
+        ['Descuentos manuales', desc.resumen.ventas_con_descuento, m(desc.resumen.manual)]
+      ], [1, 2]);
+      if (desc.promociones.length) {
+        seccion('Promociones aplicadas');
+        tabla(['Promoción', 'Descuento', 'Ventas', 'Unidades', 'Ahorro', 'Ingresos'],
+          desc.promociones.map((x: any) => [x.nombre, this.etiquetaPromo(x), x.ventas, x.unidades, m(x.ahorro), m(x.ingresos)]), [2, 3, 4, 5]);
+      }
+      if (desc.manuales.length) {
+        seccion('Descuentos manuales');
+        tabla(['Fecha', 'Cajero', 'Sucursal', 'Motivo', 'Descuento', 'Cobrado'],
+          desc.manuales.map((x: any) => [fechaHora(x.fecha_venta), x.cajero, x.nombre_sucursal, x.motivo || '', m(x.descuento), m(x.cobrado)]), [4, 5]);
+      }
+    }
     if (d.sin_ventas?.length) {
       seccion('Productos activos sin ventas en el período');
       tabla(['Producto', 'Categoría', 'Stock actual', 'Valor en stock'],
@@ -579,6 +606,14 @@ export class ReportesComponent implements OnInit, OnDestroy {
     hoja('Turnos de caja', [['Cajero', 'Sucursal', 'Apertura', 'Cierre', `Fondo inicial (${mon})`, 'Ventas', `Efectivo (${mon})`, `Total (${mon})`, `Esperado en caja (${mon})`, `Contado (${mon})`, `Diferencia (${mon})`],
       ...d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal, fechaHora(c.fecha_hora_apertura), fechaHora(c.fecha_hora_cierre), c.monto_inicial, c.ventas, c.efectivo, c.total,
         c.efectivo_esperado ?? '', c.efectivo_contado ?? '', c.diferencia ?? ''])], [24, 18, 20, 20, 16, 8, 14, 14, 18, 14, 14]);
+
+    if (d.descuentos) {
+      hoja('Promociones', [['Promoción', 'Descuento', 'Ventas', 'Unidades', `Ahorro (${mon})`, `Ingresos (${mon})`],
+        ...d.descuentos.promociones.map((x: any) => [x.nombre, this.etiquetaPromo(x), x.ventas, x.unidades, x.ahorro, x.ingresos])], [28, 14, 8, 10, 14, 14]);
+      hoja('Descuentos manuales', [['Fecha', 'Cajero', 'Sucursal', 'Motivo', `Descuento (${mon})`, `Cobrado (${mon})`],
+        ...d.descuentos.manuales.map((x: any) => [fechaHora(x.fecha_venta), x.cajero, x.nombre_sucursal, x.motivo || '', x.descuento, x.cobrado])],
+        [18, 24, 18, 36, 16, 14]);
+    }
 
     XLSX.writeFile(wb, `Informe_${this.nombreArchivo}_${this.fechaInicio()}_${this.fechaFin()}.xlsx`);
   }

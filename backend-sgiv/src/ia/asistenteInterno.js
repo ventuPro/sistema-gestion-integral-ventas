@@ -6,6 +6,7 @@ const cajaModel     = require('../models/cajaModel');
 const sucursalModel = require('../models/sucursalModel');
 const permisoModel  = require('../models/permisoModel');
 const userModel     = require('../models/userModel');
+const promocionModel = require('../models/promocionModel');
 const { guiasPermitidas } = require('./conocimiento');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const groq          = require('./groq');
@@ -45,7 +46,7 @@ const crearHerramientas = ({ usuario, esAdmin, permisos, guias }) => {
     };
 
     if (puede('dashboard')) h.ventas_de_hoy = {
-        descripcion: 'Ventas de hoy: ingresos, cantidad de ventas, ticket promedio, comparación con ayer, cobros por método, más vendidos, turnos de caja abiertos, mesas por cobrar, pedidos QR y resumen de stock.',
+        descripcion: 'Ventas de hoy: ingresos, cantidad de ventas, ticket promedio, comparación con ayer, cobros por método, más vendidos, turnos de caja abiertos, mesas por cobrar, pedidos QR, resumen de stock y lo ahorrado con promociones y descuentos manuales.',
         parametros: { type: 'object', properties: parametroSucursal(esAdmin, 'Sucursal (omitir = todas).') },
         ejecutar: async ({ id_sucursal } = {}) => {
             const id = sucursal(id_sucursal);
@@ -55,13 +56,15 @@ const crearHerramientas = ({ usuario, esAdmin, permisos, guias }) => {
                 mas_vendidos: p.top_productos.slice(0, 5), turnos_abiertos: p.turnos_abiertos.map(t => ({
                     cajero: t.cajero, sucursal: t.nombre_sucursal, apertura: t.fecha_hora_apertura,
                     fondo_inicial: t.monto_inicial, ventas: t.ventas, total: t.total, efectivo_cobrado: t.efectivo })),
-                mesas: p.mesas, pedidos_qr: p.pedidos_qr, stock: p.stock
+                mesas: p.mesas, pedidos_qr: p.pedidos_qr, stock: p.stock,
+                promociones: { vigentes_ahora: p.promociones.vigentes, ahorro_hoy: p.promociones.ahorro,
+                               descuentos_manuales_hoy: p.promociones.descuentos, ventas_con_descuento: p.promociones.ventas_con_descuento }
             };
         }
     };
 
     if (puede('reportes')) h.informe_periodo = {
-        descripcion: 'Informe de ventas entre dos fechas (inclusive): totales, comparación con el período anterior, mejor día, métodos de pago, cajeros, categorías, productos más y menos vendidos, inventario y pedidos QR.',
+        descripcion: 'Informe de ventas entre dos fechas (inclusive): totales, comparación con el período anterior, mejor día, métodos de pago, cajeros, categorías, productos más y menos vendidos, inventario, pedidos QR, promociones aplicadas y descuentos manuales por cajero.',
         parametros: { type: 'object', required: ['fecha_inicio', 'fecha_fin'], properties: {
             fecha_inicio: { type: 'string', description: 'YYYY-MM-DD' },
             fecha_fin:    { type: 'string', description: 'YYYY-MM-DD' },
@@ -80,8 +83,25 @@ const crearHerramientas = ({ usuario, esAdmin, permisos, guias }) => {
                 metodos_pago: i.metodos_pago, por_cajero: i.por_cajero.slice(0, 10), por_sucursal: i.por_sucursal,
                 por_categoria: i.por_categoria.slice(0, 10).map(c => ({ categoria: c.nombre_categoria.trim(), unidades: c.unidades, ingresos: c.ingresos })),
                 mas_vendidos: i.productos.slice(0, 10).map(p => ({ producto: p.nombre_producto, unidades: p.unidades, ingresos: p.ingresos })),
-                productos_sin_ventas: i.sin_ventas.length, inventario: i.inventario, pedidos_qr: i.pedidos_qr
+                productos_sin_ventas: i.sin_ventas.length, inventario: i.inventario, pedidos_qr: i.pedidos_qr,
+                descuentos: {
+                    ...i.descuentos.resumen,
+                    por_promocion: i.descuentos.promociones.slice(0, 10).map(x => ({ promocion: x.nombre, ventas: x.ventas, unidades: x.unidades, ahorro: x.ahorro })),
+                    manuales_por_cajero: i.descuentos.por_cajero.slice(0, 10),
+                    ultimos_manuales: i.descuentos.manuales.slice(0, 10).map(m => ({ fecha: m.fecha_venta, cajero: m.cajero, descuento: m.descuento, motivo: m.motivo }))
+                }
             };
+        }
+    };
+
+    if (puede('promociones', 'punto_venta', 'mesas')) h.promociones_vigentes = {
+        descripcion: 'Promociones que valen ahora (se aplican solas al cobrar): nombre y en qué consisten.',
+        parametros: { type: 'object', properties: parametroSucursal(esAdmin, 'Sucursal (omitir = la del usuario).') },
+        ejecutar: async ({ id_sucursal } = {}) => {
+            const id = sucursal(id_sucursal, false);
+            const p = await ajusteModel.parametros();
+            const lista = await promocionModel.vigentesDetalle(id);
+            return { sucursal: await nombreSucursal(id), promociones: lista.map(v => promocionModel.textoPromocion(v, p.moneda_simbolo)) };
         }
     };
 

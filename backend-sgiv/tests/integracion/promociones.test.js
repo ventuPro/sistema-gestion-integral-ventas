@@ -321,3 +321,20 @@ describe('Promociones en el menú QR', () => {
         assert.equal(e.cuenta.id_cuenta, undefined);
     });
 });
+
+describe('Promociones en informes', () => {
+    test('el informe y el panel muestran lo ahorrado con promociones y los descuentos manuales', async () => {
+        const inf = await api('GET', `/reportes/periodo/1?fecha_inicio=${hoy}&fecha_fin=${hoy}`, { token: tAdmin });
+        assert.equal(inf.status, 200);
+        const d = inf.body.descuentos;
+        assert.ok(d.resumen.promociones > 0 && d.resumen.ventas_con_promocion > 0);
+        assert.ok(d.promociones.some(p => p.nombre === 'Tortas -20 %' && p.ahorro === 20 && p.unidades === 2));
+        assert.ok(d.por_cajero.some(c => c.cajero === 'cajero.promo@prueba.com' && c.descuento >= 4));
+        assert.ok(d.manuales.some(m => m.motivo === 'Producto golpeado' && m.descuento === 4));
+
+        const panel = await api('GET', '/reportes/dashboard-completo/1', { token: tAdmin });
+        assert.ok(panel.body.promociones.vigentes > 0);
+        assert.ok(panel.body.promociones.ahorro > 0);
+        assert.ok(panel.body.promociones.descuentos >= 4);
+    });
+});

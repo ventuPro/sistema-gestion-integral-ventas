@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { METODO_PAGO } = require('../utils/metodosPago');
+const { CONDICION_VIGENTE } = require('./promocionModel');
 
 // id_sucursal = 0 → todas las sucursales (solo administrador, lo controla el controlador)
 const deSucursal = (columna) => `($1::int = 0 OR ${columna} = $1)`;
@@ -20,7 +21,7 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
 
     const [
         hoy, ayerHora, ayerTotal, semanaHora, metodos, porHora, promedioHora, dias,
-        productos, turnos, mesas, pedidos, stock, stockCritico, ultimas, sucursales, cajas
+        productos, turnos, mesas, pedidos, stock, stockCritico, ultimas, sucursales, cajas, promociones
     ] = await Promise.all([
         filas(`
             SELECT COUNT(*)::int AS ventas,
@@ -149,7 +150,16 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
             ORDER BY ingresos DESC, s.nombre_sucursal
         `),
         !conCajas ? [] : filas(`SELECT DISTINCT id_sucursal FROM turno_caja WHERE estado_turno = 'Abierto'`)
-            .then(r => r.map(x => x.id_sucursal))
+            .then(r => r.map(x => x.id_sucursal)),
+        filas(`
+            SELECT (SELECT COUNT(*) FROM promocion p
+                    WHERE ($1::int = 0 OR p.id_sucursal IS NULL OR p.id_sucursal = $1) AND ${CONDICION_VIGENTE})::int AS vigentes,
+                   ROUND(COALESCE(SUM(v.descuento_promociones), 0), 2)::float8 AS ahorro,
+                   ROUND(COALESCE(SUM(v.descuento_manual), 0), 2)::float8 AS descuentos,
+                   COUNT(*) FILTER (WHERE v.descuento_manual > 0)::int AS ventas_con_descuento
+            FROM venta_caja v
+            WHERE ${deSucursal('v.id_sucursal')} AND v.fecha_venta >= CURRENT_DATE
+        `, p).then(r => r[0])
     ]);
 
     return {
@@ -165,7 +175,8 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
         stock, stock_critico: stockCritico,
         ultimas_ventas: ultimas,
         sucursales,
-        cajas_abiertas: cajas
+        cajas_abiertas: cajas,
+        promociones
     };
 };
 
@@ -357,8 +368,57 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
         cierres, inventario,
         pedidos_qr: pedidos,
         por_sucursal: sucursales,
-        filtro_categorias: filtra ? categorias : []
+        filtro_categorias: filtra ? categorias : [],
+        descuentos: await descuentosDelPeriodo(id_sucursal, inicio, fin)
     };
+};
+
+// Promociones aplicadas y descuentos manuales del período (sin filtro de categorías)
+const descuentosDelPeriodo = async (id_sucursal, inicio, fin) => {
+    const params = [id_sucursal, inicio, fin];
+    const enPeriodo = `${deSucursal('vc.id_sucursal')} AND vc.fecha_venta >= $2::date AND vc.fecha_venta < $3::date + 1`;
+    const [resumen, promociones, porCajero, manuales] = await Promise.all([
+        filas(`
+            SELECT ROUND(COALESCE(SUM(vc.descuento_promociones), 0), 2)::float8 AS promociones,
+                   ROUND(COALESCE(SUM(vc.descuento_manual), 0), 2)::float8 AS manual,
+                   COUNT(*) FILTER (WHERE vc.descuento_promociones > 0)::int AS ventas_con_promocion,
+                   COUNT(*) FILTER (WHERE vc.descuento_manual > 0)::int AS ventas_con_descuento
+            FROM venta_caja vc WHERE ${enPeriodo}
+        `, params).then(r => r[0]),
+        filas(`
+            SELECT pr.id_promocion, pr.nombre, pr.tipo, pr.valor::float8 AS valor, pr.lleva, pr.paga,
+                   COUNT(DISTINCT dv.id_venta)::int AS ventas,
+                   SUM(dv.cantidad_vendida)::int AS unidades,
+                   ROUND(SUM(dv.descuento_promocion), 2)::float8 AS ahorro,
+                   ROUND(SUM(dv.subtotal_venta), 2)::float8 AS ingresos
+            FROM venta_caja vc
+            JOIN detalle_venta dv ON dv.id_venta = vc.id_venta
+            JOIN promocion pr     ON pr.id_promocion = dv.id_promocion
+            WHERE ${enPeriodo}
+            GROUP BY pr.id_promocion
+            ORDER BY ahorro DESC
+        `, params),
+        filas(`
+            SELECT u.nombre_completo AS cajero, COUNT(*)::int AS ventas,
+                   ROUND(SUM(vc.descuento_manual), 2)::float8 AS descuento,
+                   ROUND(SUM(vc.monto_total_venta), 2)::float8 AS cobrado
+            FROM venta_caja vc JOIN usuario u ON u.id_usuario = vc.id_usuario_cajero
+            WHERE ${enPeriodo} AND vc.descuento_manual > 0
+            GROUP BY u.id_usuario, u.nombre_completo
+            ORDER BY descuento DESC
+        `, params),
+        filas(`
+            SELECT vc.id_venta, vc.fecha_venta, u.nombre_completo AS cajero, s.nombre_sucursal,
+                   vc.monto_total_venta::float8 AS cobrado, vc.descuento_manual::float8 AS descuento, vc.motivo_descuento AS motivo
+            FROM venta_caja vc
+            JOIN usuario  u ON u.id_usuario  = vc.id_usuario_cajero
+            JOIN sucursal s ON s.id_sucursal = vc.id_sucursal
+            WHERE ${enPeriodo} AND vc.descuento_manual > 0
+            ORDER BY vc.fecha_venta DESC
+            LIMIT 100
+        `, params)
+    ]);
+    return { resumen, promociones, por_cajero: porCajero, manuales };
 };
 
 // ─── Desglose de un día por categoría ───

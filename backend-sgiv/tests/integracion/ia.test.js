@@ -205,7 +205,7 @@ test('el asistente del personal exige sesión', async () => {
 
 test('al cajero solo se le ofrecen las funciones de sus permisos', async () => {
     assert.equal((await consultar(tokenCajero, 'Hola')).status, 200);
-    assert.deepEqual(funcionesOfrecidas(), ['ayuda_sistema', 'consultar_stock', 'estado_caja', 'pedidos_qr', 'ventas_de_hoy']);
+    assert.deepEqual(funcionesOfrecidas(), ['ayuda_sistema', 'consultar_stock', 'estado_caja', 'pedidos_qr', 'promociones_vigentes', 'ventas_de_hoy']);
     const temas = recibidas.at(-1).tools.find(t => t.function.name === 'ayuda_sistema').function.parameters.properties.tema.enum;
     assert.ok(!temas.includes('ajustes') && !temas.includes('usuarios') && temas.includes('arqueo'));
 
