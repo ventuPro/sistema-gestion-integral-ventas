@@ -1,0 +1,74 @@
+/* ─── Panel inferior (categorías y promociones) ─── */
+.fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+  animation: aparecer 180ms ease;
+}
+.panel {
+  width: 100%;
+  max-width: 28rem;
+  max-height: 82dvh;
+  overflow-y: auto;
+  padding: 8px 0 calc(20px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  background: var(--i-papel);
+  animation: deslizar 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.asa { width: 40px; height: 4px; margin: 4px auto 12px; border-radius: 999px; background: var(--i-linea); }
+.cabeza { display: flex; align-items: center; justify-content: space-between; padding: 0 20px 12px; }
+.cabeza h2 { font-size: 18px; font-weight: 700; color: var(--i-tinta); }
+.cerrar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--i-tenue); }
+.cerrar:active { background: var(--i-linea-suave); }
+
+.mosaicos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 16px; }
+.mosaico {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px;
+  border-radius: 14px;
+  text-align: left;
+  border: 1px solid var(--i-linea);
+  background: var(--i-fondo);
+  transition: transform 120ms ease;
+}
+.mosaico:active { transform: scale(0.97); }
+.mosaico.activo { border-color: var(--i-acento); box-shadow: 0 0 0 1px var(--i-acento); }
+.mosaico .emoji { font-size: 30px; line-height: 1.1; margin-bottom: 4px; }
+.mosaico .nombre { font-size: 14.5px; font-weight: 700; color: var(--i-tinta); }
+.mosaico .cantidad { font-size: 12px; color: var(--i-tenue); }
+
+/* Promociones: tonos festivos, nunca rojo */
+.promos { display: grid; gap: 10px; padding: 0 16px; }
+.promo {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, #f59e0b 35%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklab, #fbbf24 18%, var(--i-papel)), color-mix(in oklab, #10b981 12%, var(--i-papel)));
+}
+.promo .nombre { font-size: 15px; font-weight: 700; color: var(--i-tinta); }
+.promo .texto { margin-top: 2px; font-size: 13.5px; color: var(--i-texto); }
+.ver {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #059669;
+}
+
+@keyframes aparecer { from { opacity: 0; } }
+@keyframes deslizar { from { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .fondo, .panel { animation: none; }
+}

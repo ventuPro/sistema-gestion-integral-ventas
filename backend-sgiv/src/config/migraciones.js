@@ -178,7 +178,16 @@ const MIGRACIONES = [
     CREATE INDEX IF NOT EXISTS idx_promocion_sucursal      ON promocion (id_sucursal);
     CREATE INDEX IF NOT EXISTS idx_promocion_producto_prod ON promocion_producto (id_producto);
     CREATE INDEX IF NOT EXISTS idx_promocion_categoria_cat ON promocion_categoria (id_categoria);
-    CREATE INDEX IF NOT EXISTS idx_detalle_venta_promocion ON detalle_venta (id_promocion);`
+    CREATE INDEX IF NOT EXISTS idx_detalle_venta_promocion ON detalle_venta (id_promocion);`,
+
+    // Menú QR: orden de categorías (lo define el admin), ficha del producto y recomendados de la casa
+    `ALTER TABLE categoria_producto ADD COLUMN IF NOT EXISTS orden SMALLINT;
+    UPDATE categoria_producto SET orden = id_categoria WHERE orden IS NULL;
+    ALTER TABLE categoria_producto ALTER COLUMN orden SET DEFAULT 0, ALTER COLUMN orden SET NOT NULL;
+    ALTER TABLE producto
+        ADD COLUMN IF NOT EXISTS ingredientes TEXT,
+        ADD COLUMN IF NOT EXISTS preparacion  TEXT,
+        ADD COLUMN IF NOT EXISTS destacado    BOOLEAN NOT NULL DEFAULT FALSE;`
 ];
 
 const aplicarMigraciones = async () => {

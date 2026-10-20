@@ -1,10 +1,20 @@
 const db = require('../config/db');
 
+// Las nuevas van al final del orden del menú
 const crearCategoria    = async (nombre, desc) =>
-    (await db.query(`INSERT INTO categoria_producto(nombre_categoria,descripcion_categoria) VALUES($1,$2) RETURNING *`,[nombre,desc])).rows[0];
+    (await db.query(`INSERT INTO categoria_producto(nombre_categoria, descripcion_categoria, orden)
+                     VALUES($1, $2, (SELECT COALESCE(MAX(orden), 0) + 1 FROM categoria_producto)) RETURNING *`,
+                    [nombre, desc])).rows[0];
 
 const obtenerCategorias = async () =>
-    (await db.query(`SELECT * FROM categoria_producto ORDER BY nombre_categoria ASC`)).rows;
+    (await db.query(`SELECT * FROM categoria_producto ORDER BY orden, nombre_categoria`)).rows;
+
+/** ids en el orden nuevo; las que no vengan quedan después */
+const ordenarCategorias = async (ids) =>
+    (await db.query(`
+        UPDATE categoria_producto c
+           SET orden = COALESCE((SELECT n.pos FROM unnest($1::int[]) WITH ORDINALITY AS n(id, pos)
+                                  WHERE n.id = c.id_categoria LIMIT 1), 1000 + c.id_categoria)`, [ids])).rowCount;
 
 const obtenerCategoriaPorId = async (id) =>
     (await db.query(`SELECT * FROM categoria_producto WHERE id_categoria = $1`, [id])).rows[0];
@@ -19,11 +29,16 @@ const productosDeCategoria = async (id) =>
 const eliminarCategoria = async (id) =>
     (await db.query(`DELETE FROM categoria_producto WHERE id_categoria = $1 RETURNING *`, [id])).rows[0];
 
-const crearProducto = async ({ id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen }) => {
+// Campos que el admin edita (undefined = no cambia)
+const CAMPOS = ['id_categoria', 'nombre_producto', 'descripcion_producto', 'precio_unitario', 'url_imagen',
+                'ingredientes', 'preparacion', 'destacado', 'mostrar_en_menu'];
+
+const crearProducto = async (datos) => {
+    const campos = CAMPOS.filter(c => datos[c] !== undefined && datos[c] !== null);
     const r = await db.query(`
-        INSERT INTO producto(id_categoria,nombre_producto,descripcion_producto,precio_unitario,url_imagen)
-        VALUES($1,$2,$3,$4,$5) RETURNING *
-    `, [id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen || null]);
+        INSERT INTO producto(${campos.join(', ')})
+        VALUES(${campos.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING *
+    `, campos.map(c => datos[c]));
     return r.rows[0];
 };
 
@@ -37,6 +52,10 @@ const obtenerProductos = async (id_sucursal = 1, incluirInactivos = false) => {
             p.precio_unitario,
             p.url_imagen,
             p.estado_activo,
+            p.ingredientes,
+            p.preparacion,
+            p.destacado,
+            p.mostrar_en_menu,
             c.id_categoria,
             c.nombre_categoria,
             i.cantidad_actual   AS stock_actual,
@@ -46,7 +65,7 @@ const obtenerProductos = async (id_sucursal = 1, incluirInactivos = false) => {
         JOIN inventario_sucursal  i ON i.id_producto  = p.id_producto
                                    AND i.id_sucursal  = $1
         ${filtroEstado}
-        ORDER BY c.nombre_categoria ASC, p.nombre_producto ASC
+        ORDER BY c.orden, c.nombre_categoria, p.nombre_producto
     `, [id_sucursal]);
     return r.rows;
 };
@@ -63,17 +82,14 @@ const eliminarProducto = desactivarProducto;
 const urlImagen = async (id) =>
     (await db.query('SELECT url_imagen FROM producto WHERE id_producto = $1', [id])).rows[0]?.url_imagen;
 
-const actualizarProducto = async (id, { id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen }) => {
-    const vals  = [id_categoria, nombre_producto, descripcion_producto, precio_unitario, id];
-    let   query = `UPDATE producto
-                   SET id_categoria=$1, nombre_producto=$2, descripcion_producto=$3, precio_unitario=$4`;
-    if (url_imagen !== undefined && url_imagen !== null) {
-        vals.splice(4, 0, url_imagen);
-        query += `, url_imagen=$5 WHERE id_producto=$6 RETURNING *`;
-    } else {
-        query += ` WHERE id_producto=$5 RETURNING *`;
-    }
-    return (await db.query(query, vals)).rows[0];
+const actualizarProducto = async (id, datos) => {
+    const campos = CAMPOS.filter(c => datos[c] !== undefined);
+    if (!campos.length) return (await db.query('SELECT * FROM producto WHERE id_producto = $1', [id])).rows[0];
+    const r = await db.query(
+        `UPDATE producto SET ${campos.map((c, i) => `${c} = $${i + 1}`).join(', ')}
+          WHERE id_producto = $${campos.length + 1} RETURNING *`,
+        [...campos.map(c => datos[c]), id]);
+    return r.rows[0];
 };
 
 // ─── Agregar o actualizar stock para una sucursal específica ───
@@ -92,6 +108,7 @@ const asignarProductoASucursal = async (id_producto, id_sucursal, stock_inicial 
 module.exports = {
     crearCategoria,
     obtenerCategorias,
+    ordenarCategorias,
     obtenerCategoriaPorId,
     productosDeCategoria,
     eliminarCategoria,

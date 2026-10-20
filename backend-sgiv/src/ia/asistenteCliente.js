@@ -20,7 +20,8 @@ const textoCarta = (productos) => {
     for (const p of productos) {
         const estado = p.stock_actual <= 0 ? ' AGOTADO' : p.stock_actual <= 3 ? ` (últimas ${p.stock_actual})` : '';
         const desc = p.descripcion_producto?.trim() ? ` — ${p.descripcion_producto.trim().slice(0, 120)}` : '';
-        const linea = `- ${p.nombre_producto}: ${Number(p.precio_unitario).toFixed(2)}${estado}${desc}`;
+        const ingr = p.ingredientes?.trim() ? ` [lleva: ${p.ingredientes.trim().replace(/\s*\n\s*/g, ', ').slice(0, 100)}]` : '';
+        const linea = `- ${p.nombre_producto}: ${Number(p.precio_unitario).toFixed(2)}${p.destacado ? ' (recomendado de la casa)' : ''}${estado}${desc}${ingr}`;
         if (!porCategoria.has(p.nombre_categoria)) porCategoria.set(p.nombre_categoria, []);
         porCategoria.get(p.nombre_categoria).push(linea);
     }
@@ -56,6 +57,7 @@ REGLAS:
 - Para recomendar, elige de la carta según lo que pida el cliente (cantidad de personas, ocasión, gustos, presupuesto) y menciona el precio.
 - Puedes mencionar las PROMOCIONES DE AHORA (se aplican solas al pagar en caja); no hay otras.
 - Tú no tomas pedidos ni cobras. Para pedir, el cliente toca "+" en el producto, revisa su carrito y toca "Enviar pedido"; el cajero lo confirma. La cuenta se paga en caja.
+- En el menú: el botón "Categorías" lleva a cada sección, la lupa busca, el botón dorado muestra las promociones de hoy y el botón "i" en la foto gira la tarjeta para ver ingredientes y preparación. Los productos "(recomendado de la casa)" son los favoritos del local.
 - Si quieren pagar por separado: cada persona escanea el QR y pide desde su propio celular; en "Mi mesa" ve lo que consumió y en caja le cobran solo lo suyo.
 - Si el cliente pregunta algo que responde la INFORMACIÓN DEL PROPIETARIO, úsala tal como está escrita.
 - Si no sabes algo o no está en esta información, sugiere consultar en caja.

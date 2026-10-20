@@ -301,3 +301,52 @@ describe('Fotos de productos', () => {
         for (const u of usadas) assert.ok(fs.existsSync(u), 'las que usa un producto se quedan');
     });
 });
+
+describe('Menú QR: orden de categorías y ficha del producto', () => {
+    test('el admin ordena las categorías; el menú las sigue y las nuevas van al final', async () => {
+        const [a] = await bd.sql(`INSERT INTO categoria_producto (nombre_categoria) VALUES ('Orden A') RETURNING id_categoria`);
+        const [b] = await bd.sql(`INSERT INTO categoria_producto (nombre_categoria) VALUES ('Orden B') RETURNING id_categoria`);
+        const ids = (await api('GET', '/catalogo/categorias', { token: tAdmin })).body.map(c => c.id_categoria);
+        const nuevoOrden = [b.id_categoria, a.id_categoria, ...ids.filter(id => id !== a.id_categoria && id !== b.id_categoria)];
+
+        assert.equal((await api('PUT', '/catalogo/categorias/orden', { token: tCajeroSinPermiso, body: { ids: nuevoOrden } })).status, 403);
+        assert.equal((await api('PUT', '/catalogo/categorias/orden', { token: tAdmin, body: { ids: [1, 1] } })).status, 400);
+        const r = await api('PUT', '/catalogo/categorias/orden', { token: tAdmin, body: { ids: nuevoOrden } });
+        assert.equal(r.status, 200);
+        assert.deepEqual(r.body.map(c => c.id_categoria), nuevoOrden);
+
+        const nueva = await api('POST', '/catalogo/categorias', { token: tAdmin, body: { nombre_categoria: 'Orden C' } });
+        const lista = (await api('GET', '/catalogo/categorias', { token: tAdmin })).body;
+        assert.equal(lista.at(-1).id_categoria, nueva.body.categoria.id_categoria);
+
+        await bd.sql(`INSERT INTO producto (id_categoria, nombre_producto, precio_unitario) VALUES ($1, 'Prod A', 1), ($2, 'Prod B', 1)`,
+                     [a.id_categoria, b.id_categoria]);
+        await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual)
+                      SELECT 1, id_producto, 5 FROM producto WHERE nombre_producto IN ('Prod A', 'Prod B')`);
+        const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
+                                     VALUES (1, 91, md5(random()::text)) RETURNING codigo_qr`);
+        const menu = (await api('GET', `/menu/m/${mesa.codigo_qr}/catalogo`)).body.map(p => p.nombre_producto);
+        assert.ok(menu.indexOf('Prod B') < menu.indexOf('Prod A'));
+    });
+
+    test('ingredientes, preparación, recomendado y visibilidad en el menú se guardan y llegan al cliente', async () => {
+        const id = await crearProducto('Torta ficha', 4);
+        const r = await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: {
+            nombre_producto: 'Torta ficha', precio_unitario: 10,
+            ingredientes: '  Harina, huevo, chocolate  ', preparacion: 'Horneamos\nRellenamos', destacado: true } });
+        assert.equal(r.status, 200);
+        assert.equal(r.body.producto.ingredientes, 'Harina, huevo, chocolate');
+        assert.equal(r.body.producto.destacado, true);
+        assert.ok(r.body.producto.id_categoria, 'lo que no se envía no se borra');
+
+        const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
+                                     VALUES (1, 92, md5(random()::text)) RETURNING codigo_qr`);
+        const enMenu = async () => (await api('GET', `/menu/m/${mesa.codigo_qr}/catalogo`)).body.find(p => p.id_producto === id);
+        const p = await enMenu();
+        assert.deepEqual([p.ingredientes, p.preparacion, p.destacado], ['Harina, huevo, chocolate', 'Horneamos\nRellenamos', true]);
+
+        await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: { ingredientes: '', mostrar_en_menu: false } });
+        assert.equal(await enMenu(), undefined);
+        assert.equal((await bd.sql(`SELECT ingredientes FROM producto WHERE id_producto = $1`, [id]))[0].ingredientes, null);
+    });
+});

@@ -189,7 +189,7 @@ const textoPromocion = (v, moneda) => {
 const promocionDeProducto = (prod, vigentes) => {
     const precio = Math.round(Number(prod.precio_unitario) * 100);
     const aplica = vigentes.filter(v => v.productos.some(x => x.id_producto === prod.id_producto) ||
-                                        v.categorias.some(c => c.id_categoria === prod.id_categoria));
+                                        v.categorias.includes(prod.id_categoria));
     if (!aplica.length) return null;
     const unidad = (v) => v.tipo === 'PORCENTAJE' ? Math.round(precio * (100 - v.valor) / 100)
                         : v.tipo === 'PRECIO'     ? Math.min(precio, Math.round(v.valor * 100)) : null;

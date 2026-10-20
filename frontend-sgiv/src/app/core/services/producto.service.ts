@@ -23,6 +23,11 @@ export class ProductoService {
     return this.http.post(`${this.apiUrl}/catalogo/categorias`, datos);
   }
 
+  /** ids en el orden del menú QR */
+  ordenarCategorias(ids: number[]): Observable<any[]> {
+    return this.http.put<any[]>(`${this.apiUrl}/catalogo/categorias/orden`, { ids });
+  }
+
   eliminarCategoria(id: number, confirmacion: string): Observable<any> {
     return this.http.request('delete', `${this.apiUrl}/catalogo/categorias/${id}`, {
       body: { confirmacion }

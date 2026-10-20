@@ -81,7 +81,8 @@ CREATE INDEX idx_permiso_usuario_id ON permiso_usuario (id_usuario);
 CREATE TABLE categoria_producto (
     id_categoria SERIAL PRIMARY KEY,
     nombre_categoria VARCHAR(50) NOT NULL,
-    descripcion_categoria TEXT
+    descripcion_categoria TEXT,
+    orden SMALLINT NOT NULL DEFAULT 0          -- orden en el menú QR (lo define el admin)
 );
 
 CREATE TABLE producto (
@@ -92,7 +93,10 @@ CREATE TABLE producto (
     precio_unitario DECIMAL(10, 2) NOT NULL,
     url_imagen TEXT,
     mostrar_en_menu BOOLEAN DEFAULT TRUE,
-    estado_activo BOOLEAN DEFAULT TRUE
+    estado_activo BOOLEAN DEFAULT TRUE,
+    ingredientes TEXT,                         -- reverso de la tarjeta en el menú QR
+    preparacion TEXT,
+    destacado BOOLEAN NOT NULL DEFAULT FALSE   -- «Recomendados de la casa»
 );
 
 -- Promociones: se aplican solas al cobrar y siempre gana la que más ahorra al cliente

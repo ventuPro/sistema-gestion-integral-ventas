@@ -31,39 +31,13 @@
 
     <!-- ═══ BIENVENIDA (una vez por visita) ═══ -->
     @if (bienvenida()) {
-      <div class="bienvenida bg-gradient-to-br from-blue-600 to-indigo-600" role="dialog" aria-modal="true" aria-labelledby="titulo-bienvenida">
-        <div class="bienvenida-contenido">
-          @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="bienvenida-logo"> }
-          <p class="text-white/80 text-sm">¡Bienvenido a</p>
-          <h1 id="titulo-bienvenida" class="text-2xl font-semibold leading-tight">{{ ajustes.nombre() }}!</h1>
-          <p class="bienvenida-mesa">Mesa {{ mesa.numero_mesa }} · {{ mesa.nombre_sucursal }}</p>
-          @if (ajustes.config().menu_mensaje_bienvenida) {
-            <p class="text-white/90 text-[15px] mt-4">{{ ajustes.config().menu_mensaje_bienvenida }}</p>
-          }
-
-          <ol class="bienvenida-pasos">
-            <li><span>1</span> Elige del menú y agrégalo al carrito</li>
-            <li><span>2</span> Envía tu pedido: el cajero lo confirma</li>
-            <li><span>3</span> En «Mi mesa» ves lo que consumiste y pagas en caja</li>
-          </ol>
-
-          <form class="bienvenida-tarjeta" (submit)="$event.preventDefault(); entrar()">
-            <label for="nombre-cliente" class="inf-tinta text-sm font-medium">¿Cómo te llamas? <span class="inf-sutil font-normal">(opcional)</span></label>
-            <input id="nombre-cliente" class="campo mt-1.5" [(ngModel)]="nombreEditado" name="nombre" maxlength="40"
-                   autocomplete="given-name" placeholder="Tu nombre">
-            <button type="submit" class="boton-primario w-full py-3! text-base! mt-4">Ver el menú</button>
-          </form>
-
-          @if (!mesa.recibe_pedidos || !ajustes.config().menu_activo) {
-            <p class="text-white/85 text-[13px] mt-4">Ahora no recibimos pedidos desde el celular: puedes ver el menú y pedir en caja.</p>
-          }
-        </div>
-      </div>
+      <app-bienvenida-menu [mesa]="mesa" [recomendados]="recomendados()" [promociones]="promociones().length"
+                           [(nombre)]="nombreEditado" (entrar)="entrar()" />
     }
 
     <!-- ═══ ENCABEZADO ═══ -->
-    <header class="cabecera bg-gradient-to-br from-blue-600 to-indigo-600">
-      <div class="flex items-center gap-3">
+    <header class="cabecera bg-gradient-to-br from-blue-600 to-indigo-600" [class.compacta]="compacto()">
+      <div class="marca">
         @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="w-11 h-11 object-contain rounded-lg bg-white/15 p-1 flex-shrink-0"> }
         <div class="min-w-0">
           <h1 class="text-lg font-semibold truncate">{{ ajustes.nombre() }}</h1>
@@ -84,6 +58,38 @@
           @if (pedidosActivos() > 0) { <span class="globo aviso">{{ pedidosActivos() }}</span> }
         </button>
       </nav>
+
+      <!-- Barra del menú: categorías, búsqueda y promociones -->
+      @if (vista() === 'menu') {
+        <div class="barra-menu">
+          @if (buscando()) {
+            <div class="buscador flex-1">
+              <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
+              <input id="buscar-producto" type="search" [(ngModel)]="busqueda" placeholder="Buscar productos" aria-label="Buscar productos">
+            </div>
+            <button class="boton-barra icono" (click)="cerrarBusqueda()" aria-label="Cerrar búsqueda">
+              <lucide-icon [img]="icons.cerrar" class="w-5 h-5"></lucide-icon>
+            </button>
+          } @else {
+            <button class="boton-barra flex-1 justify-between" (click)="panel.set('categorias')" aria-haspopup="dialog">
+              <span class="flex items-center gap-2 min-w-0">
+                @if (categoriaVisible(); as c) { <span aria-hidden="true">{{ c.emoji }}</span> <span class="truncate">{{ c.nombre }}</span> }
+                @else { <lucide-icon [img]="icons.categorias" class="w-4 h-4"></lucide-icon> Categorías }
+              </span>
+              <lucide-icon [img]="icons.abrir" class="w-4 h-4 opacity-70"></lucide-icon>
+            </button>
+            <button class="boton-barra icono" (click)="abrirBusqueda()" aria-label="Buscar productos">
+              <lucide-icon [img]="icons.buscar" class="w-5 h-5"></lucide-icon>
+            </button>
+            @if (promociones().length) {
+              <button class="boton-barra promo" (click)="panel.set('promos')" aria-haspopup="dialog" aria-label="Promociones">
+                <lucide-icon [img]="icons.promo" class="w-5 h-5"></lucide-icon>
+                <span class="globo-promo">{{ promociones().length }}</span>
+              </button>
+            }
+          }
+        </div>
+      }
     </header>
 
     <div class="px-4 space-y-3 mt-3 empty:hidden">
@@ -104,84 +110,146 @@
 
     <!-- ════════ MENÚ ════════ -->
     @if (vista() === 'menu') {
-      <section class="pb-28">
-        <div class="filtros">
-          <div class="buscador">
-            <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
-            <input type="search" [(ngModel)]="busqueda" placeholder="Buscar productos" aria-label="Buscar productos">
-            @if (busqueda()) {
-              <button class="quitar" (click)="busqueda.set('')" aria-label="Limpiar búsqueda">
-                <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
-              </button>
-            }
-          </div>
-          <div class="chips">
-            <button [class.activa]="categoriaActiva() === null" (click)="categoriaActiva.set(null)">Todos</button>
-            @for (cat of categorias(); track cat.id) {
-              <button [class.activa]="categoriaActiva() === cat.id" (click)="categoriaActiva.set(cat.id)">{{ cat.nombre }}</button>
-            }
-          </div>
-        </div>
-
-        @if (promociones().length) {
-          <div class="promos" aria-label="Promociones de hoy">
-            @for (p of promociones(); track p.nombre) {
-              <p class="promo"><lucide-icon [img]="icons.promo" class="w-4 h-4 flex-shrink-0"></lucide-icon> {{ p.texto }}</p>
-            }
+      <section class="pb-28 pt-3">
+        @if (promoFiltro(); as promo) {
+          <div class="px-4 pb-3">
+            <button class="filtro-promo" (click)="promoFiltro.set(null)" aria-label="Quitar el filtro de promoción">
+              🎉 {{ promo }} <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+            </button>
           </div>
         }
 
-        @if (catalogoFiltrado().length === 0) {
+        @if (mostrarCarrusel()) {
+          <app-carrusel-recomendados class="block mb-4" [productos]="recomendados()" [moneda]="moneda()"
+                                     [cantidades]="cantidades()" [puedePedir]="mesa.recibe_pedidos && ajustes.config().menu_activo"
+                                     (agregar)="agregar($event)" (ver)="verProducto($event)" />
+        }
+
+        @if (secciones().length === 0) {
           <div class="estado-vacio">
             <lucide-icon [img]="icons.sinResultados" class="w-8 h-8 inf-sutil"></lucide-icon>
             <p>No encontramos productos</p>
           </div>
         }
 
-        <div class="grid grid-cols-2 gap-3 px-4">
-          @for (prod of catalogoFiltrado(); track prod.id_producto) {
-            <article class="plato" [class.agotado]="prod.stock_actual <= 0">
-              <div class="foto">
-                @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
-                @else { <span>{{ prod.nombre_producto?.charAt(0) }}</span> }
-                @if (etiquetaPromo(prod); as e) { <span class="etiqueta-promo">{{ e }}</span> }
-                @if (prod.stock_actual <= 0) { <span class="etiqueta mal">Agotado</span> }
-                @else if (disponible(prod) === 0) { <span class="etiqueta">En tu carrito</span> }
-                @else if (disponible(prod) <= 5) { <span class="etiqueta aviso">Quedan {{ disponible(prod) }}</span> }
-              </div>
-              <div class="datos">
-                <p class="nombre">{{ prod.nombre_producto }}</p>
-                @if (prod.descripcion_producto) { <p class="descripcion">{{ prod.descripcion_producto }}</p> }
-                @if (prod.promocion?.precio_promocional !== null && prod.promocion?.precio_promocional !== undefined) {
-                  <p class="precio">
-                    <s class="precio-antes">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</s>
-                    {{ moneda() }} {{ Number(prod.promocion.precio_promocional).toFixed(2) }}
-                  </p>
-                } @else {
-                  <p class="precio">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</p>
-                }
+        @for (sec of secciones(); track sec.id) {
+          <h2 class="seccion-titulo" [id]="'cat-' + sec.id" [attr.data-seccion]="sec.id">
+            <span class="emoji" aria-hidden="true">{{ sec.emoji }}</span> {{ sec.nombre }}
+            <span class="cantidad">{{ sec.productos.length }}</span>
+          </h2>
 
-                @if (enCarrito(prod.id_producto) === 0) {
-                  <button class="agregar" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0">
-                    @if (prod.stock_actual > 0) { <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon> Agregar } @else { Agotado }
-                  </button>
-                } @else {
-                  <div class="contador">
-                    <button (click)="quitarUno(prod.id_producto)" aria-label="Quitar uno">
-                      <lucide-icon [img]="icons.menos" class="w-4 h-4"></lucide-icon>
-                    </button>
-                    <span>{{ enCarrito(prod.id_producto) }}</span>
-                    <button class="sumar" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0" aria-label="Agregar uno">
-                      <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon>
-                    </button>
+          <div class="grid grid-cols-2 grid-flow-row-dense gap-3 px-4 mb-5">
+            @for (prod of sec.productos; track prod.id_producto) {
+              <article class="plato" [id]="'prod-' + prod.id_producto" [class.agotado]="prod.stock_actual <= 0"
+                       [class.volteada]="volteadas().has(prod.id_producto)" [class.resaltado]="resaltado() === prod.id_producto">
+                <div class="giro">
+
+                  <!-- Frente -->
+                  <div class="cara frente" [attr.aria-hidden]="volteadas().has(prod.id_producto)">
+                    <div class="foto" [class.con-ficha]="prod.tiene_ficha" (click)="voltear(prod)">
+                      @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre" loading="lazy"> }
+                      @else { <span class="inicial">{{ sec.emoji }}</span> }
+                      @if (etiquetaPromo(prod); as e) { <span class="etiqueta-promo">{{ e }}</span> }
+                      @if (prod.stock_actual <= 0) { <span class="etiqueta mal">Agotado</span> }
+                      @else if (disponible(prod) === 0) { <span class="etiqueta">En tu carrito</span> }
+                      @else if (disponible(prod) <= 5) { <span class="etiqueta aviso">Quedan {{ disponible(prod) }}</span> }
+                      @if (prod.tiene_ficha) {
+                        <button class="ver-ficha" (click)="$event.stopPropagation(); voltear(prod)" [attr.aria-label]="'¿Qué lleva ' + prod.nombre + '?'">
+                          <lucide-icon [img]="icons.info" class="w-4 h-4"></lucide-icon>
+                        </button>
+                      }
+                    </div>
+                    <div class="datos">
+                      <p class="nombre">{{ prod.nombre }}</p>
+                      @if (prod.descripcion_producto) { <p class="descripcion">{{ prod.descripcion_producto }}</p> }
+                      <ng-container *ngTemplateOutlet="precioYControles; context: { $implicit: prod }" />
+                    </div>
                   </div>
-                }
-              </div>
-            </article>
-          }
-        </div>
+
+                  <!-- Reverso: ingredientes y preparación -->
+                  @if (prod.tiene_ficha) {
+                    <div class="cara reverso" [attr.aria-hidden]="!volteadas().has(prod.id_producto)">
+                      <button class="volver" (click)="voltear(prod)" aria-label="Volver">
+                        <lucide-icon [img]="icons.volver" class="w-4 h-4"></lucide-icon>
+                      </button>
+                      <div class="ficha">
+                        <p class="ficha-nombre">{{ prod.nombre }}</p>
+                        @if (prod.ingredientes_lista.length) {
+                          <p class="ficha-titulo">🧺 ¿Qué lleva?</p>
+                          <ul class="ingredientes">
+                            @for (ing of prod.ingredientes_lista; track $index) {
+                              <li><span aria-hidden="true">{{ ing.emoji }}</span> {{ ing.nombre }}</li>
+                            }
+                          </ul>
+                        }
+                        @if (prod.pasos.length) {
+                          <p class="ficha-titulo">👩‍🍳 Así lo preparamos</p>
+                          @if (prod.pasos.length === 1) { <p class="paso-unico">{{ prod.pasos[0] }}</p> }
+                          @else {
+                            <ol class="pasos">
+                              @for (paso of prod.pasos; track $index) { <li><span>{{ $index + 1 }}</span> {{ paso }}</li> }
+                            </ol>
+                          }
+                        }
+                      </div>
+                      <div class="pie-ficha">
+                        <ng-container *ngTemplateOutlet="precio; context: { $implicit: prod }" />
+                        @if (enCarrito(prod.id_producto) === 0) {
+                          <button class="agregar mini" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0" aria-label="Agregar">
+                            <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon>
+                          </button>
+                        } @else {
+                          <div class="contador mini">
+                            <button (click)="quitarUno(prod.id_producto)" aria-label="Quitar uno">
+                              <lucide-icon [img]="icons.menos" class="w-3.5 h-3.5"></lucide-icon>
+                            </button>
+                            <span>{{ enCarrito(prod.id_producto) }}</span>
+                            <button class="sumar" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0" aria-label="Agregar uno">
+                              <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon>
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        }
       </section>
     }
+
+    <ng-template #precio let-prod>
+      @if (prod.promocion?.precio_promocional !== null && prod.promocion?.precio_promocional !== undefined) {
+        <p class="precio">
+          <s class="precio-antes">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</s>
+          {{ moneda() }} {{ Number(prod.promocion.precio_promocional).toFixed(2) }}
+        </p>
+      } @else {
+        <p class="precio">{{ moneda() }} {{ Number(prod.precio_unitario).toFixed(2) }}</p>
+      }
+    </ng-template>
+
+    <ng-template #precioYControles let-prod>
+      <ng-container *ngTemplateOutlet="precio; context: { $implicit: prod }" />
+
+      @if (enCarrito(prod.id_producto) === 0) {
+        <button class="agregar" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0">
+          @if (prod.stock_actual > 0) { <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon> Agregar } @else { Agotado }
+        </button>
+      } @else {
+        <div class="contador">
+          <button (click)="quitarUno(prod.id_producto)" aria-label="Quitar uno">
+            <lucide-icon [img]="icons.menos" class="w-4 h-4"></lucide-icon>
+          </button>
+          <span>{{ enCarrito(prod.id_producto) }}</span>
+          <button class="sumar" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0" aria-label="Agregar uno">
+            <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon>
+          </button>
+        </div>
+      }
+    </ng-template>
 
     <!-- ════════ CARRITO ════════ -->
     @if (vista() === 'carrito') {
@@ -384,6 +452,13 @@
     </div>
   }
 </div>
+
+<!-- ═══ PANELES: categorías y promociones ═══ -->
+@if (panel(); as tipo) {
+  <app-panel-menu [tipo]="tipo" [categorias]="categorias()" [seccionActual]="seccionActual()"
+                  [promociones]="promociones()" [productosPorPromo]="productosPorPromo()"
+                  (cerrar)="panel.set(null)" (categoria)="irACategoria($event)" (promo)="elegirPromo($event)" />
+}
 
 @if (pedidoACancelar(); as p) {
   <app-confirmacion titulo="¿Cancelar este pedido?" mensaje="Aún no fue confirmado por el cajero."

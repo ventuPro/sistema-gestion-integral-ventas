@@ -1,0 +1,84 @@
+/* ─── Carrusel de recomendados ─── */
+.carrusel { padding: 4px 0 6px; }
+.titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--i-tinta);
+}
+.titulo lucide-icon { color: #d97706; }
+
+.pista {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 0 16px 4px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.pista::-webkit-scrollbar { display: none; }
+
+.tarjeta {
+  position: relative;
+  flex: 0 0 82%;
+  aspect-ratio: 16 / 10;
+  border-radius: 16px;
+  overflow: hidden;
+  scroll-snap-align: start;
+  cursor: pointer;
+  background: linear-gradient(135deg, #fde68a, #f59e0b);
+  box-shadow: 0 10px 24px -14px rgba(15, 23, 42, 0.55);
+}
+.tarjeta img { width: 100%; height: 100%; object-fit: cover; transition: transform 6s ease; }
+.tarjeta:hover img { transform: scale(1.06); }
+.sin-foto { position: absolute; inset: 0; display: grid; place-items: center; font-size: 64px; }
+.velo { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0) 58%); }
+
+.datos { position: absolute; left: 14px; right: 64px; bottom: 12px; color: #fff; }
+.nombre { font-size: 17px; font-weight: 700; line-height: 1.2; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); }
+.precio { margin-top: 2px; font-size: 14px; font-weight: 600; color: #fde68a; }
+.precio s { margin-right: 4px; font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.7); }
+
+.agregar {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--color-blue-600, #2563eb);
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.6);
+  transition: transform 120ms ease;
+}
+.agregar:active { transform: scale(0.9); }
+.cantidad { font-size: 16px; font-weight: 700; }
+
+.puntos { display: flex; justify-content: center; gap: 6px; padding-top: 10px; }
+.puntos button {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--i-linea);
+  transition: width 200ms ease, background-color 200ms ease;
+}
+.puntos button.activo { width: 20px; background: #d97706; }
+
+/* En la bienvenida: sobre el fondo de color */
+.bienvenida .titulo { justify-content: center; color: #fff; }
+.bienvenida .titulo lucide-icon { color: #fde68a; }
+.bienvenida .tarjeta { flex-basis: 72%; aspect-ratio: 4 / 3; }
+.bienvenida .puntos button { background: rgba(255, 255, 255, 0.35); }
+.bienvenida .puntos button.activo { background: #fde68a; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta img { transition: none; }
+}

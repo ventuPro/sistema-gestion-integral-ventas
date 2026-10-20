@@ -8,7 +8,8 @@ import { SocketService } from '../../../core/services/socket.service';
 import { InventarioService, Movimiento, TipoMovimiento } from '../../../core/services/inventario.service';
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
-         Pencil, ArrowUpDown, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban, History } from 'lucide-angular';
+         Pencil, ArrowUpDown, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban, History,
+         ChevronUp, ChevronDown, ListOrdered, Star } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
@@ -50,7 +51,11 @@ export class InventarioComponent implements OnInit, OnDestroy {
     buscar:     Search,
     cerrar:     X,
     imagen:     ImagePlus,
-    desactivar: Ban
+    desactivar: Ban,
+    subir:      ChevronUp,
+    bajar:      ChevronDown,
+    ordenar:    ListOrdered,
+    destacado:  Star
   };
 
   readonly filtrosEstado: { valor: FiltroEstado; texto: string }[] = [
@@ -115,6 +120,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   readonly formulario    = signal<any>({
     nombre_producto: '', descripcion_producto: '',
     precio_unitario: '', id_categoria: '',
+    ingredientes: '', preparacion: '', destacado: false, mostrar_en_menu: true,
     stock_inicial: 0
   });
 
@@ -251,6 +257,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.formulario.set({
       nombre_producto: '', descripcion_producto: '',
       precio_unitario: '', id_categoria: this.filtroCategoria() || '',
+      ingredientes: '', preparacion: '', destacado: false, mostrar_en_menu: true,
       stock_inicial: 0
     });
     this.mostrarModal.set(true);
@@ -266,6 +273,10 @@ export class InventarioComponent implements OnInit, OnDestroy {
       descripcion_producto: prod.descripcion_producto || '',
       precio_unitario:      prod.precio_unitario,
       id_categoria:         prod.id_categoria,
+      ingredientes:         prod.ingredientes || '',
+      preparacion:          prod.preparacion || '',
+      destacado:            !!prod.destacado,
+      mostrar_en_menu:      prod.mostrar_en_menu !== false,
       stock_inicial:        0
     });
     this.mostrarModal.set(true);
@@ -301,7 +312,11 @@ export class InventarioComponent implements OnInit, OnDestroy {
       nombre_producto:      f.nombre_producto,
       descripcion_producto: f.descripcion_producto || '',
       precio_unitario:      f.precio_unitario,
-      id_categoria:         f.id_categoria
+      id_categoria:         f.id_categoria,
+      ingredientes:         f.ingredientes || '',
+      preparacion:          f.preparacion || '',
+      destacado:            !!f.destacado,
+      mostrar_en_menu:      f.mostrar_en_menu !== false
     };
     const fallo = (e: any, msg: string) => {
       this.errorModal.set(e?.error?.error || msg);
@@ -415,6 +430,40 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.productoService.crearCategoria({ nombre_categoria: this.nombreCategoria(), descripcion_categoria: '' }).subscribe({
       next:  () => { this.cerrarModalCategoria(); this.dialogo.avisar('Categoría creada'); this.cargarCategorias(); },
       error: (e: any) => this.errorCategoria.set(e?.error?.error || 'No se pudo crear la categoría.')
+    });
+  }
+
+  // ─── ORDEN DE CATEGORÍAS EN EL MENÚ QR ───
+  readonly ordenCategorias  = signal<any[] | null>(null);
+  readonly guardandoOrden   = signal(false);
+
+  abrirOrdenCategorias() { this.ordenCategorias.set([...this.categorias()]); }
+
+  moverCategoria(i: number, paso: -1 | 1) {
+    this.ordenCategorias.update(lista => {
+      const j = i + paso;
+      if (!lista || j < 0 || j >= lista.length) return lista;
+      const copia = [...lista];
+      [copia[i], copia[j]] = [copia[j], copia[i]];
+      return copia;
+    });
+  }
+
+  guardarOrdenCategorias() {
+    const lista = this.ordenCategorias();
+    if (!lista) return;
+    this.guardandoOrden.set(true);
+    this.productoService.ordenarCategorias(lista.map(c => c.id_categoria)).subscribe({
+      next: (c) => {
+        this.categorias.set(c);
+        this.guardandoOrden.set(false);
+        this.ordenCategorias.set(null);
+        this.dialogo.avisar('Orden guardado');
+      },
+      error: (e: any) => {
+        this.guardandoOrden.set(false);
+        this.dialogo.error(e?.error?.error || 'No se pudo guardar el orden.');
+      }
     });
   }
 

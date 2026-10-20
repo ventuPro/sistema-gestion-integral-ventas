@@ -1,0 +1,38 @@
+<div class="fondo" (click)="cerrar.emit()">
+  <div class="panel" role="dialog" aria-modal="true" [attr.aria-label]="tipo() === 'categorias' ? 'Categorías' : 'Promociones'"
+       (click)="$event.stopPropagation()">
+    <div class="asa" aria-hidden="true"></div>
+    <div class="cabeza">
+      <h2>{{ tipo() === 'categorias' ? 'Categorías' : '🎉 Promociones de hoy' }}</h2>
+      <button class="cerrar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <lucide-icon [img]="icons.cerrar" class="w-5 h-5"></lucide-icon>
+      </button>
+    </div>
+
+    @if (tipo() === 'categorias') {
+      <div class="mosaicos">
+        @for (c of categorias(); track c.id) {
+          <button class="mosaico" [class.activo]="seccionActual() === c.id" (click)="categoria.emit(c.id)">
+            <span class="emoji" aria-hidden="true">{{ c.emoji }}</span>
+            <span class="nombre">{{ c.nombre }}</span>
+            <span class="cantidad">{{ c.cantidad }}</span>
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="promos">
+        @for (p of promociones(); track p.nombre) {
+          <article class="promo">
+            <p class="nombre">{{ p.nombre }}</p>
+            <p class="texto">{{ p.texto }}</p>
+            @if (productosPorPromo()[p.nombre]) {
+              <button class="ver" (click)="promo.emit(p.nombre)">
+                Ver productos <lucide-icon [img]="icons.ver" class="w-4 h-4"></lucide-icon>
+              </button>
+            }
+          </article>
+        }
+      </div>
+    }
+  </div>
+</div>

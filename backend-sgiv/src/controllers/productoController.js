@@ -14,6 +14,21 @@ const fotoNueva = (url_imagen) => {
     catch (e) { e.status = 400; throw e; }
 };
 
+// ─── Ficha del producto para el menú QR (undefined = no cambia) ───
+const texto    = (v, max) => v === undefined ? undefined : (String(v ?? '').trim().slice(0, max) || null);
+const booleano = (v) => v === undefined ? undefined : v === true || v === 'true';
+
+const datosProducto = (b) => ({
+    id_categoria:         b.id_categoria,
+    nombre_producto:      b.nombre_producto,
+    descripcion_producto: b.descripcion_producto,
+    precio_unitario:      b.precio_unitario,
+    ingredientes:         texto(b.ingredientes, 400),
+    preparacion:          texto(b.preparacion, 500),
+    destacado:            booleano(b.destacado),
+    mostrar_en_menu:      booleano(b.mostrar_en_menu)
+});
+
 const agregarCategoria  = async (req, res) => {
     try {
         const cat = await m.crearCategoria(req.body.nombre_categoria, req.body.descripcion_categoria || '');
@@ -24,6 +39,18 @@ const agregarCategoria  = async (req, res) => {
 const listarCategorias  = async (req, res) => {
     try { res.json(await m.obtenerCategorias()); }
     catch(e) { res.status(500).json({ error: e.message }); }
+};
+
+// PUT /catalogo/categorias/orden { ids: [...] }  orden del menú QR
+const ordenarCategorias = async (req, res) => {
+    try {
+        const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number) : [];
+        if (!ids.length || ids.some(id => !Number.isInteger(id) || id <= 0) || new Set(ids).size !== ids.length)
+            return res.status(400).json({ error: 'Orden de categorías inválido' });
+        await m.ordenarCategorias(ids.slice(0, 500));
+        emitirCatalogo();
+        res.json(await m.obtenerCategorias());
+    } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
 const eliminarCategoria = async (req, res) => {
@@ -75,17 +102,12 @@ const listarProductos   = async (req, res) => {
 const agregarProducto   = async (req, res) => {
     let url_imagen = null;
     try {
-        const {
-            id_categoria, nombre_producto, descripcion_producto,
-            precio_unitario, id_sucursal, stock_inicial
-        } = req.body;
+        const { id_sucursal, stock_inicial } = req.body;
 
         url_imagen = fotoNueva(req.body.url_imagen) ?? null;
 
         // 1. Crear el producto en el catálogo global
-        const prod = await m.crearProducto({
-            id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen
-        });
+        const prod = await m.crearProducto({ ...datosProducto(req.body), url_imagen });
 
         // 2. ASIGNAR el producto a la sucursal seleccionada con su stock inicial
         //    Sin este paso el producto NO aparece en ninguna sucursal
@@ -113,14 +135,11 @@ const agregarProducto   = async (req, res) => {
 const actualizarProducto = async (req, res) => {
     let url_imagen;
     try {
-        const { id_categoria, nombre_producto, descripcion_producto, precio_unitario } = req.body;
         const anterior = await m.urlImagen(req.params.id);
         if (anterior === undefined) return res.status(404).json({ error: 'Producto no encontrado' });
 
         url_imagen = fotoNueva(req.body.url_imagen);
-        const prod = await m.actualizarProducto(req.params.id, {
-            id_categoria, nombre_producto, descripcion_producto, precio_unitario, url_imagen
-        });
+        const prod = await m.actualizarProducto(req.params.id, { ...datosProducto(req.body), url_imagen });
         if (url_imagen) borrarImagen(anterior);
         emitirCatalogo();
         res.json({ producto: prod });
@@ -149,6 +168,6 @@ const reactivarProducto = async (req, res) => {
 };
 
 module.exports = {
-    agregarCategoria, listarCategorias, eliminarCategoria, listarProductos,
+    agregarCategoria, listarCategorias, ordenarCategorias, eliminarCategoria, listarProductos,
     agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto
 };

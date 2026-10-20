@@ -1,0 +1,44 @@
+<div class="bienvenida bg-gradient-to-br from-blue-600 to-indigo-600" role="dialog" aria-modal="true" aria-labelledby="titulo-bienvenida">
+  <div class="burbujas" aria-hidden="true">
+    @for (e of postres; track $index) { <span [style.--i]="$index">{{ e }}</span> }
+  </div>
+
+  <div class="contenido">
+    <div class="aparecer" style="--d: 0">
+      @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="logo"> }
+      <p class="saludo">{{ saludo }}</p>
+      <h1 id="titulo-bienvenida" class="text-[26px] font-bold leading-tight">Bienvenido a {{ ajustes.nombre() }}</h1>
+      <p class="mesa">Mesa {{ mesa().numero_mesa }} · {{ mesa().nombre_sucursal }}</p>
+      @if (ajustes.config().menu_mensaje_bienvenida) {
+        <p class="text-white/90 text-[15px] mt-3">{{ ajustes.config().menu_mensaje_bienvenida }}</p>
+      }
+      @if (promociones()) {
+        <p class="promos">🎉 {{ promociones() === 1 ? 'Hoy tenemos 1 promoción' : 'Hoy tenemos ' + promociones() + ' promociones' }}</p>
+      }
+    </div>
+
+    @if (recomendados().length) {
+      <app-carrusel-recomendados class="aparecer" style="--d: 1" variante="bienvenida"
+                                 [productos]="recomendados()" [moneda]="moneda()" />
+    }
+
+    <ol class="pasos aparecer" style="--d: 2">
+      <li><span class="emoji">🍰</span> Elige del menú</li>
+      <li><span class="emoji">📨</span> Envía tu pedido</li>
+      <li><span class="emoji">💳</span> Paga en caja</li>
+    </ol>
+
+    <form class="tarjeta aparecer" style="--d: 3" (submit)="$event.preventDefault(); entrar.emit()">
+      <label for="nombre-cliente" class="etiqueta">¿Cómo te llamas? <span class="opcional">(opcional)</span></label>
+      <input id="nombre-cliente" class="campo" [(ngModel)]="nombre" name="nombre" maxlength="40"
+             autocomplete="given-name" placeholder="Tu nombre">
+      <button type="submit" class="boton-primario boton-entrar w-full py-3! text-base! mt-4">
+        Ver el menú <lucide-icon [img]="icons.entrar" class="w-5 h-5"></lucide-icon>
+      </button>
+    </form>
+
+    @if (!mesa().recibe_pedidos || !ajustes.config().menu_activo) {
+      <p class="text-white/85 text-[13px]">Ahora no recibimos pedidos desde el celular: puedes ver el menú y pedir en caja.</p>
+    }
+  </div>
+</div>

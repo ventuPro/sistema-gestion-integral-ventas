@@ -290,6 +290,12 @@ describe('Promociones en el menú QR', () => {
         assert.deepEqual([t.promocion.nombre, t.promocion.precio_promocional], ['Tortas -25 %', 30]);
         assert.deepEqual([j.promocion.tipo, j.promocion.precio_promocional], ['NXM', null]);
 
+        // Por categoría: cada producto de la categoría la muestra
+        const bebidas = await crearCategoria('Bebidas QR'), refresco = await crearProducto('Refresco QR', 10, bebidas);
+        await crearPromo(tAdmin, { nombre: 'Bebidas -20 %', valor: 20, categorias: [bebidas] });
+        const r = (await api('GET', `/menu/m/${mesa.codigo_qr}/catalogo`)).body.find(p => p.id_producto === refresco);
+        assert.deepEqual([r.promocion?.nombre, r.promocion?.precio_promocional], ['Bebidas -20 %', 8]);
+
         const lista = (await api('GET', `/menu/m/${mesa.codigo_qr}/promociones`)).body;
         assert.ok(lista.some(v => v.texto === 'Jugos 2x1: lleva 2 y paga 1 en Jugo QR'));
 

@@ -1,0 +1,37 @@
+<section class="carrusel" [class.bienvenida]="variante() === 'bienvenida'" aria-roledescription="carrusel" aria-label="Recomendados de la casa">
+  <h2 class="titulo">
+    <lucide-icon [img]="icons.estrella" class="w-4 h-4"></lucide-icon> Recomendados de la casa
+  </h2>
+
+  <div #pista class="pista" (scroll)="alDesplazar()" (pointerdown)="pausar()">
+    @for (p of productos(); track p.id_producto) {
+      <article class="tarjeta" (click)="ver.emit(p)">
+        @if (p.url_imagen) { <img [src]="p.url_imagen | imagenUrl" [alt]="p.nombre_producto" loading="lazy"> }
+        @else { <span class="sin-foto" aria-hidden="true">{{ emojiCategoria(p.nombre_categoria) }}</span> }
+        <div class="velo"></div>
+        <div class="datos">
+          <p class="nombre">{{ nombreBonito(p.nombre_producto) }}</p>
+          <p class="precio">
+            @if (p.promocion?.precio_promocional != null) { <s>{{ moneda() }} {{ Number(p.precio_unitario).toFixed(2) }}</s> }
+            {{ moneda() }} {{ precio(p).toFixed(2) }}
+          </p>
+        </div>
+        @if (variante() === 'menu' && puedePedir()) {
+          <button class="agregar" (click)="$event.stopPropagation(); pausar(); agregar.emit(p)"
+                  [attr.aria-label]="'Agregar ' + p.nombre_producto">
+            @if (cantidades()[p.id_producto]; as n) { <span class="cantidad">{{ n }}</span> }
+            @else { <lucide-icon [img]="icons.mas" class="w-5 h-5"></lucide-icon> }
+          </button>
+        }
+      </article>
+    }
+  </div>
+
+  @if (productos().length > 1) {
+    <div class="puntos">
+      @for (p of productos(); track p.id_producto; let i = $index) {
+        <button [class.activo]="indice() === i" (click)="pausar(); irA(i)" [attr.aria-label]="'Ver ' + p.nombre_producto"></button>
+      }
+    </div>
+  }
+</section>

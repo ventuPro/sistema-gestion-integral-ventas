@@ -13,7 +13,11 @@ import type { MensajeChat } from '../../shared/asistente/asistente-chat.componen
 import { componenteDiferido } from '../../../core/utils/diferido';
 import { Cotizacion, etiquetaPromocion } from '../../../core/services/promocion.service';
 import { LucideAngularModule, UtensilsCrossed, ShoppingBag, ReceiptText, Search, X, Minus, Plus, Check,
-         SearchX, WifiOff, PartyPopper, Pencil, BadgePercent } from 'lucide-angular';
+         SearchX, WifiOff, PartyPopper, Pencil, BadgePercent, LayoutGrid, ChevronDown, Info, RotateCcw } from 'lucide-angular';
+import { CarruselRecomendadosComponent } from './carrusel-recomendados.component';
+import { BienvenidaMenuComponent } from './bienvenida-menu.component';
+import { PanelMenuComponent } from './panel-menu.component';
+import { emojiCategoria, listaIngredientes, nombreBonito, pasosPreparacion } from './ficha';
 
 type Vista = 'menu' | 'carrito' | 'pedidos';
 
@@ -61,7 +65,8 @@ const leerNombre = (): string => {
 @Component({
   selector:    'app-menu-digital',
   standalone:  true,
-  imports:     [CommonModule, FormsModule, ImagenUrlPipe, LucideAngularModule, ConfirmacionComponent],
+  imports:     [CommonModule, FormsModule, ImagenUrlPipe, LucideAngularModule, ConfirmacionComponent,
+                CarruselRecomendadosComponent, BienvenidaMenuComponent, PanelMenuComponent],
   templateUrl: './menu-digital.component.html',
   styleUrls:   ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
                 '../../shared/formulario/formulario.css', './menu-digital.component.css']
@@ -70,7 +75,9 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly Number = Number;
   readonly icons  = { menu: UtensilsCrossed, carrito: ShoppingBag, mesa: ReceiptText, buscar: Search, cerrar: X,
                       menos: Minus, mas: Plus, listo: Check, sinResultados: SearchX, sinConexion: WifiOff,
-                      qrInvalido: SearchX, gracias: PartyPopper, editar: Pencil, promo: BadgePercent };
+                      qrInvalido: SearchX, gracias: PartyPopper, editar: Pencil, promo: BadgePercent,
+                      categorias: LayoutGrid, abrir: ChevronDown, info: Info, volver: RotateCcw };
+  readonly nombreBonito = nombreBonito;
 
   private route = inject(ActivatedRoute);
   private http  = inject(HttpClient);
@@ -92,19 +99,51 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly info        = signal<InfoMesa | null>(null);
   readonly vista       = signal<Vista>('menu');
 
-  // ─── Catálogo ───
+  // ─── Catálogo (llega ordenado por el orden de categorías del admin) ───
   readonly catalogo        = signal<any[]>([]);
-  readonly categorias      = signal<{ id: number; nombre: string }[]>([]);
-  readonly categoriaActiva = signal<number | null>(null);
+  readonly categorias      = signal<{ id: number; nombre: string; emoji: string; cantidad: number }[]>([]);
   readonly busqueda        = signal('');
+  readonly buscando        = signal(false);
+  readonly promoFiltro     = signal<string | null>(null);
+  readonly panel           = signal<'categorias' | 'promos' | null>(null);
+  readonly volteadas       = signal<ReadonlySet<number>>(new Set());
+  readonly resaltado       = signal<number | null>(null);
 
-  /** Los agotados van al final para que el cliente vea primero lo que puede pedir */
+  // ─── Cabecera: se achica al bajar y muestra la categoría que se está viendo ───
+  readonly compacto        = signal(false);
+  readonly seccionActual   = signal<number | null>(null);
+
+  /** Los agotados van al final de cada categoría para que el cliente vea primero lo que puede pedir */
   readonly catalogoFiltrado = computed(() => {
-    const texto = this.busqueda().trim().toLowerCase(), cat = this.categoriaActiva();
+    const texto = this.busqueda().trim().toLowerCase(), promo = this.promoFiltro();
     return this.catalogo().filter(p =>
-      (!cat || Number(p.id_categoria) === cat) &&
+      (!promo || p.promocion?.nombre === promo) &&
       (!texto || p.nombre_producto.toLowerCase().includes(texto))
     ).sort((a, b) => Number(a.stock_actual <= 0) - Number(b.stock_actual <= 0));
+  });
+
+  readonly secciones = computed(() => {
+    const productos = this.catalogoFiltrado();
+    return this.categorias()
+      .map(c => ({ ...c, productos: productos.filter(p => Number(p.id_categoria) === c.id) }))
+      .filter(s => s.productos.length);
+  });
+
+  readonly categoriaVisible = computed(() =>
+    this.categorias().find(c => c.id === this.seccionActual()) ?? null);
+
+  readonly recomendados = computed(() => this.catalogo().filter(p => p.destacado && p.stock_actual > 0));
+  readonly mostrarCarrusel = computed(() =>
+    this.recomendados().length > 0 && !this.busqueda().trim() && !this.promoFiltro());
+
+  readonly cantidades = computed(() =>
+    Object.fromEntries(this.carrito().map(i => [i.id_producto, i.cantidad])) as Record<number, number>);
+
+  /** Productos con cada promoción (para «Ver productos» en el panel de promociones) */
+  readonly productosPorPromo = computed(() => {
+    const conteo: Record<string, number> = {};
+    for (const p of this.catalogo()) if (p.promocion) conteo[p.promocion.nombre] = (conteo[p.promocion.nombre] || 0) + 1;
+    return conteo;
   });
 
   // ─── Carrito ───
@@ -154,6 +193,13 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   private socket: Socket | null = null;
   private timers: (() => void)[] = [];
   private avisoTimer: any;
+  private resaltadoTimer: any;
+  private esperaScroll = false;
+  private readonly alDesplazar = () => {
+    if (this.esperaScroll) return;
+    this.esperaScroll = true;
+    requestAnimationFrame(() => { this.esperaScroll = false; this.medirScroll(); });
+  };
 
   constructor() {
     effect(() => {
@@ -181,6 +227,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     }
     this.cargarTodo();
     this.conectarSocket();
+    addEventListener('scroll', this.alDesplazar, { passive: true });
 
     // Respaldo del socket
     this.timers.push(sondeo(() => this.refrescarEstado(), 20_000));
@@ -190,7 +237,9 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.socket?.disconnect();
     this.timers.forEach(detener => detener());
+    removeEventListener('scroll', this.alDesplazar);
     clearTimeout(this.avisoTimer);
+    clearTimeout(this.resaltadoTimer);
     clearTimeout(this.esperaCotizacion);
   }
 
@@ -223,11 +272,20 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     });
     this.http.get<any[]>(`${this.api}/${this.codigo}/catalogo`).subscribe({
       next: (items) => {
-        const catalogo = items.map(p => ({ ...p, stock_actual: Number(p.stock_actual) || 0 }));
-        const cats = new Map<number, string>();
-        catalogo.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
+        const catalogo = items.map(p => {
+          const ingredientes = listaIngredientes(p.ingredientes), pasos = pasosPreparacion(p.preparacion);
+          return { ...p, stock_actual: Number(p.stock_actual) || 0, nombre: nombreBonito(p.nombre_producto),
+                   ingredientes_lista: ingredientes, pasos, tiene_ficha: ingredientes.length > 0 || pasos.length > 0 };
+        });
+        const cats = new Map<number, { id: number; nombre: string; emoji: string; cantidad: number }>();
+        for (const p of catalogo) {
+          const id = Number(p.id_categoria);
+          const c = cats.get(id) ?? { id, nombre: nombreBonito(p.nombre_categoria), emoji: emojiCategoria(p.nombre_categoria), cantidad: 0 };
+          cats.set(id, { ...c, cantidad: c.cantidad + 1 });
+        }
         this.catalogo.set(catalogo);
-        this.categorias.set([...cats.entries()].map(([id, nombre]) => ({ id, nombre })));
+        this.categorias.set([...cats.values()]);
+        if (this.promoFiltro() && !catalogo.some(p => p.promocion?.nombre === this.promoFiltro())) this.promoFiltro.set(null);
 
         // Precios al día; lo que ya no está en el menú sale del carrito
         const retirados: string[] = [];
@@ -380,6 +438,78 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
         if (err.codigo === 'NO_RECIBE_PEDIDOS') this.info.update(i => i && { ...i, recibe_pedidos: false });
       }
     });
+  }
+
+  // ─── Navegación del menú ───
+  private medirScroll() {
+    // Con margen para que no tiemble: la cabecera cambia de alto al achicarse
+    this.compacto.set(this.compacto() ? scrollY > 8 : scrollY > 90);
+    if (this.vista() !== 'menu') return;
+    const alto = (document.querySelector('.cabecera') as HTMLElement | null)?.offsetHeight ?? 0;
+    let actual: number | null = null;
+    document.querySelectorAll<HTMLElement>('[data-seccion]').forEach(el => {
+      if (el.getBoundingClientRect().top <= alto + 24) actual = Number(el.dataset['seccion']);
+    });
+    this.seccionActual.set(actual);
+  }
+
+  /** Baja hasta el elemento dejando lugar a la cabecera ya achicada */
+  private bajarA(id: string) {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      const cabecera = document.querySelector('.cabecera') as HTMLElement | null;
+      if (!el || !cabecera) return;
+      const marca = this.compacto() ? 0 : ((cabecera.querySelector('.marca') as HTMLElement | null)?.offsetHeight ?? 0) + 16;
+      const destino = el.getBoundingClientRect().top + scrollY - (cabecera.offsetHeight - marca) - 12;
+      scrollTo({ top: Math.max(0, destino), behavior: 'smooth' });
+    });
+  }
+
+  irACategoria(id: number) {
+    this.panel.set(null);
+    this.busqueda.set('');
+    this.buscando.set(false);
+    this.promoFiltro.set(null);
+    this.bajarA(`cat-${id}`);
+  }
+
+  elegirPromo(nombre: string) {
+    this.panel.set(null);
+    this.busqueda.set('');
+    this.buscando.set(false);
+    this.promoFiltro.set(nombre);
+    scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  abrirBusqueda() {
+    this.buscando.set(true);
+    this.promoFiltro.set(null);
+    requestAnimationFrame(() => document.getElementById('buscar-producto')?.focus());
+  }
+
+  cerrarBusqueda() {
+    this.busqueda.set('');
+    this.buscando.set(false);
+  }
+
+  voltear(prod: any) {
+    if (!prod.tiene_ficha) return;
+    this.volteadas.update(v => {
+      const nuevo = new Set(v);
+      nuevo.has(prod.id_producto) ? nuevo.delete(prod.id_producto) : nuevo.add(prod.id_producto);
+      return nuevo;
+    });
+  }
+
+  /** Desde el carrusel: baja hasta la tarjeta del producto y la resalta */
+  verProducto(prod: any) {
+    this.busqueda.set('');
+    this.buscando.set(false);
+    this.promoFiltro.set(null);
+    this.resaltado.set(prod.id_producto);
+    this.bajarA(`prod-${prod.id_producto}`);
+    clearTimeout(this.resaltadoTimer);
+    this.resaltadoTimer = setTimeout(() => this.resaltado.set(null), 1800);
   }
 
   // ─── Bienvenida y nombre del cliente ───

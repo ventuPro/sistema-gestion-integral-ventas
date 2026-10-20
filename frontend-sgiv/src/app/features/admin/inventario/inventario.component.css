@@ -18,3 +18,8 @@
 
 tr.inactivo td, tr.inactivo .fuerte { color: var(--i-sutil); }
 tr.inactivo .miniatura { opacity: 0.5; }
+
+/* Datos del producto para el menú QR */
+.menu-qr { border-top: 1px solid var(--i-linea-suave); padding-top: 14px; }
+.estrella { color: #d97706; }
+.accion:disabled { opacity: 0.35; cursor: default; }

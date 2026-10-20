@@ -10,6 +10,7 @@ const editar = [verificarToken, verificarPermiso('inventario')];
 // Rutas protegidas (solo entran los que tienen Token)
 router.post('/categorias', editar, productoController.agregarCategoria);
 router.get('/categorias', verificarToken, productoController.listarCategorias);
+router.put('/categorias/orden', editar, productoController.ordenarCategorias);
 router.delete('/categorias/:id', editar, productoController.eliminarCategoria);
 
 router.post('/productos', editar, productoController.agregarProducto);   

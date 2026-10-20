@@ -48,19 +48,30 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.5);
 }
 
-/* Encabezado fijo con pestañas */
+/* Encabezado fijo con pestañas: al bajar se oculta la marca */
 .cabecera {
   position: sticky;
   top: 0;
   z-index: 30;
-  padding: 16px 16px 12px;
+  padding: 14px 16px 12px;
   color: #fff;
+  box-shadow: 0 8px 20px -16px rgba(15, 23, 42, 0.6);
 }
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-height: 60px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: max-height 200ms ease, margin 200ms ease, opacity 200ms ease;
+}
+.cabecera.compacta { padding-top: 10px; }
+.cabecera.compacta .marca { max-height: 0; margin-bottom: 0; opacity: 0; }
 .pestanas-menu {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
-  margin-top: 12px;
   padding: 4px;
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.18);
@@ -98,107 +109,111 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
 /* En el celular, 16 px evita que el navegador haga zoom al escribir */
 .campo { font-size: 16px; padding: 10px 12px; }
 
-/* Bienvenida: pantalla completa al abrir el menú */
-.bienvenida {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  overflow-y: auto;
-  color: #fff;
-  animation: aparecer 200ms ease;
-}
-.bienvenida-contenido {
-  min-height: 100%;
-  max-width: 28rem;
-  margin: 0 auto;
-  padding: calc(40px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+/* Barra del menú: categorías, búsqueda y promociones */
+.barra-menu { display: flex; gap: 8px; margin-top: 10px; }
+.barra-menu .buscador { border: none; background: var(--i-papel); height: 40px; }
+.barra-menu .buscador input { font-size: 16px; padding: 0; }
+.boton-barra {
+  position: relative;
+  height: 40px;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-.bienvenida-logo {
-  width: 76px;
-  height: 76px;
-  margin: 0 auto 16px;
-  padding: 8px;
-  object-fit: contain;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.15);
-}
-.bienvenida-mesa {
-  display: inline-block;
-  align-self: center;
-  margin-top: 10px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 13px;
-  background: rgba(255, 255, 255, 0.16);
-}
-.bienvenida-pasos {
-  margin: 24px 0 20px;
-  display: grid;
-  gap: 10px;
-  text-align: left;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 10px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background-color 120ms ease;
 }
-.bienvenida-pasos li { display: flex; align-items: center; gap: 10px; }
-.bienvenida-pasos span {
-  width: 24px;
-  height: 24px;
+.boton-barra:active { background: rgba(255, 255, 255, 0.28); }
+.boton-barra.icono { width: 40px; padding: 0; justify-content: center; flex-shrink: 0; }
+.boton-barra.promo {
   flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
+  color: #422006;
+  background: linear-gradient(135deg, #fde68a, #fbbf24);
+}
+.globo-promo {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 19px;
+  color: #fff;
+  background: #059669;
+  box-shadow: 0 0 0 2px var(--color-indigo-600, #4f46e5);
+}
+
+.seccion-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 10px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--i-tinta);
+}
+.seccion-titulo .emoji { font-size: 20px; }
+.seccion-titulo .cantidad {
+  padding: 1px 8px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.2);
+  color: var(--i-tenue);
+  background: var(--i-linea-suave);
 }
-.bienvenida-tarjeta {
-  padding: 16px;
-  border-radius: 14px;
-  text-align: left;
-  background: var(--i-papel);
-  box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.45);
-}
-@keyframes aparecer { from { opacity: 0; } }
 
-/* Buscador y categorías */
-.filtros { padding: 12px 16px 8px; display: flex; flex-direction: column; gap: 10px; }
-.filtros .buscador input { font-size: 15px; padding: 10px 0; }
-.chips {
-  display: flex;
+.filtro-promo {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  margin: 0 -16px;
-  padding: 0 16px 2px;
-}
-.chips::-webkit-scrollbar { display: none; }
-.chips button {
-  flex-shrink: 0;
-  padding: 6px 14px;
-  border: 1px solid var(--i-linea);
+  padding: 7px 12px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  color: var(--i-texto);
-  background: var(--i-papel);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #065f46;
+  background: color-mix(in oklab, #10b981 16%, var(--i-papel));
+  border: 1px solid color-mix(in oklab, #10b981 40%, transparent);
 }
-.chips button.activa { border-color: var(--i-acento); color: #fff; background: var(--i-acento); }
 
-/* Tarjeta de producto */
-.plato {
+/* Tarjeta de producto: gira para mostrar ingredientes y preparación */
+.plato { perspective: 1100px; border-radius: 12px; transition: box-shadow 300ms ease; }
+.plato.resaltado { box-shadow: 0 0 0 3px #fbbf24, 0 10px 30px -12px rgba(217, 119, 6, 0.6); }
+.giro {
+  position: relative;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 600ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+.plato.volteada .giro { transform: rotateY(180deg); }
+/* Girada ocupa las dos columnas para que la ficha se lea sin apretarse */
+.plato.volteada { grid-column: 1 / -1; }
+.plato.volteada .foto { aspect-ratio: 16 / 9; }
+.cara {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--i-linea);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--i-papel);
   overflow: hidden;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
-.plato.agotado { opacity: 0.55; }
+.cara.frente { height: 100%; }
+.plato.agotado .cara.frente { opacity: 0.55; }
+.cara.reverso {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  border-color: color-mix(in oklab, #f59e0b 35%, var(--i-linea));
+  background: linear-gradient(170deg, color-mix(in oklab, #fbbf24 14%, var(--i-papel)), var(--i-papel) 70%);
+}
 .plato .foto {
   position: relative;
   aspect-ratio: 4 / 3;
@@ -206,11 +221,10 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
-  font-weight: 600;
-  color: var(--i-sutil);
 }
+.plato .foto.con-ficha { cursor: pointer; }
 .plato .foto img { width: 100%; height: 100%; object-fit: cover; }
+.plato .foto .inicial { font-size: 36px; opacity: 0.8; }
 .etiqueta {
   position: absolute;
   top: 8px;
@@ -224,6 +238,80 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
 }
 .etiqueta.aviso { color: #b45309; }
 .etiqueta.mal { color: #b42318; }
+.ver-ficha {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #92400e;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
+  animation: pulso 2.6s ease-in-out 1s 2;
+}
+@keyframes pulso { 50% { transform: scale(1.15); } }
+
+/* Reverso */
+.volver {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--i-tenue);
+  background: var(--i-papel);
+  border: 1px solid var(--i-linea);
+}
+.ficha { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 6px; }
+.ficha-nombre { padding-right: 30px; font-size: 15px; font-weight: 700; line-height: 1.2; color: var(--i-tinta); }
+.ficha-titulo { margin: 12px 0 6px; font-size: 13px; font-weight: 700; color: #b45309; }
+.ingredientes { display: flex; flex-wrap: wrap; gap: 4px; }
+.ingredientes li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--i-texto);
+  background: var(--i-papel);
+  border: 1px solid var(--i-linea);
+}
+.pasos { display: grid; gap: 5px; }
+.pasos li { display: flex; gap: 8px; font-size: 13px; line-height: 1.35; color: var(--i-texto); }
+.pasos li span {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: #f59e0b;
+}
+.paso-unico { font-size: 13px; line-height: 1.4; color: var(--i-texto); }
+.pie-ficha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 9px 8px 11px;
+  border-top: 1px solid var(--i-linea-suave);
+}
+.pie-ficha .precio { margin: 0; padding: 0; font-size: 14px; }
+.agregar.mini { width: 34px; height: 34px; margin: 0; flex-shrink: 0; border-radius: 50%; }
+.contador.mini { width: 92px; height: 32px; margin: 0; flex-shrink: 0; grid-template-columns: 30px 1fr 30px; }
+
 .plato .datos { padding: 10px 11px 11px; display: flex; flex-direction: column; gap: 3px; flex: 1; }
 .plato .nombre { font-size: 14px; font-weight: 600; line-height: 1.25; color: var(--i-tinta); }
 .plato .descripcion {
@@ -380,21 +468,7 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   background: #fff;
 }
 
-/* ─── Promociones ─── */
-.promos { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 12px; }
-.promo {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--i-tinta);
-  background: color-mix(in oklab, var(--i-baja) 9%, var(--i-papel));
-  border: 1px solid color-mix(in oklab, var(--i-baja) 25%, transparent);
-}
-.promo lucide-icon { color: var(--i-baja); margin-top: 1px; }
+/* ─── Promociones: tonos festivos (dorado y verde) ─── */
 .etiqueta-promo {
   position: absolute;
   top: 8px;
@@ -404,6 +478,12 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   font-size: 11px;
   font-weight: 700;
   color: #fff;
-  background: var(--i-baja);
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.4);
 }
 .precio-antes { font-size: 12px; font-weight: 500; color: var(--i-sutil); margin-right: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .giro, .marca, .plato { transition: none; }
+  .ver-ficha { animation: none; }
+}

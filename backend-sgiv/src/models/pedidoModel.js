@@ -168,14 +168,14 @@ const obtenerMesaPorCodigo = async (codigo) => {
 const obtenerCatalogoMenu = async (id_sucursal) => {
     const r = await db.query(`
         SELECT p.id_producto, p.nombre_producto, p.descripcion_producto,
-               p.precio_unitario, p.url_imagen,
+               p.precio_unitario, p.url_imagen, p.ingredientes, p.preparacion, p.destacado,
                c.id_categoria, c.nombre_categoria,
                GREATEST(i.cantidad_actual, 0)::int AS stock_actual
         FROM producto p
         JOIN categoria_producto  c ON c.id_categoria = p.id_categoria
         JOIN inventario_sucursal i ON i.id_producto  = p.id_producto AND i.id_sucursal = $1
         WHERE p.estado_activo = TRUE AND p.mostrar_en_menu IS NOT FALSE
-        ORDER BY c.nombre_categoria, p.nombre_producto
+        ORDER BY c.orden, c.nombre_categoria, p.nombre_producto
     `, [id_sucursal]);
     return r.rows;
 };
