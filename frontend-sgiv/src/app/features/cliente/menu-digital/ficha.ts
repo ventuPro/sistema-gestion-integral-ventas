@@ -1,75 +1,61 @@
 // ─── Ficha del producto en el menú QR: ingredientes, preparación y categorías ───
+import {
+  Apple, Banana, Beef, CakeSlice, Candy, Cherry, Citrus, Coffee, Cookie, Croissant, CupSoda, Dessert,
+  Droplet, Drumstick, Egg, GlassWater, Grape, Ham, IceCreamCone, Leaf, LucideIconData, Milk, Nut,
+  Sandwich, ShoppingBasket, Sparkle, UtensilsCrossed, Wheat
+} from 'lucide-angular';
 
 const sinTildes = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 // El primero que coincide gana (por eso «dulce de leche» va antes que «leche»)
-const EMOJI_INGREDIENTE: [RegExp, string][] = [
-  [/dulce de leche|manjar|caramelo|flan/, '🍮'],
-  [/chocolate|cacao|nutella/, '🍫'],
-  [/oreo|galleta/, '🍪'],
-  [/huevo|yema|clara/, '🥚'],
-  [/leche|yogur/, '🥛'],
-  [/harina|trigo|avena|integral/, '🌾'],
-  [/maicena|maiz|choclo/, '🌽'],
-  [/mantequilla|margarina/, '🧈'],
-  [/crema|nata|chantilly|merengue|helado/, '🍦'],
-  [/queso/, '🧀'],
-  [/jamon|tocino/, '🥓'],
-  [/pollo/, '🍗'],
-  [/carne|res\b/, '🥩'],
-  [/fresa|frutilla|mermelada/, '🍓'],
-  [/manzana/, '🍎'],
-  [/durazno|melocoton/, '🍑'],
-  [/platano|banana/, '🍌'],
-  [/limon|lima/, '🍋'],
-  [/naranja|mandarina/, '🍊'],
-  [/pina|anana/, '🍍'],
-  [/cereza|guinda/, '🍒'],
-  [/uva|pasa/, '🍇'],
-  [/coco/, '🥥'],
-  [/nuez|almendra|mani|castana|pecana/, '🥜'],
-  [/miel/, '🍯'],
-  [/cafe|moca/, '☕'],
-  [/\bte\b|mate|manzanilla|hierba/, '🍵'],
-  [/tomate/, '🍅'],
-  [/cebolla/, '🧅'],
-  [/aceituna|aceite|oliva/, '🫒'],
-  [/pan\b|levadura|masa|hojaldre/, '🍞'],
-  [/gelatina/, '🍮'],
-  [/azucar|stevia|endulzante/, '🍬'],
-  [/canela|vainilla|clavo|anis|especia/, '🌿'],
-  [/sal\b/, '🧂'],
-  [/agua|hielo/, '💧']
+const ICONO_INGREDIENTE: [RegExp, LucideIconData][] = [
+  [/dulce de leche|manjar|caramelo|flan|gelatina/, Dessert],
+  [/chocolate|cacao|nutella|azucar|stevia|endulzante|miel/, Candy],
+  [/oreo|galleta/, Cookie],
+  [/huevo|yema|clara/, Egg],
+  [/leche|yogur|crema|nata|chantilly|mantequilla|margarina/, Milk],
+  [/harina|trigo|avena|integral|maicena|maiz|pan\b|levadura|masa|hojaldre/, Wheat],
+  [/merengue|helado/, IceCreamCone],
+  [/jamon|tocino|queso/, Ham],
+  [/pollo/, Drumstick],
+  [/carne|res\b/, Beef],
+  [/fresa|frutilla|cereza|guinda|mermelada/, Cherry],
+  [/manzana|durazno|melocoton|pina|anana/, Apple],
+  [/platano|banana/, Banana],
+  [/limon|lima|naranja|mandarina/, Citrus],
+  [/uva|pasa/, Grape],
+  [/nuez|almendra|mani|castana|pecana|coco/, Nut],
+  [/cafe|moca/, Coffee],
+  [/\bte\b|mate|manzanilla|hierba|canela|vainilla|clavo|anis|especia|tomate|cebolla|aceituna|oliva/, Leaf],
+  [/agua|hielo/, Droplet]
 ];
 
-export interface Ingrediente { nombre: string; emoji: string; }
+export interface Ingrediente { nombre: string; icono: LucideIconData; }
 
 export const listaIngredientes = (texto: string | null | undefined): Ingrediente[] =>
   String(texto || '').split(/[,;\n]+/).map(t => t.trim()).filter(Boolean).slice(0, 15).map(nombre => ({
     nombre: nombre.charAt(0).toUpperCase() + nombre.slice(1),
-    emoji: EMOJI_INGREDIENTE.find(([r]) => r.test(sinTildes(nombre)))?.[1] ?? '✨'
+    icono: ICONO_INGREDIENTE.find(([r]) => r.test(sinTildes(nombre)))?.[1] ?? Sparkle
   }));
 
 /** Cada renglón es un paso */
 export const pasosPreparacion = (texto: string | null | undefined): string[] =>
   String(texto || '').split('\n').map(t => t.trim()).filter(Boolean).slice(0, 8);
 
-const EMOJI_CATEGORIA: [RegExp, string][] = [
-  [/torta|pastel|postre/, '🍰'],
-  [/masa.*dulce|dulce|bolleria/, '🥐'],
-  [/salad|empanada|sandwich/, '🥟'],
-  [/\bte\b|cafe|infusion/, '☕'],
-  [/galleta/, '🍪'],
-  [/jugo|licuado/, '🧃'],
-  [/refresco|gaseosa|bebida/, '🥤'],
-  [/agua/, '💧'],
-  [/helado/, '🍨'],
-  [/pan\b/, '🍞'],
-  [/almacen|abarrote/, '🛒']
+const ICONO_CATEGORIA: [RegExp, LucideIconData][] = [
+  [/torta|pastel|postre/, CakeSlice],
+  [/masa.*dulce|dulce|bolleria|pan\b/, Croissant],
+  [/salad|empanada|sandwich/, Sandwich],
+  [/\bte\b|cafe|infusion/, Coffee],
+  [/galleta/, Cookie],
+  [/jugo|licuado|refresco|gaseosa|bebida/, CupSoda],
+  [/agua/, GlassWater],
+  [/helado/, IceCreamCone],
+  [/almacen|abarrote/, ShoppingBasket]
 ];
 
-export const emojiCategoria = (nombre: string): string =>
-  EMOJI_CATEGORIA.find(([r]) => r.test(sinTildes(nombre)))?.[1] ?? '🍽️';
+export const iconoCategoria = (nombre: string): LucideIconData =>
+  ICONO_CATEGORIA.find(([r]) => r.test(sinTildes(nombre)))?.[1] ?? UtensilsCrossed;
 
 /** «MASAS SALADAS» → «Masas saladas»; lo que ya tiene minúsculas se respeta */
 export const nombreBonito = (nombre: string): string => {

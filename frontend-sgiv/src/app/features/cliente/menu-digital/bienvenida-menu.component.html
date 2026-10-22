@@ -1,6 +1,9 @@
 <div class="bienvenida bg-gradient-to-br from-blue-600 to-indigo-600" role="dialog" aria-modal="true" aria-labelledby="titulo-bienvenida">
-  <div class="burbujas" aria-hidden="true">
-    @for (e of postres; track $index) { <span [style.--i]="$index">{{ e }}</span> }
+  <div class="fondo" aria-hidden="true">
+    <span class="luz l1"></span><span class="luz l2"></span><span class="luz l3"></span>
+    @for (icono of siluetas; track $index) {
+      <lucide-icon [img]="icono" class="silueta" [style.--i]="$index" [strokeWidth]="1.25"></lucide-icon>
+    }
   </div>
 
   <div class="contenido">
@@ -13,7 +16,10 @@
         <p class="text-white/90 text-[15px] mt-3">{{ ajustes.config().menu_mensaje_bienvenida }}</p>
       }
       @if (promociones()) {
-        <p class="promos">🎉 {{ promociones() === 1 ? 'Hoy tenemos 1 promoción' : 'Hoy tenemos ' + promociones() + ' promociones' }}</p>
+        <p class="promos">
+          <lucide-icon [img]="icons.promo" class="w-4 h-4"></lucide-icon>
+          {{ promociones() === 1 ? 'Hoy tenemos 1 promoción' : 'Hoy tenemos ' + promociones() + ' promociones' }}
+        </p>
       }
     </div>
 
@@ -23,9 +29,15 @@
     }
 
     <ol class="pasos aparecer" style="--d: 2">
-      <li><span class="emoji">🍰</span> Elige del menú</li>
-      <li><span class="emoji">📨</span> Envía tu pedido</li>
-      <li><span class="emoji">💳</span> Paga en caja</li>
+      @for (paso of pasos; track paso.texto; let i = $index) {
+        <li>
+          <span class="circulo">
+            <lucide-icon [img]="paso.icono" class="w-5 h-5" [strokeWidth]="1.75"></lucide-icon>
+            <span class="numero">{{ i + 1 }}</span>
+          </span>
+          {{ paso.texto }}
+        </li>
+      }
     </ol>
 
     <form class="tarjeta aparecer" style="--d: 3" (submit)="$event.preventDefault(); entrar.emit()">

@@ -19,9 +19,9 @@ const pool = new Pool({
 pool.connect()
     .then(client => {
         client.release();
-        console.log(`✅ Conexión exitosa a la base de datos PostgreSQL (${process.env.DB_NAME})`);
+        console.log(`Conexión exitosa a la base de datos PostgreSQL (${process.env.DB_NAME})`);
     })
-    .catch(err => console.error('❌ Error al conectar a la base de datos', err.stack));
+    .catch(err => console.error('ERROR al conectar a la base de datos', err.stack));
 
 // ─── Contexto de auditoría ───
 // Antes de cada consulta se indica a PostgreSQL quién la hace; los triggers

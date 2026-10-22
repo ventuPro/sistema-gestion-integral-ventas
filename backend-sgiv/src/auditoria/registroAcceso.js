@@ -60,7 +60,7 @@ const registrarAcceso = async (req, res, next) => {
             ctx.id_acceso = r.rows[0].id_acceso;
         }
     } catch (e) {
-        console.error('❌ Auditoría no disponible:', e.message);
+        console.error('ERROR: Auditoría no disponible:', e.message);
         return res.status(503).json({ error: 'El registro de auditoría no está disponible. Intente más tarde.' });
     }
 

@@ -3,11 +3,11 @@
     <lucide-icon [img]="icons.estrella" class="w-4 h-4"></lucide-icon> Recomendados de la casa
   </h2>
 
-  <div #pista class="pista" (scroll)="alDesplazar()" (pointerdown)="pausar()">
+  <div #pista class="pista" [class.unico]="productos().length === 1" (scroll)="alDesplazar()" (pointerdown)="pausar()">
     @for (p of productos(); track p.id_producto) {
       <article class="tarjeta" (click)="ver.emit(p)">
         @if (p.url_imagen) { <img [src]="p.url_imagen | imagenUrl" [alt]="p.nombre_producto" loading="lazy"> }
-        @else { <span class="sin-foto" aria-hidden="true">{{ emojiCategoria(p.nombre_categoria) }}</span> }
+        @else { <span class="sin-foto" aria-hidden="true"><lucide-icon [img]="iconoCategoria(p.nombre_categoria)" class="w-16 h-16" [strokeWidth]="1.25"></lucide-icon></span> }
         <div class="velo"></div>
         <div class="datos">
           <p class="nombre">{{ nombreBonito(p.nombre_producto) }}</p>

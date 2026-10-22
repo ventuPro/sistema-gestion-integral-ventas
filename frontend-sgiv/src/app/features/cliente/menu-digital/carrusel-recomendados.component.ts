@@ -1,7 +1,7 @@
 import { Component, DestroyRef, ElementRef, afterNextRender, inject, input, output, signal, viewChild } from '@angular/core';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { LucideAngularModule, Plus, Star } from 'lucide-angular';
-import { emojiCategoria, nombreBonito } from './ficha';
+import { iconoCategoria, nombreBonito } from './ficha';
 
 // ─── Carrusel «Recomendados de la casa» (bienvenida y menú) ───
 // Avanza solo cada pocos segundos; se detiene un rato si el cliente lo toca.
@@ -23,7 +23,7 @@ export class CarruselRecomendadosComponent {
 
   readonly icons = { mas: Plus, estrella: Star };
   readonly Number = Number;
-  readonly emojiCategoria = emojiCategoria;
+  readonly iconoCategoria = iconoCategoria;
   readonly nombreBonito = nombreBonito;
 
   private readonly pista = viewChild<ElementRef<HTMLElement>>('pista');

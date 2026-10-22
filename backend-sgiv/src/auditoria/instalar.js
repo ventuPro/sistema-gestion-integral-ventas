@@ -60,8 +60,8 @@ const instalarAuditoria = async () => {
 // npm run auditoria:instalar
 if (require.main === module) {
     instalarAuditoria()
-        .then(r => console.log(`✅ Auditoría lista en "${r.bdAuditoria}" (${r.tablas} tablas con triggers)`))
-        .catch(e => { console.error('❌ Error instalando la auditoría:', e.message); process.exit(1); });
+        .then(r => console.log(`Auditoría lista en "${r.bdAuditoria}" (${r.tablas} tablas con triggers)`))
+        .catch(e => { console.error('ERROR instalando la auditoría:', e.message); process.exit(1); });
 }
 
 module.exports = { instalarAuditoria, nombreBdAuditoria };

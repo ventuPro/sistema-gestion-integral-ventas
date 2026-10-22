@@ -10,12 +10,12 @@ const SECRETOS_INSEGUROS = ['ventupro2503_Security_key', '123456789', 'secret', 
 const obtenerSecretoJWT = () => {
     const secreto = (process.env.JWT_SECRET || '').trim();
     if (!secreto) {
-        console.warn('⚠️  JWT_SECRET no está definido: se usa un secreto aleatorio temporal. ' +
+        console.warn('AVISO: JWT_SECRET no está definido: se usa un secreto aleatorio temporal. ' +
                      'Las sesiones se cerrarán cada vez que se reinicie el servidor.');
         return crypto.randomBytes(64).toString('hex');
     }
     if (secreto.length < 32 || SECRETOS_INSEGUROS.includes(secreto)) {
-        console.warn('⚠️  JWT_SECRET es débil o conocido. Genere uno con: ' +
+        console.warn('AVISO: JWT_SECRET es débil o conocido. Genere uno con: ' +
                      'node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
     }
     return secreto;

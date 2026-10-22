@@ -6,7 +6,7 @@
 --    2. Abrir este archivo (ícono de carpeta).
 --    3. Seleccionar UNA consulta con el mouse y presionar F5.
 --       (Sin selección, F5 ejecuta todo el archivo y solo muestra el último resultado.)
---    4. Los valores marcados con  ◄  se cambian por los que se quieran buscar.
+--    4. Los valores marcados con  <--  se cambian por los que se quieran buscar.
 --
 --  Tablas:  registro_acceso  → cada petición a la API (sesiones, consultas, operaciones)
 --           registro_cambio  → cada INSERT/UPDATE/DELETE en sgiv_db, con datos antes/después
@@ -100,14 +100,14 @@ ORDER BY s.id_acceso DESC;
 -- 3.1 Todo lo que se hizo en UNA sesión, en orden (huella de la consulta 2.5)
 SELECT id_acceso, fecha, hasta, veces, evento, peticion, estado_http, filas_modificadas
 FROM v_accesos
-WHERE sesion = 'c325214f59aae1ee'                                   -- ◄ huella de la sesión
+WHERE sesion = 'c325214f59aae1ee'                                   -- <-- huella de la sesión
 ORDER BY id_acceso;
 
 -- 3.2 Todo lo que hizo un usuario entre dos fechas (sin consultas GET)
 SELECT id_acceso, fecha, evento, ip, peticion, estado_http, filas_modificadas
 FROM v_accesos
-WHERE usuario LIKE '%admin@rickys.com%'                              -- ◄ correo del usuario
-  AND fecha_hora >= '2026-10-01' AND fecha_hora < '2026-11-01'      -- ◄ rango de fechas
+WHERE usuario LIKE '%admin@rickys.com%'                              -- <-- correo del usuario
+  AND fecha_hora >= '2026-10-01' AND fecha_hora < '2026-11-01'      -- <-- rango de fechas
   AND metodo <> 'GET'
 ORDER BY id_acceso;
 
@@ -124,7 +124,7 @@ ORDER BY id_acceso;
 SELECT ip, usuario, sesion, count(*) AS filas, sum(veces) AS peticiones,
        min(fecha) AS desde, max(COALESCE(hasta, fecha)) AS hasta
 FROM v_accesos
-WHERE ip = '192.168.1.10'                                           -- ◄ IP
+WHERE ip = '192.168.1.10'                                           -- <-- IP
 GROUP BY ip, usuario, sesion ORDER BY desde DESC;
 
 -- 3.5 IPs desde las que se conectó cada usuario
@@ -176,8 +176,8 @@ GROUP BY 1 ORDER BY 1;
 SELECT id_acceso, fecha, usuario, ip, peticion, estado_http, filas_modificadas
 FROM v_accesos
 WHERE metodo <> 'GET'
-  AND (extract(hour FROM fecha_hora AT TIME ZONE 'America/La_Paz') < 7          -- ◄ hora de apertura
-    OR extract(hour FROM fecha_hora AT TIME ZONE 'America/La_Paz') >= 22)       -- ◄ hora de cierre
+  AND (extract(hour FROM fecha_hora AT TIME ZONE 'America/La_Paz') < 7          -- <-- hora de apertura
+    OR extract(hour FROM fecha_hora AT TIME ZONE 'America/La_Paz') >= 22)       -- <-- hora de cierre
 ORDER BY id_acceso DESC LIMIT 50;
 
 -- 4.8 Consultas automáticas más repetidas (las que se agrupan)
@@ -211,12 +211,12 @@ ORDER BY id_cambio DESC;
 -- 5.4 Historial completo de UN registro (desde que se creó hasta hoy)
 SELECT fecha, usuario, operacion, campos_modificados, datos_anteriores, datos_nuevos, origen
 FROM v_cambios
-WHERE tabla = 'producto' AND id_registro = '1'                       -- ◄ tabla e id
+WHERE tabla = 'producto' AND id_registro = '1'                       -- <-- tabla e id
 ORDER BY id_cambio;
 
 -- 5.5 Qué cambió una petición concreta (id_acceso de las consultas 3.x o 4.x)
 SELECT tabla, operacion, id_registro, campos_modificados, datos_anteriores, datos_nuevos
-FROM v_cambios WHERE id_acceso = 123                                 -- ◄ id_acceso
+FROM v_cambios WHERE id_acceso = 123                                 -- <-- id_acceso
 ORDER BY id_cambio;
 
 -- 5.6 Detalle de la ÚLTIMA operación que modificó datos
@@ -227,11 +227,11 @@ ORDER BY id_cambio;
 
 -- 5.7 Quién cambió un campo concreto y a qué valor (ej.: precios)
 SELECT fecha, usuario, tabla, id_registro,
-       datos_anteriores ->> 'precio_unitario' AS antes,                -- ◄ campo
+       datos_anteriores ->> 'precio_unitario' AS antes,                -- <-- campo
        datos_nuevos     ->> 'precio_unitario' AS despues,
        origen
 FROM v_cambios
-WHERE 'precio_unitario' = ANY (campos_modificados)                   -- ◄ campo
+WHERE 'precio_unitario' = ANY (campos_modificados)                   -- <-- campo
 ORDER BY id_cambio DESC;
 
 
@@ -368,7 +368,7 @@ SELECT a.fecha, a.usuario, a.ip, a.peticion, a.estado_http,
        c.tabla, c.operacion, c.id_registro, c.campos_modificados, c.datos_anteriores, c.datos_nuevos
 FROM v_accesos a
 LEFT JOIN v_cambios c ON c.id_acceso = a.id_acceso
-WHERE a.fecha_hora >= '2026-10-16 08:00' AND a.fecha_hora < '2026-10-16 12:00'   -- ◄ período (hora de Bolivia)
+WHERE a.fecha_hora >= '2026-10-16 08:00' AND a.fecha_hora < '2026-10-16 12:00'   -- <-- período (hora de Bolivia)
   AND (a.metodo <> 'GET' OR a.estado_http >= 400)
 ORDER BY a.id_acceso, c.id_cambio;
 
@@ -381,8 +381,8 @@ ORDER BY id_cambio DESC;
 -- 10.3 Buscar un texto en cualquier dato modificado (nombre, NIT, monto, etc.)
 SELECT fecha, usuario, tabla, operacion, id_registro, datos_anteriores, datos_nuevos
 FROM v_cambios
-WHERE datos_anteriores::text ILIKE '%torta%'                         -- ◄ texto
-   OR datos_nuevos::text     ILIKE '%torta%'                         -- ◄ texto
+WHERE datos_anteriores::text ILIKE '%torta%'                         -- <-- texto
+   OR datos_nuevos::text     ILIKE '%torta%'                         -- <-- texto
 ORDER BY id_cambio DESC LIMIT 50;
 
 

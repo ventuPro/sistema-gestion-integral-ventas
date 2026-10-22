@@ -128,7 +128,7 @@ const guardarPermisosUsuario = async (id_usuario, permisos) => {
     MODULOS.forEach(m => saved[m] = false);
     r.rows.forEach(row => { saved[row.modulo] = row.tiene_acceso === true; });
 
-    console.log(`[permisos] ✅ uid=${uid} → ${guardados.length} módulos guardados/actualizados`);
+    console.log(`[permisos] uid=${uid} → ${guardados.length} módulos guardados/actualizados`);
     return saved;
 };
 

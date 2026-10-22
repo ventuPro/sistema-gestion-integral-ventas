@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, OnInit, OnDestroy, signal, untracked } from '@angular/core';
+import { Component, afterRenderEffect, computed, effect, inject, OnInit, OnDestroy, signal, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -12,12 +12,13 @@ import { ConfirmacionComponent } from '../../shared/confirmacion/confirmacion.co
 import type { MensajeChat } from '../../shared/asistente/asistente-chat.component';
 import { componenteDiferido } from '../../../core/utils/diferido';
 import { Cotizacion, etiquetaPromocion } from '../../../core/services/promocion.service';
-import { LucideAngularModule, UtensilsCrossed, ShoppingBag, ReceiptText, Search, X, Minus, Plus, Check,
-         SearchX, WifiOff, PartyPopper, Pencil, BadgePercent, LayoutGrid, ChevronDown, Info, RotateCcw } from 'lucide-angular';
+import { LucideAngularModule, LucideIconData, UtensilsCrossed, ShoppingBag, ReceiptText, Search, X, Minus, Plus, Check,
+         SearchX, WifiOff, PartyPopper, Pencil, BadgePercent, LayoutGrid, ChevronDown, Info, RotateCcw,
+         Sparkles, ShoppingBasket, ChefHat } from 'lucide-angular';
 import { CarruselRecomendadosComponent } from './carrusel-recomendados.component';
 import { BienvenidaMenuComponent } from './bienvenida-menu.component';
 import { PanelMenuComponent } from './panel-menu.component';
-import { emojiCategoria, listaIngredientes, nombreBonito, pasosPreparacion } from './ficha';
+import { iconoCategoria, listaIngredientes, nombreBonito, pasosPreparacion } from './ficha';
 
 type Vista = 'menu' | 'carrito' | 'pedidos';
 
@@ -76,7 +77,8 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly icons  = { menu: UtensilsCrossed, carrito: ShoppingBag, mesa: ReceiptText, buscar: Search, cerrar: X,
                       menos: Minus, mas: Plus, listo: Check, sinResultados: SearchX, sinConexion: WifiOff,
                       qrInvalido: SearchX, gracias: PartyPopper, editar: Pencil, promo: BadgePercent,
-                      categorias: LayoutGrid, abrir: ChevronDown, info: Info, volver: RotateCcw };
+                      categorias: LayoutGrid, abrir: ChevronDown, info: Info, volver: RotateCcw,
+                      filtroPromo: Sparkles, ingredientes: ShoppingBasket, preparacion: ChefHat };
   readonly nombreBonito = nombreBonito;
 
   private route = inject(ActivatedRoute);
@@ -101,7 +103,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   // ─── Catálogo (llega ordenado por el orden de categorías del admin) ───
   readonly catalogo        = signal<any[]>([]);
-  readonly categorias      = signal<{ id: number; nombre: string; emoji: string; cantidad: number }[]>([]);
+  private readonly ordenCategorias = signal<{ id: number; nombre: string; icono: LucideIconData }[]>([]);
   readonly busqueda        = signal('');
   readonly buscando        = signal(false);
   readonly promoFiltro     = signal<string | null>(null);
@@ -109,17 +111,23 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly volteadas       = signal<ReadonlySet<number>>(new Set());
   readonly resaltado       = signal<number | null>(null);
 
-  // ─── Cabecera: se achica al bajar y muestra la categoría que se está viendo ───
-  readonly compacto        = signal(false);
+  // ─── La cabecera muestra la categoría que se está viendo ───
   readonly seccionActual   = signal<number | null>(null);
 
-  /** Los agotados van al final de cada categoría para que el cliente vea primero lo que puede pedir */
+  /** Solo lo que tiene stock; si vuelve a haber, reaparece solo (llega por socket) */
+  readonly disponibles = computed(() => this.catalogo().filter(p => p.stock_actual > 0));
+
+  readonly categorias = computed(() => {
+    const conteo = new Map<number, number>();
+    for (const p of this.disponibles()) conteo.set(Number(p.id_categoria), (conteo.get(Number(p.id_categoria)) || 0) + 1);
+    return this.ordenCategorias().filter(c => conteo.has(c.id)).map(c => ({ ...c, cantidad: conteo.get(c.id)! }));
+  });
+
   readonly catalogoFiltrado = computed(() => {
     const texto = this.busqueda().trim().toLowerCase(), promo = this.promoFiltro();
-    return this.catalogo().filter(p =>
+    return this.disponibles().filter(p =>
       (!promo || p.promocion?.nombre === promo) &&
-      (!texto || p.nombre_producto.toLowerCase().includes(texto))
-    ).sort((a, b) => Number(a.stock_actual <= 0) - Number(b.stock_actual <= 0));
+      (!texto || p.nombre_producto.toLowerCase().includes(texto)));
   });
 
   readonly secciones = computed(() => {
@@ -142,7 +150,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   /** Productos con cada promoción (para «Ver productos» en el panel de promociones) */
   readonly productosPorPromo = computed(() => {
     const conteo: Record<string, number> = {};
-    for (const p of this.catalogo()) if (p.promocion) conteo[p.promocion.nombre] = (conteo[p.promocion.nombre] || 0) + 1;
+    for (const p of this.disponibles()) if (p.promocion) conteo[p.promocion.nombre] = (conteo[p.promocion.nombre] || 0) + 1;
     return conteo;
   });
 
@@ -194,17 +202,25 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   private timers: (() => void)[] = [];
   private avisoTimer: any;
   private resaltadoTimer: any;
-  private esperaScroll = false;
+  // Posición de cada título de categoría: se mide al cambiar la página, no en cada paso del scroll
+  private posiciones: { id: number; top: number }[] = [];
+  private linea = 0;
+  private tamano: ResizeObserver | null = null;
   private readonly alDesplazar = () => {
-    if (this.esperaScroll) return;
-    this.esperaScroll = true;
-    requestAnimationFrame(() => { this.esperaScroll = false; this.medirScroll(); });
+    const y = scrollY + this.linea;
+    let actual: number | null = null;
+    for (const s of this.posiciones) { if (s.top > y) break; actual = s.id; }
+    this.seccionActual.set(actual);
   };
 
   constructor() {
     effect(() => {
       const clave = this.claveCarrito();
       untracked(() => this.cotizarCarrito(clave));
+    });
+    afterRenderEffect(() => {
+      this.secciones(); this.vista(); this.estadoCarga();
+      untracked(() => this.medirSecciones());
     });
   }
 
@@ -228,6 +244,9 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.cargarTodo();
     this.conectarSocket();
     addEventListener('scroll', this.alDesplazar, { passive: true });
+    // Fotos que cargan, tarjetas que giran o avisos que aparecen cambian el alto: se vuelve a medir
+    this.tamano = new ResizeObserver(() => this.medirSecciones());
+    this.tamano.observe(document.body);
 
     // Respaldo del socket
     this.timers.push(sondeo(() => this.refrescarEstado(), 20_000));
@@ -238,6 +257,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.socket?.disconnect();
     this.timers.forEach(detener => detener());
     removeEventListener('scroll', this.alDesplazar);
+    this.tamano?.disconnect();
     clearTimeout(this.avisoTimer);
     clearTimeout(this.resaltadoTimer);
     clearTimeout(this.esperaCotizacion);
@@ -277,14 +297,13 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
           return { ...p, stock_actual: Number(p.stock_actual) || 0, nombre: nombreBonito(p.nombre_producto),
                    ingredientes_lista: ingredientes, pasos, tiene_ficha: ingredientes.length > 0 || pasos.length > 0 };
         });
-        const cats = new Map<number, { id: number; nombre: string; emoji: string; cantidad: number }>();
+        const cats = new Map<number, { id: number; nombre: string; icono: LucideIconData }>();
         for (const p of catalogo) {
           const id = Number(p.id_categoria);
-          const c = cats.get(id) ?? { id, nombre: nombreBonito(p.nombre_categoria), emoji: emojiCategoria(p.nombre_categoria), cantidad: 0 };
-          cats.set(id, { ...c, cantidad: c.cantidad + 1 });
+          if (!cats.has(id)) cats.set(id, { id, nombre: nombreBonito(p.nombre_categoria), icono: iconoCategoria(p.nombre_categoria) });
         }
         this.catalogo.set(catalogo);
-        this.categorias.set([...cats.values()]);
+        this.ordenCategorias.set([...cats.values()]);
         if (this.promoFiltro() && !catalogo.some(p => p.promocion?.nombre === this.promoFiltro())) this.promoFiltro.set(null);
 
         // Precios al día; lo que ya no está en el menú sale del carrito
@@ -325,8 +344,8 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
     this.socket.on('pedido:estado', (d: any) => {
       if (!this.pedidos().some(p => p.id_pedido === Number(d?.id_pedido))) return;
-      if (d.estado === 'Confirmado') this.notificar('✅ ¡Tu pedido fue confirmado! Ya lo estamos preparando.');
-      if (d.estado === 'Entregado')  this.notificar('🍰 Tu pedido fue entregado. ¡Buen provecho!');
+      if (d.estado === 'Confirmado') this.notificar('¡Tu pedido fue confirmado! Ya lo estamos preparando.');
+      if (d.estado === 'Entregado')  this.notificar('Tu pedido fue entregado. ¡Buen provecho!');
       if (d.estado === 'Cancelado')  this.notificar('Tu pedido no pudo ser atendido. Consulta en caja.');
       this.refrescarEstado();
     });
@@ -423,7 +442,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
         this.enviando.set(false);
         this.gracias.set(false);
         this.vista.set('pedidos');
-        this.mostrarAviso('📨 Pedido enviado. El cajero lo confirmará en breve.');
+        this.mostrarAviso('Pedido enviado. El cajero lo confirmará en breve.');
         this.refrescarEstado();
       },
       error: (e) => {
@@ -441,26 +460,26 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   }
 
   // ─── Navegación del menú ───
-  private medirScroll() {
-    // Con margen para que no tiemble: la cabecera cambia de alto al achicarse
-    this.compacto.set(this.compacto() ? scrollY > 8 : scrollY > 90);
-    if (this.vista() !== 'menu') return;
-    const alto = (document.querySelector('.cabecera') as HTMLElement | null)?.offsetHeight ?? 0;
-    let actual: number | null = null;
-    document.querySelectorAll<HTMLElement>('[data-seccion]').forEach(el => {
-      if (el.getBoundingClientRect().top <= alto + 24) actual = Number(el.dataset['seccion']);
-    });
-    this.seccionActual.set(actual);
+  /** Alto de la cabecera que queda fija al bajar (el logo y el nombre se van con la página) */
+  private altoFijo(): number {
+    const cabecera = document.querySelector('.cabecera') as HTMLElement | null;
+    return cabecera ? cabecera.offsetHeight + (parseFloat(getComputedStyle(cabecera).top) || 0) : 0;
   }
 
-  /** Baja hasta el elemento dejando lugar a la cabecera ya achicada */
+  private medirSecciones() {
+    const enMenu = this.vista() === 'menu' && this.estadoCarga() === 'listo';
+    this.linea = this.altoFijo() + 24;
+    this.posiciones = !enMenu ? [] : Array.from(document.querySelectorAll<HTMLElement>('[data-seccion]'), el =>
+      ({ id: Number(el.dataset['seccion']), top: el.getBoundingClientRect().top + scrollY }));
+    this.alDesplazar();
+  }
+
+  /** Baja hasta el elemento dejando lugar a la cabecera fija */
   private bajarA(id: string) {
     requestAnimationFrame(() => {
       const el = document.getElementById(id);
-      const cabecera = document.querySelector('.cabecera') as HTMLElement | null;
-      if (!el || !cabecera) return;
-      const marca = this.compacto() ? 0 : ((cabecera.querySelector('.marca') as HTMLElement | null)?.offsetHeight ?? 0) + 16;
-      const destino = el.getBoundingClientRect().top + scrollY - (cabecera.offsetHeight - marca) - 12;
+      if (!el) return;
+      const destino = el.getBoundingClientRect().top + scrollY - this.altoFijo() - 12;
       scrollTo({ top: Math.max(0, destino), behavior: 'smooth' });
     });
   }
@@ -546,7 +565,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
         if (cuentaCerrada && yaConsumia && !res.cuenta) this.gracias.set(true);
         // Pagó su parte y la mesa sigue abierta
         if (Number(antes?.mi_pendiente) > 0 && res.cuenta && Number(res.cuenta.mi_pendiente) === 0
-            && Number(res.cuenta.mi_pagado) > 0) this.notificar('✅ Tu parte ya está pagada. ¡Gracias!');
+            && Number(res.cuenta.mi_pagado) > 0) this.notificar('Tu parte ya está pagada. ¡Gracias!');
 
         this.cuenta.set(res.cuenta);
         this.pedidos.set(res.pedidos || []);

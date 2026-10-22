@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnInit, OnDestroy, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
-import { LucideAngularModule, Bell, X, Check, Minus, Plus, Trash2, Volume2, VolumeX, Truck } from 'lucide-angular';
+import { LucideAngularModule, Bell, X, Check, Minus, Plus, Trash2, Volume2, VolumeX, Truck, NotebookPen, MessageSquare } from 'lucide-angular';
 import { PedidoService } from '../../../core/services/pedido.service';
 import { SocketService } from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
@@ -31,7 +31,8 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
   readonly moneda        = inject(AjustesService).moneda;
 
   readonly icons = { bell: Bell, x: X, check: Check, minus: Minus, plus: Plus,
-                     trash: Trash2, sonido: Volume2, silencio: VolumeX, delivery: Truck };
+                     trash: Trash2, sonido: Volume2, silencio: VolumeX, delivery: Truck,
+                     nota: NotebookPen, observacion: MessageSquare };
 
   private readonly RECORDATORIO_MS = 60_000;
   private readonly RESPALDO_MS     = 30_000;
@@ -69,7 +70,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     this.subs.push(this.socketService.escuchar<any>('pedido:nuevo').subscribe(d => {
       if (!this.esDeMiSucursal(d)) return;
       this.sonar();
-      this.dialogo.avisar(`🔔 Nuevo pedido de la Mesa ${d.numero_mesa}${d.nombre_cliente ? ` (${d.nombre_cliente})` : ''}`);
+      this.dialogo.avisar(`Nuevo pedido de la Mesa ${d.numero_mesa}${d.nombre_cliente ? ` (${d.nombre_cliente})` : ''}`);
       this.cargar();
     }));
     this.subs.push(this.socketService.escuchar<any>('pedido:actualizado').subscribe(d => {
@@ -142,7 +143,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
 
   confirmar(pedido: any) {
     this.ejecutar(pedido, this.pedidoService.confirmar(pedido.id_pedido),
-                  `✓ Pedido de la Mesa ${pedido.numero_mesa} confirmado y cargado a su cuenta`);
+                  `Pedido de la Mesa ${pedido.numero_mesa} confirmado y cargado a su cuenta`);
   }
 
   async rechazar(pedido: any) {

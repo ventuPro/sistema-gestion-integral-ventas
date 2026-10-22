@@ -26,6 +26,9 @@ const disponible = () => !!process.env.GROQ_API_KEY;
 const ESTADOS = { SIN_CLAVE: 503, CLAVE_INVALIDA: 502, OCUPADO: 429, SIN_CONEXION: 502, MODELO_INVALIDO: 400, ERROR: 502 };
 
 /** Responde el error de IA con su mensaje; los demás errores, como 500 */
+// El sistema no muestra emojis: se quitan aunque el modelo los ponga
+const sinEmojis = (texto) => texto.replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}\u{1F3FB}-\u{1F3FF}]+ ?/gu, '').trim();
+
 const responderError = (res, e, contexto) => {
     if (e instanceof ErrorIA) return res.status(ESTADOS[e.codigo]).json({ error: e.message, codigo: e.codigo });
     console.error(`${contexto}:`, e);
@@ -126,7 +129,7 @@ const conversar = async ({ perfil = 'cliente', sistema, mensajes, herramientas =
         tokens += r.usage?.total_tokens || 0;
         const m = r.choices?.[0]?.message || {};
         if (!m.tool_calls?.length)
-            return { texto: (m.content || '').trim() || 'No tengo una respuesta para eso.', herramientas: usadas, tokens, modelo: r.modelo };
+            return { texto: sinEmojis(m.content || '') || 'No tengo una respuesta para eso.', herramientas: usadas, tokens, modelo: r.modelo };
 
         historial.push({ role: 'assistant', content: m.content || '', tool_calls: m.tool_calls });
         for (const llamada of m.tool_calls) {

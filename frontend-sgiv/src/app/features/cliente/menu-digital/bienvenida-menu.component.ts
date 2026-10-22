@@ -1,6 +1,6 @@
 import { Component, inject, input, model, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, ArrowRight } from 'lucide-angular';
+import { LucideAngularModule, ArrowRight, BookOpen, CakeSlice, Coffee, Cookie, Croissant, CupSoda, Dessert, IceCreamCone, Send, Sparkles, Wallet } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { CarruselRecomendadosComponent } from './carrusel-recomendados.component';
 import { saludo } from './ficha';
@@ -23,6 +23,11 @@ export class BienvenidaMenuComponent {
   readonly ajustes = inject(AjustesService);
   readonly moneda  = this.ajustes.moneda;
   readonly saludo  = saludo();
-  readonly icons   = { entrar: ArrowRight };
-  readonly postres = ['🍰', '🥐', '☕', '🍪', '🧁', '🍩', '🥧', '🍫'];
+  readonly icons   = { entrar: ArrowRight, promo: Sparkles };
+  readonly siluetas = [CakeSlice, Croissant, Coffee, Cookie, Dessert, IceCreamCone, CupSoda, CakeSlice];
+  readonly pasos = [
+    { icono: BookOpen, texto: 'Elige del menú' },
+    { icono: Send,     texto: 'Envía tu pedido' },
+    { icono: Wallet,   texto: 'Paga en caja' }
+  ];
 }

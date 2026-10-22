@@ -82,7 +82,7 @@
             <li *ngFor="let it of p.items" class="px-4 py-2.5 flex items-center gap-3">
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-semibold text-gray-800">{{ it.nombre_producto }}</p>
-                <p *ngIf="it.nota_cliente" class="text-xs text-amber-700">📝 {{ it.nota_cliente }}</p>
+                <p *ngIf="it.nota_cliente" class="text-xs text-amber-700 flex items-center gap-1"><lucide-icon [img]="icons.nota" class="w-3 h-3 shrink-0"></lucide-icon> {{ it.nota_cliente }}</p>
                 <p class="text-xs text-gray-400">{{ moneda() }} {{ (+it.subtotal).toFixed(2) }}</p>
               </div>
               <div class="flex items-center gap-1.5 flex-shrink-0">
@@ -106,8 +106,8 @@
             </li>
           </ul>
 
-          <p *ngIf="p.observacion_general" class="mx-4 mb-2 text-xs bg-gray-50 border rounded-lg px-3 py-2 text-gray-600">
-            💬 {{ p.observacion_general }}
+          <p *ngIf="p.observacion_general" class="mx-4 mb-2 text-xs bg-gray-50 border rounded-lg px-3 py-2 text-gray-600 flex items-start gap-1.5">
+            <lucide-icon [img]="icons.observacion" class="w-3.5 h-3.5 shrink-0 mt-px"></lucide-icon> {{ p.observacion_general }}
           </p>
 
           <p *ngIf="errores()[p.id_pedido]" class="mx-4 mb-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">
@@ -143,7 +143,7 @@
           <ul class="text-sm text-gray-700 space-y-1 mb-3">
             <li *ngFor="let it of p.items">
               <span class="font-bold">{{ it.cantidad }}×</span> {{ it.nombre_producto }}
-              <span *ngIf="it.nota_cliente" class="block text-xs text-amber-700 ml-5">📝 {{ it.nota_cliente }}</span>
+              <span *ngIf="it.nota_cliente" class="flex items-center gap-1 text-xs text-amber-700 ml-5"><lucide-icon [img]="icons.nota" class="w-3 h-3 shrink-0"></lucide-icon> {{ it.nota_cliente }}</span>
             </li>
           </ul>
           <p *ngIf="errores()[p.id_pedido]" class="mb-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">

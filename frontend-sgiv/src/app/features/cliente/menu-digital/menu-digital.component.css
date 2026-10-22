@@ -48,10 +48,10 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.5);
 }
 
-/* Encabezado fijo con pestañas: al bajar se oculta la marca */
+/* Cabecera fija: el top negativo (14 + 48 + 12 − 10) deja ir la marca con la página sin cambiar de alto */
 .cabecera {
   position: sticky;
-  top: 0;
+  top: -64px;
   z-index: 30;
   padding: 14px 16px 12px;
   color: #fff;
@@ -61,13 +61,14 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   display: flex;
   align-items: center;
   gap: 12px;
-  max-height: 60px;
+  height: 48px;
   margin-bottom: 12px;
-  overflow: hidden;
-  transition: max-height 200ms ease, margin 200ms ease, opacity 200ms ease;
 }
-.cabecera.compacta { padding-top: 10px; }
-.cabecera.compacta .marca { max-height: 0; margin-bottom: 0; opacity: 0; }
+/* Se desvanece mientras sube (lo anima el navegador, sin JavaScript) */
+@supports (animation-timeline: scroll()) {
+  .marca { animation: desvanecer linear both; animation-timeline: scroll(root); animation-range: 0 64px; }
+}
+@keyframes desvanecer { to { opacity: 0; transform: translateY(-10px); } }
 .pestanas-menu {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -159,7 +160,15 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   font-weight: 700;
   color: var(--i-tinta);
 }
-.seccion-titulo .emoji { font-size: 20px; }
+.icono-seccion {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--color-blue-700, #1d4ed8);
+  background: color-mix(in oklab, var(--color-blue-600, #2563eb) 12%, var(--i-papel));
+}
 .seccion-titulo .cantidad {
   padding: 1px 8px;
   border-radius: 999px;
@@ -182,12 +191,12 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   border: 1px solid color-mix(in oklab, #10b981 40%, transparent);
 }
 
-/* Tarjeta de producto: gira para mostrar ingredientes y preparación */
-.plato { perspective: 1100px; border-radius: 12px; transition: box-shadow 300ms ease; }
+/* Tarjeta: gira para mostrar la ficha (3D solo si la tiene: cada capa 3D pesa al bajar) */
+.plato { border-radius: 12px; transition: box-shadow 300ms ease; }
+.plato.con-ficha { perspective: 1100px; }
 .plato.resaltado { box-shadow: 0 0 0 3px #fbbf24, 0 10px 30px -12px rgba(217, 119, 6, 0.6); }
-.giro {
-  position: relative;
-  height: 100%;
+.giro { position: relative; height: 100%; }
+.plato.con-ficha .giro {
   transform-style: preserve-3d;
   transition: transform 600ms cubic-bezier(0.3, 0.7, 0.2, 1);
 }
@@ -202,11 +211,9 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   border-radius: 12px;
   background: var(--i-papel);
   overflow: hidden;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
 }
+.plato.con-ficha .cara { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
 .cara.frente { height: 100%; }
-.plato.agotado .cara.frente { opacity: 0.55; }
 .cara.reverso {
   position: absolute;
   inset: 0;
@@ -224,7 +231,6 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
 }
 .plato .foto.con-ficha { cursor: pointer; }
 .plato .foto img { width: 100%; height: 100%; object-fit: cover; }
-.plato .foto .inicial { font-size: 36px; opacity: 0.8; }
 .etiqueta {
   position: absolute;
   top: 8px;
@@ -237,7 +243,6 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   background: rgba(255, 255, 255, 0.95);
 }
 .etiqueta.aviso { color: #b45309; }
-.etiqueta.mal { color: #b42318; }
 .ver-ficha {
   position: absolute;
   right: 8px;
@@ -271,7 +276,7 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
 }
 .ficha { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 6px; }
 .ficha-nombre { padding-right: 30px; font-size: 15px; font-weight: 700; line-height: 1.2; color: var(--i-tinta); }
-.ficha-titulo { margin: 12px 0 6px; font-size: 13px; font-weight: 700; color: #b45309; }
+.ficha-titulo { display: flex; align-items: center; gap: 6px; margin: 12px 0 6px; font-size: 13px; font-weight: 700; color: #b45309; }
 .ingredientes { display: flex; flex-wrap: wrap; gap: 4px; }
 .ingredientes li {
   display: inline-flex;
@@ -484,6 +489,7 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
 .precio-antes { font-size: 12px; font-weight: 500; color: var(--i-sutil); margin-right: 4px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .giro, .marca, .plato { transition: none; }
+  .plato.con-ficha .giro, .plato { transition: none; }
+  .marca { animation: none; }
   .ver-ficha { animation: none; }
 }

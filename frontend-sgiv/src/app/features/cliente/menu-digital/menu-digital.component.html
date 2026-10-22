@@ -36,7 +36,7 @@
     }
 
     <!-- ═══ ENCABEZADO ═══ -->
-    <header class="cabecera bg-gradient-to-br from-blue-600 to-indigo-600" [class.compacta]="compacto()">
+    <header class="cabecera bg-gradient-to-br from-blue-600 to-indigo-600">
       <div class="marca">
         @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="w-11 h-11 object-contain rounded-lg bg-white/15 p-1 flex-shrink-0"> }
         <div class="min-w-0">
@@ -73,7 +73,7 @@
           } @else {
             <button class="boton-barra flex-1 justify-between" (click)="panel.set('categorias')" aria-haspopup="dialog">
               <span class="flex items-center gap-2 min-w-0">
-                @if (categoriaVisible(); as c) { <span aria-hidden="true">{{ c.emoji }}</span> <span class="truncate">{{ c.nombre }}</span> }
+                @if (categoriaVisible(); as c) { <lucide-icon [img]="c.icono" class="w-4 h-4 shrink-0"></lucide-icon> <span class="truncate">{{ c.nombre }}</span> }
                 @else { <lucide-icon [img]="icons.categorias" class="w-4 h-4"></lucide-icon> Categorías }
               </span>
               <lucide-icon [img]="icons.abrir" class="w-4 h-4 opacity-70"></lucide-icon>
@@ -114,7 +114,7 @@
         @if (promoFiltro(); as promo) {
           <div class="px-4 pb-3">
             <button class="filtro-promo" (click)="promoFiltro.set(null)" aria-label="Quitar el filtro de promoción">
-              🎉 {{ promo }} <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+              <lucide-icon [img]="icons.filtroPromo" class="w-4 h-4"></lucide-icon> {{ promo }} <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
             </button>
           </div>
         }
@@ -134,24 +134,23 @@
 
         @for (sec of secciones(); track sec.id) {
           <h2 class="seccion-titulo" [id]="'cat-' + sec.id" [attr.data-seccion]="sec.id">
-            <span class="emoji" aria-hidden="true">{{ sec.emoji }}</span> {{ sec.nombre }}
+            <span class="icono-seccion" aria-hidden="true"><lucide-icon [img]="sec.icono" class="w-[18px] h-[18px]" [strokeWidth]="1.75"></lucide-icon></span> {{ sec.nombre }}
             <span class="cantidad">{{ sec.productos.length }}</span>
           </h2>
 
           <div class="grid grid-cols-2 grid-flow-row-dense gap-3 px-4 mb-5">
             @for (prod of sec.productos; track prod.id_producto) {
-              <article class="plato" [id]="'prod-' + prod.id_producto" [class.agotado]="prod.stock_actual <= 0"
+              <article class="plato" [id]="'prod-' + prod.id_producto" [class.con-ficha]="prod.tiene_ficha"
                        [class.volteada]="volteadas().has(prod.id_producto)" [class.resaltado]="resaltado() === prod.id_producto">
                 <div class="giro">
 
                   <!-- Frente -->
                   <div class="cara frente" [attr.aria-hidden]="volteadas().has(prod.id_producto)">
                     <div class="foto" [class.con-ficha]="prod.tiene_ficha" (click)="voltear(prod)">
-                      @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre" loading="lazy"> }
-                      @else { <span class="inicial">{{ sec.emoji }}</span> }
+                      @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre" loading="lazy" decoding="async"> }
+                      @else { <lucide-icon [img]="sec.icono" class="w-10 h-10 inf-sutil" [strokeWidth]="1.25"></lucide-icon> }
                       @if (etiquetaPromo(prod); as e) { <span class="etiqueta-promo">{{ e }}</span> }
-                      @if (prod.stock_actual <= 0) { <span class="etiqueta mal">Agotado</span> }
-                      @else if (disponible(prod) === 0) { <span class="etiqueta">En tu carrito</span> }
+                      @if (disponible(prod) === 0) { <span class="etiqueta">En tu carrito</span> }
                       @else if (disponible(prod) <= 5) { <span class="etiqueta aviso">Quedan {{ disponible(prod) }}</span> }
                       @if (prod.tiene_ficha) {
                         <button class="ver-ficha" (click)="$event.stopPropagation(); voltear(prod)" [attr.aria-label]="'¿Qué lleva ' + prod.nombre + '?'">
@@ -175,15 +174,15 @@
                       <div class="ficha">
                         <p class="ficha-nombre">{{ prod.nombre }}</p>
                         @if (prod.ingredientes_lista.length) {
-                          <p class="ficha-titulo">🧺 ¿Qué lleva?</p>
+                          <p class="ficha-titulo"><lucide-icon [img]="icons.ingredientes" class="w-4 h-4"></lucide-icon> ¿Qué lleva?</p>
                           <ul class="ingredientes">
                             @for (ing of prod.ingredientes_lista; track $index) {
-                              <li><span aria-hidden="true">{{ ing.emoji }}</span> {{ ing.nombre }}</li>
+                              <li><lucide-icon [img]="ing.icono" class="w-3.5 h-3.5 text-amber-700" aria-hidden="true"></lucide-icon> {{ ing.nombre }}</li>
                             }
                           </ul>
                         }
                         @if (prod.pasos.length) {
-                          <p class="ficha-titulo">👩‍🍳 Así lo preparamos</p>
+                          <p class="ficha-titulo"><lucide-icon [img]="icons.preparacion" class="w-4 h-4"></lucide-icon> Así lo preparamos</p>
                           @if (prod.pasos.length === 1) { <p class="paso-unico">{{ prod.pasos[0] }}</p> }
                           @else {
                             <ol class="pasos">
@@ -236,7 +235,7 @@
 
       @if (enCarrito(prod.id_producto) === 0) {
         <button class="agregar" (click)="agregar(prod)" [disabled]="disponible(prod) <= 0">
-          @if (prod.stock_actual > 0) { <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon> Agregar } @else { Agotado }
+          <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon> Agregar
         </button>
       } @else {
         <div class="contador">

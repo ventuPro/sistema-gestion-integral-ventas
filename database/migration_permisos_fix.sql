@@ -5,7 +5,7 @@
 --  migration_permisos.sql — tu tabla anterior puede haber sido creada
 --  con un esquema incompatible (FK rota, tipos distintos, etc).
 --
---  ⚠️  Este script BORRA todos los permisos personalizados existentes.
+--  ATENCIÓN: este script BORRA todos los permisos personalizados existentes.
 --      Tras correrlo, el admin debe volver a asignar permisos a cada
 --      cajero/cocina (los defaults del rol se aplican mientras tanto).
 --

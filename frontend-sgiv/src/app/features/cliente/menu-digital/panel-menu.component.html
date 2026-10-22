@@ -3,7 +3,10 @@
        (click)="$event.stopPropagation()">
     <div class="asa" aria-hidden="true"></div>
     <div class="cabeza">
-      <h2>{{ tipo() === 'categorias' ? 'Categorías' : '🎉 Promociones de hoy' }}</h2>
+      <h2>
+        @if (tipo() === 'promos') { <lucide-icon [img]="icons.promo" class="w-5 h-5 icono-promo"></lucide-icon> }
+        {{ tipo() === 'categorias' ? 'Categorías' : 'Promociones de hoy' }}
+      </h2>
       <button class="cerrar" (click)="cerrar.emit()" aria-label="Cerrar">
         <lucide-icon [img]="icons.cerrar" class="w-5 h-5"></lucide-icon>
       </button>
@@ -13,7 +16,7 @@
       <div class="mosaicos">
         @for (c of categorias(); track c.id) {
           <button class="mosaico" [class.activo]="seccionActual() === c.id" (click)="categoria.emit(c.id)">
-            <span class="emoji" aria-hidden="true">{{ c.emoji }}</span>
+            <span class="icono" aria-hidden="true"><lucide-icon [img]="c.icono" class="w-5 h-5" [strokeWidth]="1.75"></lucide-icon></span>
             <span class="nombre">{{ c.nombre }}</span>
             <span class="cantidad">{{ c.cantidad }}</span>
           </button>

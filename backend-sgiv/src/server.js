@@ -86,7 +86,7 @@ app.use('/api/promociones', promocionRoutes);
 
 // Socket.IO eventos
 io.on('connection', (socket) => {
-    console.log(`🔌 Cliente conectado: ${socket.id}`);
+    console.log(`[socket] Cliente conectado: ${socket.id}`);
 
     // Personal del sistema: la sala 'cajeros' exige la cookie de sesión del handshake
     socket.on('unirse_sala', async (sala) => {
@@ -99,7 +99,7 @@ io.on('connection', (socket) => {
             if (!r.rows.length) return;
             socket.join([sala, `usuario_${payload.id_usuario}`]);
             socket.emit('sala_unida', sala);
-            console.log(`📡 ${socket.id} unido a sala: ${sala}`);
+            console.log(`[socket] ${socket.id} unido a sala: ${sala}`);
         } catch { /* token inválido: no se une */ }
     });
 
@@ -114,12 +114,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log(`❌ Cliente desconectado: ${socket.id}`);
+        console.log(`[socket] Cliente desconectado: ${socket.id}`);
     });
 });
 
 app.get('/', (req, res) => {
-    res.json({ mensaje: '🚀 API del Sistema SGIV v2 funcionando' });
+    res.json({ mensaje: 'API del Sistema SGIV v2 funcionando' });
 });
 
 // Solo escucha cuando se ejecuta directamente (npm run dev / start);
@@ -130,18 +130,18 @@ if (require.main === module) {
     aplicarMigraciones()
         .then(instalarAuditoria)
         .then(({ bdAuditoria, tablas }) => {
-            console.log(`🛡️  Auditoría activa en "${bdAuditoria}" (${tablas} tablas con triggers)`);
+            console.log(`Auditoría activa en "${bdAuditoria}" (${tablas} tablas con triggers)`);
             const PORT = process.env.PORT || 3000;
             server.listen(PORT, () => {
-                console.log(`🚀 Servidor + WebSocket corriendo en puerto ${PORT}`);
+                console.log(`Servidor + WebSocket corriendo en puerto ${PORT}`);
             });
             require('./controllers/pedidoController').iniciarExpiracion();
             imagenes.limpiarHuerfanas(require('./config/db'))
-                .then(n => n && console.log(`🧹 ${n} imágenes sin uso borradas`))
+                .then(n => n && console.log(`${n} imágenes sin uso borradas`))
                 .catch(e => console.error('Limpieza de imágenes:', e.message));
         })
         .catch(e => {
-            console.error('❌ No se pudo preparar la base de datos o la auditoría:', e.message);
+            console.error('ERROR: No se pudo preparar la base de datos o la auditoría:', e.message);
             process.exit(1);
         });
 }

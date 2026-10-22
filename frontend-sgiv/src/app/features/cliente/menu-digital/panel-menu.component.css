@@ -21,7 +21,8 @@
 }
 .asa { width: 40px; height: 4px; margin: 4px auto 12px; border-radius: 999px; background: var(--i-linea); }
 .cabeza { display: flex; align-items: center; justify-content: space-between; padding: 0 20px 12px; }
-.cabeza h2 { font-size: 18px; font-weight: 700; color: var(--i-tinta); }
+.cabeza h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--i-tinta); }
+.icono-promo { color: #d97706; }
 .cerrar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--i-tenue); }
 .cerrar:active { background: var(--i-linea-suave); }
 
@@ -40,7 +41,17 @@
 }
 .mosaico:active { transform: scale(0.97); }
 .mosaico.activo { border-color: var(--i-acento); box-shadow: 0 0 0 1px var(--i-acento); }
-.mosaico .emoji { font-size: 30px; line-height: 1.1; margin-bottom: 4px; }
+.mosaico .icono {
+  width: 38px;
+  height: 38px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--color-blue-700, #1d4ed8);
+  background: color-mix(in oklab, var(--color-blue-600, #2563eb) 12%, var(--i-papel));
+}
+.mosaico.activo .icono { color: #fff; background: var(--color-blue-600, #2563eb); }
 .mosaico .nombre { font-size: 14.5px; font-weight: 700; color: var(--i-tinta); }
 .mosaico .cantidad { font-size: 12px; color: var(--i-tenue); }
 
