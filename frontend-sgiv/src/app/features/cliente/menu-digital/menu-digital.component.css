@@ -110,7 +110,7 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
 /* En el celular, 16 px evita que el navegador haga zoom al escribir */
 .campo { font-size: 16px; padding: 10px 12px; }
 
-/* Barra del menú: categorías, búsqueda y promociones */
+/* Barra del menú: categorías y búsqueda */
 .barra-menu { display: flex; gap: 8px; margin-top: 10px; }
 .barra-menu .buscador { border: none; background: var(--i-papel); height: 40px; }
 .barra-menu .buscador input { font-size: 16px; padding: 0; }
@@ -130,26 +130,6 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
 }
 .boton-barra:active { background: rgba(255, 255, 255, 0.28); }
 .boton-barra.icono { width: 40px; padding: 0; justify-content: center; flex-shrink: 0; }
-.boton-barra.promo {
-  flex-shrink: 0;
-  color: #422006;
-  background: linear-gradient(135deg, #fde68a, #fbbf24);
-}
-.globo-promo {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 19px;
-  height: 19px;
-  padding: 0 5px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 19px;
-  color: #fff;
-  background: #059669;
-  box-shadow: 0 0 0 2px var(--color-indigo-600, #4f46e5);
-}
 
 .seccion-titulo {
   display: flex;

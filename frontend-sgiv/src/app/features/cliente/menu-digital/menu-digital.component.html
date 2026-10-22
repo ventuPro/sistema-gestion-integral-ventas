@@ -59,7 +59,7 @@
         </button>
       </nav>
 
-      <!-- Barra del menú: categorías, búsqueda y promociones -->
+      <!-- Barra del menú: categorías y búsqueda -->
       @if (vista() === 'menu') {
         <div class="barra-menu">
           @if (buscando()) {
@@ -73,20 +73,14 @@
           } @else {
             <button class="boton-barra flex-1 justify-between" (click)="panel.set('categorias')" aria-haspopup="dialog">
               <span class="flex items-center gap-2 min-w-0">
-                @if (categoriaVisible(); as c) { <lucide-icon [img]="c.icono" class="w-4 h-4 shrink-0"></lucide-icon> <span class="truncate">{{ c.nombre }}</span> }
-                @else { <lucide-icon [img]="icons.categorias" class="w-4 h-4"></lucide-icon> Categorías }
+                <lucide-icon [img]="etiquetaBarra().icono" class="w-4 h-4 shrink-0"></lucide-icon>
+                <span class="truncate">{{ etiquetaBarra().nombre }}</span>
               </span>
               <lucide-icon [img]="icons.abrir" class="w-4 h-4 opacity-70"></lucide-icon>
             </button>
             <button class="boton-barra icono" (click)="abrirBusqueda()" aria-label="Buscar productos">
               <lucide-icon [img]="icons.buscar" class="w-5 h-5"></lucide-icon>
             </button>
-            @if (promociones().length) {
-              <button class="boton-barra promo" (click)="panel.set('promos')" aria-haspopup="dialog" aria-label="Promociones">
-                <lucide-icon [img]="icons.promo" class="w-5 h-5"></lucide-icon>
-                <span class="globo-promo">{{ promociones().length }}</span>
-              </button>
-            }
           }
         </div>
       }
@@ -117,6 +111,10 @@
               <lucide-icon [img]="icons.filtroPromo" class="w-4 h-4"></lucide-icon> {{ promo }} <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
             </button>
           </div>
+        }
+
+        @if (promociones().length && !promoFiltro() && !busqueda().trim()) {
+          <app-cinta-promociones [promociones]="promociones()" (abrir)="panel.set('promos')" />
         }
 
         @if (mostrarCarrusel()) {

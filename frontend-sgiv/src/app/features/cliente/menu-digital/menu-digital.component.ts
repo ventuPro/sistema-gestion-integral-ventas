@@ -13,11 +13,12 @@ import type { MensajeChat } from '../../shared/asistente/asistente-chat.componen
 import { componenteDiferido } from '../../../core/utils/diferido';
 import { Cotizacion, etiquetaPromocion } from '../../../core/services/promocion.service';
 import { LucideAngularModule, LucideIconData, UtensilsCrossed, ShoppingBag, ReceiptText, Search, X, Minus, Plus, Check,
-         SearchX, WifiOff, PartyPopper, Pencil, BadgePercent, LayoutGrid, ChevronDown, Info, RotateCcw,
-         Sparkles, ShoppingBasket, ChefHat } from 'lucide-angular';
+         SearchX, WifiOff, PartyPopper, Pencil, Gift, LayoutGrid, ChevronDown, Info, RotateCcw,
+         ShoppingBasket, ChefHat } from 'lucide-angular';
 import { CarruselRecomendadosComponent } from './carrusel-recomendados.component';
 import { BienvenidaMenuComponent } from './bienvenida-menu.component';
 import { PanelMenuComponent } from './panel-menu.component';
+import { CintaPromocionesComponent } from './cinta-promociones.component';
 import { iconoCategoria, listaIngredientes, nombreBonito, pasosPreparacion } from './ficha';
 
 type Vista = 'menu' | 'carrito' | 'pedidos';
@@ -67,7 +68,7 @@ const leerNombre = (): string => {
   selector:    'app-menu-digital',
   standalone:  true,
   imports:     [CommonModule, FormsModule, ImagenUrlPipe, LucideAngularModule, ConfirmacionComponent,
-                CarruselRecomendadosComponent, BienvenidaMenuComponent, PanelMenuComponent],
+                CarruselRecomendadosComponent, BienvenidaMenuComponent, PanelMenuComponent, CintaPromocionesComponent],
   templateUrl: './menu-digital.component.html',
   styleUrls:   ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
                 '../../shared/formulario/formulario.css', './menu-digital.component.css']
@@ -76,9 +77,9 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly Number = Number;
   readonly icons  = { menu: UtensilsCrossed, carrito: ShoppingBag, mesa: ReceiptText, buscar: Search, cerrar: X,
                       menos: Minus, mas: Plus, listo: Check, sinResultados: SearchX, sinConexion: WifiOff,
-                      qrInvalido: SearchX, gracias: PartyPopper, editar: Pencil, promo: BadgePercent,
+                      qrInvalido: SearchX, gracias: PartyPopper, editar: Pencil,
                       categorias: LayoutGrid, abrir: ChevronDown, info: Info, volver: RotateCcw,
-                      filtroPromo: Sparkles, ingredientes: ShoppingBasket, preparacion: ChefHat };
+                      filtroPromo: Gift, ingredientes: ShoppingBasket, preparacion: ChefHat };
   readonly nombreBonito = nombreBonito;
 
   private route = inject(ActivatedRoute);
@@ -137,8 +138,9 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
       .filter(s => s.productos.length);
   });
 
-  readonly categoriaVisible = computed(() =>
-    this.categorias().find(c => c.id === this.seccionActual()) ?? null);
+  /** Botón de la barra: siempre el mismo elemento, solo cambian ícono y texto */
+  readonly etiquetaBarra = computed(() =>
+    this.categorias().find(c => c.id === this.seccionActual()) ?? { icono: LayoutGrid, nombre: 'Categorías' });
 
   readonly recomendados = computed(() => this.catalogo().filter(p => p.destacado && p.stock_actual > 0));
   readonly mostrarCarrusel = computed(() =>

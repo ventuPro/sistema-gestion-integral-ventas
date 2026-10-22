@@ -8,18 +8,22 @@
   justify-content: center;
   background: rgba(15, 23, 42, 0.45);
   animation: aparecer 180ms ease;
+  transition: opacity 200ms ease;
 }
+.fondo.saliendo { opacity: 0; }
 .panel {
   width: 100%;
   max-width: 28rem;
   max-height: 82dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  will-change: transform;
   padding: 8px 0 calc(20px + env(safe-area-inset-bottom));
   border-radius: 20px 20px 0 0;
   background: var(--i-papel);
   animation: deslizar 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.asa { width: 40px; height: 4px; margin: 4px auto 12px; border-radius: 999px; background: var(--i-linea); }
+.asa { width: 40px; height: 5px; margin: 2px auto 12px; border-radius: 999px; background: var(--i-linea); }
 .cabeza { display: flex; align-items: center; justify-content: space-between; padding: 0 20px 12px; }
 .cabeza h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--i-tinta); }
 .icono-promo { color: #d97706; }

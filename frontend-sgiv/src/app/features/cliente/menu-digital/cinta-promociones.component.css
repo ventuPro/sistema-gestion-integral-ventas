@@ -1,0 +1,68 @@
+/* ─── Franja dorada de promociones (nunca rojo) ─── */
+:host { display: block; padding: 0 16px 16px; }
+.cinta {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 12px;
+  border-radius: 16px;
+  overflow: hidden;
+  text-align: left;
+  color: #422006;
+  background: linear-gradient(120deg, #fef3c7, #fcd34d 45%, #f59e0b);
+  box-shadow: 0 10px 24px -14px rgba(180, 83, 9, 0.75), inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  transition: transform 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.cinta:active { transform: scale(0.98); }
+/* Brillo que cruza la franja de vez en cuando */
+.cinta::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: translateX(-120%) skewX(-20deg);
+  animation: brillo 4.5s ease-in-out 1s infinite;
+  pointer-events: none;
+}
+.regalo {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #059669, #047857);
+  box-shadow: 0 4px 10px -4px rgba(4, 120, 87, 0.7);
+}
+.textos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.titulo { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; letter-spacing: 0.01em; }
+.cantidad {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  background: #059669;
+}
+.detalle { font-size: 13px; font-weight: 500; color: #713f12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ver {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 10px 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: #422006;
+}
+@keyframes brillo { 0%, 60% { transform: translateX(-120%) skewX(-20deg); } 100% { transform: translateX(320%) skewX(-20deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cinta::after { animation: none; display: none; }
+}
