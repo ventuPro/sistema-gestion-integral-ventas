@@ -147,6 +147,11 @@ export class MesasComponent implements OnInit, OnDestroy {
     for (const evento of recargar)
       this.subs.push(this.socketService.escuchar<any>(evento).subscribe(() => this.cargarMesas()));
 
+    // Cierre automático de las 00:00
+    this.subs.push(this.socketService.escuchar<any>('caja:cerrada').subscribe(d => {
+      if (!this.esAdmin() && Number(d?.id_usuario) === this.sesion.usuario()?.id_usuario) this.verificarAccesoCaja();
+    }));
+
     this.subs.push(this.socketService.escuchar<any>('cuenta:qr_integrado').subscribe(data => {
       this.dialogo.avisar(`Pedido QR cargado a la Mesa ${data.numero_mesa || ''}`);
       this.cargarMesas();

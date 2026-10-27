@@ -14,6 +14,8 @@ import { DialogoService } from '../../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
 import { Cotizacion, DescuentoManual, PromocionService } from '../../../../core/services/promocion.service';
 import { SesionService } from '../../../../core/services/sesion.service';
+import { BarraCategoriasComponent } from '../../../shared/barra-categorias/barra-categorias.component';
+import { agruparPorCategoria } from '../../../../core/utils/categorias';
 
 /** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
 export interface GrupoCuenta {
@@ -33,7 +35,8 @@ const totalPendiente = (items: any[]) =>
 @Component({
   selector: 'app-mesa-modal',
   standalone: true,
-  imports: [CommonModule, NgTemplateOutlet, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule],
+  imports: [CommonModule, NgTemplateOutlet, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule,
+            BarraCategoriasComponent],
   templateUrl: './mesa-modal.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css', './mesa-modal.component.css']
 })
@@ -63,8 +66,6 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly vista        = signal<'info' | 'comanda' | 'pago' | 'qr' | 'ticket'>('info');
 
   readonly productos       = signal<any[]>([]);
-  readonly categorias      = signal<{ id: number; nombre: string }[]>([]);
-  readonly categoriaFiltro = signal<number | null>(null);
   readonly busqueda        = signal('');
 
   readonly metodo = METODO_PAGO;
@@ -128,10 +129,13 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly porCliente = computed(() => (this.cuentaActiva()?.items || []).some((i: any) => i.cliente_mesa));
 
   readonly productosFiltrados = computed(() => {
-    const cat = this.categoriaFiltro(), texto = this.busqueda().toLowerCase();
-    return this.productos().filter(p =>
-      (!cat || p.id_categoria === cat) && (!texto || p.nombre_producto.toLowerCase().includes(texto)));
+    const texto = this.busqueda().toLowerCase();
+    return this.productos().filter(p => !texto || p.nombre_producto.toLowerCase().includes(texto));
   });
+
+  /** Por categoría en el orden del menú; los que se agotan pasan al final */
+  readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados()));
+  readonly barra = computed(() => this.secciones().map(s => ({ id: s.id, nombre: s.nombre, icono: s.icono, cantidad: s.productos.length })));
 
   readonly datosTicket = signal<any>(null);
   readonly fechaTicket = signal(new Date());
@@ -230,11 +234,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
     this.cuentaService.getProductos(id_sucursal).subscribe({
       next: (prods: any[]) => {
-        const productos = prods.filter(p => Number(p.stock_actual) > 0);
-        const cats = new Map<number, string>();
-        productos.forEach(p => cats.set(Number(p.id_categoria), p.nombre_categoria));
-        this.productos.set(productos);
-        this.categorias.set(Array.from(cats.entries()).map(([id, nombre]) => ({ id, nombre })));
+        this.productos.set(prods.filter(p => Number(p.stock_actual) > 0));
       },
       error: () => {
         console.error('Error al cargar catálogo de la mesa');

@@ -312,7 +312,7 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
             SELECT t.id_turno, u.nombre_completo AS cajero, s.nombre_sucursal,
                    t.fecha_hora_apertura, t.fecha_hora_cierre, t.monto_inicial::float8 AS monto_inicial,
                    t.monto_calculado::float8 AS efectivo_esperado, t.monto_real_declarado::float8 AS efectivo_contado,
-                   t.diferencia::float8 AS diferencia,
+                   t.diferencia::float8 AS diferencia, t.cerrado_por,
                    COUNT(v.id_venta)::int AS ventas,
                    ROUND(COALESCE(SUM(v.monto_total_venta), 0), 2)::float8 AS total,
                    ROUND(COALESCE(SUM(v.monto_total_venta) FILTER (WHERE v.metodo_pago = '${METODO_PAGO.efectivo}'), 0), 2)::float8 AS efectivo

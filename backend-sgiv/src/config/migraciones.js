@@ -233,7 +233,29 @@ const MIGRACIONES = [
         PRIMARY KEY (id_transferencia, id_producto)
     );
     CREATE INDEX IF NOT EXISTS idx_transferencia_origen_fecha  ON transferencia (id_sucursal_origen, fecha_transferencia);
-    CREATE INDEX IF NOT EXISTS idx_transferencia_destino_fecha ON transferencia (id_sucursal_destino, fecha_transferencia);`
+    CREATE INDEX IF NOT EXISTS idx_transferencia_destino_fecha ON transferencia (id_sucursal_destino, fecha_transferencia);`,
+
+    // Quién cerró cada turno: el cajero, el administrador o el sistema (cierre automático a las 00:00)
+    `ALTER TABLE turno_caja
+        ADD COLUMN IF NOT EXISTS cerrado_por VARCHAR(15) CHECK (cerrado_por IN ('Cajero', 'Administrador', 'Sistema'));
+    CREATE INDEX IF NOT EXISTS idx_turno_estado_apertura ON turno_caja (estado_turno, fecha_hora_apertura);`,
+
+    // Foto del stock de cada sucursal al terminar el día (lista de productos que quedaron)
+    `CREATE TABLE IF NOT EXISTS foto_stock (
+        id_foto         SERIAL PRIMARY KEY,
+        id_sucursal     INT NOT NULL REFERENCES sucursal(id_sucursal),
+        fecha           DATE NOT NULL,
+        fecha_toma      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        desbloqueada_por INT REFERENCES usuario(id_usuario),
+        fecha_desbloqueo TIMESTAMPTZ,
+        UNIQUE (id_sucursal, fecha)
+    );
+    CREATE TABLE IF NOT EXISTS detalle_foto_stock (
+        id_foto     INT NOT NULL REFERENCES foto_stock(id_foto),
+        id_producto INT NOT NULL REFERENCES producto(id_producto),
+        cantidad    INT NOT NULL,
+        PRIMARY KEY (id_foto, id_producto)
+    );`
 ];
 
 const aplicarMigraciones = async () => {

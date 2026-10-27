@@ -60,6 +60,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private subPermisos?: Subscription;
   private subRuta?: Subscription;
   private subTransferencias?: Subscription;
+  private subCierre?: Subscription;
 
   /** Menú lateral abierto (solo en celular y tablet) */
   readonly menuAbierto = signal(false);
@@ -122,12 +123,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
       else if (Number(d.id_sucursal_destino) === this.sesion.idSucursal())
         this.dialogo.avisar(`Llegaron productos de ${d.nombre_origen}: ${d.resumen}`);
     });
+    this.subCierre = this.socketService.escuchar<any>('caja:cerrada').subscribe(d => {
+      if (d?.por === 'Sistema' && Number(d.id_usuario) === this.usuario()?.id_usuario)
+        this.dialogo.avisar('El sistema cerró tu caja a las 00:00.');
+    });
   }
 
   ngOnDestroy() {
     this.subPermisos?.unsubscribe();
     this.subRuta?.unsubscribe();
     this.subTransferencias?.unsubscribe();
+    this.subCierre?.unsubscribe();
     this.permisoService.dejarDeEscuchar();
   }
 

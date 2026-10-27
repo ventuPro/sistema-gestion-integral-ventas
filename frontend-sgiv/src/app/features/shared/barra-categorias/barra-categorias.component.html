@@ -1,0 +1,21 @@
+<div class="barra">
+  <button type="button" class="actual" (click)="abierta.set(!abierta())" aria-haspopup="listbox" [attr.aria-expanded]="abierta()">
+    <lucide-icon [img]="etiqueta().icono" class="w-4 h-4 flex-shrink-0" [strokeWidth]="1.75"></lucide-icon>
+    <span class="nombre">{{ etiqueta().nombre }}</span>
+    @if (etiqueta().cantidad !== null) { <span class="cantidad">{{ etiqueta().cantidad }}</span> }
+    <lucide-icon [img]="icons.abrir" class="w-4 h-4 flecha" [class.girada]="abierta()"></lucide-icon>
+  </button>
+  <ng-content />
+</div>
+
+@if (abierta()) {
+  <div class="lista" role="listbox" aria-label="Categorías">
+    @for (c of categorias(); track c.id) {
+      <button type="button" role="option" [attr.aria-selected]="c.id === actual()" [class.activa]="c.id === actual()" (click)="ir(c.id)">
+        <lucide-icon [img]="c.icono" class="w-4 h-4 flex-shrink-0" [strokeWidth]="1.75"></lucide-icon>
+        <span class="flex-1 text-left truncate">{{ c.nombre }}</span>
+        <span class="cantidad">{{ c.cantidad }}</span>
+      </button>
+    }
+  </div>
+}

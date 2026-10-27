@@ -20,11 +20,13 @@ import { cifra, fechaLarga } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../core/utils/metodos-pago';
 import { SesionService } from '../../../core/services/sesion.service';
+import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
+import { agruparPorCategoria } from '../../../core/utils/categorias';
 
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent, BarraCategoriasComponent],
   templateUrl: './punto-venta.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './punto-venta.component.css']
 })
@@ -42,6 +44,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   private apiUrl          = environment.apiUrl;
 
   private stockSub?: Subscription;
+  private cierreSub?: Subscription;
 
   readonly icons = {
     shieldAlert: ShieldAlert,
@@ -65,6 +68,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   // ─── Estado de acceso (fuente: backend) ───
   readonly verificandoCaja = signal(true);
   readonly estadoCaja      = signal<EstadoCajaCompleto['estado']>('SIN_APERTURA');
+  readonly cierreSistema   = signal<EstadoCajaCompleto['cierre_sistema']>(null);
   readonly puedeVender     = signal(false);
 
   // ─── Turno ───
@@ -76,21 +80,19 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── Catálogo ───
   readonly productosDisponibles = signal<any[]>([]);
-  readonly categorias           = signal<{ id: number; nombre: string }[]>([]);
-  readonly categoriaFiltro      = signal<number | null>(null);
   readonly busqueda             = signal('');
   readonly cargando             = signal(true);
 
   readonly productosFiltrados = computed(() => {
-    const q = this.busqueda().trim().toLowerCase(), cat = this.categoriaFiltro();
-    return this.productosDisponibles().filter(p => {
-      const porCat  = !cat || Number(p.id_categoria) === cat;
-      const porNomb = !q ||
-        (p.nombre_producto || '').toLowerCase().includes(q) ||
-        (p.nombre_categoria || '').toLowerCase().includes(q);
-      return porCat && porNomb;
-    });
+    const q = this.busqueda().trim().toLowerCase();
+    return this.productosDisponibles().filter(p => !q ||
+      (p.nombre_producto || '').toLowerCase().includes(q) ||
+      (p.nombre_categoria || '').toLowerCase().includes(q));
   });
+
+  /** Por categoría en el orden del menú; los que se agotan pasan al final */
+  readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados()));
+  readonly barra = computed(() => this.secciones().map(s => ({ id: s.id, nombre: s.nombre, icono: s.icono, cantidad: s.productos.length })));
 
   // ─── Carrito ───
   readonly carrito = signal<any[]>([]);
@@ -209,10 +211,15 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.subCotizacion?.unsubscribe();
     this.detenerSondeo?.();
     this.stockSub?.unsubscribe();
+    this.cierreSub?.unsubscribe();
   }
 
   private suscribirStockGlobal() {
     this.socketService.conectar('cajeros');
+    // Cierre automático de las 00:00: se bloquea al instante
+    this.cierreSub = this.socketService.escuchar<any>('caja:cerrada').subscribe(d => {
+      if (Number(d?.id_usuario) === this.sesion.usuario()?.id_usuario) this.verificarAccesoCaja();
+    });
     this.stockSub = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(payload => {
       if (!payload) return;
       const idSuc = this.sesion.idSucursal();
@@ -253,6 +260,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   private aplicarEstado(res: EstadoCajaCompleto) {
     this.estadoCaja.set(res.estado);
+    this.cierreSistema.set(res.cierre_sistema ?? null);
     this.puedeVender.set(res.puede_vender);
     this.turnoActivo.set(res.turno);
     this.verificandoCaja.set(false);
@@ -328,12 +336,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
           }))
           .filter(p => p.stock_actual > 0);
         this.productosDisponibles.set(productos);
-
-        const mapCats = new Map<number, string>();
-        productos.forEach(p => mapCats.set(Number(p.id_categoria), p.nombre_categoria));
-        this.categorias.set(Array.from(mapCats.entries())
-          .map(([id, nombre]) => ({ id, nombre }))
-          .sort((a, b) => a.nombre.localeCompare(b.nombre)));
 
         this.cargando.set(false);
       },

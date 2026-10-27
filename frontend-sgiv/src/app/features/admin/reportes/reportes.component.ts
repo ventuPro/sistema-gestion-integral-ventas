@@ -514,7 +514,8 @@ export class ReportesComponent implements OnInit, OnDestroy {
     if (d.cierres?.length) {
       seccion('Turnos de caja cerrados');
       tabla(['Cajero', 'Sucursal', 'Cierre', 'Ventas', 'Efectivo', 'Total', 'Diferencia'],
-        d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal, fechaHora(c.fecha_hora_cierre), c.ventas, m(c.efectivo), m(c.total),
+        d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal,
+          fechaHora(c.fecha_hora_cierre) + (c.cerrado_por === 'Sistema' ? ' (sistema)' : ''), c.ventas, m(c.efectivo), m(c.total),
           c.diferencia === null ? 'sin conteo' : m(c.diferencia)]), [3, 4, 5, 6]);
     }
     const desc = d.descuentos;

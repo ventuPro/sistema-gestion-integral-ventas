@@ -49,6 +49,9 @@
           <lucide-icon [img]="icons.landmark" class="w-6 h-6 flex-shrink-0 mt-0.5" style="color: var(--i-acento)"></lucide-icon>
           <div>
             <h2 class="inf-tinta font-semibold text-[15px]">Abrir la caja del día</h2>
+            @if (cierreSistema(); as c) {
+              <p class="inf-aviso text-[13px] mt-1">Tu caja del {{ c.fecha_hora_apertura | date:'dd/MM' }} la cerró el sistema a las 00:00.</p>
+            }
           </div>
         </div>
         <label class="inf-etiqueta block mt-6 mb-2">Fondo inicial</label>
@@ -103,15 +106,9 @@
               </button>
             }
           </div>
-          <nav class="inf-pestanas">
-            <button [class.activa]="!categoriaFiltro()" (click)="categoriaFiltro.set(null)">Todos</button>
-            @for (cat of categorias(); track cat.id) {
-              <button [class.activa]="categoriaFiltro() === cat.id" (click)="categoriaFiltro.set(cat.id)">{{ cat.nombre }}</button>
-            }
-          </nav>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4">
+        <div class="flex-1 overflow-y-auto p-4 pt-0">
           @if (cargando()) {
             <div class="catalogo">
               @for (n of [1,2,3,4,5,6]; track n) { <div class="inf-esqueleto h-48"></div> }
@@ -121,8 +118,14 @@
           } @else if (productosFiltrados().length === 0) {
             <p class="inf-vacio">Sin resultados para «{{ busqueda() }}».</p>
           } @else {
+            <app-barra-categorias [categorias]="barra()" />
+            @for (sec of secciones(); track sec.id) {
+            <h3 class="titulo-categoria" [attr.data-seccion]="sec.id">
+              <lucide-icon [img]="sec.icono" class="w-4 h-4" [strokeWidth]="1.75"></lucide-icon> {{ sec.nombre }}
+              <span class="cantidad">{{ sec.productos.length }}</span>
+            </h3>
             <div class="catalogo">
-              @for (prod of productosFiltrados(); track prod.id_producto) {
+              @for (prod of sec.productos; track prod.id_producto) {
                 <button class="producto" (click)="agregarAlCarrito(prod)" [disabled]="prod.stock_actual <= 0">
                   <div class="foto">
                     @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
@@ -137,6 +140,7 @@
                 </button>
               }
             </div>
+            }
           }
         </div>
 

@@ -136,6 +136,7 @@ if (require.main === module) {
                 console.log(`Servidor + WebSocket corriendo en puerto ${PORT}`);
             });
             require('./controllers/pedidoController').iniciarExpiracion();
+            require('./procesos/cierreDiario').iniciar();
             imagenes.limpiarHuerfanas(require('./config/db'))
                 .then(n => n && console.log(`${n} imágenes sin uso borradas`))
                 .catch(e => console.error('Limpieza de imágenes:', e.message));

@@ -26,6 +26,19 @@ export interface FiltrosMovimientos {
   hasta?: string | null;
 }
 
+export interface ListaDia {
+  id_foto:          number;
+  id_sucursal:      number;
+  nombre_sucursal:  string;
+  /** Día que terminó (AAAA-MM-DD) */
+  fecha:            string;
+  /** Hubo ventas hoy y el administrador no dio acceso: el cajero no la ve */
+  bloqueada:        boolean;
+  desbloqueada_por: string | null;
+  items: { id_producto: number; nombre_producto: string; cantidad: number;
+           id_categoria: number; nombre_categoria: string; orden_categoria: number }[];
+}
+
 export interface NuevaTransferencia {
   id_sucursal_origen: number;
   id_sucursal_destino: number;
@@ -68,6 +81,15 @@ export class InventarioService {
     if (f.desde)       params = params.set('desde', f.desde);
     if (f.hasta)       params = params.set('hasta', f.hasta);
     return this.http.get<Movimiento[]>(`${this.api}/movimientos`, { params });
+  }
+
+  // ─── Lista de productos que quedaron del día anterior ───
+  listaDia(id_sucursal: number): Observable<ListaDia> {
+    return this.http.get<ListaDia>(`${this.api}/lista-dia`, { params: new HttpParams().set('id_sucursal', id_sucursal) });
+  }
+
+  desbloquearListaDia(id_foto: number) {
+    return this.http.post<{ mensaje: string }>(`${this.api}/lista-dia/${id_foto}/desbloquear`, {});
   }
 
   // ─── Transferencias entre sucursales ───

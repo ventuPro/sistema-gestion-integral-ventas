@@ -243,10 +243,18 @@
             <input type="text" name="buscaProducto" [(ngModel)]="buscaProducto" placeholder="Buscar producto para agregar">
           </div>
           <div class="catalogo">
-            @for (prod of productosModal(); track prod.id_producto) {
-              <button type="button" class="opcion chica" [class.activa]="tieneProducto(prod.id_producto)" (click)="alternarProducto(prod)">
-                {{ prod.nombre_producto }} <span class="inf-tenue">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</span>
-              </button>
+            <app-barra-categorias [categorias]="barraModal()" />
+            @for (sec of seccionesModal(); track sec.id) {
+              <h4 class="titulo-categoria" [attr.data-seccion]="sec.id">
+                <lucide-icon [img]="sec.icono" class="w-4 h-4" [strokeWidth]="1.75"></lucide-icon> {{ sec.nombre }}
+              </h4>
+              <div class="fichas">
+                @for (prod of sec.productos; track prod.id_producto) {
+                  <button type="button" class="opcion chica" [class.activa]="tieneProducto(prod.id_producto)" (click)="alternarProducto(prod)">
+                    {{ prod.nombre_producto }} <span class="inf-tenue">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</span>
+                  </button>
+                }
+              </div>
             }
           </div>
         </div>

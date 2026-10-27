@@ -25,6 +25,19 @@
 }
 .buscador input::placeholder { color: var(--i-sutil); }
 
+/* Título de cada categoría (las mismas secciones que el menú QR) */
+.titulo-categoria {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--i-tinta);
+}
+.titulo-categoria:first-of-type { margin-top: 4px; }
+.titulo-categoria .cantidad { font-size: 11.5px; font-weight: 500; color: var(--i-tenue); }
+
 /* Tarjetas de producto */
 .catalogo {
   display: grid;

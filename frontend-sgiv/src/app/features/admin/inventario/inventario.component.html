@@ -9,6 +9,9 @@
       <h1 class="inf-titulo">Inventario</h1>
     </div>
     <div class="flex flex-wrap items-center gap-2">
+      <button class="inf-boton" (click)="mostrarListaDia.set(true)">
+        <lucide-icon [img]="icons.listaDia" class="w-3.5 h-3.5"></lucide-icon> Lista del día anterior
+      </button>
       <button class="inf-boton" (click)="abrirOrdenCategorias()">
         <lucide-icon [img]="icons.ordenar" class="w-3.5 h-3.5"></lucide-icon> Ordenar categorías
       </button>
@@ -56,8 +59,12 @@
     <app-transferencias [idSucursal]="idSucursal()" [productos]="productos()" />
   }
 
+  @if (mostrarListaDia()) {
+    <app-lista-dia [idSucursal]="idSucursal()" (cerrar)="mostrarListaDia.set(false)" />
+  }
+
   @if (vista() === 'productos') {
-  <section class="inf-hoja overflow-hidden">
+  <section class="inf-hoja overflow-clip">
     <div class="p-4 pb-3 separador-inferior space-y-3">
       <div class="flex flex-wrap items-center gap-3">
         <div class="buscador flex-1 min-w-[220px]">
@@ -75,17 +82,6 @@
           }
         </div>
       </div>
-      <div class="flex items-center gap-4">
-        <nav class="inf-pestanas flex-1 min-w-0">
-          <button [class.activa]="!filtroCategoria()" (click)="seleccionarCategoria(null)">Todas</button>
-          @for (cat of categorias(); track cat.id_categoria) {
-            <button [class.activa]="filtroCategoria() === cat.id_categoria" (click)="seleccionarCategoria(cat.id_categoria)">{{ cat.nombre_categoria }}</button>
-          }
-        </nav>
-        @if (categoriaActual()) {
-          <button class="inf-enlace inf-baja flex-shrink-0" (click)="abrirModalBorrarCategoria(categoriaActual())">Eliminar categoría</button>
-        }
-      </div>
     </div>
 
     @if (cargando()) {
@@ -97,20 +93,29 @@
     } @else if (productosFiltrados().length === 0) {
       <p class="inf-vacio">Ningún producto coincide con los filtros.</p>
     } @else {
+      <app-barra-categorias class="px-4 separador-inferior" [categorias]="barra()" />
       <div class="overflow-x-auto">
         <table class="inf-tabla">
           <thead>
             <tr>
               <th>Producto</th>
-              <th>Categoría</th>
               <th class="num">Precio</th>
               <th class="num">Stock</th>
               <th>Estado</th>
               <th></th>
             </tr>
           </thead>
+          @for (sec of secciones(); track sec.id) {
           <tbody>
-            @for (prod of productosFiltrados(); track prod.id_producto) {
+            <tr class="fila-seccion" [attr.data-seccion]="sec.id">
+              <td colspan="5">
+                <span class="flex items-center gap-2">
+                  <lucide-icon [img]="sec.icono" class="w-4 h-4" [strokeWidth]="1.75"></lucide-icon> {{ sec.nombre }}
+                  <span class="inf-sutil font-normal">{{ sec.productos.length }}</span>
+                </span>
+              </td>
+            </tr>
+            @for (prod of sec.productos; track prod.id_producto) {
               <tr [class.inactivo]="!prod.estado_activo">
                 <td>
                   <div class="flex items-center gap-3 min-w-[200px]">
@@ -127,7 +132,6 @@
                     </div>
                   </div>
                 </td>
-                <td>{{ prod.nombre_categoria }}</td>
                 <td class="num">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</td>
                 <td class="num">
                   <span class="fuerte">{{ prod.stock_actual || 0 }}</span>
@@ -164,6 +168,7 @@
               </tr>
             }
           </tbody>
+          }
         </table>
       </div>
       <div class="inf-pie-hoja">{{ productosFiltrados().length }} de {{ productos().length }} producto(s)</div>
@@ -425,6 +430,9 @@
           <li class="flex items-center gap-3 px-5 py-1.5">
             <span class="w-5 text-right inf-sutil text-[12px] tabular-nums">{{ i + 1 }}</span>
             <span class="flex-1 inf-tinta text-[13.5px] truncate">{{ cat.nombre_categoria }}</span>
+            <button class="accion peligro" (click)="ordenCategorias.set(null); abrirModalBorrarCategoria(cat)" [attr.aria-label]="'Eliminar ' + cat.nombre_categoria">
+              <lucide-icon [img]="icons.quitarCategoria" class="w-4 h-4"></lucide-icon>
+            </button>
             <button class="accion" (click)="moverCategoria(i, -1)" [disabled]="primero" [attr.aria-label]="'Subir ' + cat.nombre_categoria">
               <lucide-icon [img]="icons.subir" class="w-4 h-4"></lucide-icon>
             </button>

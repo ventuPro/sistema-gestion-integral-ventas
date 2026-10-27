@@ -8,6 +8,8 @@ export interface EstadoCajaCompleto {
   caja_habilitada: boolean;
   tiene_turno_hoy: boolean;
   puede_vender:    boolean;
+  /** Su turno anterior lo cerró el sistema a las 00:00 */
+  cierre_sistema?: { id_turno: number; fecha_hora_apertura: string; fecha_hora_cierre: string } | null;
   turno: {
     id_turno: number;
     fecha_hora_apertura: string;

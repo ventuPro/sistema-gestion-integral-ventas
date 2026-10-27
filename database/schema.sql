@@ -14,6 +14,8 @@ DROP TABLE IF EXISTS detalle_venta CASCADE;
 DROP TABLE IF EXISTS venta_caja CASCADE;
 DROP TABLE IF EXISTS cliente CASCADE;
 DROP TABLE IF EXISTS turno_caja CASCADE;
+DROP TABLE IF EXISTS detalle_foto_stock CASCADE;
+DROP TABLE IF EXISTS foto_stock CASCADE;
 DROP TABLE IF EXISTS detalle_transferencia CASCADE;
 DROP TABLE IF EXISTS transferencia CASCADE;
 DROP TABLE IF EXISTS bloqueo_menu CASCADE;
@@ -181,6 +183,24 @@ CREATE TABLE detalle_transferencia (
     PRIMARY KEY (id_transferencia, id_producto)
 );
 
+-- Foto del stock al terminar cada día (00:00): «lista de productos que quedaron».
+-- El cajero la ve hasta la primera venta del día siguiente, salvo que el administrador la desbloquee.
+CREATE TABLE foto_stock (
+    id_foto         SERIAL PRIMARY KEY,
+    id_sucursal     INT NOT NULL REFERENCES sucursal(id_sucursal),
+    fecha           DATE NOT NULL,
+    fecha_toma      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    desbloqueada_por INT REFERENCES usuario(id_usuario),
+    fecha_desbloqueo TIMESTAMPTZ,
+    UNIQUE (id_sucursal, fecha)
+);
+CREATE TABLE detalle_foto_stock (
+    id_foto     INT NOT NULL REFERENCES foto_stock(id_foto),
+    id_producto INT NOT NULL REFERENCES producto(id_producto),
+    cantidad    INT NOT NULL,
+    PRIMARY KEY (id_foto, id_producto)
+);
+
 CREATE TABLE notificacion_admin (
     id_notificacion SERIAL PRIMARY KEY,
     id_sucursal INT REFERENCES sucursal(id_sucursal),
@@ -306,7 +326,9 @@ CREATE TABLE turno_caja (
     monto_calculado DECIMAL(10, 2),
     monto_real_declarado DECIMAL(10, 2),
     diferencia DECIMAL(10, 2),
-    estado_turno VARCHAR(20) DEFAULT 'Abierto'
+    estado_turno VARCHAR(20) DEFAULT 'Abierto',
+    -- Cajero, Administrador o Sistema (cierre automático a las 00:00)
+    cerrado_por VARCHAR(15) CHECK (cerrado_por IN ('Cajero', 'Administrador', 'Sistema'))
 );
 
 -- ==========================================
@@ -448,6 +470,7 @@ CREATE INDEX idx_pedido_cuenta            ON pedido_mesa (id_cuenta);
 CREATE INDEX idx_mesa_sucursal_numero     ON mesa_local (id_sucursal, numero_mesa);
 CREATE INDEX idx_mesa_estado_habilitacion ON mesa_local (estado_mesa, fecha_habilitacion);
 CREATE INDEX idx_bloqueo_menu_mesa        ON bloqueo_menu (id_mesa, bloqueado_hasta);
+CREATE INDEX idx_turno_estado_apertura     ON turno_caja (estado_turno, fecha_hora_apertura);
 CREATE INDEX idx_transferencia_origen_fecha  ON transferencia (id_sucursal_origen, fecha_transferencia);
 CREATE INDEX idx_transferencia_destino_fecha ON transferencia (id_sucursal_destino, fecha_transferencia);
 CREATE INDEX idx_venta_caja_sucursal_fecha ON venta_caja (id_sucursal, fecha_venta);

@@ -1,0 +1,37 @@
+.bloqueo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--i-aviso);
+  background: color-mix(in oklab, var(--i-aviso) 10%, transparent);
+}
+
+.categorias { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
+.categoria {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--i-linea);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--i-tinta);
+  background: var(--i-papel);
+}
+.categoria.activa { border-color: var(--i-acento); background: var(--i-acento-suave); }
+.casilla {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--i-linea);
+  border-radius: 4px;
+  color: #fff;
+}
+.categoria.activa .casilla { background: var(--i-acento); border-color: var(--i-acento); }
+
+.fuera-de-vista { position: fixed; left: -10000px; top: 0; }

@@ -11,6 +11,8 @@ import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { cifra, entero, fechaCorta } from '../../../core/utils/informe';
+import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
+import { agruparPorCategoria } from '../../../core/utils/categorias';
 
 type Filtro = 'vigentes' | 'activas' | 'inactivas' | 'todas';
 
@@ -29,7 +31,7 @@ const hoyISO = (dias = 0) => {
 @Component({
   selector: 'app-promociones',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, BarraCategoriasComponent],
   templateUrl: './promociones.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './promociones.component.css']
@@ -94,8 +96,12 @@ export class PromocionesComponent implements OnInit {
 
   readonly productosModal = computed(() => {
     const texto = this.buscaProducto().trim().toLowerCase();
-    return this.productos().filter(p => !texto || p.nombre_producto.toLowerCase().includes(texto)).slice(0, 60);
+    return this.productos().filter(p => !texto || p.nombre_producto.toLowerCase().includes(texto));
   });
+
+  /** Para elegir productos: por categoría, en el orden del menú */
+  readonly seccionesModal = computed(() => agruparPorCategoria(this.productosModal(), { stockPrimero: false }));
+  readonly barraModal = computed(() => this.seccionesModal().map(s => ({ id: s.id, nombre: s.nombre, icono: s.icono, cantidad: s.productos.length })));
 
   ngOnInit() {
     if (this.esAdmin())

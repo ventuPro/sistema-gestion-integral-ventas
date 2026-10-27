@@ -25,13 +25,14 @@ tr.inactiva td { opacity: 0.6; }
 .opcion.dia { min-width: 48px; justify-content: center; }
 
 .catalogo {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-height: 168px;
+  display: block;
+  max-height: 280px;
   overflow-y: auto;
-  padding: 2px;
+  padding: 0 4px 6px;
+  border: 1px solid var(--i-linea-suave);
+  border-radius: 8px;
 }
+.catalogo .titulo-categoria { margin: 12px 0 6px; font-size: 12.5px; }
 
 .elegidos { display: flex; flex-direction: column; gap: 6px; }
 .elegidos li {

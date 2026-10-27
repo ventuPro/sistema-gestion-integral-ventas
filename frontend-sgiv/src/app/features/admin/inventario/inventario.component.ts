@@ -9,7 +9,7 @@ import { InventarioService, Movimiento, TipoMovimiento } from '../../../core/ser
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
          Pencil, ArrowUpDown, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban, History,
-         ChevronUp, ChevronDown, ListOrdered, Star } from 'lucide-angular';
+         ChevronUp, ChevronDown, ListOrdered, Star, ClipboardList, Trash2 } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
@@ -18,13 +18,17 @@ import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
 import { comprimirImagen } from '../../../core/utils/imagen';
 import { TransferenciasComponent } from './transferencias/transferencias.component';
+import { ListaDiaComponent } from './lista-dia/lista-dia.component';
+import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
+import { agruparPorCategoria } from '../../../core/utils/categorias';
 
 type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe, TransferenciasComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe, TransferenciasComponent,
+            ListaDiaComponent, BarraCategoriasComponent],
   templateUrl: './inventario.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './inventario.component.css']
@@ -56,8 +60,12 @@ export class InventarioComponent implements OnInit, OnDestroy {
     subir:      ChevronUp,
     bajar:      ChevronDown,
     ordenar:    ListOrdered,
-    destacado:  Star
+    destacado:  Star,
+    listaDia:   ClipboardList,
+    quitarCategoria: Trash2
   };
+
+  readonly mostrarListaDia = signal(false);
 
   readonly filtrosEstado: { valor: FiltroEstado; texto: string }[] = [
     { valor: 'activos',   texto: 'Activos' },
@@ -80,19 +88,17 @@ export class InventarioComponent implements OnInit, OnDestroy {
   readonly guardando  = signal(false);
 
   // ─── Filtros ───
-  readonly filtroCategoria = signal<number | null>(null);
   readonly filtroBusqueda  = signal('');
   readonly filtroEstado    = signal<FiltroEstado>('activos');
 
   readonly productosFiltrados = computed(() => {
-    const texto = this.filtroBusqueda().toLowerCase(), f = this.filtroEstado(), cat = this.filtroCategoria();
+    const texto = this.filtroBusqueda().toLowerCase(), f = this.filtroEstado();
     return this.productos().filter(p => {
-      const porCat    = !cat || p.id_categoria === cat;
       const porNomb   = !texto || p.nombre_producto.toLowerCase().includes(texto);
       const porEstado = f === 'todos'
                         || (f === 'inactivos' && !p.estado_activo)
                         || (p.estado_activo && (f === 'activos' || this.estadoStock(p) === f));
-      return porCat && porNomb && porEstado;
+      return porNomb && porEstado;
     });
   });
 
@@ -106,8 +112,9 @@ export class InventarioComponent implements OnInit, OnDestroy {
     };
   });
 
-  readonly categoriaActual = computed(() =>
-    this.categorias().find(c => c.id_categoria === this.filtroCategoria()) || null);
+  /** Por categoría en el orden del menú; en cada una, primero los que tienen stock */
+  readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados()));
+  readonly barra = computed(() => this.secciones().map(s => ({ id: s.id, nombre: s.nombre, icono: s.icono, cantidad: s.productos.length })));
 
   // Formularios de los modales: se reemplazan con set(); el template edita los campos del objeto actual
 
@@ -251,9 +258,6 @@ export class InventarioComponent implements OnInit, OnDestroy {
     return stock <= Number(p.stock_minimo_alerta ?? 0) ? 'bajo' : 'ok';
   }
 
-  seleccionarCategoria(id: number | null) {
-    this.filtroCategoria.set(id);
-  }
 
   // ─── MODAL PRODUCTO ───
   abrirModalNuevo() {
@@ -263,7 +267,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.previewImagen.set(null);
     this.formulario.set({
       nombre_producto: '', descripcion_producto: '',
-      precio_unitario: '', id_categoria: this.filtroCategoria() || '',
+      precio_unitario: '', id_categoria: '',
       ingredientes: '', preparacion: '', destacado: false, mostrar_en_menu: true,
       stock_inicial: 0
     });
@@ -508,7 +512,6 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.errorBorrarCat.set('');
     this.productoService.eliminarCategoria(cat.id_categoria, this.inputConfirmacionCat()).subscribe({
       next: () => {
-        if (this.filtroCategoria() === cat.id_categoria) this.filtroCategoria.set(null);
         this.cerrarModalBorrarCategoria();
         this.dialogo.avisar('Categoría eliminada');
         this.cargarCategorias();

@@ -66,12 +66,19 @@ const obtenerEstadoCompleto = async (id_usuario) => {
     }
 
     // 3. No tiene ningún turno hoy → primera apertura del día
+    // Si su turno anterior lo cerró el sistema a las 00:00, se le avisa
+    const rSistema = await db.query(`
+        SELECT id_turno, fecha_hora_apertura, fecha_hora_cierre FROM turno_caja
+        WHERE id_usuario_cajero = $1 AND cerrado_por = 'Sistema' AND fecha_hora_cierre >= CURRENT_DATE - INTERVAL '1 day'
+        ORDER BY fecha_hora_cierre DESC LIMIT 1
+    `, [id_usuario]);
     return {
         estado:          'SIN_APERTURA',
         caja_habilitada: false,
         tiene_turno_hoy: false,
         turno:           null,
-        puede_vender:    false
+        puede_vender:    false,
+        cierre_sistema:  rSistema.rows[0] || null
     };
 };
 
@@ -127,7 +134,7 @@ const cerrarCaja = async (id_sucursal, id_usuario_cajero, efectivo_contado = nul
 
         const r = await client.query(`
             UPDATE turno_caja t
-            SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado',
+            SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado', cerrado_por = 'Cajero',
                 monto_calculado = t.monto_inicial + e.efectivo,
                 monto_real_declarado = $2::numeric,
                 diferencia = $2::numeric - (t.monto_inicial + e.efectivo)
@@ -204,7 +211,7 @@ const reabrirTurno = async (id_usuario_cajero) => {
         const r = await client.query(`
             UPDATE turno_caja
             SET estado_turno = 'Abierto',
-                fecha_hora_cierre = NULL
+                fecha_hora_cierre = NULL, cerrado_por = NULL
             WHERE id_turno = $1
             RETURNING *
         `, [id_turno]);
@@ -280,7 +287,7 @@ const deshabilitarCaja = async (id_usuario) => {
         // (antes se filtraba por la sucursal del usuario y no se cerraba).
         await client.query(`
             UPDATE turno_caja
-            SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado'
+            SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado', cerrado_por = 'Administrador'
             WHERE id_usuario_cajero = $1
               AND estado_turno      = 'Abierto'
         `, [id_usuario]);
@@ -293,6 +300,39 @@ const deshabilitarCaja = async (id_usuario) => {
 
         await client.query('COMMIT');
         return r.rows[0];
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+};
+
+
+// ─── Cierre automático: los turnos abiertos de un día anterior se cierran a las 00:00 ───
+// La hora de cierre es la medianoche de su día (aunque el proceso corra después, p. ej. si el
+// servidor estuvo apagado). Sin conteo de efectivo: queda «sin conteo» con lo esperado.
+const cerrarTurnosVencidos = async () => {
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const r = await client.query(`
+            UPDATE turno_caja t
+            SET estado_turno = 'Cerrado', cerrado_por = 'Sistema',
+                fecha_hora_cierre = date_trunc('day', t.fecha_hora_apertura) + INTERVAL '1 day',
+                monto_calculado = t.monto_inicial + COALESCE((
+                    SELECT SUM(v.monto_total_venta) FROM venta_caja v
+                    WHERE v.id_turno = t.id_turno AND v.metodo_pago = '${METODO_PAGO.efectivo}'), 0)
+            WHERE t.estado_turno = 'Abierto' AND t.fecha_hora_apertura < CURRENT_DATE
+            RETURNING t.id_turno, t.id_usuario_cajero, t.id_sucursal
+        `);
+        if (r.rows.length) {
+            await client.query(
+                `UPDATE usuario SET caja_habilitada = FALSE WHERE id_usuario = ANY($1::int[])`,
+                [r.rows.map(t => t.id_usuario_cajero)]);
+        }
+        await client.query('COMMIT');
+        return r.rows;
     } catch (e) {
         await client.query('ROLLBACK');
         throw e;
@@ -623,6 +663,7 @@ const obtenerCierresCaja = async () => {
             t.monto_calculado::float8      AS efectivo_esperado,
             t.monto_real_declarado::float8 AS efectivo_contado,
             t.diferencia::float8           AS diferencia,
+            t.cerrado_por,
             s.id_sucursal,
             u.nombre_completo            AS nombre_cajero,
             s.nombre_sucursal,
@@ -684,7 +725,7 @@ module.exports = {
     obtenerEstadoCompleto,
     habilitarCaja, deshabilitarCaja,
     obtenerArqueoHoy, obtenerVentasHoyPOS,
-    abrirTurno, cerrarCaja, reabrirTurno, registrarVenta, calcularItemsVenta,
+    abrirTurno, cerrarCaja, reabrirTurno, cerrarTurnosVencidos, registrarVenta, calcularItemsVenta,
     obtenerCierresCaja,
     verificarTurnoHoy,
     obtenerEstadoCajaSucursal

@@ -1,5 +1,6 @@
 const inventarioModel = require('../models/inventarioModel');
 const transferenciaModel = require('../models/transferenciaModel');
+const listaDiaModel = require('../models/listaDiaModel');
 const { emitirStock, emitirCajeros } = require('../utils/tiempoReal');
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -126,5 +127,35 @@ const obtenerTransferencia = async (req, res) => {
     }
 };
 
+// ─── Lista de productos que quedaron del día anterior ───
+
+// GET /api/inventario/lista-dia?id_sucursal  (el cajero, la de su sucursal)
+const obtenerListaDia = async (req, res) => {
+    try {
+        const id_sucursal = sucursalPermitida(req, req.query.id_sucursal);
+        if (!id_sucursal) return res.status(403).json({ error: 'Solo puedes ver la lista de tu sucursal' });
+        const lista = await listaDiaModel.obtener(id_sucursal, esAdmin(req));
+        if (!lista) return res.status(404).json({ error: 'Todavía no hay una lista guardada para esta sucursal' });
+        res.json(lista);
+    } catch (e) {
+        console.error('obtenerListaDia:', e);
+        res.status(500).json({ error: 'No se pudo consultar la lista' });
+    }
+};
+
+// POST /api/inventario/lista-dia/:id/desbloquear  (solo administrador)
+const desbloquearListaDia = async (req, res) => {
+    try {
+        const foto = await listaDiaModel.desbloquear(Number(req.params.id) || 0, req.usuario.id_usuario);
+        if (!foto) return res.status(404).json({ error: 'Lista no encontrada' });
+        emitirCajeros('lista_dia:actualizada', { id_sucursal: foto.id_sucursal });
+        res.json({ mensaje: 'El cajero ya puede imprimir la lista' });
+    } catch (e) {
+        console.error('desbloquearListaDia:', e);
+        res.status(500).json({ error: 'No se pudo dar acceso a la lista' });
+    }
+};
+
 module.exports = { listarMotivos, registrarMovimiento, listarMovimientos,
+                   obtenerListaDia, desbloquearListaDia,
                    crearTransferencia, listarTransferencias, obtenerTransferencia };
