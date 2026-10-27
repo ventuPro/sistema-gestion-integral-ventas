@@ -187,7 +187,34 @@ const MIGRACIONES = [
     ALTER TABLE producto
         ADD COLUMN IF NOT EXISTS ingredientes TEXT,
         ADD COLUMN IF NOT EXISTS preparacion  TEXT,
-        ADD COLUMN IF NOT EXISTS destacado    BOOLEAN NOT NULL DEFAULT FALSE;`
+        ADD COLUMN IF NOT EXISTS destacado    BOOLEAN NOT NULL DEFAULT FALSE;`,
+
+    // Menú QR: visita del cliente, mesa habilitada, pedidos sin verificar y bloqueos por pedido falso
+    `ALTER TABLE mesa_local
+        ADD COLUMN IF NOT EXISTS fecha_habilitacion TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS fecha_liberacion   TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS codigo_visita      VARCHAR(32);
+    UPDATE mesa_local SET fecha_habilitacion = NOW() WHERE estado_mesa = 'Ocupada' AND fecha_habilitacion IS NULL;
+    ALTER TABLE pedido_mesa
+        ADD COLUMN IF NOT EXISTS sin_verificar BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS ip_cliente    VARCHAR(45);
+    CREATE TABLE IF NOT EXISTS bloqueo_menu (
+        id_bloqueo   SERIAL PRIMARY KEY,
+        id_mesa      INT NOT NULL REFERENCES mesa_local(id_mesa) ON DELETE CASCADE,
+        cliente_mesa VARCHAR(32),
+        ip_cliente   VARCHAR(45),
+        id_pedido    INT REFERENCES pedido_mesa(id_pedido) ON DELETE SET NULL,
+        id_usuario   INT REFERENCES usuario(id_usuario),
+        fecha_bloqueo TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        bloqueado_hasta TIMESTAMPTZ NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_bloqueo_menu_mesa  ON bloqueo_menu (id_mesa, bloqueado_hasta);
+    CREATE INDEX IF NOT EXISTS idx_mesa_estado_habilitacion ON mesa_local (estado_mesa, fecha_habilitacion);
+    ALTER TABLE configuracion
+        ADD COLUMN IF NOT EXISTS menu_visita_horas       INT NOT NULL DEFAULT 3  CHECK (menu_visita_horas BETWEEN 1 AND 12),
+        ADD COLUMN IF NOT EXISTS menu_visita_inactividad INT NOT NULL DEFAULT 30 CHECK (menu_visita_inactividad BETWEEN 10 AND 240),
+        ADD COLUMN IF NOT EXISTS menu_bloqueo_horas      INT NOT NULL DEFAULT 6  CHECK (menu_bloqueo_horas BETWEEN 1 AND 72),
+        ADD COLUMN IF NOT EXISTS menu_qr_visita          BOOLEAN NOT NULL DEFAULT FALSE;`
 ];
 
 const aplicarMigraciones = async () => {

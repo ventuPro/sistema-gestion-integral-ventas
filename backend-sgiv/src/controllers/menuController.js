@@ -2,6 +2,7 @@ const pedidoModel = require('../models/pedidoModel');
 const ajusteModel = require('../models/ajusteModel');
 const promocionModel = require('../models/promocionModel');
 const cuentaModel = require('../models/cuentaModel');
+const visitaModel = require('../models/visitaModel');
 const { calcularItemsVenta } = require('../models/cajaModel');
 const db = require('../config/db');
 const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
@@ -35,6 +36,8 @@ const ERRORES = {
     STOCK_INSUFICIENTE:     409,
     PRODUCTO_NO_DISPONIBLE: 409,
     NO_RECIBE_PEDIDOS:      409,
+    BLOQUEADO:              403,
+    ESPERA_VERIFICACION:    429,
     DEMASIADOS_PENDIENTES:  429
 };
 const responderError = (res, e, contexto) => {
@@ -73,6 +76,46 @@ const obtenerMesa = async (req, res) => {
                    recibe_pedidos: recibe_pedidos && menu_activo, pedidos_desactivados: !menu_activo });
     } catch (e) {
         responderError(res, e, 'obtenerMesa');
+    }
+};
+
+// ─── Visita: empieza al abrir el menú (escanear) y termina por tiempo, inactividad o al liberar la mesa ───
+const MENSAJES_VISITA = {
+    vencida:       'Tu visita terminó. Escanea el QR de tu mesa para pedir.',
+    terminada:     'Tu visita terminó. Escanea el QR de tu mesa para pedir.',
+    sin_qr_visita: 'Pide al personal el QR de tu visita para hacer pedidos.',
+    bloqueado:     'No puedes hacer pedidos desde esta mesa por ahora. Pide ayuda en caja.'
+};
+const CODIGO_VISITA = /^[0-9a-f]{32}$/;
+
+// POST /api/menu/m/:codigo/visita { cliente_mesa, visita?, v? }
+// Sin `visita` empieza una nueva; con ella la renueva (actividad del cliente) si sigue vigente
+const visita = async (req, res) => {
+    try {
+        const cliente = clienteMesa(req.body?.cliente_mesa);
+        if (!cliente) return res.status(400).json({ error: 'Código de celular inválido' });
+        const p = await ajusteModel.parametros();
+        const mesa = req.mesa;
+
+        let token;
+        if (req.body?.visita) {
+            const r = visitaModel.revisar(req.body.visita, mesa, p);
+            if (r.datos?.c !== cliente || ['vencida', 'terminada'].includes(r.motivo)) {
+                const motivo = r.datos?.c === cliente ? r.motivo : 'vencida';
+                return res.json({ visita: null, motivo, mensaje: MENSAJES_VISITA[motivo] });
+            }
+            token = visitaModel.firmar({ ...r.datos, a: Date.now() });
+        } else {
+            const v = CODIGO_VISITA.test(String(req.body?.v || '')) ? String(req.body.v) : null;
+            token = visitaModel.firmar({ m: mesa.id_mesa, c: cliente, i: Date.now(), v });
+        }
+
+        let motivo = visitaModel.revisar(token, mesa, p).motivo ?? null;
+        if (!motivo && await visitaModel.estaBloqueado(db, mesa.id_mesa, cliente, req.ip)) motivo = 'bloqueado';
+        res.json({ visita: token, motivo, mensaje: motivo ? MENSAJES_VISITA[motivo] : null,
+                   inactividad_min: p.menu_visita_inactividad });
+    } catch (e) {
+        responderError(res, e, 'visita');
     }
 };
 
@@ -124,6 +167,9 @@ const crearPedido = async (req, res) => {
         const p = await ajusteModel.parametros();
         if (!p.menu_activo)
             return res.status(409).json({ error: 'Los pedidos desde el menú están desactivados. Pide en caja.', codigo: 'NO_RECIBE_PEDIDOS' });
+        const v = visitaModel.revisar(req.body?.visita, req.mesa, p);
+        if (!v.valida)
+            return res.status(403).json({ error: MENSAJES_VISITA[v.motivo], codigo: 'VISITA_VENCIDA', motivo: v.motivo });
         if (superaLimiteIp(req.ip, Number(process.env.MENU_MAX_PEDIDOS_IP) || p.menu_max_pedidos_ip))
             return res.status(429).json({ error: 'Hiciste muchos pedidos seguidos. Espera unos minutos o pide ayuda en caja.' });
 
@@ -132,8 +178,9 @@ const crearPedido = async (req, res) => {
             items:               req.body?.items,
             observacion_general: req.body?.observacion_general,
             maxPendientes:       p.menu_max_pendientes_mesa,
-            cliente_mesa:        clienteMesa(req.body?.cliente_mesa),
-            nombre_cliente:      nombreCliente(req.body?.nombre_cliente)
+            cliente_mesa:        v.datos.c,
+            nombre_cliente:      nombreCliente(req.body?.nombre_cliente),
+            ip_cliente:          String(req.ip || '').slice(0, 45) || null
         });
 
         emitirStock(cambios);
@@ -143,13 +190,15 @@ const crearPedido = async (req, res) => {
             id_mesa:     pedido.id_mesa,
             numero_mesa: req.mesa.numero_mesa,
             nombre_cliente: pedido.nombre_cliente,
-            monto_total: pedido.monto_total
+            monto_total: pedido.monto_total,
+            sin_verificar: pedido.sin_verificar
         });
 
         res.status(201).json({
             mensaje:     'Pedido enviado. El cajero lo confirmará en breve.',
             id_pedido:   pedido.id_pedido,
-            monto_total: pedido.monto_total
+            monto_total: pedido.monto_total,
+            visita:      visitaModel.firmar({ ...v.datos, a: Date.now() })
         });
     } catch (e) {
         responderError(res, e, 'crearPedido');
@@ -198,4 +247,4 @@ const obtenerEstado = async (req, res) => {
     }
 };
 
-module.exports = { cargarMesa, obtenerMesa, obtenerCatalogo, obtenerPromociones, cotizarCarrito, crearPedido, cancelarPedido, obtenerEstado };
+module.exports = { cargarMesa, obtenerMesa, visita, obtenerCatalogo, obtenerPromociones, cotizarCarrito, crearPedido, cancelarPedido, obtenerEstado };

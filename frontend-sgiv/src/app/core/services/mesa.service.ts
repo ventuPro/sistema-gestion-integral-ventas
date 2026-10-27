@@ -27,8 +27,18 @@ export class MesaService {
     return this.http.post(`${this.apiUrl}/mesas/${id_mesa}/qr/regenerar`, {});
   }
 
-  actualizarEstado(id_mesa: number, estado_mesa: string): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/mesas/${id_mesa}/estado`, { estado_mesa });
+  habilitar(id_mesa: number): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.apiUrl}/mesas/${id_mesa}/habilitar`, {});
+  }
+
+  liberar(id_mesa: number): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${this.apiUrl}/mesas/${id_mesa}/liberar`, {});
+  }
+
+  /** QR temporal impreso: sirve solo mientras la mesa siga habilitada */
+  qrVisita(id_mesa: number, base_url: string): Observable<{ qr: string; url: string; numero_mesa: number }> {
+    const params = new HttpParams().set('base_url', base_url);
+    return this.http.get<any>(`${this.apiUrl}/mesas/${id_mesa}/qr-visita`, { params });
   }
 
   eliminarMesa(id_mesa: number): Observable<any> {

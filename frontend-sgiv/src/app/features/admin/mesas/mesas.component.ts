@@ -10,7 +10,8 @@ import { SocketService }  from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { MesaModalComponent } from './mesa-modal/mesa-modal.component';
 import { LucideAngularModule,
-         ShieldAlert, Landmark, RefreshCw, QrCode, Printer, Download, Plus, Trash2, X } from 'lucide-angular';
+         ShieldAlert, Landmark, RefreshCw, QrCode, Printer, Download, Plus, Trash2, X,
+         DoorOpen, DoorClosed, Ticket } from 'lucide-angular';
 import { sondeo } from '../../../core/utils/sondeo';
 import { cifra, fechaLarga } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
@@ -31,7 +32,7 @@ export class MesasComponent implements OnInit, OnDestroy {
   private mesaService   = inject(MesaService);
   private socketService = inject(SocketService);
   readonly moneda        = inject(AjustesService).moneda;
-  private ajustes       = inject(AjustesService);
+  readonly ajustes      = inject(AjustesService);
 
   readonly icons = {
     shieldAlert: ShieldAlert,
@@ -42,7 +43,10 @@ export class MesasComponent implements OnInit, OnDestroy {
     download:    Download,
     mas:         Plus,
     quitar:      Trash2,
-    cerrar:      X
+    cerrar:      X,
+    habilitar:   DoorOpen,
+    liberar:     DoorClosed,
+    qrVisita:    Ticket
   };
 
   readonly cifra    = cifra;
@@ -179,6 +183,66 @@ export class MesasComponent implements OnInit, OnDestroy {
     };
   });
 
+  // ─── HABILITAR / LIBERAR (menú QR: con la mesa habilitada sus clientes piden sin verificación) ───
+  readonly procesandoMesa = signal<number | null>(null);
+
+  /** Con el QR temporal activo se imprime su ticket al habilitar (la ventana se abre con el clic) */
+  habilitar(mesa: any) {
+    const ventana = this.ajustes.config().menu_qr_visita ? this.abrirVentana() : null;
+    if (ventana === undefined) return;
+    this.accionMesa(mesa, this.mesaService.habilitar(mesa.id_mesa),
+                    () => ventana && this.imprimirQRVisita(mesa, ventana), () => ventana?.close());
+  }
+
+  async liberar(mesa: any) {
+    const si = await this.dialogo.confirmar({
+      titulo: `¿Liberar la Mesa ${mesa.numero_mesa}?`,
+      mensaje: 'Los clientes de esta mesa tendrán que volver a escanear el QR para pedir.',
+      textoConfirmar: 'Liberar'
+    });
+    if (si) this.accionMesa(mesa, this.mesaService.liberar(mesa.id_mesa));
+  }
+
+  private accionMesa(mesa: any, accion: any, despues?: () => void, siFalla?: () => void) {
+    if (this.procesandoMesa()) { siFalla?.(); return; }
+    this.procesandoMesa.set(mesa.id_mesa);
+    accion.subscribe({
+      next: (r: any) => { this.procesandoMesa.set(null); this.dialogo.avisar(r.mensaje); this.cargarMesas(); despues?.(); },
+      error: (e: any) => {
+        this.procesandoMesa.set(null);
+        siFalla?.();
+        this.dialogo.error(e?.error?.error || 'No se pudo actualizar la mesa.');
+      }
+    });
+  }
+
+  /** undefined = el navegador bloqueó la ventana */
+  private abrirVentana(): Window | undefined {
+    const ventana = window.open('', '_blank');
+    if (ventana) return ventana;
+    this.dialogo.error('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes.');
+    return undefined;
+  }
+
+  /** Ticket con el QR que sirve solo durante esta visita */
+  imprimirQRVisita(mesa: any, ventana = this.abrirVentana()) {
+    if (!ventana) return;
+    this.mesaService.qrVisita(mesa.id_mesa, this.baseUrlGuardada()).subscribe({
+      next: (r) => this.escribirHoja(ventana, 'QR de la visita', `
+        <div class="tarjeta">
+          ${this.cabeceraHoja()}
+          <img src="${r.qr}" alt="QR Mesa ${r.numero_mesa}">
+          <p class="mesa">Mesa ${r.numero_mesa}</p>
+          <p class="ayuda">Escanea para pedir durante tu visita</p>
+        </div>`, 'ticket'),
+      error: (e: any) => { ventana.close(); this.dialogo.error(e?.error?.error || 'No se pudo generar el QR de la visita.'); }
+    });
+  }
+
+  private baseUrlGuardada(): string {
+    try { return localStorage.getItem(this.CLAVE_URL_QR) || window.location.origin; } catch { return window.location.origin; }
+  }
+
   // ─── NUEVA MESA ───
   abrirModalMesa()  { this.nuevaMesaNum.set(''); this.errorMesa.set(''); this.mostrarModalMesa.set(true); }
   cerrarModalMesa() { this.mostrarModalMesa.set(false); }
@@ -283,25 +347,35 @@ export class MesasComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Hoja imprimible en una ventana aparte: no arrastra el resto del sistema */
-  imprimirQR() {
+  private cabeceraHoja(): string {
     const nombre = this.escaparHtml(this.ajustes.nombre());
     const logo   = this.ajustes.logo() ? `<img class="logo" src="${this.ajustes.logo()}" alt="">` : '';
-    const color  = `rgb(${this.ajustes.colorPrimarioRgb().join(',')})`;
+    return `${logo}<p class="marca">${nombre}</p>`;
+  }
+
+  /** Hoja imprimible en una ventana aparte: no arrastra el resto del sistema */
+  imprimirQR() {
     const tarjetas = this.codigosQR().map(c => `
       <div class="tarjeta">
-        ${logo}<p class="marca">${nombre}</p>
+        ${this.cabeceraHoja()}
         <img src="${c.qr}" alt="QR Mesa ${c.numero_mesa}">
         <p class="mesa">Mesa ${c.numero_mesa}</p>
-        <p class="ayuda">Escanea para ver el menú y pedir desde tu mesa</p>
+        <p class="ayuda">${this.ajustes.config().menu_qr_visita ? 'Escanea para ver el menú'
+                                                                   : 'Escanea para ver el menú y pedir desde tu mesa'}</p>
       </div>`).join('');
 
-    const ventana = window.open('', '_blank');
-    if (!ventana) { this.dialogo.error('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes.'); return; }
-    ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Códigos QR de mesas</title>
+    const ventana = this.abrirVentana();
+    if (ventana) this.escribirHoja(ventana, 'Códigos QR de mesas', tarjetas, 'hoja');
+  }
+
+  /** hoja = varias tarjetas en A4; ticket = una sola, para la impresora de tickets */
+  private escribirHoja(ventana: Window, titulo: string, contenido: string, formato: 'hoja' | 'ticket') {
+    const color = `rgb(${this.ajustes.colorPrimarioRgb().join(',')})`;
+    ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${titulo}</title>
       <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 12mm; }
-        .hoja { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10mm; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: ${formato === 'hoja' ? '12mm' : '2mm'}; }
+        .hoja { display: grid; grid-template-columns: ${formato === 'hoja' ? 'repeat(2, 1fr)' : '1fr'}; gap: 10mm;
+                ${formato === 'ticket' ? 'width: 70mm;' : ''} }
         .tarjeta { border: 2px dashed #999; border-radius: 6mm; padding: 6mm; text-align: center; break-inside: avoid; }
         .tarjeta img { width: 60mm; height: 60mm; }
         .marca { margin: 0 0 2mm; font-weight: bold; color: ${color}; }
@@ -309,7 +383,7 @@ export class MesasComponent implements OnInit, OnDestroy {
         .mesa  { margin: 2mm 0 0; font-size: 22pt; font-weight: 900; }
         .ayuda { margin: 1mm 0 0; font-size: 10pt; color: #555; }
       </style></head>
-      <body><div class="hoja">${tarjetas}</div>
+      <body><div class="hoja">${contenido}</div>
       <script>window.onload = () => { window.print(); }<\/script></body></html>`);
     ventana.document.close();
   }

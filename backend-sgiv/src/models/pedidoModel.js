@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { registrarHistorial } = require('./inventarioModel');
+const visitaModel = require('./visitaModel');
 
 // ─── Pedidos del cliente: Pendiente_Cajero → Confirmado → Entregado → Pagado / Cancelado ───
 
@@ -155,6 +156,7 @@ const itemsDelPedido = async (client, id_pedido) =>
 const obtenerMesaPorCodigo = async (codigo) => {
     const r = await db.query(`
         SELECT m.id_mesa, m.numero_mesa, m.id_sucursal, s.nombre_sucursal,
+               m.estado_mesa, m.fecha_liberacion, m.codigo_visita,
                s.estado_activo AND EXISTS (SELECT 1 FROM turno_caja t
                        WHERE t.id_sucursal = m.id_sucursal AND t.estado_turno = 'Abierto') AS recibe_pedidos
         FROM mesa_local m
@@ -182,12 +184,18 @@ const obtenerCatalogoMenu = async (id_sucursal) => {
 
 // ─── CLIENTE: crear pedido desde la mesa ───
 // cliente_mesa: código del celular (menú QR); nombre_cliente: opcional, lo escribe el cliente
+// Con la mesa libre el pedido queda «sin verificar»: uno pendiente por celular/IP hasta que el cajero confirme
 const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes = MAX_PENDIENTES_MESA,
-                                 cliente_mesa = null, nombre_cliente = null }) => {
+                                 cliente_mesa = null, nombre_cliente = null, ip_cliente = null }) => {
     const lista = normalizarItems(items);
 
     return enTransaccion(async (client) => {
-        await client.query(`SELECT id_mesa FROM mesa_local WHERE id_mesa = $1 FOR UPDATE`, [mesa.id_mesa]);
+        const rMesa = await client.query(
+            `SELECT estado_mesa FROM mesa_local WHERE id_mesa = $1 FOR UPDATE`, [mesa.id_mesa]);
+        const sin_verificar = rMesa.rows[0]?.estado_mesa !== 'Ocupada';
+
+        if (await visitaModel.estaBloqueado(client, mesa.id_mesa, cliente_mesa, ip_cliente))
+            throw errorCodigo('BLOQUEADO', 'No puedes hacer pedidos desde esta mesa por ahora. Pide ayuda en caja.');
 
         const rTurno = await client.query(
             `SELECT 1 FROM turno_caja t JOIN sucursal s ON s.id_sucursal = t.id_sucursal
@@ -201,6 +209,17 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
             [mesa.id_mesa]);
         if (rPend.rows[0].n >= maxPendientes)
             throw errorCodigo('DEMASIADOS_PENDIENTES', 'Tu mesa ya tiene pedidos esperando confirmación. Espera a que el cajero los confirme.');
+
+        if (sin_verificar) {
+            const rMio = await client.query(`
+                SELECT 1 FROM pedido_mesa
+                WHERE id_mesa = $1 AND estado_pedido = 'Pendiente_Cajero'
+                  AND ((cliente_mesa IS NOT NULL AND cliente_mesa = $2) OR (ip_cliente IS NOT NULL AND ip_cliente = $3))
+                LIMIT 1
+            `, [mesa.id_mesa, cliente_mesa, ip_cliente]);
+            if (rMio.rows.length)
+                throw errorCodigo('ESPERA_VERIFICACION', 'Espera a que el cajero confirme tu primer pedido para hacer otro.');
+        }
 
         const rProd = await client.query(`
             SELECT id_producto, precio_unitario FROM producto
@@ -217,11 +236,11 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
         const totalCentavos = lista.reduce((s, i) => s + precios.get(i.id_producto) * i.cantidad, 0);
         const rPed = await client.query(`
             INSERT INTO pedido_mesa (tipo_pedido, id_sucursal, id_mesa, estado_pedido, monto_total, observacion_general,
-                                     cliente_mesa, nombre_cliente)
-            VALUES ('Mesa', $1, $2, 'Pendiente_Cajero', $3, $4, $5, $6)
+                                     cliente_mesa, nombre_cliente, sin_verificar, ip_cliente)
+            VALUES ('Mesa', $1, $2, 'Pendiente_Cajero', $3, $4, $5, $6, $7, $8)
             RETURNING *
         `, [mesa.id_sucursal, mesa.id_mesa, totalCentavos / 100, texto(observacion_general, MAX_LARGO_NOTA),
-            cliente_mesa, nombre_cliente]);
+            cliente_mesa, nombre_cliente, sin_verificar, ip_cliente]);
         const pedido = rPed.rows[0];
 
         for (const it of lista) {
@@ -243,7 +262,7 @@ const obtenerBandeja = async (id_sucursal, minutos_expiracion) => {
         SELECT pm.id_pedido, pm.tipo_pedido, pm.id_mesa, pm.id_sucursal, pm.estado_pedido,
                pm.monto_total, pm.fecha_pedido, pm.fecha_aprobacion, pm.observacion_general,
                pm.fecha_pedido + make_interval(mins => $2) AS fecha_expiracion,
-               pm.nombre_cliente, pm.telefono_cliente, pm.direccion_entrega,
+               pm.nombre_cliente, pm.telefono_cliente, pm.direccion_entrega, pm.sin_verificar,
                m.numero_mesa,
                json_agg(json_build_object(
                    'id_detalle',      dp.id_detalle_pedido,
@@ -348,7 +367,7 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
             SET total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta = $1 AND id_venta IS NULL)
             WHERE id_cuenta = $1
         `, [id_cuenta]);
-        await client.query(`UPDATE mesa_local SET estado_mesa = 'Ocupada' WHERE id_mesa = $1`, [pedido.id_mesa]);
+        await visitaModel.habilitar(client, pedido.id_mesa);
 
         const rPed = await client.query(`
             UPDATE pedido_mesa
@@ -372,11 +391,12 @@ const cancelarPendiente = async (client, pedido, id_usuario = null) => {
     return { pedido: r.rows[0], cambios };
 };
 
-// ─── CAJERO: rechazar (sin motivo) ───
-const rechazarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
+// ─── CAJERO: rechazar (falso = bloquea ese celular/IP en la mesa por unas horas) ───
+const rechazarPedido = async ({ id_pedido, id_usuario, id_sucursal, falso = false, horasBloqueo = 6 }) =>
     enTransaccion(async (client) => {
         const pedido = await bloquearPedido(client, id_pedido, id_sucursal);
         exigirEstado(pedido, 'Pendiente_Cajero');
+        if (falso && pedido.id_mesa) await visitaModel.bloquear(client, { pedido, id_usuario, horas: horasBloqueo });
         return cancelarPendiente(client, pedido, id_usuario);
     });
 

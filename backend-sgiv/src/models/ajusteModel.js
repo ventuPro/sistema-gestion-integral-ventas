@@ -10,19 +10,21 @@ const CAMPOS_EMPRESA = ['nombre_comercial', 'razon_social', 'nit', 'rubro', 'esl
 const CAMPOS_APARIENCIA = ['url_logo', 'url_favicon', 'color_primario', 'color_secundario', 'tema'];
 const CAMPOS_PARAMETROS = ['moneda_simbolo', 'pago_efectivo', 'pago_qr', 'url_qr_cobro', 'ticket_mensaje_pie', 'ticket_ancho',
                            'menu_activo', 'menu_mensaje_bienvenida', 'menu_minutos_expiracion',
-                           'menu_max_pendientes_mesa', 'menu_max_pedidos_ip', 'stock_minimo_defecto',
+                           'menu_max_pendientes_mesa', 'menu_max_pedidos_ip', 'menu_visita_horas',
+                           'menu_visita_inactividad', 'menu_bloqueo_horas', 'menu_qr_visita', 'stock_minimo_defecto',
                            'captcha_activo', 'login_max_intentos', 'login_minutos_bloqueo', 'sesion_horas'];
 const CAMPOS_IA = ['ia_info_negocio'];
 
 // No se envían sin sesión
 const PRIVADOS = ['id_configuracion', 'fecha_actualizacion', 'login_max_intentos', 'login_minutos_bloqueo',
                   'sesion_horas', 'menu_max_pedidos_ip', 'menu_max_pendientes_mesa', 'menu_minutos_expiracion',
-                  'stock_minimo_defecto', ...CAMPOS_IA];
+                  'menu_visita_horas', 'menu_visita_inactividad', 'menu_bloqueo_horas', 'stock_minimo_defecto', ...CAMPOS_IA];
 
 // Valores del sistema original, por si la fila no existe
 const POR_DEFECTO = {
     moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80',
     menu_activo: true, menu_minutos_expiracion: 15, menu_max_pendientes_mesa: 3, menu_max_pedidos_ip: 10,
+    menu_visita_horas: 3, menu_visita_inactividad: 30, menu_bloqueo_horas: 6, menu_qr_visita: false,
     stock_minimo_defecto: 5, captcha_activo: true, login_max_intentos: 5, login_minutos_bloqueo: 15, sesion_horas: 8, ia_info_negocio: null
 };
 

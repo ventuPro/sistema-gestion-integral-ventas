@@ -17,6 +17,10 @@ interface Parametros {
   menu_minutos_expiracion: number;
   menu_max_pendientes_mesa: number;
   menu_max_pedidos_ip: number;
+  menu_visita_horas: number;
+  menu_visita_inactividad: number;
+  menu_bloqueo_horas: number;
+  menu_qr_visita: boolean;
   stock_minimo_defecto: number;
   captcha_activo: boolean;
   login_max_intentos: number;
@@ -28,7 +32,8 @@ interface Parametros {
 const ORIGINALES: Parametros = {
   moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80',
   menu_activo: true, menu_mensaje_bienvenida: '', menu_minutos_expiracion: 15, menu_max_pendientes_mesa: 3,
-  menu_max_pedidos_ip: 10, stock_minimo_defecto: 5, captcha_activo: true, login_max_intentos: 5,
+  menu_max_pedidos_ip: 10, menu_visita_horas: 3, menu_visita_inactividad: 30, menu_bloqueo_horas: 6,
+  menu_qr_visita: false, stock_minimo_defecto: 5, captcha_activo: true, login_max_intentos: 5,
   login_minutos_bloqueo: 15, sesion_horas: 8
 };
 
@@ -60,7 +65,10 @@ export class AjustesParametrosComponent implements OnInit {
   readonly camposMenu: CampoNumero[] = [
     { clave: 'menu_minutos_expiracion', etiqueta: 'Vencimiento de pedidos sin confirmar', unidad: 'min', min: 5, max: 120 },
     { clave: 'menu_max_pendientes_mesa', etiqueta: 'Pedidos pendientes por mesa', unidad: 'pedidos', min: 1, max: 10 },
-    { clave: 'menu_max_pedidos_ip', etiqueta: 'Pedidos por celular cada 10 minutos', unidad: 'pedidos', min: 1, max: 100 }
+    { clave: 'menu_max_pedidos_ip', etiqueta: 'Pedidos por celular cada 10 minutos', unidad: 'pedidos', min: 1, max: 100 },
+    { clave: 'menu_visita_horas', etiqueta: 'Duración máxima de la visita', unidad: 'horas', min: 1, max: 12 },
+    { clave: 'menu_visita_inactividad', etiqueta: 'Fin de la visita por inactividad', unidad: 'min', min: 10, max: 240 },
+    { clave: 'menu_bloqueo_horas', etiqueta: 'Bloqueo por pedido falso', unidad: 'horas', min: 1, max: 72 }
   ];
 
   readonly camposSeguridad: CampoNumero[] = [

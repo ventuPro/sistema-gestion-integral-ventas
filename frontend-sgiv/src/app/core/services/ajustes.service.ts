@@ -48,6 +48,8 @@ export interface Configuracion {
   ticket_ancho: '58' | '80' | 'A4';
   menu_activo: boolean;
   menu_mensaje_bienvenida: string | null;
+  /** Pedidos solo con el QR temporal impreso de la visita */
+  menu_qr_visita: boolean;
   captcha_activo: boolean;
   /** Chatbots siempre activos: true si el servidor tiene la clave de Groq */
   ia_cliente_disponible: boolean;
@@ -56,6 +58,9 @@ export interface Configuracion {
   menu_minutos_expiracion?: number;
   menu_max_pendientes_mesa?: number;
   menu_max_pedidos_ip?: number;
+  menu_visita_horas?: number;
+  menu_visita_inactividad?: number;
+  menu_bloqueo_horas?: number;
   stock_minimo_defecto?: number;
   login_max_intentos?: number;
   login_minutos_bloqueo?: number;
@@ -74,7 +79,7 @@ export const CONFIG_ORIGINAL: Configuracion = {
   url_logo: null, url_favicon: null, color_primario: null, color_secundario: null, tema: 'claro',
   moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, url_qr_cobro: null,
   ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80', menu_activo: true, menu_mensaje_bienvenida: null,
-  captcha_activo: true, ia_cliente_disponible: false, ia_interno_disponible: false
+  menu_qr_visita: false, captcha_activo: true, ia_cliente_disponible: false, ia_interno_disponible: false
 };
 
 // Tonos originales de Tailwind (blue-600 e indigo-600), para mostrar en el selector
@@ -91,6 +96,7 @@ const CLAVE_CACHE = 'ajustes_sgiv';
 
 // Llegan solo al administrador: no se guardan en la configuración compartida
 const PRIVADOS = ['menu_minutos_expiracion', 'menu_max_pendientes_mesa', 'menu_max_pedidos_ip', 'stock_minimo_defecto',
+                  'menu_visita_horas', 'menu_visita_inactividad', 'menu_bloqueo_horas',
                   'login_max_intentos', 'login_minutos_bloqueo', 'sesion_horas', 'id_configuracion', 'fecha_actualizacion',
                   'ia_info_negocio'];
 

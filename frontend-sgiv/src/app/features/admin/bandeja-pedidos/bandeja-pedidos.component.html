@@ -71,6 +71,10 @@
             <div class="flex items-center gap-2">
               <lucide-icon *ngIf="p.tipo_pedido === 'Delivery'" [img]="icons.delivery" class="w-4 h-4 text-gray-600"></lucide-icon>
               <span class="font-black text-gray-800 text-lg">{{ etiqueta(p) }}</span>
+              <span *ngIf="p.sin_verificar"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-300">
+                <lucide-icon [img]="icons.sinVerificar" class="w-3.5 h-3.5"></lucide-icon> Sin verificar
+              </span>
             </div>
             <span class="text-xs font-semibold"
                   [class.text-red-600]="porVencer(p)" [class.text-gray-500]="!porVencer(p)">
@@ -116,6 +120,10 @@
 
           <div class="px-4 py-3 border-t flex items-center gap-2">
             <span class="flex-1 font-black text-gray-800">{{ moneda() }} {{ (+p.monto_total).toFixed(2) }}</span>
+            <button *ngIf="p.tipo_pedido === 'Mesa'" (click)="rechazarFalso(p)" [disabled]="ocupado()[p.id_pedido]"
+                    class="px-2.5 py-2 rounded-lg text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-40 flex items-center gap-1">
+              <lucide-icon [img]="icons.falso" class="w-4 h-4"></lucide-icon> Falso
+            </button>
             <button (click)="rechazar(p)" [disabled]="ocupado()[p.id_pedido]"
                     class="px-3 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-40">
               Rechazar

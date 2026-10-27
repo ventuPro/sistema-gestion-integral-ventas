@@ -180,7 +180,13 @@ CREATE TABLE mesa_local (
     id_sucursal INT REFERENCES sucursal(id_sucursal),
     numero_mesa INT NOT NULL,
     codigo_qr TEXT UNIQUE NOT NULL,
-    estado_mesa VARCHAR(20) DEFAULT 'Libre'
+    -- Libre / Ocupada (= habilitada: sus celulares piden sin verificación)
+    estado_mesa VARCHAR(20) DEFAULT 'Libre',
+    fecha_habilitacion TIMESTAMPTZ,
+    -- Las visitas del menú QR que empezaron antes de esta fecha terminaron
+    fecha_liberacion TIMESTAMPTZ,
+    -- Código del QR temporal impreso (cambia en cada habilitación)
+    codigo_visita VARCHAR(32)
 );
 
 -- Comanda / cuenta abierta de una mesa (atención directa del cajero + pedidos QR)
@@ -218,10 +224,25 @@ CREATE TABLE pedido_mesa (
     direccion_entrega TEXT,
     -- Código del celular que hizo el pedido (menú QR): consumo y cobro por persona
     cliente_mesa VARCHAR(32),
+    -- Pedido hecho con la mesa libre: el cajero lo verifica
+    sin_verificar BOOLEAN NOT NULL DEFAULT FALSE,
+    ip_cliente VARCHAR(45),
     CONSTRAINT pedido_mesa_estado_check
         CHECK (estado_pedido IN ('Pendiente_Cajero', 'Confirmado', 'Entregado', 'Pagado', 'Cancelado')),
     CONSTRAINT pedido_mesa_tipo_check
         CHECK (tipo_pedido IN ('Mesa', 'Delivery') AND (tipo_pedido <> 'Mesa' OR id_mesa IS NOT NULL))
+);
+
+-- Celular/IP que no puede pedir en una mesa (pedido rechazado como falso)
+CREATE TABLE bloqueo_menu (
+    id_bloqueo   SERIAL PRIMARY KEY,
+    id_mesa      INT NOT NULL REFERENCES mesa_local(id_mesa) ON DELETE CASCADE,
+    cliente_mesa VARCHAR(32),
+    ip_cliente   VARCHAR(45),
+    id_pedido    INT REFERENCES pedido_mesa(id_pedido) ON DELETE SET NULL,
+    id_usuario   INT REFERENCES usuario(id_usuario),
+    fecha_bloqueo TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    bloqueado_hasta TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE detalle_pedido (
@@ -352,6 +373,10 @@ CREATE TABLE configuracion (
     menu_minutos_expiracion  INT NOT NULL DEFAULT 15 CHECK (menu_minutos_expiracion BETWEEN 5 AND 120),
     menu_max_pendientes_mesa INT NOT NULL DEFAULT 3  CHECK (menu_max_pendientes_mesa BETWEEN 1 AND 10),
     menu_max_pedidos_ip      INT NOT NULL DEFAULT 10 CHECK (menu_max_pedidos_ip BETWEEN 1 AND 100),
+    menu_visita_horas        INT NOT NULL DEFAULT 3  CHECK (menu_visita_horas BETWEEN 1 AND 12),
+    menu_visita_inactividad  INT NOT NULL DEFAULT 30 CHECK (menu_visita_inactividad BETWEEN 10 AND 240),
+    menu_bloqueo_horas       INT NOT NULL DEFAULT 6  CHECK (menu_bloqueo_horas BETWEEN 1 AND 72),
+    menu_qr_visita           BOOLEAN NOT NULL DEFAULT FALSE,
     -- Parámetros: inventario
     stock_minimo_defecto     INT NOT NULL DEFAULT 5  CHECK (stock_minimo_defecto BETWEEN 0 AND 10000),
     -- Parámetros: seguridad
@@ -401,6 +426,8 @@ CREATE INDEX idx_pedido_sucursal_estado   ON pedido_mesa (id_sucursal, estado_pe
 CREATE INDEX idx_pedido_mesa_estado       ON pedido_mesa (id_mesa, estado_pedido);
 CREATE INDEX idx_pedido_cuenta            ON pedido_mesa (id_cuenta);
 CREATE INDEX idx_mesa_sucursal_numero     ON mesa_local (id_sucursal, numero_mesa);
+CREATE INDEX idx_mesa_estado_habilitacion ON mesa_local (estado_mesa, fecha_habilitacion);
+CREATE INDEX idx_bloqueo_menu_mesa        ON bloqueo_menu (id_mesa, bloqueado_hasta);
 CREATE INDEX idx_venta_caja_sucursal_fecha ON venta_caja (id_sucursal, fecha_venta);
 CREATE INDEX idx_venta_caja_turno         ON venta_caja (id_turno);
 CREATE INDEX idx_detalle_venta_venta      ON detalle_venta (id_venta);

@@ -3,6 +3,7 @@ const router  = express.Router();
 const ctrl    = require('../controllers/cuentaController');
 const { verificarToken, verificarPermiso } = require('../middlewares/authMiddleware');
 const pedidoModel = require('../models/pedidoModel');
+const visitaModel = require('../models/visitaModel');
 const { emitirStock, emitirMesa } = require('../utils/tiempoReal');
 
 const mesas = [verificarToken, verificarPermiso('mesas')];
@@ -45,14 +46,16 @@ router.post('/:id_cuenta/cancelar-si-vacia', mesas, async (req, res) => {
             await client.query('BEGIN');
             // Si el cajero quitó todos los productos de pedidos QR, esos pedidos quedan cancelados
             await pedidoModel.finalizarPedidosDeCuenta(client, id_cuenta, 'Cancelado');
+            // Si el cajero ya había habilitado la mesa antes de abrir esta cuenta, sigue habilitada
+            const rMesa = await client.query(`
+                SELECT m.fecha_habilitacion < c.fecha_apertura AS ya_habilitada
+                FROM cuenta_mesa c JOIN mesa_local m ON m.id_mesa = c.id_mesa WHERE c.id_cuenta = $1
+            `, [id_cuenta]);
             await client.query(
                 `UPDATE cuenta_mesa SET estado=$2, fecha_cierre=NOW() WHERE id_cuenta=$1`,
                 [id_cuenta, estadoFinal]
             );
-            await client.query(
-                `UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`,
-                [id_mesa]
-            );
+            if (estadoFinal === 'Pagada' || !rMesa.rows[0]?.ya_habilitada) await visitaModel.liberar(client, id_mesa);
             await client.query('COMMIT');
         } catch (e) {
             await client.query('ROLLBACK');
@@ -102,9 +105,7 @@ router.post('/reset-mesa', mesas, async (req, res) => {
         const pendientes = await pedidoModel.cancelarPendientesMesa(client, id_mesa);
         cambiosStock = cambiosStock.concat(pendientes.cambios);
 
-        await client.query(
-            `UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`, [id_mesa]
-        );
+        await visitaModel.liberar(client, id_mesa);
         await client.query('COMMIT');
 
         global.io?.to('cajeros').emit('mesa:actualizada', { id_mesa });

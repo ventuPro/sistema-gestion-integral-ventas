@@ -89,12 +89,15 @@ const ENTEROS = {
     menu_minutos_expiracion:  { min: 5, max: 120,   nombre: 'Vencimiento de pedidos sin confirmar (minutos)' },
     menu_max_pendientes_mesa: { min: 1, max: 10,    nombre: 'Pedidos pendientes por mesa' },
     menu_max_pedidos_ip:      { min: 1, max: 100,   nombre: 'Pedidos por dispositivo cada 10 minutos' },
+    menu_visita_horas:        { min: 1, max: 12,    nombre: 'Duración máxima de la visita (horas)' },
+    menu_visita_inactividad:  { min: 10, max: 240,  nombre: 'Fin de la visita por inactividad (minutos)' },
+    menu_bloqueo_horas:       { min: 1, max: 72,    nombre: 'Bloqueo por pedido falso (horas)' },
     stock_minimo_defecto:     { min: 0, max: 10000, nombre: 'Stock mínimo por defecto' },
     login_max_intentos:       { min: 3, max: 20,    nombre: 'Intentos de inicio de sesión' },
     login_minutos_bloqueo:    { min: 1, max: 1440,  nombre: 'Minutos de bloqueo' },
     sesion_horas:             { min: 1, max: 24,    nombre: 'Duración de la sesión (horas)' }
 };
-const BOOLEANOS = ['pago_efectivo', 'pago_qr', 'menu_activo', 'captcha_activo'];
+const BOOLEANOS = ['pago_efectivo', 'pago_qr', 'menu_activo', 'menu_qr_visita', 'captcha_activo'];
 const TEXTOS = {
     moneda_simbolo:          { max: 5,   obligatorio: true, nombre: 'símbolo de moneda' },
     ticket_mensaje_pie:      { max: 150, obligatorio: true, nombre: 'mensaje del pie del ticket' },

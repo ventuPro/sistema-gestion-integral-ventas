@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { finalizarPedidosDeCuenta } = require('./pedidoModel');
 const { registrarHistorial } = require('./inventarioModel');
 const promocionModel = require('./promocionModel');
+const visitaModel = require('./visitaModel');
 
 // total_acumulado = lo que falta cobrar (las partes ya pagadas tienen id_venta)
 const recalcularTotal = (client, id_cuenta) => client.query(`
@@ -32,11 +33,7 @@ const abrirCuenta = async (id_mesa, id_usuario) => {
         throw e;
     }
 
-    // Cambiar estado de la mesa
-    await db.query(
-        `UPDATE mesa_local SET estado_mesa='Ocupada' WHERE id_mesa=$1`,
-        [id_mesa]
-    );
+    await visitaModel.habilitar(db, id_mesa);
 
     return r.rows[0];
 };
@@ -319,7 +316,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
                     total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta=$2)
                 WHERE id_cuenta=$2
             `, [metodo_pago, id_cuenta]);
-            await client.query(`UPDATE mesa_local SET estado_mesa='Libre' WHERE id_mesa=$1`, [cuenta.id_mesa]);
+            await visitaModel.liberar(client, cuenta.id_mesa);
         } else {
             await recalcularTotal(client, id_cuenta);
             if (parte?.cliente_mesa) {

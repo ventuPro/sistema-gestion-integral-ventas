@@ -88,7 +88,7 @@
         <span class="inf-leyenda inf-nota">
           <span class="inf-estado ok">Libre</span>
           <span class="inf-estado aviso">Con cuenta</span>
-          <span class="inf-estado mal">Ocupada</span>
+          <span class="inf-estado habilitada">Habilitada</span>
         </span>
       </div>
 
@@ -114,10 +114,28 @@
                   <span class="total">{{ moneda() }} {{ cifra(mesa.total_acumulado) }}</span>
                   <span class="inf-sub mt-0!">{{ mesa.num_items }} ítem(s)</span>
                 } @else if (mesa.estado_mesa === 'Ocupada') {
-                  <span class="inf-estado mal mt-2">Ocupada</span>
-                } @else {
+                  <span class="inf-estado habilitada mt-2">Habilitada</span>
                 }
               </button>
+              @if (!mesa.id_cuenta) {
+                <div class="acciones-mesa">
+                  @if (mesa.estado_mesa === 'Ocupada') {
+                    <button class="inf-boton" (click)="liberar(mesa)" [disabled]="procesandoMesa() === mesa.id_mesa">
+                      <lucide-icon [img]="icons.liberar" class="w-3.5 h-3.5"></lucide-icon> Liberar
+                    </button>
+                    @if (ajustes.config().menu_qr_visita) {
+                      <button class="inf-boton" (click)="imprimirQRVisita(mesa)" title="Imprimir QR de la visita"
+                              aria-label="Imprimir QR de la visita">
+                        <lucide-icon [img]="icons.qrVisita" class="w-3.5 h-3.5"></lucide-icon>
+                      </button>
+                    }
+                  } @else {
+                    <button class="inf-boton" (click)="habilitar(mesa)" [disabled]="procesandoMesa() === mesa.id_mesa">
+                      <lucide-icon [img]="icons.habilitar" class="w-3.5 h-3.5"></lucide-icon> Habilitar
+                    </button>
+                  }
+                </div>
+              }
             </div>
           }
         </div>

@@ -5,6 +5,7 @@ const asistente = require('../controllers/asistenteController');
 
 // Menú digital del cliente (público). :codigo = código QR de la mesa
 router.get  ('/m/:codigo',                              ctrl.cargarMesa, ctrl.obtenerMesa);
+router.post ('/m/:codigo/visita',                       ctrl.cargarMesa, ctrl.visita);
 router.get  ('/m/:codigo/catalogo',                     ctrl.cargarMesa, ctrl.obtenerCatalogo);
 router.get  ('/m/:codigo/estado',                       ctrl.cargarMesa, ctrl.obtenerEstado);
 router.get  ('/m/:codigo/promociones',                  ctrl.cargarMesa, ctrl.obtenerPromociones);

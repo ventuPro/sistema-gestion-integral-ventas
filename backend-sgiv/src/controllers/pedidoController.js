@@ -2,7 +2,9 @@ const pedidoModel = require('../models/pedidoModel');
 const cuentaModel = require('../models/cuentaModel');
 const { emitirStock, emitirCajeros, emitirMesa } = require('../utils/tiempoReal');
 const contexto    = require('../auditoria/contexto');
+const { marcarEvento } = require('../auditoria/registroAcceso');
 const ajusteModel = require('../models/ajusteModel');
+const visitaModel = require('../models/visitaModel');
 
 // ─── Errores ───
 const ERRORES = {
@@ -90,17 +92,21 @@ const confirmarPedido = async (req, res) => {
     }
 };
 
-// POST /api/pedidos/:id_pedido/rechazar
+// POST /api/pedidos/:id_pedido/rechazar { falso? }  falso = bloquea ese celular/IP en la mesa
 const rechazarPedido = async (req, res) => {
     try {
+        const falso = req.body?.falso === true;
         const r = await pedidoModel.rechazarPedido({
-            id_pedido:   Number(req.params.id_pedido),
-            id_usuario:  req.usuario.id_usuario,
-            id_sucursal: sucursalFiltro(req)
+            id_pedido:    Number(req.params.id_pedido),
+            id_usuario:   req.usuario.id_usuario,
+            id_sucursal:  sucursalFiltro(req),
+            falso,
+            horasBloqueo: (await ajusteModel.parametros()).menu_bloqueo_horas
         });
+        if (falso) marcarEvento(res, 'PEDIDO_FALSO', { id_pedido: r.pedido.id_pedido, id_mesa: r.pedido.id_mesa });
         emitirStock(r.cambios);
         avisarCambio(r.pedido);
-        res.json({ mensaje: 'Pedido rechazado' });
+        res.json({ mensaje: falso ? 'Pedido rechazado como falso' : 'Pedido rechazado' });
     } catch (e) {
         responderError(res, e, 'rechazarPedido');
     }
@@ -120,14 +126,20 @@ const marcarEntregado = async (req, res) => {
     }
 };
 
-// Revisa cada minuto los pedidos que nadie atendió
-const CONTEXTO_EXPIRACION = { usuario: 'Sistema', origen: 'Proceso automático: vencimiento de pedidos' };
+// Revisa cada minuto los pedidos que nadie atendió y las mesas habilitadas en las que nadie pidió
+const CONTEXTO_EXPIRACION = { usuario: 'Sistema', origen: 'Proceso automático: vencimiento de pedidos y mesas' };
 
 const iniciarExpiracion = () => setInterval(() => contexto.ejecutar({ ...CONTEXTO_EXPIRACION }, async () => {
     try {
         const r = await pedidoModel.expirarPendientes(await minutosExpiracion());
         emitirStock(r.cambios);
         r.pedidos.forEach(p => avisarCambio(p));
+
+        const mesas = await visitaModel.liberarVencidas((await ajusteModel.parametros()).menu_visita_horas);
+        for (const m of mesas) {
+            emitirCajeros('mesa:actualizada', { id_mesa: m.id_mesa, id_sucursal: m.id_sucursal });
+            emitirMesa(m.id_mesa, 'visita:terminada', {});
+        }
     } catch (e) {
         console.error('expirarPendientes:', e.message);
     }

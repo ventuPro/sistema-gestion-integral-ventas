@@ -93,6 +93,8 @@
              ? 'Los pedidos desde el celular están desactivados. Puedes ver el menú y pedir en caja.'
              : 'En este momento no estamos recibiendo pedidos desde el menú. Puedes verlo y pedir en caja.' }}
         </p>
+      } @else if (motivoVisita()) {
+        <p class="aviso-suave">{{ mensajeVisita() }}</p>
       }
       @if (gracias()) {
         <div class="inf-hoja p-4 text-center">
@@ -119,7 +121,7 @@
 
         @if (mostrarCarrusel()) {
           <app-carrusel-recomendados class="block mb-4" [productos]="recomendados()" [moneda]="moneda()"
-                                     [cantidades]="cantidades()" [puedePedir]="mesa.recibe_pedidos && ajustes.config().menu_activo"
+                                     [cantidades]="cantidades()" [puedePedir]="puedePedir()"
                                      (agregar)="agregar($event)" (ver)="verProducto($event)" />
         }
 
@@ -305,7 +307,7 @@
             </div>
             @if (errorEnvio()) { <p class="error-formulario">{{ errorEnvio() }}</p> }
             <button class="boton-primario w-full py-3.5! text-base!" (click)="enviarPedido()"
-                    [disabled]="enviando() || !mesa.recibe_pedidos || !ajustes.config().menu_activo">
+                    [disabled]="enviando() || !puedePedir()">
               {{ enviando() ? 'Enviando…' : 'Enviar pedido' }}
             </button>
             @if (nombreCliente()) { <p class="text-center ayuda">A nombre de <b class="inf-tinta">{{ nombreCliente() }}</b></p> }

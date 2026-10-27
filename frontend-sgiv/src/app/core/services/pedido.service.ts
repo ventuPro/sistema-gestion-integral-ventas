@@ -23,8 +23,9 @@ export class PedidoService {
     return this.http.post(`${this.apiUrl}/${id_pedido}/confirmar`, {});
   }
 
-  rechazar(id_pedido: number): Observable<any> {
-    return this.http.post(`${this.apiUrl}/${id_pedido}/rechazar`, {});
+  /** falso = además bloquea ese celular en la mesa por unas horas */
+  rechazar(id_pedido: number, falso = false): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${id_pedido}/rechazar`, { falso });
   }
 
   marcarEntregado(id_pedido: number): Observable<any> {

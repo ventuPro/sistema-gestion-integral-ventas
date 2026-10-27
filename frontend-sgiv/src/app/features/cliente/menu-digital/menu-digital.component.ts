@@ -27,6 +27,9 @@ interface InfoMesa {
   numero_mesa: number; nombre_sucursal: string; id_sucursal: number; recibe_pedidos: boolean; pedidos_desactivados?: boolean;
 }
 
+type MotivoVisita = 'vencida' | 'terminada' | 'sin_qr_visita' | 'bloqueado';
+interface RespuestaVisita { visita: string | null; motivo: MotivoVisita | null; mensaje: string | null; inactividad_min?: number }
+
 interface ItemCarrito {
   id_producto:     number;
   nombre_producto: string;
@@ -193,6 +196,23 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   readonly aviso = signal<string | null>(null);
 
+  // ─── Visita: empieza al abrir el menú (escanear el QR) y se renueva mientras el cliente lo usa ───
+  private visita: string | null = null;
+  /** Código del QR temporal impreso (?v=) */
+  private codigoVisita: string | null = null;
+  readonly motivoVisita  = signal<MotivoVisita | null>(null);
+  readonly mensajeVisita = signal('');
+  private inactividadMs = 30 * 60_000;
+  private ultimaRenovacion = 0;
+  private renovando = false;
+  private readonly RENOVAR_CADA_MS = 2 * 60_000;
+  private readonly alUsar = () => {
+    if (this.visita && !this.renovando && Date.now() - this.ultimaRenovacion > this.RENOVAR_CADA_MS) this.revisarVisita();
+  };
+
+  readonly puedePedir = computed(() =>
+    !!this.info()?.recibe_pedidos && this.ajustes.config().menu_activo && !this.motivoVisita());
+
   // ─── Asistente con IA (se descarga solo si está disponible) ───
   readonly chatAsistente = componenteDiferido(() => this.ajustes.config().ia_cliente_disponible,
     () => import('../../shared/asistente/asistente-chat.component').then(m => m.AsistenteChatComponent));
@@ -243,7 +263,16 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
       this.estadoCarga.set('invalido');
       return;
     }
+    this.codigoVisita = this.route.snapshot.queryParamMap.get('v');
     this.cargarTodo();
+    this.revisarVisita();
+    for (const evento of ['pointerdown', 'keydown', 'scroll'])
+      addEventListener(evento, this.alUsar, { passive: true });
+    // Sin usar el menú (celular bloqueado o pestaña olvidada) la visita termina
+    const vigilar = setInterval(() => {
+      if (this.visita && Date.now() - this.ultimaRenovacion > this.inactividadMs) this.terminarVisita('vencida');
+    }, 30_000);
+    this.timers.push(() => clearInterval(vigilar));
     this.conectarSocket();
     addEventListener('scroll', this.alDesplazar, { passive: true });
     // Fotos que cargan, tarjetas que giran o avisos que aparecen cambian el alto: se vuelve a medir
@@ -259,6 +288,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.socket?.disconnect();
     this.timers.forEach(detener => detener());
     removeEventListener('scroll', this.alDesplazar);
+    for (const evento of ['pointerdown', 'keydown', 'scroll']) removeEventListener(evento, this.alUsar);
     this.tamano?.disconnect();
     clearTimeout(this.avisoTimer);
     clearTimeout(this.resaltadoTimer);
@@ -353,7 +383,8 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     });
 
     this.socket.on('cuenta:actualizada', () => this.refrescarEstado());
-    this.socket.on('cuenta:cerrada',     () => this.refrescarEstado(true));
+    this.socket.on('cuenta:cerrada',     () => { this.refrescarEstado(true); this.revisarVisita(); });
+    this.socket.on('visita:terminada',   () => this.revisarVisita());
   }
 
   /** Cambia el stock de un producto del catálogo; false si no está en él */
@@ -421,16 +452,45 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     this.carrito.update(c => c.filter(i => i.id_producto !== item.id_producto));
   }
 
+  // ─── Visita ───
+  /** Sin visita guardada empieza una nueva; con ella la renueva o avisa que terminó */
+  private revisarVisita() {
+    if (this.renovando || (!this.visita && this.motivoVisita() && this.motivoVisita() !== 'sin_qr_visita'
+                           && this.motivoVisita() !== 'bloqueado')) return;
+    this.renovando = true;
+    this.http.post<RespuestaVisita>(`${this.api}/${this.codigo}/visita`,
+      { cliente_mesa: this.celular, visita: this.visita, v: this.codigoVisita }).subscribe({
+      next: (r) => {
+        this.renovando = false;
+        if (r.inactividad_min) this.inactividadMs = r.inactividad_min * 60_000;
+        if (!r.visita) return this.terminarVisita(r.motivo ?? 'vencida', r.mensaje);
+        this.visita = r.visita;
+        this.ultimaRenovacion = Date.now();
+        this.motivoVisita.set(r.motivo);
+        this.mensajeVisita.set(r.mensaje || '');
+      },
+      error: () => { this.renovando = false; }
+    });
+  }
+
+  private terminarVisita(motivo: MotivoVisita, mensaje?: string | null) {
+    this.visita = null;
+    this.motivoVisita.set(motivo);
+    this.mensajeVisita.set(mensaje || 'Tu visita terminó. Escanea el QR de tu mesa para pedir.');
+  }
+
   // ─── Enviar pedido ───
   enviarPedido() {
     const carrito = this.carrito();
     if (!carrito.length || this.enviando()) return;
     if (!this.info()?.recibe_pedidos)
       return this.errorEnvio.set('En este momento no estamos recibiendo pedidos desde el menú. Consulta en caja.');
+    if (this.motivoVisita()) return this.errorEnvio.set(this.mensajeVisita());
     this.enviando.set(true);
     this.errorEnvio.set('');
 
     const body = {
+      visita:              this.visita,
       cliente_mesa:        this.celular,
       nombre_cliente:      this.nombreCliente().trim() || null,
       observacion_general: this.observacionGeneral().trim() || null,
@@ -438,7 +498,8 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
     };
 
     this.http.post<any>(`${this.api}/${this.codigo}/pedidos`, body).subscribe({
-      next: () => {
+      next: (r) => {
+        if (r?.visita) { this.visita = r.visita; this.ultimaRenovacion = Date.now(); }
         this.carrito.set([]);
         this.observacionGeneral.set('');
         this.enviando.set(false);
@@ -457,6 +518,8 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
         }
         if (err.codigo === 'PRODUCTO_NO_DISPONIBLE') this.cargarCatalogo();
         if (err.codigo === 'NO_RECIBE_PEDIDOS') this.info.update(i => i && { ...i, recibe_pedidos: false });
+        if (err.codigo === 'VISITA_VENCIDA') this.terminarVisita(err.motivo ?? 'vencida', err.error);
+        if (err.codigo === 'BLOQUEADO') { this.motivoVisita.set('bloqueado'); this.mensajeVisita.set(err.error); }
       }
     });
   }

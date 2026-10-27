@@ -10,7 +10,9 @@ router.get    ('/sucursal/:id_sucursal', mesas, ctrl.listarMesas);
 router.get    ('/sucursal/:id_sucursal/qr', mesas, ctrl.obtenerQRSucursal);
 router.get    ('/:id_mesa/qr',         mesas, ctrl.obtenerQR);
 router.post   ('/:id_mesa/qr/regenerar', mesas, ctrl.regenerarQR);
-router.patch  ('/:id_mesa/estado',     mesas, ctrl.actualizarEstado);
+router.post   ('/:id_mesa/habilitar',  mesas, ctrl.habilitar);
+router.post   ('/:id_mesa/liberar',    mesas, ctrl.liberar);
+router.get    ('/:id_mesa/qr-visita',  mesas, ctrl.obtenerQRVisita);
 router.delete ('/:id_mesa',            mesas, ctrl.eliminarMesa);
 
 module.exports = router;

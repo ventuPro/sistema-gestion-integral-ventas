@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const { crearBdPrueba } = require('../bdPrueba');
 const { crearLogin } = require('../sesionPrueba');
+const { crearPedir, celularAzar } = require('../menuPrueba');
 
 // ─── Pruebas del menú digital QR (cliente → cajero) ───
 // Levantan el backend real contra una BD temporal.
@@ -56,15 +57,16 @@ const stock = async (id_producto, id_sucursal = 1) => {
     return Number(r.cantidad_actual);
 };
 
-const crearMesa = async (numero, id_sucursal = 1) => {
+// habilitada = la mesa ya tiene clientes atendidos (sus pedidos no necesitan verificación)
+const crearMesa = async (numero, id_sucursal = 1, habilitada = true) => {
     const [m] = await bd.sql(
-        `INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
-         VALUES ($1, $2, md5(random()::text)) RETURNING id_mesa, codigo_qr`, [id_sucursal, numero]);
+        `INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr, estado_mesa, fecha_habilitacion)
+         VALUES ($1, $2, md5(random()::text), $3::varchar, CASE WHEN $3::varchar = 'Ocupada' THEN NOW() END)
+         RETURNING id_mesa, codigo_qr`, [id_sucursal, numero, habilitada ? 'Ocupada' : 'Libre']);
     return m;
 };
 
-const pedir = (codigo, items, extra = {}) =>
-    api('POST', `/menu/m/${codigo}/pedidos`, { body: { items, ...extra } });
+const pedir = crearPedir((...a) => api(...a));
 
 const estadoPedido = async (id_pedido) =>
     (await bd.sql(`SELECT * FROM pedido_mesa WHERE id_pedido = $1`, [id_pedido]))[0];
@@ -164,9 +166,8 @@ describe('Menú QR: crear pedido', () => {
         assert.equal(det[0].cantidad_solicitada, 2);
         assert.equal(det[0].nota_cliente, 'sin crema; con vela');
 
-        // La mesa no se marca ocupada hasta que el cajero confirma
-        const [m] = await bd.sql(`SELECT estado_mesa FROM mesa_local WHERE id_mesa = $1`, [mesa.id_mesa]);
-        assert.equal(m.estado_mesa, 'Libre');
+        // Mesa habilitada: el pedido no necesita verificación
+        assert.equal(ped.sin_verificar, false);
     });
 
     test('si un producto no alcanza, no se reserva nada del pedido', async () => {
@@ -447,9 +448,10 @@ describe('Menú QR: confirmar, entregar y cobrar', () => {
         assert.equal(c.status, 200);
         assert.equal(await stock(cafe), antes + 2);
 
-        const p2 = await pedir(mesa.codigo_qr, [{ id_producto: cafe, cantidad: 1 }]);
+        const p2 = await pedir(mesa.codigo_qr, [{ id_producto: cafe, cantidad: 1 }], { cliente_mesa: celular });
         await api('POST', `/pedidos/${p2.body.id_pedido}/confirmar`, { token: tCajero });
-        assert.equal((await api('POST', `/menu/m/${mesa.codigo_qr}/pedidos/${p2.body.id_pedido}/cancelar`)).status, 409);
+        assert.equal((await api('POST', `/menu/m/${mesa.codigo_qr}/pedidos/${p2.body.id_pedido}/cancelar`,
+                                { body: { cliente_mesa: celular } })).status, 409);
     });
 
     test('resetear la mesa cancela sus pedidos (pendientes y confirmados) y devuelve todo el stock', async () => {
@@ -580,5 +582,249 @@ describe('Menú QR: códigos de todas las mesas', () => {
         assert.ok(admin.body.some(m => m.numero_mesa === 92));
 
         assert.equal((await api('GET', '/mesas/sucursal/1/qr?base_url=javascript:alert(1)', { token: tCajero })).status, 400);
+    });
+});
+
+// ─── Visita del cliente, mesa habilitada y pedidos falsos ───
+describe('Menú QR: visita y mesa habilitada', () => {
+    // Se cargan después de crear la BD de prueba (antes apuntarían a la BD real)
+    let prod, visitaModel, ajusteModel;
+
+    const abrirVisita = async (codigo, cliente_mesa, extra = {}) =>
+        (await api('POST', `/menu/m/${codigo}/visita`, { body: { cliente_mesa, ...extra } })).body;
+    const mesaDb = async (id_mesa) => (await bd.sql(`SELECT * FROM mesa_local WHERE id_mesa = $1`, [id_mesa]))[0];
+    const configurar = async (campos) => {
+        const sets = Object.keys(campos).map((k, i) => `${k} = $${i + 1}`).join(', ');
+        await bd.sql(`UPDATE configuracion SET ${sets} WHERE id_configuracion = 1`, Object.values(campos));
+        ajusteModel.limpiarCache();
+    };
+
+    before(async () => {
+        visitaModel = require('../../src/models/visitaModel');
+        ajusteModel = require('../../src/models/ajusteModel');
+        prod = await crearProducto('Visita QR', 5, 200);
+    });
+
+    test('sin visita, adulterada o de otra mesa no se puede pedir', async () => {
+        const mesa = await crearMesa(70), otra = await crearMesa(71);
+        const item = [{ id_producto: prod, cantidad: 1 }];
+        const sin = await pedir(mesa.codigo_qr, item, { visita: null });
+        assert.equal(sin.status, 403);
+        assert.equal(sin.body.codigo, 'VISITA_VENCIDA');
+
+        const cel = celularAzar();
+        const { visita } = await abrirVisita(mesa.codigo_qr, cel);
+        const [datos] = visita.split('.');
+        const falsa = `${datos}.${'A'.repeat(43)}`;
+        assert.equal((await pedir(mesa.codigo_qr, item, { cliente_mesa: cel, visita: falsa })).status, 403);
+        assert.equal((await pedir(otra.codigo_qr, item, { cliente_mesa: cel, visita })).status, 403);
+        assert.equal((await pedir(mesa.codigo_qr, item, { cliente_mesa: cel, visita })).status, 201);
+    });
+
+    test('la visita vence por tiempo máximo y por inactividad; con actividad se renueva', async () => {
+        const mesa = await crearMesa(72);
+        const cel = celularAzar(), ahora = Date.now();
+        const inactiva = visitaModel.firmar({ m: mesa.id_mesa, c: cel, i: ahora - 40 * 60_000, a: ahora - 31 * 60_000 });
+        const larga    = visitaModel.firmar({ m: mesa.id_mesa, c: cel, i: ahora - 3.1 * 3600_000, a: ahora });
+        const activa   = visitaModel.firmar({ m: mesa.id_mesa, c: cel, i: ahora - 40 * 60_000, a: ahora - 20 * 60_000 });
+
+        for (const t of [inactiva, larga]) {
+            const r = await abrirVisita(mesa.codigo_qr, cel, { visita: t });
+            assert.equal(r.visita, null);
+            assert.equal(r.motivo, 'vencida');
+            const p = await pedir(mesa.codigo_qr, [{ id_producto: prod, cantidad: 1 }], { cliente_mesa: cel, visita: t });
+            assert.equal(p.status, 403);
+        }
+        const renovada = await abrirVisita(mesa.codigo_qr, cel, { visita: activa });
+        assert.ok(renovada.visita);
+        assert.equal(renovada.motivo, null);
+        const d = visitaModel.leer(renovada.visita);
+        assert.ok(Date.now() - d.a < 5000);
+        assert.equal(d.i, visitaModel.leer(activa).i);
+        // Otro celular no puede usar esa visita
+        assert.equal((await abrirVisita(mesa.codigo_qr, celularAzar(), { visita: activa })).visita, null);
+    });
+
+    test('mesa libre: un pedido sin verificar por celular/IP; al confirmarlo la mesa queda habilitada', async () => {
+        const mesa = await crearMesa(73, 1, false);
+        const ana = celularAzar(), beto = celularAzar();
+        const item = [{ id_producto: prod, cantidad: 1 }];
+
+        const p1 = await pedir(mesa.codigo_qr, item, { cliente_mesa: ana });
+        assert.equal(p1.status, 201);
+        assert.equal((await estadoPedido(p1.body.id_pedido)).sin_verificar, true);
+        const otro = await pedir(mesa.codigo_qr, item, { cliente_mesa: ana });
+        assert.equal(otro.status, 429);
+        assert.equal(otro.body.codigo, 'ESPERA_VERIFICACION');
+        // Otro celular desde la misma conexión tampoco
+        assert.equal((await pedir(mesa.codigo_qr, item, { cliente_mesa: beto })).status, 429);
+
+        const bandeja = await api('GET', '/pedidos/bandeja', { token: tCajero });
+        assert.equal(bandeja.body.find(p => p.id_pedido === p1.body.id_pedido).sin_verificar, true);
+
+        assert.equal((await api('POST', `/pedidos/${p1.body.id_pedido}/confirmar`, { token: tCajero })).status, 200);
+        const m = await mesaDb(mesa.id_mesa);
+        assert.equal(m.estado_mesa, 'Ocupada');
+        assert.ok(m.fecha_habilitacion);
+        assert.match(m.codigo_visita, /^[0-9a-f]{32}$/);
+
+        const p2 = await pedir(mesa.codigo_qr, item, { cliente_mesa: beto });
+        const p3 = await pedir(mesa.codigo_qr, item, { cliente_mesa: beto });
+        assert.equal(p2.status, 201);
+        assert.equal(p3.status, 201);
+        assert.equal((await estadoPedido(p2.body.id_pedido)).sin_verificar, false);
+    });
+
+    test('rechazar como falso bloquea ese celular/IP solo en esa mesa y por las horas configuradas', async () => {
+        const mesa = await crearMesa(74, 1, false), otra = await crearMesa(75, 1, false);
+        const rata = celularAzar();
+        const item = [{ id_producto: prod, cantidad: 1 }];
+        const antes = await stock(prod);
+
+        const p = await pedir(mesa.codigo_qr, item, { cliente_mesa: rata });
+        const r = await api('POST', `/pedidos/${p.body.id_pedido}/rechazar`, { token: tCajero, body: { falso: true } });
+        assert.equal(r.status, 200);
+        assert.equal(await stock(prod), antes);
+        const [b] = await bd.sql(
+            `SELECT *, EXTRACT(EPOCH FROM bloqueado_hasta - fecha_bloqueo)::int AS segundos FROM bloqueo_menu WHERE id_pedido = $1`,
+            [p.body.id_pedido]);
+        assert.equal(b.cliente_mesa, rata);
+        assert.equal(b.segundos, 6 * 3600);
+
+        const bloqueado = await pedir(mesa.codigo_qr, item, { cliente_mesa: rata });
+        assert.equal(bloqueado.status, 403);
+        assert.equal(bloqueado.body.codigo, 'BLOQUEADO');
+        assert.equal((await abrirVisita(mesa.codigo_qr, rata)).motivo, 'bloqueado');
+        // Misma IP con otro celular, en la misma mesa: también bloqueado
+        assert.equal((await pedir(mesa.codigo_qr, item, { cliente_mesa: celularAzar() })).status, 403);
+
+        // En otra mesa sí puede pedir (y el rechazo normal no bloquea)
+        const enOtra = await pedir(otra.codigo_qr, item, { cliente_mesa: rata });
+        assert.equal(enOtra.status, 201);
+        await api('POST', `/pedidos/${enOtra.body.id_pedido}/rechazar`, { token: tCajero });
+        assert.equal((await pedir(otra.codigo_qr, item, { cliente_mesa: rata })).status, 201);
+
+        // Pasado el bloqueo vuelve a poder pedir
+        await bd.sql(`UPDATE bloqueo_menu SET bloqueado_hasta = NOW() - interval '1 minute' WHERE id_mesa = $1`, [mesa.id_mesa]);
+        assert.equal((await pedir(mesa.codigo_qr, item, { cliente_mesa: rata })).status, 201);
+    });
+
+    test('al cobrar y cerrar la cuenta terminan las visitas de la mesa', async () => {
+        const mesa = await crearMesa(76, 1, false);
+        const cel = celularAzar();
+        const { visita } = await abrirVisita(mesa.codigo_qr, cel);
+        const p = await pedir(mesa.codigo_qr, [{ id_producto: prod, cantidad: 1 }], { cliente_mesa: cel, visita });
+        const conf = await api('POST', `/pedidos/${p.body.id_pedido}/confirmar`, { token: tCajero });
+        const cobro = await api('POST', `/cuentas/${conf.body.id_cuenta}/cerrar`,
+                                { token: tCajero, body: { metodo_pago: 'Efectivo' } });
+        assert.equal(cobro.status, 200);
+
+        const m = await mesaDb(mesa.id_mesa);
+        assert.equal(m.estado_mesa, 'Libre');
+        assert.equal(m.codigo_visita, null);
+        assert.ok(m.fecha_liberacion);
+
+        const r = await abrirVisita(mesa.codigo_qr, cel, { visita });
+        assert.equal(r.visita, null);
+        assert.equal(r.motivo, 'terminada');
+        const tarde = await pedir(mesa.codigo_qr, [{ id_producto: prod, cantidad: 1 }], { cliente_mesa: cel, visita });
+        assert.equal(tarde.status, 403);
+        // Escanear de nuevo = visita nueva
+        assert.ok((await abrirVisita(mesa.codigo_qr, cel)).visita);
+    });
+
+    test('el cajero habilita y libera mesas de su sucursal; con cuenta abierta no se libera', async () => {
+        const mesa = await crearMesa(77, 1, false), ajena = await crearMesa(77, 2, false);
+        assert.equal((await api('POST', `/mesas/${mesa.id_mesa}/habilitar`, { token: tCajero })).status, 200);
+        assert.equal((await mesaDb(mesa.id_mesa)).estado_mesa, 'Ocupada');
+        assert.equal((await api('POST', `/mesas/${ajena.id_mesa}/habilitar`, { token: tCajero })).status, 403);
+        assert.equal((await api('POST', `/mesas/${ajena.id_mesa}/habilitar`, { token: tAdmin })).status, 200);
+        assert.equal((await api('POST', '/mesas/999999/liberar', { token: tAdmin })).status, 404);
+
+        const p = await pedir(mesa.codigo_qr, [{ id_producto: prod, cantidad: 1 }]);
+        assert.equal((await estadoPedido(p.body.id_pedido)).sin_verificar, false);
+        await api('POST', `/pedidos/${p.body.id_pedido}/confirmar`, { token: tCajero });
+        const conCuenta = await api('POST', `/mesas/${mesa.id_mesa}/liberar`, { token: tCajero });
+        assert.equal(conCuenta.status, 409);
+        assert.equal(conCuenta.body.codigo, 'CUENTA_ABIERTA');
+
+        assert.equal((await api('POST', `/mesas/${ajena.id_mesa}/liberar`, { token: tAdmin })).status, 200);
+        assert.equal((await mesaDb(ajena.id_mesa)).estado_mesa, 'Libre');
+    });
+
+    test('abrir y cerrar una cuenta vacía no deshace la habilitación hecha por el cajero', async () => {
+        const habilitada = await crearMesa(81, 1, false), libre = await crearMesa(82, 1, false);
+        await api('POST', `/mesas/${habilitada.id_mesa}/habilitar`, { token: tCajero });
+        for (const m of [habilitada, libre]) {
+            const c = await api('POST', '/cuentas/abrir', { token: tCajero, body: { id_mesa: m.id_mesa } });
+            assert.equal(c.status, 201);
+            assert.equal((await mesaDb(m.id_mesa)).estado_mesa, 'Ocupada');
+            const cancelar = await api('POST', `/cuentas/${c.body.cuenta.id_cuenta}/cancelar-si-vacia`, { token: tCajero });
+            assert.equal(cancelar.status, 200);
+        }
+        assert.equal((await mesaDb(habilitada.id_mesa)).estado_mesa, 'Ocupada');
+        assert.equal((await mesaDb(libre.id_mesa)).estado_mesa, 'Libre');
+    });
+
+    test('las mesas habilitadas sin cuenta se liberan solas pasado el tiempo máximo', async () => {
+        const vacia = await crearMesa(78), conCuenta = await crearMesa(79);
+        const p = await pedir(conCuenta.codigo_qr, [{ id_producto: prod, cantidad: 1 }]);
+        await api('POST', `/pedidos/${p.body.id_pedido}/confirmar`, { token: tCajero });
+        await bd.sql(`UPDATE mesa_local SET fecha_habilitacion = NOW() - interval '4 hours' WHERE id_mesa = ANY($1::int[])`,
+                     [[vacia.id_mesa, conCuenta.id_mesa]]);
+
+        const liberadas = await visitaModel.liberarVencidas(3);
+        assert.ok(liberadas.some(m => m.id_mesa === vacia.id_mesa));
+        assert.ok(!liberadas.some(m => m.id_mesa === conCuenta.id_mesa));
+        assert.equal((await mesaDb(vacia.id_mesa)).estado_mesa, 'Libre');
+        assert.equal((await mesaDb(conCuenta.id_mesa)).estado_mesa, 'Ocupada');
+    });
+
+    test('QR temporal impreso: sin el ticket no se pide; cambia en cada habilitación', async () => {
+        await configurar({ menu_qr_visita: true });
+        try {
+            const mesa = await crearMesa(80, 1, false);
+            const item = [{ id_producto: prod, cantidad: 1 }];
+            assert.equal((await api('GET', `/mesas/${mesa.id_mesa}/qr-visita`, { token: tCajero })).status, 409);
+
+            await api('POST', `/mesas/${mesa.id_mesa}/habilitar`, { token: tCajero });
+            const qr = await api('GET', `/mesas/${mesa.id_mesa}/qr-visita?base_url=https://ricky.bo`, { token: tCajero });
+            assert.equal(qr.status, 200);
+            assert.ok(qr.body.qr.startsWith('data:image/png'));
+            const v = new URL(qr.body.url).searchParams.get('v');
+            assert.equal(qr.body.url, `https://ricky.bo/menu/${mesa.codigo_qr}?v=${v}`);
+
+            // QR fijo de la mesa: puede ver, no pedir
+            const cel = celularAzar();
+            assert.equal((await abrirVisita(mesa.codigo_qr, cel)).motivo, 'sin_qr_visita');
+            assert.equal((await pedir(mesa.codigo_qr, item, { cliente_mesa: cel })).status, 403);
+            assert.equal((await api('GET', `/menu/m/${mesa.codigo_qr}/catalogo`)).status, 200);
+
+            const conTicket = await abrirVisita(mesa.codigo_qr, cel, { v });
+            assert.equal(conTicket.motivo, null);
+            const p = await pedir(mesa.codigo_qr, item, { cliente_mesa: cel, visita: conTicket.visita });
+            assert.equal(p.status, 201);
+
+            // Al liberar, el ticket deja de servir; la nueva habilitación trae otro código
+            await api('POST', `/pedidos/${p.body.id_pedido}/rechazar`, { token: tCajero });
+            assert.equal((await api('POST', `/mesas/${mesa.id_mesa}/liberar`, { token: tCajero })).status, 200);
+            await api('POST', `/mesas/${mesa.id_mesa}/habilitar`, { token: tCajero });
+            assert.notEqual((await mesaDb(mesa.id_mesa)).codigo_visita, v);
+            assert.equal((await abrirVisita(mesa.codigo_qr, cel, { v })).motivo, 'sin_qr_visita');
+        } finally {
+            await configurar({ menu_qr_visita: false });
+        }
+    });
+
+    test('los parámetros de la visita se guardan desde Ajustes con sus límites', async () => {
+        const bien = await api('PUT', '/ajustes/parametros', { token: tAdmin,
+            body: { menu_visita_horas: 4, menu_visita_inactividad: 45, menu_bloqueo_horas: 12, menu_qr_visita: false } });
+        assert.equal(bien.status, 200);
+        assert.equal((await api('PUT', '/ajustes/parametros', { token: tAdmin, body: { menu_visita_horas: 13 } })).status, 400);
+        assert.equal((await api('PUT', '/ajustes/parametros', { token: tAdmin, body: { menu_visita_inactividad: 5 } })).status, 400);
+        assert.equal((await api('PUT', '/ajustes/parametros', { token: tAdmin, body: { menu_qr_visita: 'si' } })).status, 400);
+        const publico = (await api('GET', '/ajustes/publico')).body;
+        assert.equal(publico.menu_visita_horas, undefined);
+        await configurar({ menu_visita_horas: 3, menu_visita_inactividad: 30, menu_bloqueo_horas: 6 });
     });
 });

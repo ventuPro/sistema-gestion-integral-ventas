@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const pedidoModel = require('./pedidoModel');
 const cuentaModel = require('./cuentaModel');
+const visitaModel = require('./visitaModel');
 
 // Código aleatorio que identifica la mesa en la URL del menú (/menu/<codigo>).
 // No se usa el id interno porque es fácil de adivinar.
@@ -29,7 +30,7 @@ const crearMesa = async (id_sucursal, numero_mesa) => {
 const obtenerMesasPorSucursal = async (id_sucursal) => {
     const r = await db.query(`
         SELECT
-            m.id_mesa, m.numero_mesa, m.estado_mesa, m.codigo_qr, m.id_sucursal,
+            m.id_mesa, m.numero_mesa, m.estado_mesa, m.codigo_qr, m.id_sucursal, m.fecha_habilitacion,
             c.id_cuenta, c.total_acumulado, c.fecha_apertura,
             (SELECT COUNT(*)::int FROM detalle_cuenta dc WHERE dc.id_cuenta=c.id_cuenta AND dc.id_venta IS NULL) AS num_items
         FROM mesa_local m
@@ -88,12 +89,50 @@ const regenerarCodigoQR = async (id_mesa) => {
     return r.rows[0];
 };
 
-const actualizarEstadoMesa = async (id_mesa, estado_mesa) => {
-    const r = await db.query(
-        `UPDATE mesa_local SET estado_mesa=$1 WHERE id_mesa=$2 RETURNING *`,
-        [estado_mesa, id_mesa]
-    );
+const errorMesa = (code, message) => Object.assign(new Error(message), { code });
+
+// ─── Habilitar / liberar a mano (menú QR) ───
+const sucursalDeMesa = async (id_mesa) =>
+    (await db.query(`SELECT id_sucursal FROM mesa_local WHERE id_mesa = $1`, [id_mesa])).rows[0]?.id_sucursal ?? null;
+
+const habilitarMesa = async (id_mesa) => {
+    const r = await visitaModel.habilitar(db, id_mesa);
+    if (!r.rows.length) throw errorMesa('MESA_NO_ENCONTRADA', 'Mesa no encontrada');
     return r.rows[0];
+};
+
+// Con cuenta abierta no se libera: se cobra o se cancela
+const liberarMesa = async (id_mesa) => {
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const r = await client.query(`SELECT numero_mesa FROM mesa_local WHERE id_mesa = $1 FOR UPDATE`, [id_mesa]);
+        if (!r.rows.length) throw errorMesa('MESA_NO_ENCONTRADA', 'Mesa no encontrada');
+        const rCuenta = await client.query(
+            `SELECT 1 FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta'`, [id_mesa]);
+        if (rCuenta.rows.length)
+            throw errorMesa('CUENTA_ABIERTA', 'La mesa tiene una cuenta abierta: cóbrela o cancélela para liberarla');
+        await visitaModel.liberar(client, id_mesa);
+        await client.query('COMMIT');
+        return r.rows[0];
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+};
+
+// QR temporal impreso: sirve solo mientras la mesa siga habilitada
+const generarQRVisita = async (id_mesa, base_url) => {
+    const r = await db.query(
+        `SELECT numero_mesa, codigo_qr, codigo_visita, estado_mesa FROM mesa_local WHERE id_mesa = $1`, [id_mesa]);
+    if (!r.rows.length) throw errorMesa('MESA_NO_ENCONTRADA', 'Mesa no encontrada');
+    const mesa = r.rows[0];
+    if (mesa.estado_mesa !== 'Ocupada' || !mesa.codigo_visita)
+        throw errorMesa('MESA_LIBRE', 'Habilite la mesa para imprimir el QR de la visita');
+    const url = `${base_url}/menu/${mesa.codigo_qr}?v=${mesa.codigo_visita}`;
+    return { url, qr: await imagenQR(url), numero_mesa: mesa.numero_mesa };
 };
 
 const eliminarMesa = async (id_mesa, id_usuario = null) => {
@@ -144,4 +183,5 @@ const eliminarMesa = async (id_mesa, id_usuario = null) => {
     }
 };
 
-module.exports = { crearMesa, obtenerMesasPorSucursal, generarQR, generarQRSucursal, regenerarCodigoQR, actualizarEstadoMesa, eliminarMesa };
+module.exports = { crearMesa, obtenerMesasPorSucursal, generarQR, generarQRSucursal, regenerarCodigoQR,
+                   sucursalDeMesa, habilitarMesa, liberarMesa, generarQRVisita, eliminarMesa };

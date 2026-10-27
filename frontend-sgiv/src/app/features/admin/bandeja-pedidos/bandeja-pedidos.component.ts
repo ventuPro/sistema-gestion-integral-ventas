@@ -1,7 +1,8 @@
 import { Component, computed, inject, OnInit, OnDestroy, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
-import { LucideAngularModule, Bell, X, Check, Minus, Plus, Trash2, Volume2, VolumeX, Truck, NotebookPen, MessageSquare } from 'lucide-angular';
+import { LucideAngularModule, Bell, X, Check, Minus, Plus, Trash2, Volume2, VolumeX, Truck, NotebookPen, MessageSquare,
+         ShieldAlert, Ban } from 'lucide-angular';
 import { PedidoService } from '../../../core/services/pedido.service';
 import { SocketService } from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
@@ -32,7 +33,7 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
 
   readonly icons = { bell: Bell, x: X, check: Check, minus: Minus, plus: Plus,
                      trash: Trash2, sonido: Volume2, silencio: VolumeX, delivery: Truck,
-                     nota: NotebookPen, observacion: MessageSquare };
+                     nota: NotebookPen, observacion: MessageSquare, sinVerificar: ShieldAlert, falso: Ban };
 
   private readonly RECORDATORIO_MS = 60_000;
   private readonly RESPALDO_MS     = 30_000;
@@ -155,6 +156,17 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     if (!si) return;
     this.ejecutar(pedido, this.pedidoService.rechazar(pedido.id_pedido),
                   `Pedido de la Mesa ${pedido.numero_mesa} rechazado`);
+  }
+
+  async rechazarFalso(pedido: any) {
+    const si = await this.dialogo.confirmar({
+      titulo: `¿Rechazar como falso el pedido de la Mesa ${pedido.numero_mesa}?`,
+      mensaje: 'Los productos vuelven al stock y ese celular no podrá pedir en esta mesa por unas horas.',
+      textoConfirmar: 'Rechazar como falso', peligro: true
+    });
+    if (!si) return;
+    this.ejecutar(pedido, this.pedidoService.rechazar(pedido.id_pedido, true),
+                  `Pedido de la Mesa ${pedido.numero_mesa} rechazado como falso`);
   }
 
   entregado(pedido: any) {

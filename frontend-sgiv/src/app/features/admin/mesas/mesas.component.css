@@ -1,4 +1,6 @@
 /* ─── Plano de mesas ─── */
+:host { --habilitada: #6d28d9; }
+:host-context(html.tema-oscuro) { --habilitada: #a78bfa; }
 .plano {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -15,13 +17,18 @@
   border: 1px solid var(--i-linea);
   border-top: 3px solid var(--estado, var(--i-linea));
   border-radius: 8px;
+  min-height: 110px;
   background: var(--i-papel);
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .mesa:hover { box-shadow: 0 0 0 3px var(--i-acento-suave); border-color: var(--i-acento); border-top-color: var(--estado); }
 .mesa.libre { --estado: var(--i-sube); }
 .mesa.cuenta { --estado: var(--i-aviso); }
-.mesa.ocupada { --estado: var(--i-baja); }
+.mesa.ocupada { --estado: var(--habilitada); }
+.inf-estado.habilitada { color: var(--habilitada); }
+.acciones-mesa { display: flex; gap: 6px; margin-top: 6px; }
+.acciones-mesa .inf-boton { flex: 1; justify-content: center; }
+.acciones-mesa .inf-boton:has(> lucide-icon:only-child) { flex: 0 0 auto; }
 .mesa .numero { font-size: 26px; line-height: 1.1; font-weight: 600; letter-spacing: -0.02em; color: var(--i-tinta); }
 .mesa .total { font-size: 15px; font-weight: 600; color: var(--i-tinta); margin-top: 8px; }
 

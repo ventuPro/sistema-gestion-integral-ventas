@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { registrarHistorial } = require('./inventarioModel');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const promocionModel = require('./promocionModel');
+const visitaModel = require('./visitaModel');
 
 // Estado de caja basado en turno_caja.estado_turno.
 // caja_habilitada se sincroniza automáticamente con el estado del turno.
@@ -591,10 +592,8 @@ const registrarVenta = async ({
                 `UPDATE pedido_mesa SET estado_pedido = 'Pagado' WHERE id_pedido = $1`,
                 [id_pedido_mesa]
             );
-            await client.query(`
-                UPDATE mesa_local SET estado_mesa = 'Libre'
-                WHERE id_mesa = (SELECT id_mesa FROM pedido_mesa WHERE id_pedido = $1)
-            `, [id_pedido_mesa]);
+            const rMesa = await client.query(`SELECT id_mesa FROM pedido_mesa WHERE id_pedido = $1`, [id_pedido_mesa]);
+            if (rMesa.rows[0]?.id_mesa) await visitaModel.liberar(client, rMesa.rows[0].id_mesa);
         }
 
         await client.query('COMMIT');

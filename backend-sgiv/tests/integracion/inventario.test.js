@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const { crearBdPrueba } = require('../bdPrueba');
 const { crearLogin } = require('../sesionPrueba');
+const { crearPedir } = require('../menuPrueba');
 
 // ─── Movimientos de inventario: entradas y mermas con motivo ───
 // Levantan el backend real contra una BD temporal.
@@ -236,7 +237,7 @@ describe('Inventario: mesas y menú QR también quedan en el historial', () => {
         const id = await crearProducto('Pie QR', 6);
         const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
                                      VALUES (1, 42, md5(random()::text)) RETURNING codigo_qr`);
-        const ped = await api('POST', `/menu/m/${mesa.codigo_qr}/pedidos`, { body: { items: [{ id_producto: id, cantidad: 2 }] } });
+        const ped = await crearPedir(api)(mesa.codigo_qr, [{ id_producto: id, cantidad: 2 }]);
         assert.equal(ped.status, 201);
         assert.equal((await api('POST', `/pedidos/${ped.body.id_pedido}/rechazar`, { token: tCajero })).status, 200);
 
