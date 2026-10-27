@@ -55,7 +55,9 @@ router.post('/:id_cuenta/cancelar-si-vacia', mesas, async (req, res) => {
                 `UPDATE cuenta_mesa SET estado=$2, fecha_cierre=NOW() WHERE id_cuenta=$1`,
                 [id_cuenta, estadoFinal]
             );
-            if (estadoFinal === 'Pagada' || !rMesa.rows[0]?.ya_habilitada) await visitaModel.liberar(client, id_mesa);
+            // Pagada = los clientes terminaron; si no, solo se deshace la apertura y sus visitas siguen
+            if (estadoFinal === 'Pagada') await visitaModel.liberar(client, id_mesa);
+            else if (!rMesa.rows[0]?.ya_habilitada) await visitaModel.liberar(client, id_mesa, { terminarVisitas: false });
             await client.query('COMMIT');
         } catch (e) {
             await client.query('ROLLBACK');

@@ -16,12 +16,14 @@ const habilitar = (q, id_mesa) => q.query(`
     RETURNING id_mesa, numero_mesa, id_sucursal, codigo_visita
 `, [id_mesa, crypto.randomBytes(16).toString('hex')]);
 
-// Las visitas que empezaron antes terminan y el QR temporal deja de servir
-const liberar = (q, id_mesa) => q.query(`
+// Las visitas que empezaron antes terminan y el QR temporal deja de servir.
+// terminarVisitas = false: solo vuelve a libre (el cajero abrió y cerró la mesa sin cargar nada)
+const liberar = (q, id_mesa, { terminarVisitas = true } = {}) => q.query(`
     UPDATE mesa_local
-    SET estado_mesa = 'Libre', fecha_habilitacion = NULL, codigo_visita = NULL, fecha_liberacion = NOW()
+    SET estado_mesa = 'Libre', fecha_habilitacion = NULL, codigo_visita = NULL,
+        fecha_liberacion = CASE WHEN $2 THEN NOW() ELSE fecha_liberacion END
     WHERE id_mesa = $1
-`, [id_mesa]);
+`, [id_mesa, terminarVisitas]);
 
 // Habilitadas hace más de `horas` y sin cuenta abierta (nadie pidió nada)
 const liberarVencidas = async (horas) => (await db.query(`

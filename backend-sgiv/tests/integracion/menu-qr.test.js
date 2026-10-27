@@ -645,7 +645,7 @@ describe('Menú QR: visita y mesa habilitada', () => {
         assert.equal((await abrirVisita(mesa.codigo_qr, celularAzar(), { visita: activa })).visita, null);
     });
 
-    test('mesa libre: un pedido sin verificar por celular/IP; al confirmarlo la mesa queda habilitada', async () => {
+    test('mesa libre: un pedido sin verificar por celular; al confirmarlo la mesa queda habilitada', async () => {
         const mesa = await crearMesa(73, 1, false);
         const ana = celularAzar(), beto = celularAzar();
         const item = [{ id_producto: prod, cantidad: 1 }];
@@ -656,8 +656,10 @@ describe('Menú QR: visita y mesa habilitada', () => {
         const otro = await pedir(mesa.codigo_qr, item, { cliente_mesa: ana });
         assert.equal(otro.status, 429);
         assert.equal(otro.body.codigo, 'ESPERA_VERIFICACION');
-        // Otro celular desde la misma conexión tampoco
-        assert.equal((await pedir(mesa.codigo_qr, item, { cliente_mesa: beto })).status, 429);
+        // Otro celular, aunque comparta la conexión (WiFi u operador), sí puede enviar el suyo
+        const pb = await pedir(mesa.codigo_qr, item, { cliente_mesa: beto });
+        assert.equal(pb.status, 201);
+        assert.equal((await estadoPedido(pb.body.id_pedido)).sin_verificar, true);
 
         const bandeja = await api('GET', '/pedidos/bandeja', { token: tCajero });
         assert.equal(bandeja.body.find(p => p.id_pedido === p1.body.id_pedido).sin_verificar, true);
@@ -750,6 +752,19 @@ describe('Menú QR: visita y mesa habilitada', () => {
 
         assert.equal((await api('POST', `/mesas/${ajena.id_mesa}/liberar`, { token: tAdmin })).status, 200);
         assert.equal((await mesaDb(ajena.id_mesa)).estado_mesa, 'Libre');
+    });
+
+    test('abrir y cerrar una mesa sin cargar nada no termina las visitas de sus clientes', async () => {
+        const mesa = await crearMesa(83, 1, false);
+        const cel = celularAzar();
+        const { visita } = await abrirVisita(mesa.codigo_qr, cel);
+        const c = await api('POST', '/cuentas/abrir', { token: tCajero, body: { id_mesa: mesa.id_mesa } });
+        await api('POST', `/cuentas/${c.body.cuenta.id_cuenta}/cancelar-si-vacia`, { token: tCajero });
+        assert.equal((await mesaDb(mesa.id_mesa)).estado_mesa, 'Libre');
+        const r = await abrirVisita(mesa.codigo_qr, cel, { visita });
+        assert.ok(r.visita);
+        assert.equal(r.motivo, null);
+        assert.equal((await pedir(mesa.codigo_qr, [{ id_producto: prod, cantidad: 1 }], { cliente_mesa: cel, visita: r.visita })).status, 201);
     });
 
     test('abrir y cerrar una cuenta vacía no deshace la habilitación hecha por el cajero', async () => {

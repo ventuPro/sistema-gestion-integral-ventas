@@ -184,7 +184,7 @@ const obtenerCatalogoMenu = async (id_sucursal) => {
 
 // ─── CLIENTE: crear pedido desde la mesa ───
 // cliente_mesa: código del celular (menú QR); nombre_cliente: opcional, lo escribe el cliente
-// Con la mesa libre el pedido queda «sin verificar»: uno pendiente por celular/IP hasta que el cajero confirme
+// Con la mesa libre el pedido queda «sin verificar»: uno pendiente por celular hasta que el cajero confirme
 const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes = MAX_PENDIENTES_MESA,
                                  cliente_mesa = null, nombre_cliente = null, ip_cliente = null }) => {
     const lista = normalizarItems(items);
@@ -213,10 +213,9 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
         if (sin_verificar) {
             const rMio = await client.query(`
                 SELECT 1 FROM pedido_mesa
-                WHERE id_mesa = $1 AND estado_pedido = 'Pendiente_Cajero'
-                  AND ((cliente_mesa IS NOT NULL AND cliente_mesa = $2) OR (ip_cliente IS NOT NULL AND ip_cliente = $3))
+                WHERE id_mesa = $1 AND estado_pedido = 'Pendiente_Cajero' AND cliente_mesa = $2
                 LIMIT 1
-            `, [mesa.id_mesa, cliente_mesa, ip_cliente]);
+            `, [mesa.id_mesa, cliente_mesa]);
             if (rMio.rows.length)
                 throw errorCodigo('ESPERA_VERIFICACION', 'Espera a que el cajero confirme tu primer pedido para hacer otro.');
         }
