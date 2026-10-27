@@ -1,0 +1,160 @@
+<section class="inf-hoja overflow-hidden">
+  <div class="p-4 separador-inferior flex flex-wrap items-center gap-3">
+    <div class="inf-segmentos">
+      <button [class.activa]="periodo() === 'hoy'" (click)="cambiarPeriodo('hoy')">Hoy</button>
+      <button [class.activa]="periodo() === '7'" (click)="cambiarPeriodo('7')">7 días</button>
+      <button [class.activa]="periodo() === '30'" (click)="cambiarPeriodo('30')">30 días</button>
+    </div>
+    <button class="boton-primario py-1.5! text-[12.5px]! ml-auto" (click)="abrirNueva()">
+      <lucide-icon [img]="icons.transferir" class="w-3.5 h-3.5"></lucide-icon> Nueva transferencia
+    </button>
+  </div>
+
+  @if (cargando() && !lista().length) {
+    <div class="p-4 space-y-2">
+      @for (n of [1,2,3]; track n) { <div class="inf-esqueleto h-11"></div> }
+    </div>
+  } @else if (!lista().length) {
+    <p class="inf-vacio">No hay transferencias en este período.</p>
+  } @else {
+    <div class="overflow-x-auto" [class.inf-refrescando]="cargando()">
+      <table class="inf-tabla">
+        <thead>
+          <tr>
+            <th>N.º</th>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Desde</th>
+            <th>Hacia</th>
+            <th class="num">Productos</th>
+            <th class="num">Unidades</th>
+            <th>Usuario</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of lista(); track t.id_transferencia) {
+            <tr class="fila-clic" (click)="ver(t.id_transferencia)">
+              <td class="fuerte">#{{ t.id_transferencia }}</td>
+              <td class="whitespace-nowrap">{{ t.fecha_transferencia | date:'dd/MM HH:mm' }}</td>
+              <td>
+                @if (esSalida(t)) { <span class="inf-estado aviso">Enviada</span> }
+                @else { <span class="inf-estado ok">Recibida</span> }
+              </td>
+              <td>{{ t.nombre_origen }}</td>
+              <td>{{ t.nombre_destino }}</td>
+              <td class="num">{{ t.productos }}</td>
+              <td class="num fuerte">{{ t.unidades }}</td>
+              <td>{{ t.usuario || '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="inf-pie-hoja">{{ lista().length }} transferencia(s)</div>
+  }
+</section>
+
+<!-- ═══ NUEVA TRANSFERENCIA ═══ -->
+@if (nueva()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarNueva()">
+    <div class="inf-hoja ventana w-full max-w-lg max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[15px]">Nueva transferencia</h3>
+        <button class="quitar" (click)="cerrarNueva()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 overflow-y-auto">
+        <div class="grupo">
+          <label class="inf-etiqueta" for="destino-transferencia">Hacia</label>
+          <select id="destino-transferencia" class="campo" [(ngModel)]="destino">
+            <option [ngValue]="null" disabled>Elige la sucursal</option>
+            @for (s of destinos(); track s.id_sucursal) { <option [ngValue]="s.id_sucursal">{{ s.nombre_sucursal }}</option> }
+          </select>
+        </div>
+
+        <div class="grupo">
+          <label class="inf-etiqueta" for="buscar-transferencia">Productos</label>
+          <div class="buscador">
+            <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
+            <input id="buscar-transferencia" type="text" [(ngModel)]="busqueda" placeholder="Buscar producto" autocomplete="off">
+          </div>
+          @if (sugerencias().length) {
+            <ul class="sugerencias">
+              @for (p of sugerencias(); track p.id_producto) {
+                <li><button type="button" (click)="agregar(p)">
+                  <span>{{ p.nombre_producto }}</span><span class="inf-tenue">{{ p.stock_actual }} en stock</span>
+                </button></li>
+              }
+            </ul>
+          }
+        </div>
+
+        @if (lineas().length) {
+          <div class="space-y-2">
+            @for (l of lineas(); track l.id_producto) {
+              <div class="linea-transferencia">
+                <div class="min-w-0">
+                  <p class="inf-tinta text-[13.5px] font-medium truncate">{{ l.nombre_producto }}</p>
+                  <p class="inf-sub mt-0!" [class.inf-baja]="l.cantidad > l.disponible">{{ l.disponible }} en stock</p>
+                </div>
+                <input type="number" min="1" [max]="l.disponible" class="campo cantidad" [ngModel]="l.cantidad"
+                       (ngModelChange)="cambiarCantidad(l, $event)" [attr.aria-label]="'Cantidad de ' + l.nombre_producto">
+                <button class="quitar" (click)="quitar(l)" aria-label="Quitar producto">
+                  <lucide-icon [img]="icons.quitar" class="w-4 h-4"></lucide-icon>
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="grupo">
+          <label class="inf-etiqueta" for="obs-transferencia">Observación <span class="inf-sutil">(opcional)</span></label>
+          <input id="obs-transferencia" class="campo" [(ngModel)]="observacion" maxlength="200">
+        </div>
+
+        @if (errorNueva()) { <p class="error-formulario">{{ errorNueva() }}</p> }
+      </div>
+
+      <div class="inf-pie-hoja flex items-center justify-between gap-2">
+        <span class="inf-tinta text-[13px]">{{ unidades() }} unidad(es)</span>
+        <div class="flex gap-2">
+          <button class="inf-boton" (click)="cerrarNueva()">Cancelar</button>
+          <button class="boton-primario" (click)="transferir()" [disabled]="enviando()">
+            <lucide-icon [img]="icons.transferir" class="w-4 h-4"></lucide-icon>
+            {{ enviando() ? 'Transfiriendo…' : 'Transferir' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ═══ DETALLE Y COMPROBANTE ═══ -->
+@if (detalle(); as t) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="detalle.set(null)">
+    <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[85vh]" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <div>
+          <h3 class="inf-tinta font-semibold text-[15px]">Transferencia #{{ t.id_transferencia }}</h3>
+          <p class="inf-sub mt-0! flex items-center gap-1">
+            {{ t.nombre_origen }} <lucide-icon [img]="icons.hacia" class="w-3 h-3"></lucide-icon> {{ t.nombre_destino }}
+          </p>
+        </div>
+        <button class="quitar" (click)="detalle.set(null)" aria-label="Cerrar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+      <div #zonaComprobante class="overflow-y-auto p-4 flex justify-center" style="background: var(--i-fondo)">
+        <div class="shadow-sm"><app-comprobante-transferencia [t]="t" /></div>
+      </div>
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button class="inf-boton" (click)="detalle.set(null)">Cerrar</button>
+        <button class="boton-primario" (click)="imprimir()">
+          <lucide-icon [img]="icons.imprimir" class="w-4 h-4"></lucide-icon> Imprimir
+        </button>
+      </div>
+    </div>
+  </div>
+}

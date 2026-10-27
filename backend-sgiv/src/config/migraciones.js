@@ -214,7 +214,26 @@ const MIGRACIONES = [
         ADD COLUMN IF NOT EXISTS menu_visita_horas       INT NOT NULL DEFAULT 3  CHECK (menu_visita_horas BETWEEN 1 AND 12),
         ADD COLUMN IF NOT EXISTS menu_visita_inactividad INT NOT NULL DEFAULT 30 CHECK (menu_visita_inactividad BETWEEN 10 AND 240),
         ADD COLUMN IF NOT EXISTS menu_bloqueo_horas      INT NOT NULL DEFAULT 6  CHECK (menu_bloqueo_horas BETWEEN 1 AND 72),
-        ADD COLUMN IF NOT EXISTS menu_qr_visita          BOOLEAN NOT NULL DEFAULT FALSE;`
+        ADD COLUMN IF NOT EXISTS menu_qr_visita          BOOLEAN NOT NULL DEFAULT FALSE;`,
+
+    // Transferencias de productos entre sucursales (directas: salen del origen y entran al destino a la vez)
+    `CREATE TABLE IF NOT EXISTS transferencia (
+        id_transferencia    SERIAL PRIMARY KEY,
+        id_sucursal_origen  INT NOT NULL REFERENCES sucursal(id_sucursal),
+        id_sucursal_destino INT NOT NULL REFERENCES sucursal(id_sucursal),
+        id_usuario          INT REFERENCES usuario(id_usuario),
+        observacion         VARCHAR(200),
+        fecha_transferencia TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CHECK (id_sucursal_origen <> id_sucursal_destino)
+    );
+    CREATE TABLE IF NOT EXISTS detalle_transferencia (
+        id_transferencia INT NOT NULL REFERENCES transferencia(id_transferencia),
+        id_producto      INT NOT NULL REFERENCES producto(id_producto),
+        cantidad         INT NOT NULL CHECK (cantidad > 0),
+        PRIMARY KEY (id_transferencia, id_producto)
+    );
+    CREATE INDEX IF NOT EXISTS idx_transferencia_origen_fecha  ON transferencia (id_sucursal_origen, fecha_transferencia);
+    CREATE INDEX IF NOT EXISTS idx_transferencia_destino_fecha ON transferencia (id_sucursal_destino, fecha_transferencia);`
 ];
 
 const aplicarMigraciones = async () => {

@@ -1,5 +1,6 @@
 const inventarioModel = require('../models/inventarioModel');
-const { emitirStock } = require('../utils/tiempoReal');
+const transferenciaModel = require('../models/transferenciaModel');
+const { emitirStock, emitirCajeros } = require('../utils/tiempoReal');
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const esAdmin = (req) => Number(req.usuario.id_rol) === 1;
@@ -66,4 +67,64 @@ const listarMovimientos = async (req, res) => {
     }
 };
 
-module.exports = { listarMotivos, registrarMovimiento, listarMovimientos };
+// ─── Transferencias entre sucursales ───
+const ERRORES_TRANSFERENCIA = { INVALIDA: 400, NO_EXISTE: 404, SIN_STOCK: 409 };
+
+// POST /api/inventario/transferencias { id_sucursal_origen?, id_sucursal_destino, items, observacion }
+const crearTransferencia = async (req, res) => {
+    try {
+        const id_origen = sucursalPermitida(req, req.body?.id_sucursal_origen);
+        if (!id_origen) return res.status(403).json({ error: 'Solo puedes transferir desde tu sucursal' });
+        const r = await transferenciaModel.crear({
+            id_origen, id_destino: Number(req.body?.id_sucursal_destino), id_usuario: req.usuario.id_usuario,
+            items: req.body?.items, observacion: req.body?.observacion
+        });
+        const t = r.transferencia;
+        emitirStock(r.cambios);
+        emitirCajeros('transferencia:nueva', {
+            id_transferencia: t.id_transferencia, id_usuario: req.usuario.id_usuario,
+            id_sucursal_origen: t.id_sucursal_origen, nombre_origen: t.nombre_origen,
+            id_sucursal_destino: t.id_sucursal_destino, nombre_destino: t.nombre_destino,
+            resumen: r.items.map(i => `${i.cantidad} ${i.nombre_producto}`).join(', ')
+        });
+        res.status(201).json({ mensaje: `Transferencia #${t.id_transferencia} a ${t.nombre_destino} registrada`,
+                               id_transferencia: t.id_transferencia });
+    } catch (e) {
+        const status = ERRORES_TRANSFERENCIA[e.codigo];
+        if (status) return res.status(status).json({ error: e.message, codigo: e.codigo });
+        console.error('crearTransferencia:', e);
+        res.status(500).json({ error: 'No se pudo registrar la transferencia' });
+    }
+};
+
+// GET /api/inventario/transferencias?id_sucursal&desde&hasta  (admin sin sucursal = todas)
+const listarTransferencias = async (req, res) => {
+    try {
+        const { desde, hasta } = req.query;
+        if ((desde && !FECHA.test(desde)) || (hasta && !FECHA.test(hasta)))
+            return res.status(400).json({ error: 'Las fechas deben tener el formato AAAA-MM-DD' });
+        const id_sucursal = esAdmin(req) ? (Number(req.query.id_sucursal) || null) : Number(req.usuario.id_sucursal);
+        const limite = Math.min(Math.max(Number(req.query.limite) || 200, 1), 500);
+        res.json(await transferenciaModel.listar({ id_sucursal, desde: desde || null, hasta: hasta || null, limite }));
+    } catch (e) {
+        console.error('listarTransferencias:', e);
+        res.status(500).json({ error: 'No se pudieron consultar las transferencias' });
+    }
+};
+
+// GET /api/inventario/transferencias/:id
+const obtenerTransferencia = async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) return res.status(404).json({ error: 'Transferencia no encontrada' });
+        const t = await transferenciaModel.obtener(id, esAdmin(req) ? null : Number(req.usuario.id_sucursal));
+        if (!t) return res.status(404).json({ error: 'Transferencia no encontrada' });
+        res.json(t);
+    } catch (e) {
+        console.error('obtenerTransferencia:', e);
+        res.status(500).json({ error: 'No se pudo consultar la transferencia' });
+    }
+};
+
+module.exports = { listarMotivos, registrarMovimiento, listarMovimientos,
+                   crearTransferencia, listarTransferencias, obtenerTransferencia };

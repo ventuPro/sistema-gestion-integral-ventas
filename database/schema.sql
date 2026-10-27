@@ -14,6 +14,9 @@ DROP TABLE IF EXISTS detalle_venta CASCADE;
 DROP TABLE IF EXISTS venta_caja CASCADE;
 DROP TABLE IF EXISTS cliente CASCADE;
 DROP TABLE IF EXISTS turno_caja CASCADE;
+DROP TABLE IF EXISTS detalle_transferencia CASCADE;
+DROP TABLE IF EXISTS transferencia CASCADE;
+DROP TABLE IF EXISTS bloqueo_menu CASCADE;
 DROP TABLE IF EXISTS detalle_pedido CASCADE;
 DROP TABLE IF EXISTS pedido_mesa CASCADE;
 DROP TABLE IF EXISTS mesa_local CASCADE;
@@ -159,6 +162,23 @@ CREATE TABLE historial_inventario (
     detalle VARCHAR(200),
     stock_resultante INT,
     fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Transferencias directas de productos entre sucursales (no se editan ni se borran)
+CREATE TABLE transferencia (
+    id_transferencia    SERIAL PRIMARY KEY,
+    id_sucursal_origen  INT NOT NULL REFERENCES sucursal(id_sucursal),
+    id_sucursal_destino INT NOT NULL REFERENCES sucursal(id_sucursal),
+    id_usuario          INT REFERENCES usuario(id_usuario),
+    observacion         VARCHAR(200),
+    fecha_transferencia TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (id_sucursal_origen <> id_sucursal_destino)
+);
+CREATE TABLE detalle_transferencia (
+    id_transferencia INT NOT NULL REFERENCES transferencia(id_transferencia),
+    id_producto      INT NOT NULL REFERENCES producto(id_producto),
+    cantidad         INT NOT NULL CHECK (cantidad > 0),
+    PRIMARY KEY (id_transferencia, id_producto)
 );
 
 CREATE TABLE notificacion_admin (
@@ -428,6 +448,8 @@ CREATE INDEX idx_pedido_cuenta            ON pedido_mesa (id_cuenta);
 CREATE INDEX idx_mesa_sucursal_numero     ON mesa_local (id_sucursal, numero_mesa);
 CREATE INDEX idx_mesa_estado_habilitacion ON mesa_local (estado_mesa, fecha_habilitacion);
 CREATE INDEX idx_bloqueo_menu_mesa        ON bloqueo_menu (id_mesa, bloqueado_hasta);
+CREATE INDEX idx_transferencia_origen_fecha  ON transferencia (id_sucursal_origen, fecha_transferencia);
+CREATE INDEX idx_transferencia_destino_fecha ON transferencia (id_sucursal_destino, fecha_transferencia);
 CREATE INDEX idx_venta_caja_sucursal_fecha ON venta_caja (id_sucursal, fecha_venta);
 CREATE INDEX idx_venta_caja_turno         ON venta_caja (id_turno);
 CREATE INDEX idx_detalle_venta_venta      ON detalle_venta (id_venta);

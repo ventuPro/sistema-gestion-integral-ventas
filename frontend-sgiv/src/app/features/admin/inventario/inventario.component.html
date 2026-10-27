@@ -49,7 +49,12 @@
   <nav class="inf-pestanas separador-inferior">
     <button [class.activa]="vista() === 'productos'" (click)="vista.set('productos')">Productos</button>
     <button [class.activa]="vista() === 'movimientos'" (click)="verMovimientos()">Movimientos</button>
+    <button [class.activa]="vista() === 'transferencias'" (click)="vista.set('transferencias')">Transferencias</button>
   </nav>
+
+  @if (vista() === 'transferencias') {
+    <app-transferencias [idSucursal]="idSucursal()" [productos]="productos()" />
+  }
 
   @if (vista() === 'productos') {
   <section class="inf-hoja overflow-hidden">

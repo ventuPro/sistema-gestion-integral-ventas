@@ -26,6 +26,27 @@ export interface FiltrosMovimientos {
   hasta?: string | null;
 }
 
+export interface NuevaTransferencia {
+  id_sucursal_origen: number;
+  id_sucursal_destino: number;
+  items: { id_producto: number; cantidad: number }[];
+  observacion?: string | null;
+}
+
+export interface Transferencia {
+  id_transferencia:    number;
+  fecha_transferencia: string;
+  observacion:         string | null;
+  id_sucursal_origen:  number;
+  nombre_origen:       string;
+  id_sucursal_destino: number;
+  nombre_destino:      string;
+  usuario:             string | null;
+  productos?:          number;
+  unidades?:           number;
+  items?:              { id_producto: number; nombre_producto: string; cantidad: number }[];
+}
+
 // ─── Movimientos de inventario: entradas y mermas con motivo ───
 @Injectable({ providedIn: 'root' })
 export class InventarioService {
@@ -47,5 +68,22 @@ export class InventarioService {
     if (f.desde)       params = params.set('desde', f.desde);
     if (f.hasta)       params = params.set('hasta', f.hasta);
     return this.http.get<Movimiento[]>(`${this.api}/movimientos`, { params });
+  }
+
+  // ─── Transferencias entre sucursales ───
+  transferir(datos: NuevaTransferencia) {
+    return this.http.post<{ mensaje: string; id_transferencia: number }>(`${this.api}/transferencias`, datos);
+  }
+
+  /** id_sucursal: las que salieron o llegaron a esa sucursal */
+  listarTransferencias(f: { id_sucursal: number; desde?: string | null; hasta?: string | null }): Observable<Transferencia[]> {
+    let params = new HttpParams().set('id_sucursal', f.id_sucursal);
+    if (f.desde) params = params.set('desde', f.desde);
+    if (f.hasta) params = params.set('hasta', f.hasta);
+    return this.http.get<Transferencia[]>(`${this.api}/transferencias`, { params });
+  }
+
+  obtenerTransferencia(id: number): Observable<Transferencia> {
+    return this.http.get<Transferencia>(`${this.api}/transferencias/${id}`);
   }
 }

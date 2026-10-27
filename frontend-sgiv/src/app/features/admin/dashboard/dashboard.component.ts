@@ -59,6 +59,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private subPermisos?: Subscription;
   private subRuta?: Subscription;
+  private subTransferencias?: Subscription;
 
   /** Menú lateral abierto (solo en celular y tablet) */
   readonly menuAbierto = signal(false);
@@ -107,11 +108,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
 
     this.permisoService.escucharCambios();
+    this.avisarTransferencias();
+  }
+
+  /** Aviso a la sucursal que recibe productos (y al administrador), en cualquier pantalla */
+  private avisarTransferencias() {
+    this.socketService.conectar('cajeros');
+    this.subTransferencias = this.socketService.escuchar<any>('transferencia:nueva').subscribe(d => {
+      const yo = this.usuario();
+      if (!d || !yo || Number(d.id_usuario) === Number(yo.id_usuario)) return;
+      if (this.esAdmin())
+        this.dialogo.avisar(`Transferencia de ${d.nombre_origen} a ${d.nombre_destino}: ${d.resumen}`);
+      else if (Number(d.id_sucursal_destino) === this.sesion.idSucursal())
+        this.dialogo.avisar(`Llegaron productos de ${d.nombre_origen}: ${d.resumen}`);
+    });
   }
 
   ngOnDestroy() {
     this.subPermisos?.unsubscribe();
     this.subRuta?.unsubscribe();
+    this.subTransferencias?.unsubscribe();
     this.permisoService.dejarDeEscuchar();
   }
 

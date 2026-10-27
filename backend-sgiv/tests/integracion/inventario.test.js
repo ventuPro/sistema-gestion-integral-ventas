@@ -351,3 +351,116 @@ describe('Menú QR: orden de categorías y ficha del producto', () => {
         assert.equal((await bd.sql(`SELECT ingredientes FROM producto WHERE id_producto = $1`, [id]))[0].ingredientes, null);
     });
 });
+
+// ─── Transferencias entre sucursales ───
+describe('Transferencias entre sucursales', () => {
+    const transferir = (token, body) => api('POST', '/inventario/transferencias', { token, body });
+    const historialDe = async (id_producto, id_sucursal) =>
+        (await api('GET', `/inventario/movimientos?id_producto=${id_producto}&id_sucursal=${id_sucursal}`, { token: tAdmin })).body
+            .map(m => `${m.tipo_movimiento} ${m.cantidad_movida} ${m.motivo_movimiento} | ${m.detalle} | saldo ${m.stock_resultante}`);
+
+    test('sale del origen y entra al destino a la vez, con historial en ambas sucursales', async () => {
+        const torta = await crearProducto('Torta transferida', 50);
+        const pie   = await crearProducto('Pie transferido', 10);
+        await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES ($1, $2, 4)`,
+                     [idOtraSucursal, torta]);
+        const [{ nombre_sucursal: central }] = await bd.sql(`SELECT nombre_sucursal FROM sucursal WHERE id_sucursal = 1`);
+
+        const r = await transferir(tCajero, { id_sucursal_destino: idOtraSucursal, observacion: 'Para el sábado',
+            items: [{ id_producto: torta, cantidad: 15 }, { id_producto: pie, cantidad: 3 }, { id_producto: torta, cantidad: 5 }] });
+        assert.equal(r.status, 201);
+        const id = r.body.id_transferencia;
+
+        assert.equal(await stock(torta), 30);
+        assert.equal(await stock(torta, idOtraSucursal), 24);
+        assert.equal(await stock(pie), 7);
+        // El destino no tenía el pie: se le crea en su inventario
+        assert.equal(await stock(pie, idOtraSucursal), 3);
+
+        assert.equal((await historialDe(torta, 1))[0], `SALIDA 20 Transferencia | A Otra sucursal · #${id} | saldo 30`);
+        assert.equal((await historialDe(torta, idOtraSucursal))[0], `INGRESO 20 Transferencia | Desde ${central} · #${id} | saldo 24`);
+
+        const det = await api('GET', `/inventario/transferencias/${id}`, { token: tCajero });
+        assert.equal(det.status, 200);
+        assert.equal(det.body.observacion, 'Para el sábado');
+        assert.equal(det.body.usuario, 'cajero.inv@prueba.com');
+        assert.deepEqual(det.body.items.map(i => [i.nombre_producto, i.cantidad]),
+                         [['Pie transferido', 3], ['Torta transferida', 20]]);
+
+        const lista = (await api('GET', '/inventario/transferencias', { token: tCajero })).body;
+        const fila = lista.find(t => t.id_transferencia === id);
+        assert.equal(fila.productos, 2);
+        assert.equal(fila.unidades, 23);
+    });
+
+    test('no se transfiere más de lo que hay; si un producto falla, no se mueve nada', async () => {
+        const a = await crearProducto('Transf A', 10), b = await crearProducto('Transf B', 2);
+        const r = await transferir(tAdmin, { id_sucursal_origen: 1, id_sucursal_destino: idOtraSucursal,
+            items: [{ id_producto: a, cantidad: 5 }, { id_producto: b, cantidad: 3 }] });
+        assert.equal(r.status, 409);
+        assert.match(r.body.error, /Solo quedan 2 de "Transf B"/);
+        assert.equal(await stock(a), 10);
+        assert.equal((await bd.sql(`SELECT 1 FROM inventario_sucursal WHERE id_sucursal = $1 AND id_producto = $2`,
+                                   [idOtraSucursal, a])).length, 0);
+    });
+
+    test('validaciones: misma sucursal, destino inactivo, cantidades y producto inexistente', async () => {
+        const p = await crearProducto('Transf validar', 10);
+        const item = [{ id_producto: p, cantidad: 1 }];
+        const destino = idOtraSucursal;
+        assert.equal((await transferir(tCajero, { id_sucursal_destino: 1, items: item })).status, 400);
+        assert.equal((await transferir(tCajero, { id_sucursal_destino: destino, items: [] })).status, 400);
+        assert.equal((await transferir(tCajero, { id_sucursal_destino: destino, items: [{ id_producto: p, cantidad: 0 }] })).status, 400);
+        assert.equal((await transferir(tCajero, { id_sucursal_destino: destino, items: [{ id_producto: p, cantidad: 1.5 }] })).status, 400);
+        assert.equal((await transferir(tCajero, { id_sucursal_destino: destino, items: [{ id_producto: 999999, cantidad: 1 }] })).status, 400);
+        assert.equal((await transferir(tCajero, { id_sucursal_destino: 999999, items: item })).status, 404);
+
+        const [inactiva] = await bd.sql(
+            `INSERT INTO sucursal (nombre_sucursal, estado_activo) VALUES ('Cerrada', FALSE) RETURNING id_sucursal`);
+        const r = await transferir(tCajero, { id_sucursal_destino: inactiva.id_sucursal, items: item });
+        assert.equal(r.status, 400);
+        assert.match(r.body.error, /inactiva/);
+        assert.equal(await stock(p), 10);
+    });
+
+    test('el cajero solo transfiere desde su sucursal y solo ve las suyas; sin permiso de inventario no entra', async () => {
+        const p = await crearProducto('Transf permisos', 10, idOtraSucursal);
+        const ajena = await transferir(tCajero, { id_sucursal_origen: idOtraSucursal, id_sucursal_destino: 1,
+                                                  items: [{ id_producto: p, cantidad: 1 }] });
+        assert.equal(ajena.status, 403);
+
+        const admin = await transferir(tAdmin, { id_sucursal_origen: idOtraSucursal, id_sucursal_destino: 1,
+                                                 items: [{ id_producto: p, cantidad: 4 }] });
+        assert.equal(admin.status, 201);
+        assert.equal(await stock(p, idOtraSucursal), 6);
+        assert.equal(await stock(p, 1), 4);
+
+        // Llegó a la sucursal del cajero: la ve
+        assert.equal((await api('GET', `/inventario/transferencias/${admin.body.id_transferencia}`, { token: tCajero })).status, 200);
+
+        const [s3] = await bd.sql(`INSERT INTO sucursal (nombre_sucursal) VALUES ('Tercera') RETURNING id_sucursal`);
+        await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES ($1, $2, 5)`,
+                     [s3.id_sucursal, p]);
+        const otra = await transferir(tAdmin, { id_sucursal_origen: s3.id_sucursal, id_sucursal_destino: idOtraSucursal,
+                                                items: [{ id_producto: p, cantidad: 1 }] });
+        const idOtra = otra.body.id_transferencia;
+        assert.equal((await api('GET', `/inventario/transferencias/${idOtra}`, { token: tCajero })).status, 404);
+        assert.ok(!(await api('GET', '/inventario/transferencias', { token: tCajero })).body.some(t => t.id_transferencia === idOtra));
+        assert.ok((await api('GET', '/inventario/transferencias', { token: tAdmin })).body.some(t => t.id_transferencia === idOtra));
+
+        assert.equal((await api('GET', '/inventario/transferencias', { token: tCajeroSinPermiso })).status, 403);
+        assert.equal((await transferir(tCajeroSinPermiso, { id_sucursal_destino: idOtraSucursal, items: [] })).status, 403);
+    });
+
+    test('dos transferencias simultáneas de las últimas unidades: solo una sale', async () => {
+        const p = await crearProducto('Transf carrera', 5);
+        const [r1, r2] = await Promise.all([
+            transferir(tAdmin, { id_sucursal_origen: 1, id_sucursal_destino: idOtraSucursal,
+                                 items: [{ id_producto: p, cantidad: 4 }] }),
+            transferir(tCajero, { id_sucursal_destino: idOtraSucursal, items: [{ id_producto: p, cantidad: 4 }] })
+        ]);
+        assert.deepEqual([r1.status, r2.status].sort(), [201, 409]);
+        assert.equal(await stock(p), 1);
+        assert.equal(await stock(p, idOtraSucursal), 4);
+    });
+});

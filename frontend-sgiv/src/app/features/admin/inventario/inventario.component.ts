@@ -17,13 +17,14 @@ import { cifra } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
 import { comprimirImagen } from '../../../core/utils/imagen';
+import { TransferenciasComponent } from './transferencias/transferencias.component';
 
 type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe, TransferenciasComponent],
   templateUrl: './inventario.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './inventario.component.css']
@@ -131,13 +132,14 @@ export class InventarioComponent implements OnInit, OnDestroy {
   readonly errorMov    = signal('');
 
   // ─── Pestaña Movimientos ───
-  readonly vista             = signal<'productos' | 'movimientos'>('productos');
+  readonly vista             = signal<'productos' | 'movimientos' | 'transferencias'>('productos');
   readonly movimientos       = signal<Movimiento[]>([]);
   readonly cargandoMov       = signal(false);
   readonly periodoMov        = signal<'hoy' | '7' | '30'>('7');
   readonly tipoMov           = signal<TipoMovimiento | null>(null);
   readonly productoFiltroMov = signal<{ id_producto: number; nombre_producto: string } | null>(null);
   private recargaMov: any;
+  private recargaProductos: any;
 
   // ─── Modal Categoría ───
   readonly mostrarModalCategoria = signal(false);
@@ -158,14 +160,19 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.suscribirStock();
   }
 
-  ngOnDestroy() { this.stockSub?.unsubscribe(); clearTimeout(this.recargaMov); }
+  ngOnDestroy() { this.stockSub?.unsubscribe(); clearTimeout(this.recargaMov); clearTimeout(this.recargaProductos); }
 
   // Ventas de POS, mesas y menú QR actualizan el stock sin recargar
   private suscribirStock() {
     this.socketService.conectar('cajeros');
     this.stockSub = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(p => {
       if (!p || Number(p.id_sucursal) !== this.idSucursal()) return;
-      if (!this.fijarStock(Number(p.id_producto), Number(p.nueva_cantidad_disponible) || 0)) return;
+      // Un producto que la sucursal no tenía (llegó por transferencia): se recarga la lista
+      if (!this.fijarStock(Number(p.id_producto), Number(p.nueva_cantidad_disponible) || 0)) {
+        clearTimeout(this.recargaProductos);
+        this.recargaProductos = setTimeout(() => this.cargarProductos(), 400);
+        return;
+      }
       if (this.vista() === 'movimientos') {
         clearTimeout(this.recargaMov);
         this.recargaMov = setTimeout(() => this.cargarMovimientos(), 600);
