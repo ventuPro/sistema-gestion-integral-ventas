@@ -39,6 +39,21 @@ export interface ListaDia {
            id_categoria: number; nombre_categoria: string; orden_categoria: number }[];
 }
 
+export interface IngresoDia {
+  id_historial:      number;
+  fecha_registro:    string;
+  cantidad_movida:   number;
+  motivo_movimiento: string;
+  detalle:           string | null;
+  stock_resultante:  number | null;
+  id_producto:       number;
+  nombre_producto:   string;
+  usuario:           string | null;
+  id_categoria:      number | null;
+  nombre_categoria:  string | null;
+  orden_categoria:   number;
+}
+
 export interface NuevaTransferencia {
   id_sucursal_origen: number;
   id_sucursal_destino: number;
@@ -81,6 +96,13 @@ export class InventarioService {
     if (f.desde)       params = params.set('desde', f.desde);
     if (f.hasta)       params = params.set('hasta', f.hasta);
     return this.http.get<Movimiento[]>(`${this.api}/movimientos`, { params });
+  }
+
+  /** Entradas de un día (fecha AAAA-MM-DD; vacía = hoy) */
+  ingresosDia(id_sucursal: number, fecha?: string | null): Observable<IngresoDia[]> {
+    let params = new HttpParams().set('id_sucursal', id_sucursal);
+    if (fecha) params = params.set('fecha', fecha);
+    return this.http.get<IngresoDia[]>(`${this.api}/ingresos`, { params });
   }
 
   // ─── Lista de productos que quedaron del día anterior ───

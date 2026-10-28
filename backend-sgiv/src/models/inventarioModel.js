@@ -79,4 +79,28 @@ const listarMovimientos = async ({ id_sucursal, id_producto, tipo, desde, hasta,
     return r.rows;
 };
 
-module.exports = { MOTIVOS, registrarHistorial, registrarMovimiento, listarMovimientos };
+// ─── Ingresos del día (lo que se produjo o llegó; sin las devoluciones de pedidos y cuentas) ───
+const NO_SON_INGRESOS = ['Devuelto de cuenta de mesa', 'Pedido QR devuelto'];
+
+/** fecha: AAAA-MM-DD o null = hoy (hora de La Paz) */
+const ingresosDelDia = async ({ id_sucursal, fecha }) => {
+    const r = await db.query(`
+        SELECT h.id_historial, h.fecha_registro, h.cantidad_movida, h.motivo_movimiento, h.detalle,
+               h.stock_resultante, p.id_producto, p.nombre_producto, u.nombre_completo AS usuario,
+               c.id_categoria, c.nombre_categoria, COALESCE(c.orden, 0) AS orden_categoria
+        FROM historial_inventario h
+        JOIN inventario_sucursal i       ON i.id_inventario = h.id_inventario
+        JOIN producto p                  ON p.id_producto   = i.id_producto
+        LEFT JOIN categoria_producto c   ON c.id_categoria  = p.id_categoria
+        LEFT JOIN usuario u              ON u.id_usuario    = h.id_usuario
+        WHERE i.id_sucursal = $1
+          AND h.tipo_movimiento = 'INGRESO'
+          AND h.motivo_movimiento <> ALL($3)
+          AND h.fecha_registro >= COALESCE($2::date, CURRENT_DATE)
+          AND h.fecha_registro <  COALESCE($2::date, CURRENT_DATE) + INTERVAL '1 day'
+        ORDER BY h.fecha_registro DESC, h.id_historial DESC
+    `, [id_sucursal, fecha, NO_SON_INGRESOS]);
+    return r.rows;
+};
+
+module.exports = { MOTIVOS, registrarHistorial, registrarMovimiento, listarMovimientos, ingresosDelDia };

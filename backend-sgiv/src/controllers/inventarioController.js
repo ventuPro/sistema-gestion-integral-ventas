@@ -69,6 +69,20 @@ const listarMovimientos = async (req, res) => {
     }
 };
 
+// GET /api/inventario/ingresos?id_sucursal&fecha  (fecha vacía = hoy)
+const ingresosDelDia = async (req, res) => {
+    try {
+        const { fecha } = req.query;
+        const id_sucursal = sucursalPermitida(req, req.query.id_sucursal);
+        if (!id_sucursal) return res.status(403).json({ error: 'Solo puedes ver el inventario de tu sucursal' });
+        if (fecha && !FECHA.test(fecha)) return res.status(400).json({ error: 'La fecha debe tener el formato AAAA-MM-DD' });
+        res.json(await inventarioModel.ingresosDelDia({ id_sucursal, fecha: fecha || null }));
+    } catch (error) {
+        console.error('ingresosDelDia:', error);
+        res.status(500).json({ error: 'No se pudieron consultar los ingresos del día' });
+    }
+};
+
 // ─── Transferencias entre sucursales ───
 const ERRORES_TRANSFERENCIA = { INVALIDA: 400, NO_EXISTE: 404, SIN_STOCK: 409 };
 
@@ -157,6 +171,6 @@ const desbloquearListaDia = async (req, res) => {
     }
 };
 
-module.exports = { listarMotivos, registrarMovimiento, listarMovimientos,
+module.exports = { listarMotivos, registrarMovimiento, listarMovimientos, ingresosDelDia,
                    obtenerListaDia, desbloquearListaDia,
                    crearTransferencia, listarTransferencias, obtenerTransferencia };

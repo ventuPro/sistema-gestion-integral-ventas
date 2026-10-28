@@ -9,6 +9,9 @@
       <h1 class="inf-titulo">Inventario</h1>
     </div>
     <div class="flex flex-wrap items-center gap-2">
+      <button class="inf-boton" (click)="mostrarIngresos.set(true)">
+        <lucide-icon [img]="icons.ingresos" class="w-3.5 h-3.5"></lucide-icon> Ingresos del día
+      </button>
       <button class="inf-boton" (click)="mostrarListaDia.set(true)">
         <lucide-icon [img]="icons.listaDia" class="w-3.5 h-3.5"></lucide-icon> Lista del día anterior
       </button>
@@ -38,6 +41,11 @@
 
   @if (vista() === 'transferencias') {
     <app-transferencias [idSucursal]="idSucursal()" [productos]="productos()" />
+  }
+
+  @if (mostrarIngresos()) {
+    <app-ingresos-dia [idSucursal]="idSucursal()" [nombreSucursal]="sucursalSeleccionada()?.nombre_sucursal || ''"
+                      (cerrar)="mostrarIngresos.set(false)" />
   }
 
   @if (mostrarListaDia()) {

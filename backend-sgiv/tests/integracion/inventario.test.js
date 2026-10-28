@@ -209,6 +209,32 @@ describe('Inventario: historial', () => {
     });
 });
 
+describe('Inventario: ingresos del día', () => {
+    test('solo entradas de la sucursal en ese día, sin devoluciones de mesas; el cajero solo la suya', async () => {
+        const id = await crearProducto('Ingresos dia', 0);
+        await mover(tCajero, { id_producto: id, tipo: 'INGRESO', cantidad: 12, motivo: 'Producción' });
+        await mover(tCajero, { id_producto: id, tipo: 'INGRESO', cantidad: 6,  motivo: 'Producción' });
+        await mover(tCajero, { id_producto: id, tipo: 'SALIDA',  cantidad: 1,  motivo: 'Degustación' });
+        const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
+                                     VALUES (1, 43, md5(random()::text)) RETURNING id_mesa`);
+        const cuenta = (await api('POST', '/cuentas/abrir', { token: tCajero, body: { id_mesa: mesa.id_mesa } })).body.cuenta;
+        const ag = await api('POST', `/cuentas/${cuenta.id_cuenta}/producto`, { token: tCajero, body: { id_producto: id, cantidad: 2 } });
+        await api('DELETE', `/cuentas/detalle/${ag.body.detalle.id_detalle_cuenta}`, { token: tCajero });
+
+        const deHoy = (await api('GET', '/inventario/ingresos', { token: tCajero })).body.filter(m => m.id_producto === id);
+        assert.deepEqual(deHoy.map(m => m.cantidad_movida), [6, 12]);   // el más reciente primero
+        assert.ok(deHoy[0].nombre_categoria && deHoy[0].usuario);
+
+        const [{ hoy }] = await bd.sql(`SELECT to_char(now() AT TIME ZONE 'America/La_Paz', 'YYYY-MM-DD') AS hoy`);
+        assert.equal((await api('GET', `/inventario/ingresos?fecha=${hoy}`, { token: tAdmin })).body.filter(m => m.id_producto === id).length, 2);
+        assert.equal((await api('GET', '/inventario/ingresos?fecha=2020-01-01', { token: tAdmin })).body.length, 0);
+        assert.equal((await api('GET', `/inventario/ingresos?id_sucursal=${idOtraSucursal}`, { token: tAdmin })).body.some(m => m.id_producto === id), false);
+        assert.equal((await api('GET', `/inventario/ingresos?id_sucursal=${idOtraSucursal}`, { token: tCajero })).status, 403);
+        assert.equal((await api('GET', '/inventario/ingresos?fecha=28/10/2026', { token: tAdmin })).status, 400);
+        assert.equal((await api('GET', '/inventario/ingresos', { token: tCajeroSinPermiso })).status, 403);
+    });
+});
+
 describe('Inventario: mesas y menú QR también quedan en el historial', () => {
     const historial = async (id) =>
         (await api('GET', `/inventario/movimientos?id_producto=${id}`, { token: tAdmin })).body

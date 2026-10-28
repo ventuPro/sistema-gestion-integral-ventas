@@ -1,0 +1,97 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrar.emit()">
+  <div class="inf-hoja ventana w-full max-w-2xl max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+    <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
+      <div>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Ingresos del día</h3>
+        <p class="inf-sub mt-0!">{{ nombreSucursal() }} · {{ fechaTexto() }}</p>
+      </div>
+      <button class="quitar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+      </button>
+    </div>
+
+    <div class="px-5 py-3 separador-inferior flex flex-wrap items-center gap-3">
+      <input type="date" class="inf-campo" [value]="fecha()" [max]="hoy" (change)="cambiarFecha($any($event.target).value)" aria-label="Día">
+      <div class="inf-segmentos">
+        <button [class.activa]="vista() === 'productos'" (click)="vista.set('productos')">Por producto</button>
+        <button [class.activa]="vista() === 'detalle'" (click)="vista.set('detalle')">Detalle</button>
+      </div>
+    </div>
+
+    <div class="overflow-y-auto flex-1">
+      @switch (estado()) {
+        @case ('cargando') { <div class="p-5"><div class="inf-esqueleto h-40"></div></div> }
+        @case ('error') { <p class="inf-vacio">No se pudieron cargar los ingresos.</p> }
+        @default {
+          @if (!ingresos().length) {
+            <p class="inf-vacio">Sin ingresos en este día.</p>
+          } @else if (vista() === 'productos') {
+            <table class="inf-tabla">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th class="num">Entradas</th>
+                  <th class="num">Última</th>
+                  <th class="num">Cantidad</th>
+                </tr>
+              </thead>
+              @for (g of grupos(); track g.id) {
+                <tbody>
+                  <tr class="fila-seccion"><td colspan="4">{{ g.categoria }}</td></tr>
+                  @for (p of g.productos; track p.id_producto) {
+                    <tr>
+                      <td class="fuerte">{{ p.nombre_producto }}</td>
+                      <td class="num">{{ p.entradas }}</td>
+                      <td class="num">{{ p.ultima | date:'HH:mm' }}</td>
+                      <td class="num"><span class="font-semibold inf-sube">+{{ p.cantidad }}</span></td>
+                    </tr>
+                  }
+                </tbody>
+              }
+            </table>
+          } @else {
+            <table class="inf-tabla">
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Producto</th>
+                  <th class="num">Cantidad</th>
+                  <th>Motivo</th>
+                  <th>Usuario</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (m of ingresos(); track m.id_historial) {
+                  <tr>
+                    <td class="whitespace-nowrap">{{ m.fecha_registro | date:'HH:mm' }}</td>
+                    <td class="fuerte">{{ m.nombre_producto }}</td>
+                    <td class="num"><span class="font-semibold inf-sube">+{{ m.cantidad_movida }}</span></td>
+                    <td>
+                      {{ m.motivo_movimiento }}
+                      @if (m.detalle) { <span class="inf-secundario">{{ m.detalle }}</span> }
+                    </td>
+                    <td>{{ m.usuario || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        }
+      }
+    </div>
+
+    @if (estado() === 'listo' && ingresos().length) {
+      <div class="inf-pie-hoja flex flex-wrap items-center justify-between gap-2">
+        <span class="inf-tinta">{{ totales().productos }} producto(s) · {{ totales().unidades }} unidad(es)</span>
+        <button class="inf-boton" (click)="imprimirTicket()">
+          <lucide-icon [img]="icons.ticket" class="w-4 h-4"></lucide-icon> Ticket
+        </button>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Ticket fuera de la vista: solo se usa para imprimir -->
+<div #zonaTicket class="fuera-de-vista" aria-hidden="true">
+  <app-ticket-lista-dia [grupos]="gruposTicket()" [sucursal]="nombreSucursal()" [fecha]="fecha()" titulo="INGRESOS DEL DÍA" />
+</div>

@@ -14,7 +14,7 @@ export interface GrupoListaDia { categoria: string; items: { nombre_producto: st
     <div class="tk" [class]="'tk-' + ancho()">
       <div class="tk-cabecera">
         <p class="tk-nombre">{{ ajustes.nombre() }}</p>
-        <p class="tk-dato">PRODUCTOS QUE QUEDARON</p>
+        <p class="tk-dato">{{ titulo() }}</p>
         <p class="tk-dato">{{ sucursal() }} · {{ fecha() }}</p>
       </div>
       @for (g of grupos(); track g.categoria) {
@@ -34,6 +34,7 @@ export class TicketListaDiaComponent {
   readonly grupos   = input.required<GrupoListaDia[]>();
   readonly sucursal = input('');
   readonly fecha    = input('');
+  readonly titulo   = input('PRODUCTOS QUE QUEDARON');
 
   readonly ancho    = computed(() => this.ajustes.config().ticket_ancho || '80');
   readonly unidades = computed(() => this.grupos().reduce((s, g) => s + g.items.reduce((t, i) => t + i.cantidad, 0), 0));

@@ -1,0 +1,9 @@
+tr.fila-seccion td {
+  padding-top: 14px;
+  font-size: calc(13px * var(--escala-texto));
+  font-weight: 600;
+  color: var(--i-acento);
+  background: var(--i-fondo);
+}
+
+.fuera-de-vista { position: fixed; left: -10000px; top: 0; }
