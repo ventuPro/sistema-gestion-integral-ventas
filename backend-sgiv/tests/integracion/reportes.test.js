@@ -124,12 +124,6 @@ describe('Informe por período', () => {
         assert.equal((await api('/reportes/periodo/1?fecha_inicio=2024-01-01&fecha_fin=2026-03-02', tAdmin)).status, 400);
     });
 
-    test('desglose de un día por categoría', async () => {
-        const { body } = await api('/reportes/dia-detalle/1?fecha=2026-03-02', tAdmin);
-        assert.equal(body.total_dia, 110);
-        assert.equal(body.desglose[0].nombre_categoria, 'Tortas R');
-        assert.equal(body.desglose[0].porcentaje_dia, 90.9);
-    });
 });
 
 describe('Permisos de informes', () => {
@@ -149,12 +143,11 @@ describe('Permisos de informes', () => {
 });
 
 describe('Panel del día', () => {
-    test('estructura completa y 14 días de historial', async () => {
+    test('estructura completa', async () => {
         const { status, body } = await api('/reportes/dashboard-completo/1', tAdmin);
         assert.equal(status, 200);
         for (const k of ['hoy', 'comparativo', 'metodos_pago', 'por_hora', 'turnos_abiertos', 'mesas', 'pedidos_qr', 'stock', 'ultimas_ventas'])
             assert.ok(k in body, k);
-        assert.equal(body.ultimos_dias.length, 14);
         assert.ok(body.stock.productos >= 3);
         assert.ok(Array.isArray(body.cajas_abiertas));
     });

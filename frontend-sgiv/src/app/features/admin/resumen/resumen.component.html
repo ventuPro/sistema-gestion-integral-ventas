@@ -43,21 +43,19 @@
         <p class="inf-etiqueta">Ingresos de hoy</p>
         <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(hoy().ingresos) }}</p>
 
-        <div class="mt-4 space-y-1.5">
-          <p class="inf-comparacion">
-            <span class="inf-delta" [ngClass]="claseDelta(vsAyer())">
-              <lucide-icon [img]="iconoDelta(vsAyer())" class="w-3 h-3"></lucide-icon>
-              {{ textoDelta(vsAyer()) }}
-            </span>
-            vs. ayer a esta hora ({{ moneda() }} {{ cifra(comp().ayer_misma_hora?.ingresos) }})
-          </p>
-          <p class="inf-comparacion">
-            <span class="inf-delta" [ngClass]="claseDelta(vsSemana())">
-              <lucide-icon [img]="iconoDelta(vsSemana())" class="w-3 h-3"></lucide-icon>
-              {{ textoDelta(vsSemana()) }}
-            </span>
-            vs. el {{ diaSemanaPasada }} pasado a esta hora
-          </p>
+        <div class="cobros-hoy" [class.uno]="!(ajustes.config().pago_efectivo && ajustes.config().pago_qr)">
+          @if (ajustes.config().pago_efectivo) {
+            <div class="cobro-hoy">
+              <p class="inf-etiqueta"><lucide-icon [img]="icons.efectivo" class="w-4 h-4"></lucide-icon> Efectivo</p>
+              <p class="cobro-monto">{{ moneda() }} {{ cifra(cobradoHoy().efectivo) }}</p>
+            </div>
+          }
+          @if (ajustes.config().pago_qr) {
+            <div class="cobro-hoy">
+              <p class="inf-etiqueta"><lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon> QR</p>
+              <p class="cobro-monto">{{ moneda() }} {{ cifra(cobradoHoy().qr) }}</p>
+            </div>
+          }
         </div>
 
         <dl class="inf-pares mt-6 pt-5 panel-separador">
@@ -106,11 +104,6 @@
         <p class="inf-etiqueta">Alertas de stock</p>
         <p class="inf-valor" [class.inf-baja]="datos().stock?.agotados > 0">{{ alertasStock() }}</p>
         <p class="inf-sub">{{ datos().stock?.agotados || 0 }} agotados · {{ datos().stock?.bajos || 0 }} bajo mínimo</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Promociones</p>
-        <p class="inf-valor">{{ datos().promociones?.vigentes || 0 }} vigentes</p>
-        <p class="inf-sub">ahorro {{ moneda() }} {{ cifra(datos().promociones?.ahorro) }} · descuentos {{ moneda() }} {{ cifra(datos().promociones?.descuentos) }}</p>
       </div>
     </section>
 
@@ -288,21 +281,6 @@
         }
       </section>
     </div>
-
-    <!-- Últimos 14 días -->
-    <section class="inf-hoja p-5">
-      <div class="inf-seccion">
-        <h2>Últimos 7 días vs. 7 anteriores</h2>
-      </div>
-      <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2 mb-4">
-        <p class="inf-valor mt-0!">{{ moneda() }} {{ cifra(semanas().actual) }}</p>
-        <p class="inf-comparacion">
-          <span class="inf-delta" [ngClass]="claseDelta(semanas().delta)">{{ textoDelta(semanas().delta) }}</span>
-          frente a {{ moneda() }} {{ cifra(semanas().previa) }} la semana anterior
-        </p>
-      </div>
-      <div class="relative h-52"><canvas #graficoDias></canvas></div>
-    </section>
 
   </div>
   }

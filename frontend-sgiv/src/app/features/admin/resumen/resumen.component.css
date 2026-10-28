@@ -32,3 +32,23 @@
   width: 38px;
   flex-shrink: 0;
 }
+
+/* Efectivo y QR debajo de los ingresos de hoy */
+.cobros-hoy { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+.cobros-hoy.uno { grid-template-columns: 1fr; }
+.cobro-hoy {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--i-acento-suave);
+  border: 1px solid color-mix(in oklab, var(--i-acento) 25%, transparent);
+}
+.cobro-hoy .inf-etiqueta { display: flex; align-items: center; gap: 6px; color: var(--i-acento); font-weight: 600; }
+.cobro-monto {
+  margin-top: 4px;
+  font-size: calc(24px * var(--escala-texto));
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--i-tinta);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

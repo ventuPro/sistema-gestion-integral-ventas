@@ -2,13 +2,14 @@ import { Component, computed, inject, Injector, OnInit, OnDestroy, afterNextRend
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Chart } from '../../../core/utils/graficos';
-import { LucideAngularModule, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-angular';
+import { LucideAngularModule, Banknote, QrCode } from 'lucide-angular';
 import { ReporteService } from '../../../core/services/reporte.service';
 import { SucursalService } from '../../../core/services/sucursal.service';
 import { ProductoService } from '../../../core/services/producto.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
-import { cifra, entero, variacion, porcentaje, fechaLarga, fechaCorta, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
+import { cifra, entero, porcentaje, fechaLarga, fechaHora, hora, temaGrafico, opcionesBase } from '../../../core/utils/informe';
+import { METODO_PAGO } from '../../../core/utils/metodos-pago';
 import { sondeo } from '../../../core/utils/sondeo';
 import { SesionService } from '../../../core/services/sesion.service';
 
@@ -24,14 +25,13 @@ export class ResumenComponent implements OnInit, OnDestroy {
   private reporteService  = inject(ReporteService);
   private sucursalService = inject(SucursalService);
   private productoService = inject(ProductoService);
-  private ajustes         = inject(AjustesService);
+  readonly ajustes        = inject(AjustesService);
   private injector        = inject(Injector);
   readonly moneda         = this.ajustes.moneda;
 
   @ViewChild('graficoHoras') graficoHorasRef?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('graficoDias')  graficoDiasRef?:  ElementRef<HTMLCanvasElement>;
 
-  readonly icons = { sube: ArrowUpRight, baja: ArrowDownRight, igual: Minus };
+  readonly icons = { efectivo: Banknote, qr: QrCode };
   readonly cifra = cifra;
   readonly entero = entero;
   readonly hora = hora;
@@ -117,11 +117,12 @@ export class ResumenComponent implements OnInit, OnDestroy {
   readonly comp  = computed(() => this.datos()?.comparativo || {});
   readonly todas = computed(() => this.sucursalActual() === null);
 
-  readonly vsAyer   = computed(() => variacion(this.hoy().ingresos, this.comp().ayer_misma_hora?.ingresos));
-  readonly vsSemana = computed(() => variacion(this.hoy().ingresos, this.comp().semana_pasada_misma_hora?.ingresos));
-  get diaSemanaPasada(): string {
-    return DIAS_SEMANA[(new Date().getDay() + 6) % 7].toLowerCase();
-  }
+  /** Cobrado hoy en efectivo y por QR */
+  readonly cobradoHoy = computed(() => {
+    const metodos: any[] = this.datos()?.metodos_pago || [];
+    const de = (m: string) => metodos.find(x => x.metodo_pago === m)?.ingresos || 0;
+    return { efectivo: de(METODO_PAGO.efectivo), qr: de(METODO_PAGO.qr) };
+  });
 
   readonly totalMetodos = computed(() =>
     (this.datos()?.metodos_pago || []).reduce((s: number, m: any) => s + m.ingresos, 0));
@@ -138,14 +139,6 @@ export class ResumenComponent implements OnInit, OnDestroy {
   readonly totalSucursales = computed(() =>
     (this.datos()?.sucursales || []).reduce((s: number, x: any) => s + x.ingresos, 0));
 
-  /** Últimos 7 días contra los 7 anteriores */
-  readonly semanas = computed(() => {
-    const d = this.datos()?.ultimos_dias || [];
-    const suma = (a: any[]) => a.reduce((s, x) => s + x.ingresos, 0);
-    const actual = suma(d.slice(7)), previa = suma(d.slice(0, 7));
-    return { actual, previa, delta: variacion(actual, previa) };
-  });
-
   /** "desde 17:36", o con fecha si el turno se abrió otro día */
   desde(f: string): string {
     const d = new Date(f);
@@ -154,21 +147,6 @@ export class ResumenComponent implements OnInit, OnDestroy {
 
   colorMetodo(i: number): string {
     return temaGrafico(this.ajustes).serie[i % 6];
-  }
-
-  claseDelta(v: number | null): string {
-    if (v === null || Math.abs(v) < 0.5) return 'igual';
-    return v > 0 ? 'sube' : 'baja';
-  }
-
-  iconoDelta(v: number | null) {
-    const c = this.claseDelta(v);
-    return c === 'sube' ? this.icons.sube : c === 'baja' ? this.icons.baja : this.icons.igual;
-  }
-
-  textoDelta(v: number | null): string {
-    if (v === null) return 'sin base';
-    return `${Math.abs(v).toFixed(1)} %`;
   }
 
   // ─── Gráficos ───
@@ -219,26 +197,5 @@ export class ResumenComponent implements OnInit, OnDestroy {
       }));
     }
 
-    const lienzoDias = this.graficoDiasRef?.nativeElement;
-    if (lienzoDias && datos.ultimos_dias?.length) {
-      const dias = datos.ultimos_dias;
-      const base = opcionesBase(t, fmt);
-      base.plugins.tooltip.callbacks = {
-        title: (i: any) => fechaLarga(dias[i[0].dataIndex].fecha),
-        label: (i: any) => `${this.moneda()} ${cifra(i.raw)} · ${dias[i.dataIndex].ventas} ventas`
-      };
-      this.graficos.push(new Chart(lienzoDias, {
-        type: 'bar',
-        data: {
-          labels: dias.map((d: any) => fechaCorta(d.fecha)),
-          datasets: [{
-            data: dias.map((d: any) => d.ingresos),
-            backgroundColor: dias.map((_: any, i: number) => i === dias.length - 1 ? t.acento : i >= 7 ? t.acentoMedio : t.fantasma),
-            borderRadius: 3, barPercentage: 0.75
-          }]
-        },
-        options: base
-      }));
-    }
   }
 }

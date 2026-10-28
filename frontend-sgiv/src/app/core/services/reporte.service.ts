@@ -28,8 +28,4 @@ export class ReporteService {
     return this.http.get(`${this.apiUrl}/reportes/periodo/${id_sucursal}`, { params });
   }
 
-  obtenerDesgloseDia(id_sucursal: number, fecha: string): Observable<any> {
-    const params = new HttpParams().set('fecha', fecha);
-    return this.http.get(`${this.apiUrl}/reportes/dia-detalle/${id_sucursal}`, { params });
-  }
 }

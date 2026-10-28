@@ -51,17 +51,4 @@ const obtenerInforme = async (req, res) => {
     }
 };
 
-const obtenerDesgloseDia = async (req, res) => {
-    try {
-        const id_sucursal = sucursalPermitida(req);
-        if (id_sucursal === null) return res.status(400).json({ error: 'Sucursal inválida' });
-        const { fecha } = req.query;
-        if (!fechaValida(fecha)) return res.status(400).json({ error: 'Fecha requerida en formato YYYY-MM-DD' });
-        res.json(await reporteModel.obtenerDesgloseDia(id_sucursal, fecha));
-    } catch (error) {
-        console.error('Error en obtenerDesgloseDia:', error);
-        res.status(500).json({ error: 'Error al obtener el desglose del día' });
-    }
-};
-
-module.exports = { obtenerPanel, obtenerInforme, obtenerDesgloseDia };
+module.exports = { obtenerPanel, obtenerInforme };

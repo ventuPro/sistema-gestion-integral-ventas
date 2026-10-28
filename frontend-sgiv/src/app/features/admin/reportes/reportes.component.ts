@@ -3,14 +3,14 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Chart } from '../../../core/utils/graficos';
-import { LucideAngularModule, ChevronDown, ChevronRight, X, Check, SlidersHorizontal, FileSpreadsheet, FileText, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-angular';
+import { LucideAngularModule, ChevronDown, ChevronRight, X, Check, SlidersHorizontal, FileSpreadsheet, FileText } from 'lucide-angular';
 import { ReporteService } from '../../../core/services/reporte.service';
 import { ProductoService } from '../../../core/services/producto.service';
 import { SucursalService } from '../../../core/services/sucursal.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { etiquetaPromocion } from '../../../core/services/promocion.service';
-import { cifra, entero, variacion, porcentaje, fechaCorta, fechaLarga, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
+import { cifra, entero, porcentaje, fechaCorta, fechaLarga, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
 import { SesionService } from '../../../core/services/sesion.service';
 
 type Periodo = 'hoy' | 'ayer' | 'semana' | 'mes' | 'mes_anterior' | 'personalizado';
@@ -37,7 +37,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
 
   readonly icons = {
     abajo: ChevronDown, derecha: ChevronRight, cerrar: X, check: Check, filtro: SlidersHorizontal,
-    excel: FileSpreadsheet, pdf: FileText, sube: ArrowUpRight, baja: ArrowDownRight, igual: Minus
+    excel: FileSpreadsheet, pdf: FileText
   };
   readonly cifra = cifra;
   readonly entero = entero;
@@ -70,11 +70,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
 
   readonly verTodosProductos = signal(false);
   readonly verTodosTurnos    = signal(false);
-  readonly verSinVentas      = signal(false);
-
-  readonly diasExpandidos = signal(new Set<string>());
-  readonly desglosePorDia = signal<Record<string, any>>({});
-  readonly cargandoDia    = signal<Record<string, boolean>>({});
 
   private reporteSub: Subscription | null = null;
   private debounceTimer: any = null;
@@ -187,8 +182,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
           this.datos.set(d);
           this.cargando.set(false);
           this.refrescando.set(false);
-          this.diasExpandidos.set(new Set());
-          this.desglosePorDia.set({});
           afterNextRender(() => this.renderizarGraficos(), { injector: this.injector });
         },
         error: (e) => {
@@ -199,30 +192,8 @@ export class ReportesComponent implements OnInit, OnDestroy {
       });
   }
 
-  // ─── Desglose por día ───
-  toggleDia(d: any) {
-    if (!d.ventas) return;
-    const abierto = this.diasExpandidos().has(d.dia);
-    this.diasExpandidos.update(actual => {
-      const nuevo = new Set(actual);
-      if (abierto) nuevo.delete(d.dia); else nuevo.add(d.dia);
-      return nuevo;
-    });
-    if (abierto || this.desglosePorDia()[d.dia]) return;
-    this.cargandoDia.update(c => ({ ...c, [d.dia]: true }));
-    const listo = (r: any) => {
-      this.desglosePorDia.update(x => ({ ...x, [d.dia]: r }));
-      this.cargandoDia.update(c => ({ ...c, [d.dia]: false }));
-    };
-    this.reporteService.obtenerDesgloseDia(this.sucursalSeleccionada() ?? 0, d.dia).subscribe({
-      next: listo,
-      error: () => listo({ desglose: [] })
-    });
-  }
-
   // ─── Datos derivados ───
   readonly r     = computed(() => this.datos()?.resumen  || {});
-  readonly ant   = computed(() => this.datos()?.anterior || {});
   readonly todas = computed(() => this.sucursalSeleccionada() === null);
 
   readonly nombreSucursal = computed(() => {
@@ -239,16 +210,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
     return inicio === fin ? fechaLarga(inicio) : `${fechaCorta(inicio)} – ${fechaCorta(fin)} ${fin.slice(0, 4)}`;
   });
 
-  readonly textoPeriodoAnterior = computed(() => {
-    const [a, b] = this.datos()?.periodo_anterior || [];
-    if (!a) return '';
-    return a === b ? fechaCorta(a) : `${fechaCorta(a)} – ${fechaCorta(b)}`;
-  });
-
-  readonly vsIngresos = computed(() => variacion(this.r().ingresos_totales, this.ant().ingresos_totales));
-  readonly vsVentas   = computed(() => variacion(this.r().total_ventas, this.ant().total_ventas));
-  readonly vsTicket   = computed(() => variacion(this.r().ticket_promedio, this.ant().ticket_promedio));
-  readonly vsUnidades = computed(() => variacion(this.r().unidades, this.ant().unidades));
   readonly promedioDiario = computed(() => (this.r().ingresos_totales || 0) / Math.max(1, this.diasPeriodo()));
 
   readonly mejorDia = computed(() => {
@@ -266,10 +227,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
     return d.length ? d.reduce((a: any, b: any) => this.promedioDow(b) > this.promedioDow(a) ? b : a) : null;
   });
 
-  diaSemanaDe(dia: string): string {
-    return DIAS_SEMANA[(new Date(dia + 'T00:00:00').getDay() + 6) % 7].slice(0, 3).toLowerCase();
-  }
-
   promedioDow(d: any): number { return d.dias ? d.ingresos / d.dias : 0; }
 
   readonly productosVisibles = computed<any[]>(() => {
@@ -280,27 +237,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
   readonly turnosVisibles = computed<any[]>(() => {
     const t = this.datos()?.cierres || [];
     return this.verTodosTurnos() ? t : t.slice(0, 8);
-  });
-
-  /** Productos sin ventas agrupados por categoría */
-  readonly sinVentasPorCategoria = computed(() => {
-    const grupos = new Map<string, any[]>();
-    for (const p of this.datos()?.sin_ventas || []) {
-      if (!grupos.has(p.nombre_categoria)) grupos.set(p.nombre_categoria, []);
-      grupos.get(p.nombre_categoria)!.push(p);
-    }
-    return [...grupos].map(([categoria, productos]) => ({ categoria, productos }));
-  });
-
-  readonly resumenSinVentas = computed(() => {
-    const l = this.datos()?.sin_ventas || [];
-    const conStock = l.filter((p: any) => p.stock > 0);
-    return {
-      conStock: conStock.length,
-      unidades: conStock.reduce((s: number, p: any) => s + p.stock, 0),
-      valor:    conStock.reduce((s: number, p: any) => s + p.stock * p.precio, 0),
-      agotados: l.length - conStock.length
-    };
   });
 
   /** Promociones aplicadas y descuentos manuales del período */
@@ -316,20 +252,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
   readonly tasaCancelacion = computed(() => porcentaje(this.datos()?.pedidos_qr?.cancelados, this.datos()?.pedidos_qr?.total));
 
   colorSerie(i: number): string { return temaGrafico(this.ajustes).serie[i % 6]; }
-
-  claseDelta(v: number | null): string {
-    if (v === null || Math.abs(v) < 0.5) return 'igual';
-    return v > 0 ? 'sube' : 'baja';
-  }
-
-  iconoDelta(v: number | null) {
-    const c = this.claseDelta(v);
-    return c === 'sube' ? this.icons.sube : c === 'baja' ? this.icons.baja : this.icons.igual;
-  }
-
-  textoDelta(v: number | null): string {
-    return v === null ? 'sin base' : `${Math.abs(v).toFixed(1)} %`;
-  }
 
   // ─── Gráficos ───
   private renderizarGraficos() {
@@ -431,7 +353,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
     const nombre = this.ajustes.nombre();
     const mon = this.moneda();
     const m = (n: any) => `${mon} ${cifra(n).replace('−', '-')}`;
-    const delta = (v: number | null) => v === null ? '—' : `${v >= 0 ? '+' : '-'}${Math.abs(v).toFixed(1)} %`;
 
     // Encabezado: logo, nombre y una regla de color
     const logo = await this.ajustes.logoComoDataUri();
@@ -473,15 +394,13 @@ export class ReportesComponent implements OnInit, OnDestroy {
     };
 
     seccion('Resumen del período');
-    tabla(['Indicador', 'Período', `Anterior (${this.textoPeriodoAnterior()})`, 'Variación'], [
-      ['Ingresos', m(d.resumen.ingresos_totales), m(d.anterior.ingresos_totales), delta(this.vsIngresos())],
-      ['Ventas', entero(d.resumen.total_ventas), entero(d.anterior.total_ventas), delta(this.vsVentas())],
-      ['Ticket promedio', m(d.resumen.ticket_promedio), m(d.anterior.ticket_promedio), delta(this.vsTicket())],
-      ['Unidades vendidas', entero(d.resumen.unidades), entero(d.anterior.unidades), delta(this.vsUnidades())],
-      ['Promedio diario', m(this.promedioDiario()), '', ''],
-      ['Venta más alta', m(d.resumen.venta_maxima), '', ''],
-      ['Días con venta', `${d.resumen.dias_con_venta} de ${this.diasPeriodo()}`, '', '']
-    ], [1, 2, 3]);
+    tabla(['Indicador', 'Valor'], [
+      ['Ingresos', m(d.resumen.ingresos_totales)],
+      ['Ventas', entero(d.resumen.total_ventas)],
+      ['Ticket promedio', m(d.resumen.ticket_promedio)],
+      ['Unidades vendidas', entero(d.resumen.unidades)],
+      ['Venta más alta', m(d.resumen.venta_maxima)]
+    ], [1]);
 
     if (d.por_sucursal?.length) {
       seccion('Por sucursal');
@@ -508,9 +427,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
       tabla(['#', 'Producto', 'Categoría', 'Unidades', 'Ingresos', '%'],
         d.productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, p.unidades, m(p.ingresos), `${porcentaje(p.ingresos, d.resumen.ingresos_totales).toFixed(1)} %`]), [3, 4, 5]);
     }
-    seccion('Ventas por día');
-    tabla(['Fecha', 'Ventas', 'Ingresos'],
-      d.ventas_diarias.map((x: any) => [x.dia, x.ventas, m(x.ingresos)]), [1, 2]);
     if (d.cierres?.length) {
       seccion('Turnos de caja cerrados');
       tabla(['Cajero', 'Sucursal', 'Cierre', 'Ventas', 'Efectivo', 'Total', 'Diferencia'],
@@ -536,11 +452,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
           desc.manuales.map((x: any) => [fechaHora(x.fecha_venta), x.cajero, x.nombre_sucursal, x.motivo || '', m(x.descuento), m(x.cobrado)]), [4, 5]);
       }
     }
-    if (d.sin_ventas?.length) {
-      seccion('Productos activos sin ventas en el período');
-      tabla(['Producto', 'Categoría', 'Stock actual', 'Valor en stock'],
-        d.sin_ventas.map((p: any) => [p.nombre_producto, p.nombre_categoria, p.stock, m(p.stock * p.precio)]), [2, 3]);
-    }
 
     const total = doc.getNumberOfPages();
     for (let i = 1; i <= total; i++) {
@@ -565,7 +476,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
       XLSX.utils.book_append_sheet(wb, ws, nombre);
     };
     const pct = (a: number) => +porcentaje(a, d.resumen.ingresos_totales).toFixed(2);
-    const variacionExcel = (v: number | null) => v === null ? '' : +v.toFixed(2);
 
     hoja('Resumen', [
       [`INFORME DE VENTAS — ${this.ajustes.nombre()}`],
@@ -573,14 +483,12 @@ export class ReportesComponent implements OnInit, OnDestroy {
       ['Sucursal', this.nombreSucursal()],
       ['Categorías', this.nombresCategorias()],
       [],
-      ['Indicador', 'Período', 'Período anterior', 'Variación %'],
-      [`Ingresos (${mon})`, d.resumen.ingresos_totales, d.anterior.ingresos_totales, variacionExcel(this.vsIngresos())],
-      ['Ventas', d.resumen.total_ventas, d.anterior.total_ventas, variacionExcel(this.vsVentas())],
-      [`Ticket promedio (${mon})`, d.resumen.ticket_promedio, d.anterior.ticket_promedio, variacionExcel(this.vsTicket())],
-      ['Unidades', d.resumen.unidades, d.anterior.unidades, variacionExcel(this.vsUnidades())],
-      [`Promedio diario (${mon})`, +this.promedioDiario().toFixed(2)],
+      ['Indicador', 'Valor'],
+      [`Ingresos (${mon})`, d.resumen.ingresos_totales],
+      ['Ventas', d.resumen.total_ventas],
+      [`Ticket promedio (${mon})`, d.resumen.ticket_promedio],
+      ['Unidades', d.resumen.unidades],
       [`Venta más alta (${mon})`, d.resumen.venta_maxima],
-      ['Días con venta', d.resumen.dias_con_venta, `de ${this.diasPeriodo()}`],
       [],
       ['Inventario actual'],
       ['Productos', d.inventario.productos], ['Unidades en stock', d.inventario.unidades],
@@ -591,7 +499,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
       ['Recibidos', d.pedidos_qr.total], ['Atendidos', d.pedidos_qr.atendidos], ['Cancelados', d.pedidos_qr.cancelados],
       [`Monto (${mon})`, d.pedidos_qr.monto]
     ], [32, 22, 22, 14]);
-    hoja('Por día', [['Fecha', 'Ventas', `Ingresos (${mon})`], ...d.ventas_diarias.map((x: any) => [x.dia, x.ventas, x.ingresos])], [14, 10, 16]);
     if (d.por_sucursal?.length)
       hoja('Por sucursal', [['Sucursal', 'Ventas', `Ingresos (${mon})`, `Ticket (${mon})`, '%'], ...d.por_sucursal.map((s: any) => [s.nombre_sucursal, s.ventas, s.ingresos, s.ticket, pct(s.ingresos)])], [24, 10, 16, 14, 8]);
     hoja('Métodos de pago', [['Método', 'Ventas', `Ingresos (${mon})`, '%'], ...d.metodos_pago.map((x: any) => [x.metodo_pago, x.ventas, x.ingresos, pct(x.ingresos)])], [18, 10, 16, 8]);
@@ -602,8 +509,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
     hoja('Categorías', [['Categoría', 'Unidades', `Ingresos (${mon})`, '%'], ...d.por_categoria.map((c: any) => [c.nombre_categoria, c.unidades, c.ingresos, pct(c.ingresos)])], [24, 10, 16, 8]);
     hoja('Productos', [['#', 'Producto', 'Categoría', 'Unidades', `Ingresos (${mon})`, '%'],
       ...d.productos.map((p: any, i: number) => [i + 1, p.nombre_producto, p.nombre_categoria, p.unidades, p.ingresos, pct(p.ingresos)])], [5, 30, 20, 10, 16, 8]);
-    hoja('Sin ventas', [['Producto', 'Categoría', 'Stock actual', `Precio (${mon})`, `Valor en stock (${mon})`],
-      ...d.sin_ventas.map((p: any) => [p.nombre_producto, p.nombre_categoria, p.stock, p.precio, +(p.stock * p.precio).toFixed(2)])], [30, 20, 12, 12, 18]);
     hoja('Turnos de caja', [['Cajero', 'Sucursal', 'Apertura', 'Cierre', `Fondo inicial (${mon})`, 'Ventas', `Efectivo (${mon})`, `Total (${mon})`, `Esperado en caja (${mon})`, `Contado (${mon})`, `Diferencia (${mon})`],
       ...d.cierres.map((c: any) => [c.cajero, c.nombre_sucursal, fechaHora(c.fecha_hora_apertura), fechaHora(c.fecha_hora_cierre), c.monto_inicial, c.ventas, c.efectivo, c.total,
         c.efectivo_esperado ?? '', c.efectivo_contado ?? '', c.diferencia ?? ''])], [24, 18, 20, 20, 16, 8, 14, 14, 18, 14, 14]);

@@ -3,9 +3,8 @@
 // modulo: permiso que se exige (null = solo administrador).
 const GUIAS = {
     panel: { modulo: 'dashboard', titulo: 'Panel principal', resumen: 'resumen del día (ingresos, cobros, turnos abiertos, stock por reponer, lo más vendido).', texto: `
-Menú lateral → «Panel principal». Muestra el día en curso: ingresos de hoy comparados con ayer a la misma hora, ventas, ticket promedio, ritmo de ventas por hora, cobros por método (efectivo / QR), turnos de caja abiertos con el efectivo que debería haber, consumo por cobrar en mesas, pedidos del menú QR, alertas de stock («Stock por reponer», con enlace «Ver inventario»), lo más vendido hoy y las últimas ventas. Se actualiza solo.
-El administrador elige la sucursal (o «Todas») con el selector de sucursal de arriba. «Últimos 7 días vs. 7 anteriores» compara las ventas de la última semana con la semana previa. El ticket promedio es el ingreso por venta.
-«Promociones» muestra cuántas promociones están vigentes ahora y lo ahorrado con promociones y con descuentos manuales hoy.` },
+Menú lateral → «Panel principal». Muestra el día en curso: ingresos de hoy y, justo debajo, lo cobrado en efectivo y por QR; ventas, ticket promedio, ritmo de ventas por hora, cobros por método (efectivo / QR), turnos de caja abiertos con el efectivo que debería haber, consumo por cobrar en mesas, pedidos del menú QR, alertas de stock («Stock por reponer», con enlace «Ver inventario»), lo más vendido hoy y las últimas ventas. Se actualiza solo.
+El administrador elige la sucursal (o «Todas») con el selector de sucursal de arriba. El ticket promedio es el ingreso por venta. Las promociones vigentes se ven en el menú «Promociones».` },
 
     punto_venta: { modulo: 'punto_venta', titulo: 'Punto de venta', resumen: '«Abrir la caja del día» con el fondo inicial; vender tocando productos → «Cobrar venta» → método de pago → «Confirmar venta».', texto: `
 Menú lateral → «Punto de venta».
@@ -60,7 +59,7 @@ El cajero solo ve y mueve el stock de su sucursal.` },
 
     reportes: { modulo: 'reportes', titulo: 'Reportes (informes)', resumen: 'elegir período (y sucursal); exportar a PDF o Excel.', texto: `
 Menú lateral → «Reportes». Elige el período (fechas) y, si eres administrador, la sucursal; puedes filtrar por categorías.
-Incluye: ingresos del período comparados con el período anterior, ventas, ticket promedio, unidades, mejor día, venta más alta (en una sola venta), evolución diaria (abre un día para ver sus categorías), horas de mayor venta, promedio por día de la semana, comparativo de sucursales, cobros por método, desempeño por cajero, ventas por categoría, productos vendidos (y sin ventas), turnos cerrados con su arqueo, inventario actual y pedidos del menú QR.
+Incluye: ingresos del período, ventas, ticket promedio, unidades, mejor día, venta más alta (en una sola venta), evolución de los ingresos por día (gráfico), horas de mayor venta, promedio por día de la semana, comparativo de sucursales, cobros por método, desempeño por cajero, ventas por categoría, productos vendidos, turnos cerrados con su arqueo, inventario actual y pedidos del menú QR.
 Se puede exportar a PDF o Excel e imprimir.
 La sección «Promociones y descuentos» muestra lo ahorrado con promociones y con descuentos manuales, cada promoción con sus ventas, unidades, ahorro e ingresos, los descuentos manuales por cajero y los últimos descuentos con su motivo. También va en el PDF y en el Excel (hojas «Promociones» y «Descuentos manuales»).` },
 

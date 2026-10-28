@@ -86,33 +86,19 @@
         <div class="p-6 lg:border-r bloque-linea">
           <p class="inf-etiqueta">Ingresos del período</p>
           <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(r().ingresos_totales) }}</p>
-          <p class="inf-comparacion mt-3">
-            <span class="inf-delta" [ngClass]="claseDelta(vsIngresos())">
-              <lucide-icon [img]="iconoDelta(vsIngresos())" class="w-3 h-3"></lucide-icon>{{ textoDelta(vsIngresos()) }}
-            </span>
-            vs. {{ textoPeriodoAnterior() }} ({{ moneda() }} {{ cifra(ant().ingresos_totales) }})
-          </p>
         </div>
         <div class="inf-tira tira-resumen">
           <div>
             <p class="inf-etiqueta">Ventas</p>
             <p class="inf-valor">{{ entero(r().total_ventas) }}</p>
-            <p class="inf-sub"><span [ngClass]="'inf-' + claseDelta(vsVentas())">{{ textoDelta(vsVentas()) }}</span> vs. anterior</p>
           </div>
           <div>
             <p class="inf-etiqueta">Ticket promedio</p>
             <p class="inf-valor">{{ moneda() }} {{ cifra(r().ticket_promedio) }}</p>
-            <p class="inf-sub"><span [ngClass]="'inf-' + claseDelta(vsTicket())">{{ textoDelta(vsTicket()) }}</span> vs. anterior</p>
           </div>
           <div>
             <p class="inf-etiqueta">Unidades vendidas</p>
             <p class="inf-valor">{{ entero(r().unidades) }}</p>
-            <p class="inf-sub"><span [ngClass]="'inf-' + claseDelta(vsUnidades())">{{ textoDelta(vsUnidades()) }}</span> vs. anterior</p>
-          </div>
-          <div>
-            <p class="inf-etiqueta">Promedio diario</p>
-            <p class="inf-valor">{{ moneda() }} {{ cifra(promedioDiario()) }}</p>
-            <p class="inf-sub">{{ r().dias_con_venta }} de {{ diasPeriodo() }} días con ventas</p>
           </div>
           <div>
             <p class="inf-etiqueta">Mejor día</p>
@@ -287,44 +273,6 @@
       </section>
     </div>
 
-    <!-- Productos sin ventas -->
-    @if (datos().sin_ventas?.length) {
-      <section class="inf-hoja">
-        <button class="sin-ventas-cabecera" (click)="verSinVentas.set(!verSinVentas())" [attr.aria-expanded]="verSinVentas()">
-          <lucide-icon [img]="verSinVentas() ? icons.abajo : icons.derecha" class="w-4 h-4 inf-tenue"></lucide-icon>
-          <span class="flex-1 text-left">
-            <span class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))]">
-              {{ datos().sin_ventas.length }} {{ datos().sin_ventas.length === 1 ? 'producto activo no se vendió' : 'productos activos no se vendieron' }}
-            </span>
-            <span class="inf-sub block">
-              {{ resumenSinVentas().conStock }} con stock ({{ entero(resumenSinVentas().unidades) }} uds. · {{ moneda() }} {{ cifra(resumenSinVentas().valor) }} a precio de venta)
-              · {{ resumenSinVentas().agotados }} agotados
-            </span>
-          </span>
-          <span class="inf-enlace">{{ verSinVentas() ? 'Ocultar' : 'Ver detalle' }}</span>
-        </button>
-        @if (verSinVentas()) {
-          <div class="sin-ventas">
-            @for (g of sinVentasPorCategoria(); track g.categoria) {
-              <div class="sin-ventas-grupo">
-                <p class="sin-ventas-categoria">{{ g.categoria }} <span>{{ g.productos.length }}</span></p>
-                @for (p of g.productos; track p.nombre_producto) {
-                  <div class="sin-ventas-fila">
-                    <span class="truncate" [title]="p.nombre_producto">{{ p.nombre_producto }}</span>
-                    @if (p.stock > 0) {
-                      <span class="whitespace-nowrap"><b class="inf-tinta">{{ p.stock }}</b>&nbsp;<span class="inf-sutil">uds. · {{ moneda() }} {{ cifra(p.stock * p.precio) }}</span></span>
-                    } @else {
-                      <span class="inf-estado mal">Agotado</span>
-                    }
-                  </div>
-                }
-              </div>
-            }
-          </div>
-        }
-      </section>
-    }
-
     <!-- 06 Caja, inventario y menú QR -->
     <div class="grid lg:grid-cols-3 gap-5">
       <section class="inf-hoja lg:col-span-2 min-w-0">
@@ -473,61 +421,6 @@
       } @else {
         <p class="inf-vacio">Sin promociones ni descuentos en el período.</p>
       }
-    </section>
-
-    <!-- 07 Detalle por día -->
-    <section class="inf-hoja overflow-hidden">
-      <div class="px-5 pt-5">
-        <div class="inf-seccion mb-1!">
-          <span class="inf-indice">12</span><h2>Detalle por día</h2>
-        </div>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="inf-tabla">
-          <thead><tr><th class="w-8"></th><th>Fecha</th><th class="num">Ventas</th><th class="num">Ticket promedio</th><th class="num">Ingresos</th></tr></thead>
-          <tbody>
-            @for (d of datos().ventas_diarias; track d.dia) {
-              <tr (click)="toggleDia(d)" [class.dia-vacio]="!d.ventas" [class.dia-abierto]="diasExpandidos().has(d.dia)" class="dia">
-                <td>@if (d.ventas) { <lucide-icon [img]="diasExpandidos().has(d.dia) ? icons.abajo : icons.derecha" class="w-3.5 h-3.5 inf-tenue"></lucide-icon> }</td>
-                <td class="fuerte">{{ fechaCorta(d.dia) }} <span class="inf-tenue font-normal text-xs ml-1">{{ diaSemanaDe(d.dia) }}</span></td>
-                <td class="num">{{ d.ventas || '—' }}</td>
-                <td class="num">{{ d.ventas ? moneda() + ' ' + cifra(d.ingresos / d.ventas) : '—' }}</td>
-                <td class="num fuerte">{{ d.ventas ? moneda() + ' ' + cifra(d.ingresos) : '—' }}</td>
-              </tr>
-              @if (diasExpandidos().has(d.dia)) {
-                <tr class="desglose">
-                  <td></td>
-                  <td colspan="4">
-                    @if (cargandoDia()[d.dia]) {
-                      <div class="inf-esqueleto h-16 my-1"></div>
-                    } @else {
-                      @for (c of desglosePorDia()[d.dia]?.desglose; track c.id_categoria) {
-                        <div class="flex items-center gap-3 py-1 text-[length:calc(12.5px*var(--escala-texto))]">
-                          <span class="w-40 truncate">{{ c.nombre_categoria }}</span>
-                          <div class="inf-barra flex-1"><span [style.width.%]="c.porcentaje_dia"></span></div>
-                          <span class="inf-tenue w-16 text-right">{{ c.unidades }} uds.</span>
-                          <span class="w-12 text-right inf-tenue">{{ c.porcentaje_dia }} %</span>
-                          <span class="inf-tinta font-semibold w-28 text-right">{{ moneda() }} {{ cifra(c.ingresos) }}</span>
-                        </div>
-                      } @empty {
-                        <p class="inf-vacio">Sin desglose para este día.</p>
-                      }
-                    }
-                  </td>
-                </tr>
-              }
-            }
-          </tbody>
-          <tfoot>
-            <tr>
-              <td></td><td>Total del período</td>
-              <td class="num">{{ entero(r().total_ventas) }}</td>
-              <td class="num">{{ moneda() }} {{ cifra(r().ticket_promedio) }}</td>
-              <td class="num">{{ moneda() }} {{ cifra(r().ingresos_totales) }}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
     </section>
 
   </div>
