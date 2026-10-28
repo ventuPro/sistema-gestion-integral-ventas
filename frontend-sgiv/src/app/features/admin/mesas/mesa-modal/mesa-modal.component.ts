@@ -16,6 +16,7 @@ import { Cotizacion, DescuentoManual, PromocionService } from '../../../../core/
 import { SesionService } from '../../../../core/services/sesion.service';
 import { BarraCategoriasComponent } from '../../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria } from '../../../../core/utils/categorias';
+import { FondoModalDirective } from '../../../../core/directives/fondo-modal.directive';
 
 /** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
 export interface GrupoCuenta {
@@ -35,7 +36,7 @@ const totalPendiente = (items: any[]) =>
 @Component({
   selector: 'app-mesa-modal',
   standalone: true,
-  imports: [CommonModule, NgTemplateOutlet, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule,
+  imports: [FondoModalDirective, CommonModule, NgTemplateOutlet, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule,
             BarraCategoriasComponent],
   templateUrl: './mesa-modal.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css', './mesa-modal.component.css']

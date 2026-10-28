@@ -104,7 +104,7 @@
 
 <!-- ═══ CREAR / EDITAR ═══ -->
 @if (modalAbierto()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModal()">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModal()">
     <form class="inf-hoja ventana w-full max-w-2xl max-h-[92vh] flex flex-col" (ngSubmit)="guardar()" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <h3 class="inf-tinta font-semibold text-[15px]">{{ formulario().id_promocion ? 'Editar promoción' : 'Nueva promoción' }}</h3>

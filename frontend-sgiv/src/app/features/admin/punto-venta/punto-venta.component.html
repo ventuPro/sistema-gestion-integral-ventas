@@ -292,7 +292,7 @@
 
 <!-- ═══ DESCUENTO MANUAL ═══ -->
 @if (mostrarDescuento()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarDescuento()">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarDescuento()">
     <form class="inf-hoja ventana w-full max-w-sm" (ngSubmit)="aplicarDescuento()" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <h3 class="inf-tinta font-semibold text-[15px]">Descuento</h3>
@@ -335,7 +335,7 @@
 
 <!-- ═══ COBRO ═══ -->
 @if (mostrarModalCobro()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarModalCobro()">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModalCobro()">
     <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <h3 class="inf-tinta font-semibold text-[15px]">Cobrar venta</h3>
@@ -405,7 +405,7 @@
 
 <!-- ═══ COMPROBANTE ═══ -->
 @if (mostrarTicket()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarTicket()">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarTicket()">
     <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[90vh]" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <div>

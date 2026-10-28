@@ -5,6 +5,7 @@ import { LucideAngularModule, Plus, Pencil, Trash2, X } from 'lucide-angular';
 import { AjustesService, Propietario } from '../../../../core/services/ajustes.service';
 import { ConfirmacionComponent } from '../../../shared/confirmacion/confirmacion.component';
 import { DialogoService } from '../../../../core/services/dialogo.service';
+import { FondoModalDirective } from '../../../../core/directives/fondo-modal.directive';
 
 const VACIO: Propietario = {
   nombre_completo: '', ci: '', cargo: '', telefono: '', correo: '', porcentaje_participacion: 0
@@ -14,7 +15,7 @@ const VACIO: Propietario = {
 @Component({
   selector: 'app-ajustes-propietarios',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ConfirmacionComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ConfirmacionComponent],
   templateUrl: './ajustes-propietarios.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css',
               '../../../shared/formulario/formulario.css', '../ajustes.css']

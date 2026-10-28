@@ -205,7 +205,7 @@
 
 <!-- Confirmación del cierre -->
 @if (mostrarConfirmCierre()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="mostrarConfirmCierre.set(false)">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="mostrarConfirmCierre.set(false)">
     <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <h3 class="inf-tinta font-semibold text-[15px]">¿Cerrar la caja?</h3>

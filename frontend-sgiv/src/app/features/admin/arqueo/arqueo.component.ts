@@ -6,6 +6,7 @@ import { CajaService } from '../../../core/services/caja.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { cifra, entero, porcentaje, fechaLarga, fechaHora, hora, temaGrafico } from '../../../core/utils/informe';
 import { SesionService } from '../../../core/services/sesion.service';
+import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 
 // Billetes y monedas en circulación (boliviano)
 const DENOMINACIONES = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1];
@@ -13,7 +14,7 @@ const DENOMINACIONES = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1];
 @Component({
   selector: 'app-arqueo',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule],
   templateUrl: './arqueo.component.html',
   styleUrls: ['../../shared/informe/informe.css', './arqueo.component.css']
 })

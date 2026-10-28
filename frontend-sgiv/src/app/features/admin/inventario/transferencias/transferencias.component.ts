@@ -11,6 +11,7 @@ import { AjustesService } from '../../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../../core/services/impresion.service';
 import { ComprobanteTransferenciaComponent } from '../../../shared/ticket/comprobante-transferencia.component';
 import { environment } from '../../../../../environments/environment';
+import { FondoModalDirective } from '../../../../core/directives/fondo-modal.directive';
 
 interface Linea { id_producto: number; nombre_producto: string; disponible: number; cantidad: number }
 
@@ -18,7 +19,7 @@ interface Linea { id_producto: number; nombre_producto: string; disponible: numb
 @Component({
   selector: 'app-transferencias',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ComprobanteTransferenciaComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ComprobanteTransferenciaComponent],
   templateUrl: './transferencias.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css',
               '../../../shared/formulario/formulario.css', './transferencias.component.css']

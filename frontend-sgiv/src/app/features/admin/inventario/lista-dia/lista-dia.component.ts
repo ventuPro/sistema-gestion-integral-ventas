@@ -10,12 +10,13 @@ import { ImpresionService } from '../../../../core/services/impresion.service';
 import { SesionService } from '../../../../core/services/sesion.service';
 import { fechaLarga, hora } from '../../../../core/utils/informe';
 import { GrupoListaDia, TicketListaDiaComponent } from '../../../shared/ticket/ticket-lista-dia.component';
+import { FondoModalDirective } from '../../../../core/directives/fondo-modal.directive';
 
 // ─── Inventario → «Lista del día anterior»: ticket, PDF o Excel por categorías ───
 @Component({
   selector: 'app-lista-dia',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, TicketListaDiaComponent],
+  imports: [FondoModalDirective, CommonModule, LucideAngularModule, TicketListaDiaComponent],
   templateUrl: './lista-dia.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css', './lista-dia.component.css']
 })

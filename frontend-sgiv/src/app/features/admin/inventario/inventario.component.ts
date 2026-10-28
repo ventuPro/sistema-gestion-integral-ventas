@@ -21,13 +21,14 @@ import { TransferenciasComponent } from './transferencias/transferencias.compone
 import { ListaDiaComponent } from './lista-dia/lista-dia.component';
 import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria } from '../../../core/utils/categorias';
+import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 
 type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe, TransferenciasComponent,
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe, TransferenciasComponent,
             ListaDiaComponent, BarraCategoriasComponent],
   templateUrl: './inventario.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',

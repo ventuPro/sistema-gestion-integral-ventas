@@ -16,11 +16,12 @@ import { sondeo } from '../../../core/utils/sondeo';
 import { cifra, fechaLarga } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
+import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 
 @Component({
   selector: 'app-mesas',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, MesaModalComponent, LucideAngularModule],
+  imports: [FondoModalDirective, CommonModule, FormsModule, RouterLink, MesaModalComponent, LucideAngularModule],
   templateUrl: './mesas.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './mesas.component.css']
 })

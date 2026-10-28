@@ -22,11 +22,12 @@ import { METODO_PAGO, MetodoPago } from '../../../core/utils/metodos-pago';
 import { SesionService } from '../../../core/services/sesion.service';
 import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria } from '../../../core/utils/categorias';
+import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent, BarraCategoriasComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent, BarraCategoriasComponent],
   templateUrl: './punto-venta.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './punto-venta.component.css']
 })

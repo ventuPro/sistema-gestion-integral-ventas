@@ -11,6 +11,7 @@ import { LucideAngularModule,
          UserCheck, UserX, X, Plus, Search } from 'lucide-angular';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService, ROL } from '../../../core/services/sesion.service';
+import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 
 interface Confirmacion {
   titulo:  string;
@@ -24,7 +25,7 @@ interface Confirmacion {
 @Component({
   selector: 'app-usuarios',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ConfirmacionComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ConfirmacionComponent],
   templateUrl: './usuarios.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './usuarios.component.css']

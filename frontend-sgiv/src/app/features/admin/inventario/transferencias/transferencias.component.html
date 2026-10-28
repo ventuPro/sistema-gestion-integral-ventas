@@ -56,7 +56,7 @@
 
 <!-- ═══ NUEVA TRANSFERENCIA ═══ -->
 @if (nueva()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="cerrarNueva()">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarNueva()">
     <div class="inf-hoja ventana w-full max-w-lg max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <h3 class="inf-tinta font-semibold text-[15px]">Nueva transferencia</h3>
@@ -133,7 +133,7 @@
 
 <!-- ═══ DETALLE Y COMPROBANTE ═══ -->
 @if (detalle(); as t) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (click)="detalle.set(null)">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="detalle.set(null)">
     <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[85vh]" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <div>

@@ -5,6 +5,7 @@ import { LucideAngularModule, Plus, Pencil, X, MapPin, Phone, Clock, Copy } from
 import { SucursalService } from '../../../../core/services/sucursal.service';
 import { ConfirmacionComponent } from '../../../shared/confirmacion/confirmacion.component';
 import { DialogoService } from '../../../../core/services/dialogo.service';
+import { FondoModalDirective } from '../../../../core/directives/fondo-modal.directive';
 
 interface DiaHorario { dia_semana: number; abierto: boolean; hora_apertura: string; hora_cierre: string }
 
@@ -15,7 +16,7 @@ const DIAS_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 @Component({
   selector: 'app-ajustes-sucursales',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ConfirmacionComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ConfirmacionComponent],
   templateUrl: './ajustes-sucursales.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css',
               '../../../shared/formulario/formulario.css', '../ajustes.css', './ajustes-sucursales.component.css']

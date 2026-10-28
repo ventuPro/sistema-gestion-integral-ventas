@@ -22,9 +22,7 @@
   </div>
 </ng-template>
 
-<div #bd class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal"
-     (mousedown)="bd.setAttribute('data-md', $event.target === bd ? '1' : '0')"
-     (mouseup)="bd.getAttribute('data-md') === '1' && $event.target === bd && cerrarModal(); bd.setAttribute('data-md','0')">
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModal()">
 
   <div class="inf-hoja ventana w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden relative">
 
@@ -171,7 +169,7 @@
 
     <!-- Cobro -->
     @if (vista() === 'pago') {
-      <div class="absolute inset-0 z-10 flex items-center justify-center p-4 fondo-modal" (click)="vista.set('comanda')">
+      <div class="absolute inset-0 z-10 flex items-center justify-center p-4 fondo-modal" (fondoModal)="vista.set('comanda')">
         <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
           <div class="flex items-center justify-between px-5 py-4 separador-inferior">
             <h3 class="inf-tinta font-semibold text-[15px]">Cobrar · {{ parteCobro()?.nombre ?? 'Mesa ' + mesa?.numero_mesa }}</h3>

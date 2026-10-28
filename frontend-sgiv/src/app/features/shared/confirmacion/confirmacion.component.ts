@@ -1,12 +1,14 @@
 import { Component, input, output } from '@angular/core';
+import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 
 // ─── Diálogo de confirmación (reemplaza a confirm()) ───
 @Component({
   selector: 'app-confirmacion',
   standalone: true,
+  imports: [FondoModalDirective],
   styleUrls: ['../informe/informe.css', '../venta/venta.css', '../formulario/formulario.css'],
   template: `
-    <div class="fixed inset-0 z-[70] flex items-center justify-center p-4 fondo-modal" (click)="cancelar.emit()">
+    <div class="fixed inset-0 z-[70] flex items-center justify-center p-4 fondo-modal" (fondoModal)="cancelar.emit()">
       <div class="inf-hoja ventana w-full max-w-sm" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
         <div class="p-5">
           <h3 class="inf-tinta font-semibold text-[15px]">{{ titulo() }}</h3>

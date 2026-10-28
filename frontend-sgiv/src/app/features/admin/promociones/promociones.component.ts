@@ -13,6 +13,7 @@ import { SelectorSucursalComponent } from '../../shared/selector-sucursal/select
 import { cifra, entero, fechaCorta } from '../../../core/utils/informe';
 import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria } from '../../../core/utils/categorias';
+import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 
 type Filtro = 'vigentes' | 'activas' | 'inactivas' | 'todas';
 
@@ -31,7 +32,7 @@ const hoyISO = (dias = 0) => {
 @Component({
   selector: 'app-promociones',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, BarraCategoriasComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, BarraCategoriasComponent],
   templateUrl: './promociones.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './promociones.component.css']
