@@ -59,17 +59,6 @@ export class UsuariosComponent implements OnInit {
   readonly busqueda     = signal('');
   readonly filtroEstado = signal<'todos' | 'activos' | 'inactivos'>('activos');
 
-  readonly resumen = computed(() => {
-    const activos = this.listaUsuarios().filter(u => u.estado_activo);
-    const cajeros = activos.filter(u => +u.id_rol === ROL.cajero);
-    return {
-      activos:       activos.length,
-      admins:        activos.filter(u => +u.id_rol === ROL.administrador).length,
-      cajeros:       cajeros.length,
-      cajasAbiertas: cajeros.filter(u => u.caja_habilitada).length
-    };
-  });
-
   readonly usuariosFiltrados = computed(() => {
     const texto = this.busqueda().trim().toLowerCase(), estado = this.filtroEstado();
     return this.listaUsuarios().filter(u =>

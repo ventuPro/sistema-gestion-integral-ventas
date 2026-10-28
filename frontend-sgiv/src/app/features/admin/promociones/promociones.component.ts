@@ -77,16 +77,6 @@ export class PromocionesComponent implements OnInit {
       (!texto || p.nombre.toLowerCase().includes(texto)));
   });
 
-  readonly resumen = computed(() => {
-    const hoy = hoyISO(), lista = this.promociones();
-    return {
-      vigentes:    lista.filter(p => p.vigente).length,
-      programadas: lista.filter(p => p.estado_activo && !p.vigente && p.fecha_fin >= hoy).length,
-      usos:        lista.reduce((s, p) => s + (p.usos || 0), 0),
-      ahorro:      lista.reduce((s, p) => s + (p.ahorro || 0), 0)
-    };
-  });
-
   // ─── Formulario: se reemplaza con set(); el template edita los campos simples del objeto actual ───
   readonly modalAbierto    = signal(false);
   readonly formulario      = signal<Promocion>(this.vacia());

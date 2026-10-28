@@ -36,13 +36,12 @@ export class CierresCajaComponent implements OnInit {
   });
 
   readonly totales = computed(() => {
-    const t = { ventas: 0, total: 0, efectivo: 0, qr: 0, diferencia: 0, contados: 0 };
+    const t = { ventas: 0, total: 0, efectivo: 0, qr: 0 };
     for (const c of this.cierresFiltrados()) {
       t.ventas   += Number(c.total_ventas);
       t.total    += Number(c.total_recaudado);
       t.efectivo += Number(c.total_efectivo);
       t.qr       += Number(c.total_qr);
-      if (c.diferencia !== null) { t.diferencia += Number(c.diferencia); t.contados++; }
     }
     return t;
   });

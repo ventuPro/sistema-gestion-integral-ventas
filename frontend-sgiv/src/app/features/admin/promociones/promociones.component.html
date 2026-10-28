@@ -18,25 +18,6 @@
                            (cambio)="cambiarSucursal($event)" />
   }
 
-  <section class="inf-hoja inf-tira overflow-hidden">
-    <div>
-      <p class="inf-etiqueta">Vigentes ahora</p>
-      <p class="inf-valor" [class.inf-sube]="resumen().vigentes > 0">{{ resumen().vigentes }}</p>
-    </div>
-    <div>
-      <p class="inf-etiqueta">Programadas</p>
-      <p class="inf-valor">{{ resumen().programadas }}</p>
-    </div>
-    <div>
-      <p class="inf-etiqueta">Ventas con promoción</p>
-      <p class="inf-valor">{{ entero(resumen().usos) }}</p>
-    </div>
-    <div>
-      <p class="inf-etiqueta">Ahorro otorgado</p>
-      <p class="inf-valor">{{ moneda() }} {{ cifra(resumen().ahorro) }}</p>
-    </div>
-  </section>
-
   <section class="inf-hoja overflow-hidden">
     <div class="p-4 pb-3 separador-inferior flex flex-wrap items-center gap-3">
       <div class="buscador flex-1 min-w-[220px]">

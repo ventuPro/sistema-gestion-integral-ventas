@@ -63,7 +63,7 @@ Se puede exportar a PDF o Excel e imprimir.
 La sección «Promociones y descuentos» muestra lo ahorrado con promociones y con descuentos manuales, cada promoción con sus ventas, unidades, ahorro e ingresos, los descuentos manuales por cajero y los últimos descuentos con su motivo. También va en el PDF y en el Excel (hojas «Promociones» y «Descuentos manuales»).` },
 
     promociones: { modulo: 'promociones', titulo: 'Promociones', resumen: '«Nueva promoción»: nombre, tipo (Porcentaje, Precio especial, Lleva N paga M, Combo), productos o categorías, fechas, días y horario; activar/desactivar.', texto: `
-Menú lateral → «Promociones» (el administrador da este permiso en Usuarios → «Permisos de acceso»). Arriba: «Vigentes ahora», «Programadas», «Ventas con promoción» y «Ahorro otorgado». Filtros: Vigentes ahora, Activas, Inactivas, Todas.
+Menú lateral → «Promociones» (el administrador da este permiso en Usuarios → «Permisos de acceso»). Filtros: Vigentes ahora, Activas, Inactivas, Todas.
 «Nueva promoción»: «Nombre» y «Tipo»:
 - Porcentaje: descuento en % sobre productos o categorías (por ejemplo −20 % en toda la categoría Tortas).
 - Precio especial: un precio por unidad más bajo que el normal, para productos (por ejemplo cuñapé a 2 Bs.).
@@ -78,7 +78,7 @@ Menú lateral → «Usuarios». «Nuevo usuario»: nombre completo, correo, cont
 En cada usuario: editar (la contraseña no se cambia ahí: se cambia con el botón de la llave de la lista), «Cambiar contraseña», activar o desactivar (un usuario inactivo no puede entrar), habilitar su caja y ajustar «Permisos de acceso» por módulo (Panel, Punto de venta, Mesas, Arqueo, Inventario, Reportes, Usuarios). Los permisos nuevos se aplican al instante en la sesión abierta del usuario: su menú cambia y, si estaba en una pantalla que ya no puede ver, sale de ella.` },
 
     cierres: { modulo: null, titulo: 'Cierres de caja (administrador)', resumen: 'turnos cerrados y resultado del arqueo.', texto: `
-Menú lateral → «Cierres de caja». Lista los turnos cerrados con cajero, ventas, total, efectivo y el resultado del arqueo («Cuadra», sobrante o faltante, o «sin conteo» si el cajero no contó el efectivo). Los turnos que cerró el sistema a las 00:00 (porque nadie cerró la caja) dicen «Cerrado por el sistema»; los que cerró el administrador desde Usuarios, «Cerrado por el administrador». Arriba muestra el total recaudado en todos los turnos, lo cobrado en efectivo y QR y las diferencias de arqueo.` },
+Menú lateral → «Cierres de caja». Lista los turnos cerrados con cajero, ventas, total, efectivo y el resultado del arqueo («Cuadra», sobrante o faltante, o «sin conteo» si el cajero no contó el efectivo). Los turnos que cerró el sistema a las 00:00 (porque nadie cerró la caja) dicen «Cerrado por el sistema»; los que cerró el administrador desde Usuarios, «Cerrado por el administrador». Al final de la tabla va la fila de totales (ventas, efectivo, QR y total).` },
 
     ajustes: { modulo: null, titulo: 'Ajustes (administrador)', resumen: 'pestañas Empresa, Apariencia, Propietarios, Sucursales, Parámetros y Chatbot.', texto: `
 Menú lateral → «Ajustes». Pestañas:

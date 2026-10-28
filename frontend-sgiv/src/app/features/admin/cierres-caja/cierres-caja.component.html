@@ -16,32 +16,8 @@
   </header>
 
   @if (cargando()) {
-    <div class="space-y-5"><div class="inf-esqueleto h-24"></div><div class="inf-esqueleto h-72"></div></div>
+    <div class="inf-esqueleto h-72"></div>
   } @else {
-
-    <section class="inf-hoja inf-tira overflow-hidden">
-      <div>
-        <p class="inf-etiqueta">Turnos cerrados</p>
-        <p class="inf-valor">{{ entero(cierresFiltrados().length) }}</p>
-        <p class="inf-sub">{{ entero(totales().ventas) }} ventas</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Total recaudado</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(totales().total) }}</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Efectivo</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(totales().efectivo) }}</p>
-        <p class="inf-sub">QR {{ moneda() }} {{ cifra(totales().qr) }}</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Diferencias de arqueo</p>
-        <p class="inf-valor" [ngClass]="totales().diferencia < 0 ? 'inf-baja' : totales().diferencia > 0 ? 'inf-aviso' : ''">
-          {{ totales().contados ? moneda() + ' ' + cifra(totales().diferencia) : '—' }}
-        </p>
-        <p class="inf-sub">{{ totales().contados }} de {{ cierresFiltrados().length }} turnos contados</p>
-      </div>
-    </section>
 
     <section class="inf-hoja overflow-hidden">
       @if (cierresFiltrados().length) {

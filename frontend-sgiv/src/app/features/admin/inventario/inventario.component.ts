@@ -102,16 +102,6 @@ export class InventarioComponent implements OnInit, OnDestroy {
     });
   });
 
-  readonly resumen = computed(() => {
-    const activos = this.productos().filter(p => p.estado_activo);
-    return {
-      activos:  activos.length,
-      bajos:    activos.filter(p => this.estadoStock(p) === 'bajo').length,
-      agotados: activos.filter(p => this.estadoStock(p) === 'sin').length,
-      valor:    activos.reduce((t, p) => t + Number(p.precio_unitario) * Math.max(Number(p.stock_actual) || 0, 0), 0)
-    };
-  });
-
   /** Por categoría en el orden del menú; en cada una, primero los que tienen stock */
   readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados()));
   readonly barra = computed(() => this.secciones().map(s => ({ id: s.id, nombre: s.nombre, icono: s.icono, cantidad: s.productos.length })));

@@ -30,25 +30,6 @@
                          [soloLectura]="sucursales().length <= 1"
                          (cambio)="cambiarSucursal($event)" />
 
-  <section class="inf-hoja inf-tira overflow-hidden">
-    <div>
-      <p class="inf-etiqueta">Productos activos</p>
-      <p class="inf-valor">{{ resumen().activos }}</p>
-    </div>
-    <div>
-      <p class="inf-etiqueta">Stock bajo</p>
-      <p class="inf-valor" [class.inf-aviso]="resumen().bajos > 0">{{ resumen().bajos }}</p>
-    </div>
-    <div>
-      <p class="inf-etiqueta">Sin stock</p>
-      <p class="inf-valor" [class.inf-baja]="resumen().agotados > 0">{{ resumen().agotados }}</p>
-    </div>
-    <div>
-      <p class="inf-etiqueta">Valor en stock</p>
-      <p class="inf-valor">{{ moneda() }} {{ cifra(resumen().valor) }}</p>
-    </div>
-  </section>
-
   <nav class="inf-pestanas separador-inferior">
     <button [class.activa]="vista() === 'productos'" (click)="vista.set('productos')">Productos</button>
     <button [class.activa]="vista() === 'movimientos'" (click)="verMovimientos()">Movimientos</button>

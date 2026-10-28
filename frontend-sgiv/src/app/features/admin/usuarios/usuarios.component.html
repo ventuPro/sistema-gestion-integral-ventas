@@ -10,21 +10,6 @@
     </button>
   </header>
 
-  <section class="inf-hoja inf-tira overflow-hidden">
-    <div>
-      <p class="inf-etiqueta">Usuarios activos</p>
-      <p class="inf-valor">{{ resumen().activos }} <span class="inf-tenue text-sm font-normal">de {{ listaUsuarios().length }}</span></p>
-    </div>
-    <div>
-      <p class="inf-etiqueta">Administradores</p>
-      <p class="inf-valor">{{ resumen().admins }}</p>
-    </div>
-    <div>
-      <p class="inf-etiqueta">Cajeros con caja habilitada</p>
-      <p class="inf-valor">{{ resumen().cajasAbiertas }} <span class="inf-tenue text-sm font-normal">de {{ resumen().cajeros }}</span></p>
-    </div>
-  </section>
-
   <section class="inf-hoja overflow-hidden">
     <div class="p-4 separador-inferior flex flex-wrap items-center gap-3">
       <div class="buscador flex-1 min-w-[220px]">
