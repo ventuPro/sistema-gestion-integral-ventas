@@ -103,7 +103,7 @@
                   <span class="inf-estado habilitada mt-2">Habilitada</span>
                 }
               </button>
-              @if (!mesa.id_cuenta) {
+              @if (!mesa.id_cuenta && (mesa.estado_mesa === 'Ocupada' || ajustes.config().menu_qr_visita)) {
                 <div class="acciones-mesa">
                   @if (mesa.estado_mesa === 'Ocupada') {
                     <button class="inf-boton" (click)="liberar(mesa)" [disabled]="procesandoMesa() === mesa.id_mesa">
@@ -116,6 +116,7 @@
                       </button>
                     }
                   } @else {
+                    <!-- Habilitar solo con el QR temporal impreso: imprime el ticket de la visita -->
                     <button class="inf-boton" (click)="habilitar(mesa)" [disabled]="procesandoMesa() === mesa.id_mesa">
                       <lucide-icon [img]="icons.habilitar" class="w-3.5 h-3.5"></lucide-icon> Habilitar
                     </button>

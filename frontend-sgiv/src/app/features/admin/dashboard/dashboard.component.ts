@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
-         Landmark, LogOut, Building2, RefreshCw,
+         Landmark, LogOut, Building2,
          Settings, Menu, X, Bell, BadgePercent } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
@@ -55,7 +55,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   /** Cache reactivo de permisos — se actualiza con permisos$ del service */
   readonly permisosActuales   = signal<Record<string, boolean>>({});
-  readonly recargandoPermisos = signal(false);
 
   private subPermisos?: Subscription;
   private subRuta?: Subscription;
@@ -82,7 +81,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     pedidos:    Bell,
     cerrar:     X,
     sucursal:   Building2,
-    refresh:    RefreshCw,
     ajustes:    Settings,
     promociones: BadgePercent
   };
@@ -205,22 +203,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const ruta = this.router.url.split(/[/?#]/)[2];
     const enlace = this.secciones().flatMap(s => s.enlaces).find(e => e.ruta === ruta);
     if (enlace?.modulo && !this.tiene(enlace.modulo)) this.router.navigate(['/dashboard/sin-acceso']);
-  }
-
-  /** Botón manual de recarga (cajero) */
-  recargarPermisos() {
-    if (this.recargandoPermisos()) return;
-    this.recargandoPermisos.set(true);
-    this.permisoService.recargarPermisos().subscribe({
-      next: () => {
-        this.recargandoPermisos.set(false);
-        this.dialogo.avisar('Permisos actualizados.');
-      },
-      error: () => {
-        this.recargandoPermisos.set(false);
-        this.dialogo.error('No se pudieron recargar los permisos.');
-      }
-    });
   }
 
   cerrarSesion() {

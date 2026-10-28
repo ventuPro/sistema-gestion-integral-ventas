@@ -127,8 +127,7 @@ export class PermisoService {
 
   /**
    * Recarga los permisos del servidor. Si cambiaron respecto al cache, los
-   * actualiza y emite por permisos$. Devuelve un Observable que el cajero
-   * puede usar para refrescar manualmente con un botón.
+   * actualiza y emite por permisos$. Lo usa escucharCambios() al llegar un aviso del servidor.
    */
   recargarPermisos(): Observable<Record<string, boolean>> {
     return new Observable(observer => {
