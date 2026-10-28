@@ -206,6 +206,69 @@ const quitarProductoCuenta = async (id_detalle_cuenta, id_usuario = null) => {
     }
 };
 
+// ─── CAMBIAR LA CANTIDAD DE UN PRODUCTO DE LA COMANDA (reserva o devuelve la diferencia) ───
+const cambiarCantidadDetalle = async (id_detalle_cuenta, cantidad, id_usuario = null) => {
+    cantidad = Number(cantidad);
+    if (!Number.isInteger(cantidad) || cantidad <= 0 || cantidad > 100000) throw new Error('CANTIDAD_INVALIDA');
+
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const rDet = await client.query(`
+            SELECT dc.id_cuenta, dc.id_producto, dc.cantidad, dc.precio_unitario, dc.id_venta,
+                   ml.id_sucursal, cm.id_mesa, ml.numero_mesa
+            FROM detalle_cuenta dc
+            JOIN cuenta_mesa cm ON dc.id_cuenta = cm.id_cuenta
+            JOIN mesa_local  ml ON cm.id_mesa   = ml.id_mesa
+            WHERE dc.id_detalle_cuenta = $1 AND cm.estado = 'Abierta'
+            FOR UPDATE OF dc
+        `, [id_detalle_cuenta]);
+        if (rDet.rows.length === 0) throw new Error('DETALLE_NO_ENCONTRADO');
+        const det = rDet.rows[0];
+        if (det.id_venta) throw new Error('DETALLE_PAGADO');
+
+        const diferencia = cantidad - Number(det.cantidad);
+        let nuevo_stock = null;
+        if (diferencia !== 0) {
+            const rInv = await client.query(`
+                SELECT id_inventario, cantidad_actual FROM inventario_sucursal
+                WHERE id_sucursal = $1 AND id_producto = $2 FOR UPDATE
+            `, [det.id_sucursal, det.id_producto]);
+            if (rInv.rows.length === 0) throw new Error('PRODUCTO_SIN_INVENTARIO');
+            const disponible = Number(rInv.rows[0].cantidad_actual);
+            if (diferencia > disponible)
+                throw Object.assign(new Error('STOCK_INSUFICIENTE'), { disponible: disponible + Number(det.cantidad) });
+
+            nuevo_stock = Number((await client.query(
+                `UPDATE inventario_sucursal SET cantidad_actual = cantidad_actual - $1
+                 WHERE id_inventario = $2 RETURNING cantidad_actual`,
+                [diferencia, rInv.rows[0].id_inventario]
+            )).rows[0].cantidad_actual);
+            await registrarHistorial(client, {
+                id_inventario: rInv.rows[0].id_inventario, id_usuario,
+                tipo: diferencia > 0 ? 'SALIDA' : 'INGRESO', cantidad: Math.abs(diferencia),
+                motivo: diferencia > 0 ? 'Cuenta de mesa' : 'Devuelto de cuenta de mesa',
+                detalle: `Mesa ${det.numero_mesa}`, stock_resultante: nuevo_stock
+            });
+
+            await client.query(
+                `UPDATE detalle_cuenta SET cantidad = $1::int, subtotal = $1::int * precio_unitario WHERE id_detalle_cuenta = $2`,
+                [cantidad, id_detalle_cuenta]
+            );
+            await recalcularTotal(client, det.id_cuenta);
+        }
+
+        await client.query('COMMIT');
+        return { id_cuenta: det.id_cuenta, id_producto: det.id_producto, nuevo_stock,
+                 id_sucursal: det.id_sucursal, id_mesa: det.id_mesa };
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+};
+
 // ─── DEVOLVER STOCK DE TODOS LOS ITEMS DE UNA CUENTA (cancelaciones) ───
 const devolverStockCuenta = async (client, id_cuenta, id_usuario = null) => {
     const rItems = await client.query(`
@@ -391,6 +454,6 @@ const obtenerMesasConCuenta = async (id_sucursal) => {
 
 module.exports = {
     abrirCuenta, obtenerCuentaActiva, agregarProductoCuenta,
-    quitarProductoCuenta, devolverStockCuenta, cerrarCuenta,
+    quitarProductoCuenta, cambiarCantidadDetalle, devolverStockCuenta, cerrarCuenta,
     obtenerMesasConCuenta, cotizarCuenta
 };

@@ -65,7 +65,7 @@ const agregarProducto = async (req, res) => {
             nueva_cantidad_disponible: resultado.nuevo_stock
         });
 
-        res.status(201).json({ detalle: resultado.detalle, total: cuentaActualizada?.total_acumulado });
+        res.status(201).json({ detalle: resultado.detalle, total: cuentaActualizada?.total_acumulado, stock: resultado.nuevo_stock });
     } catch(e) {
         console.error('agregarProducto:', e.message);
         if (e.message === 'STOCK_INSUFICIENTE')
@@ -101,7 +101,7 @@ const quitarProducto = async (req, res) => {
             });
         }
 
-        res.json({ mensaje: 'Producto eliminado', total: cuentaActualizada?.total_acumulado });
+        res.json({ mensaje: 'Producto eliminado', total: cuentaActualizada?.total_acumulado, stock: resultado.nuevo_stock });
     } catch(e) {
         if (e.message === 'DETALLE_NO_ENCONTRADO')
             return res.status(404).json({ error: 'El producto ya no está en la cuenta' });
@@ -109,6 +109,42 @@ const quitarProducto = async (req, res) => {
             return res.status(409).json({ error: 'Ese producto ya fue pagado: no se puede quitar' });
         console.error('quitarProducto:', e);
         res.status(500).json({ error: 'Error al quitar producto' });
+    }
+};
+
+// PATCH /api/cuentas/detalle/:id_detalle { cantidad }
+const cambiarCantidad = async (req, res) => {
+    try {
+        const r = await cuentaModel.cambiarCantidadDetalle(Number(req.params.id_detalle), req.body?.cantidad, req.usuario.id_usuario);
+        const cuentaActualizada = await cuentaModel.obtenerCuentaActiva(r.id_mesa);
+
+        io()?.to('cajeros').emit('cuenta:producto_agregado', {
+            id_cuenta:       r.id_cuenta,
+            id_mesa:         cuentaActualizada?.id_mesa,
+            total_acumulado: cuentaActualizada?.total_acumulado
+        });
+        emitirMesa(r.id_mesa, 'cuenta:actualizada', {});
+        if (r.nuevo_stock != null) {
+            io()?.emit('actualizacion_stock_global', {
+                id_producto:               r.id_producto,
+                id_sucursal:               r.id_sucursal,
+                nueva_cantidad_disponible: r.nuevo_stock
+            });
+        }
+        res.json({ total: cuentaActualizada?.total_acumulado, stock: r.nuevo_stock });
+    } catch (e) {
+        if (e.message === 'CANTIDAD_INVALIDA')
+            return res.status(400).json({ error: 'La cantidad debe ser un entero mayor a 0' });
+        if (e.message === 'STOCK_INSUFICIENTE')
+            return res.status(409).json({ error: `Solo hay ${e.disponible} disponibles`, disponible: e.disponible });
+        if (e.message === 'DETALLE_NO_ENCONTRADO')
+            return res.status(404).json({ error: 'El producto ya no está en la cuenta' });
+        if (e.message === 'DETALLE_PAGADO')
+            return res.status(409).json({ error: 'Ese producto ya fue pagado: no se puede cambiar' });
+        if (e.message === 'PRODUCTO_SIN_INVENTARIO')
+            return res.status(404).json({ error: 'El producto no está en el inventario de la sucursal' });
+        console.error('cambiarCantidad:', e);
+        res.status(500).json({ error: 'Error al cambiar la cantidad' });
     }
 };
 
@@ -195,4 +231,4 @@ const getMesasConCuenta = async (req, res) => {
     }
 };
 
-module.exports = { abrirCuenta, getCuentaActiva, agregarProducto, quitarProducto, cerrarCuenta, getMesasConCuenta, cotizarCuenta };
+module.exports = { abrirCuenta, getCuentaActiva, agregarProducto, quitarProducto, cambiarCantidad, cerrarCuenta, getMesasConCuenta, cotizarCuenta };

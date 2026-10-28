@@ -13,6 +13,7 @@ router.get  ('/mesa/:id_mesa',            mesas, ctrl.getCuentaActiva);
 router.post ('/abrir',                    mesas, ctrl.abrirCuenta);
 router.post ('/:id_cuenta/producto',      mesas, ctrl.agregarProducto);
 router.delete('/detalle/:id_detalle',     mesas, ctrl.quitarProducto);
+router.patch('/detalle/:id_detalle',      mesas, ctrl.cambiarCantidad);
 router.post ('/:id_cuenta/cerrar',        mesas, ctrl.cerrarCuenta);
 router.get  ('/:id_cuenta/cotizacion',    mesas, ctrl.cotizarCuenta);
 router.post ('/:id_cuenta/cotizar',       mesas, ctrl.cotizarCuenta);

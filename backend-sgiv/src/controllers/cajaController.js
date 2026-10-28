@@ -200,7 +200,7 @@ const cobrarVenta = async (req, res) => {
             });
         }
 
-        res.status(201).json({ mensaje: 'Venta registrada', id_venta, cotizacion });
+        res.status(201).json({ mensaje: 'Venta registrada', id_venta, cotizacion, stock: cambiosStock });
     } catch (e) {
         console.error('cobrarVenta:', e.message);
         if (e.message === 'CAJA_CERRADA')
@@ -228,10 +228,18 @@ const sucursalDe = (req, pedida) => Number(req.usuario.id_rol) === 1
     ? Number(pedida) || Number(req.usuario.id_sucursal)
     : Number(req.usuario.id_sucursal);
 
+/** Con caja abierta se cotiza en la sucursal del turno (la misma con la que se cobra) */
+const sucursalVenta = async (req, pedida) => {
+    const r = await db.query(
+        `SELECT id_sucursal FROM turno_caja WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto'
+         ORDER BY fecha_hora_apertura DESC LIMIT 1`, [req.usuario.id_usuario]);
+    return Number(r.rows[0]?.id_sucursal) || sucursalDe(req, pedida);
+};
+
 // GET /api/caja/promociones-vigentes?id_sucursal=  etiquetas del catálogo del punto de venta
 const promocionesVigentes = async (req, res) => {
     try {
-        const lista = await promocionModel.vigentes(db, sucursalDe(req, req.query.id_sucursal));
+        const lista = await promocionModel.vigentes(db, await sucursalVenta(req, req.query.id_sucursal));
         res.json(lista.map(p => ({ ...p, productos: p.productos.map(x => x.id_producto) })));
     } catch (e) {
         console.error('promocionesVigentes:', e.message);
@@ -243,7 +251,7 @@ const promocionesVigentes = async (req, res) => {
 const cotizarVenta = async (req, res) => {
     const client = await db.connect();
     try {
-        const id_sucursal = sucursalDe(req, req.body?.id_sucursal);
+        const id_sucursal = await sucursalVenta(req, req.body?.id_sucursal);
         const items = await cajaModel.calcularItemsVenta(client, req.body?.detalles);
         const cot = await promocionModel.cotizar(client, {
             id_sucursal,

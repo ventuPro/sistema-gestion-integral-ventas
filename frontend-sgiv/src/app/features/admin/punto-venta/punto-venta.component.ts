@@ -12,7 +12,7 @@ import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { TicketComponent } from '../../shared/ticket/ticket.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Search, X, ReceiptText, Trash2,
-         ShoppingCart, Banknote, QrCode, Printer, BadgePercent } from 'lucide-angular';
+         ShoppingCart, Banknote, QrCode, Printer, BadgePercent, Minus, Plus } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../core/services/impresion.service';
 import { sondeo } from '../../../core/utils/sondeo';
@@ -46,6 +46,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   private stockSub?: Subscription;
   private cierreSub?: Subscription;
+  private catalogoSub?: Subscription;
+  private esperaRecarga: any;
 
   readonly icons = {
     shieldAlert: ShieldAlert,
@@ -60,7 +62,9 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     efectivo:    Banknote,
     qr:          QrCode,
     imprimir:    Printer,
-    descuento:   BadgePercent
+    descuento:   BadgePercent,
+    menos:       Minus,
+    mas:         Plus
   };
 
   readonly cifra    = cifra;
@@ -79,10 +83,23 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly abriendoTurno     = signal(false);
   readonly errorTurno        = signal('');
 
-  // ─── Catálogo ───
-  readonly productosDisponibles = signal<any[]>([]);
-  readonly busqueda             = signal('');
-  readonly cargando             = signal(true);
+  // ─── Catálogo: stock del servidor; lo que está en el carrito se descuenta al mostrarlo ───
+  private readonly catalogo = signal<any[]>([]);
+  readonly busqueda         = signal('');
+  readonly cargando         = signal(true);
+
+  /** Sucursal del turno abierto (la de la venta) */
+  readonly sucursal = computed(() => Number(this.turnoActivo()?.id_sucursal) || this.sesion.idSucursal());
+
+  private readonly enCarrito = computed(() => new Map(this.carrito().map(i => [i.id_producto, Number(i.cantidad)])));
+  private readonly stockServidor = computed(() => new Map(this.catalogo().map(p => [p.id_producto, p.stock_actual])));
+
+  readonly productosDisponibles = computed(() => {
+    const enCarrito = this.enCarrito();
+    return this.catalogo()
+      .filter(p => p.stock_actual > 0)
+      .map(p => enCarrito.has(p.id_producto) ? { ...p, stock_actual: Math.max(0, p.stock_actual - enCarrito.get(p.id_producto)!) } : p);
+  });
 
   readonly productosFiltrados = computed(() => {
     const q = this.busqueda().trim().toLowerCase();
@@ -101,6 +118,15 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly carrito = signal<any[]>([]);
 
   readonly unidades = computed(() => this.carrito().reduce((s, i) => s + Number(i.cantidad), 0));
+  readonly cobrando = signal(false);
+
+  /** Líneas con más unidades que el stock (id → disponible) */
+  readonly excedidos = computed(() => {
+    const stock = this.stockServidor();
+    return new Map(this.carrito()
+      .filter(i => i.cantidad > (stock.get(i.id_producto) ?? 0))
+      .map(i => [i.id_producto, stock.get(i.id_producto) ?? 0]));
+  });
 
   /** A precio de lista */
   readonly subtotal = computed(() =>
@@ -123,7 +149,12 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     const c = this.cotizacionGuardada();
     return c && c.clave === this.clave() ? c.datos : null;
   });
-  readonly cotizando = computed(() => this.carrito().length > 0 && !this.cotizacion());
+  private readonly errorGuardado = signal<{ clave: string; mensaje: string } | null>(null);
+  readonly errorCotizacion = computed(() => {
+    const e = this.errorGuardado();
+    return e && e.clave === this.clave() ? e.mensaje : '';
+  });
+  readonly cotizando = computed(() => this.carrito().length > 0 && !this.cotizacion() && !this.errorCotizacion());
   readonly total = computed(() => this.cotizacion()?.total ?? this.subtotal());
 
   /** Línea cotizada por producto */
@@ -195,6 +226,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     clearTimeout(this.esperaCotizacion);
     this.subCotizacion?.unsubscribe();
     if (!this.carrito().length) return;
+    this.errorGuardado.set(null);
     this.esperaCotizacion = setTimeout(() => {
       this.subCotizacion = this.promociones.cotizarVenta(this.detalles(), this.descuento()).subscribe({
         next: (datos) => this.cotizacionGuardada.set({ clave, datos }),
@@ -203,7 +235,11 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
           if (e?.error?.error === 'DESCUENTO_INVALIDO' && this.descuento()) {
             this.descuento.set(null);
             this.dialogo.error(`Se quitó el descuento: ${e.error.detalle}`);
+            return;
           }
+          // Sin total no se cobra: se muestra el motivo y Cobrar vuelve a intentarlo
+          this.errorGuardado.set({ clave, mensaje: e?.error?.detalle || 'No se pudo calcular el total. Revisa la conexión.' });
+          if (e?.error?.error === 'VENTA_INVALIDA') this.recargarCatalogo();
         }
       });
     }, 200);
@@ -216,10 +252,12 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearTimeout(this.esperaCotizacion);
+    clearTimeout(this.esperaRecarga);
     this.subCotizacion?.unsubscribe();
     this.detenerSondeo?.();
     this.stockSub?.unsubscribe();
     this.cierreSub?.unsubscribe();
+    this.catalogoSub?.unsubscribe();
   }
 
   private suscribirStockGlobal() {
@@ -229,16 +267,26 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       if (Number(d?.id_usuario) === this.sesion.usuario()?.id_usuario) this.verificarAccesoCaja();
     });
     this.stockSub = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(payload => {
-      if (!payload) return;
-      const idSuc = this.sesion.idSucursal();
-      if (Number(payload.id_sucursal) !== idSuc) return;
-
-      const idProd = Number(payload.id_producto);
-      const nuevo  = Number(payload.nueva_cantidad_disponible) || 0;
-
-      this.productosDisponibles.update(ps => ps.map(p =>
-        Number(p.id_producto) === idProd ? { ...p, stock_actual: nuevo } : p));
+      if (!payload || Number(payload.id_sucursal) !== this.sucursal()) return;
+      this.fijarStock([{ id_producto: payload.id_producto, nuevo_stock: payload.nueva_cantidad_disponible }]);
     });
+    // Productos nuevos, editados o desactivados y promociones
+    this.catalogoSub = this.socketService.escuchar<any>('catalogo:actualizado').subscribe(() => this.recargarCatalogo());
+  }
+
+  /** Stock que informa el servidor; un producto que no estaba en pantalla obliga a recargar */
+  private fijarStock(cambios: { id_producto: any; nuevo_stock: any }[]) {
+    if (this.estadoCaja() !== 'ABIERTA' || !cambios.length) return;
+    const nuevos = new Map(cambios.map(c => [Number(c.id_producto), Number(c.nuevo_stock) || 0]));
+    const conocidos = new Set(this.catalogo().map(p => p.id_producto));
+    this.catalogo.update(ps => ps.map(p => nuevos.has(p.id_producto) ? { ...p, stock_actual: nuevos.get(p.id_producto) } : p));
+    if ([...nuevos.keys()].some(id => !conocidos.has(id))) this.recargarCatalogo();
+  }
+
+  private recargarCatalogo() {
+    if (this.estadoCaja() !== 'ABIERTA') return;
+    clearTimeout(this.esperaRecarga);
+    this.esperaRecarga = setTimeout(() => this.cargarCatalogo(true), 400);
   }
 
   // ─── VERIFICACIÓN PRINCIPAL ───
@@ -321,27 +369,38 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   }
 
   // ─── CATÁLOGO ───
-  cargarCatalogo() {
-    this.cargando.set(true);
-    const id_sucursal = this.sesion.idSucursal();
+  /** silencioso: sin esqueleto (recargas por cambios del catálogo) */
+  cargarCatalogo(silencioso = false) {
+    if (!silencioso) this.cargando.set(true);
 
-    this.productoService.obtenerInventario(id_sucursal).subscribe({
+    this.productoService.obtenerInventario(this.sucursal()).subscribe({
       next: (datos: any[]) => {
-        const productos = (datos || [])
-          .map(p => ({
-            ...p,
-            stock_actual:    Number(p.stock_actual)    || 0,
-            precio_unitario: Number(p.precio_unitario) || 0
-          }))
-          .filter(p => p.stock_actual > 0);
-        this.productosDisponibles.set(productos);
-        this.enfocarBuscador();
-
+        const productos = (datos || []).map(p => ({
+          ...p,
+          id_producto:     Number(p.id_producto),
+          stock_actual:    Number(p.stock_actual)    || 0,
+          precio_unitario: Number(p.precio_unitario) || 0
+        }));
+        this.catalogo.set(productos);
+        this.sincronizarCarrito(productos);
+        if (!silencioso) this.enfocarBuscador();
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false)
     });
     this.promociones.vigentesPuntoVenta().subscribe({ next: (v) => this.vigentes.set(v) });
+  }
+
+  /** Precios al día en el carrito; lo que ya no se vende se quita */
+  private sincronizarCarrito(productos: any[]) {
+    if (!this.carrito().length) return;
+    const porId = new Map(productos.map(p => [p.id_producto, p]));
+    const quitados = this.carrito().filter(i => !porId.has(i.id_producto)).map(i => i.nombre_producto);
+    this.carrito.update(c => c.filter(i => porId.has(i.id_producto)).map(i => {
+      const precio = porId.get(i.id_producto).precio_unitario;
+      return precio === i.precio_unitario ? i : { ...i, precio_unitario: precio, subtotal: precio * i.cantidad };
+    }));
+    if (quitados.length) this.dialogo.error(`Se quitó del carrito lo que ya no está a la venta: ${quitados.join(', ')}.`);
   }
 
   // ─── TECLADO ───
@@ -375,37 +434,56 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── CARRITO ───
   agregarAlCarrito(producto: any) {
-    const precio          = Number(producto.precio_unitario) || 0;
-    const stockDisponible = Number(producto.stock_actual)    || 0;
+    if (this.cobrando()) return;
+    const precio = Number(producto.precio_unitario) || 0;
 
-    if (stockDisponible <= 0) {
+    // stock_actual ya descuenta lo que está en el carrito
+    if ((Number(producto.stock_actual) || 0) <= 0) {
       this.dialogo.error(`Sin stock: ${producto.nombre_producto}`); return;
     }
 
-    const existe = this.carrito().some(i => i.id_producto === producto.id_producto);
-    this.carrito.update(c => existe
-      ? c.map(i => i.id_producto === producto.id_producto
-          ? { ...i, cantidad: Number(i.cantidad) + 1, precio_unitario: precio, subtotal: (Number(i.cantidad) + 1) * precio }
-          : i)
-      : [...c, { ...producto, cantidad: 1, precio_unitario: precio, subtotal: precio }]);
+    const existe = this.carrito().find(i => i.id_producto === producto.id_producto);
+    if (existe) return this.fijarCantidad(existe, existe.cantidad + 1);
+    const { stock_actual, ...datos } = producto;
+    this.carrito.update(c => [...c, { ...datos, cantidad: 1, precio_unitario: precio, subtotal: precio }]);
+  }
 
-    this.productosDisponibles.update(ps => ps.map(p =>
-      p.id_producto === producto.id_producto ? { ...p, stock_actual: stockDisponible - 1 } : p));
+  /** Cantidad escrita o con −/+: entera, desde 1 y hasta el stock */
+  fijarCantidad(item: any, valor: any, campo?: HTMLInputElement) {
+    if (this.cobrando()) return;
+    const max = this.stockServidor().get(item.id_producto) ?? 0;
+    let cantidad = Math.floor(Number(valor));
+    if (!(cantidad >= 1)) cantidad = item.cantidad;
+    if (cantidad > max && cantidad > item.cantidad) {
+      this.dialogo.error(max > 0 ? `Solo hay ${max} de «${item.nombre_producto}».` : `Sin stock: ${item.nombre_producto}`);
+      cantidad = Math.max(item.cantidad, Math.min(cantidad, max));
+    }
+    if (campo) campo.value = String(cantidad);
+    if (cantidad === item.cantidad) return;
+    this.carrito.update(c => c.map(i => i.id_producto === item.id_producto
+      ? { ...i, cantidad, subtotal: cantidad * i.precio_unitario } : i));
   }
 
   quitarDelCarrito(index: number) {
-    const item = this.carrito()[index];
-    if (!item) return;
-
-    this.productosDisponibles.update(ps => ps.map(p =>
-      p.id_producto === item.id_producto ? { ...p, stock_actual: Number(p.stock_actual) + Number(item.cantidad) } : p));
-
+    if (this.cobrando()) return;
     this.carrito.update(c => c.filter((_, i) => i !== index));
+  }
+
+  /** Enter en la cantidad: vuelve al buscador */
+  volverAlBuscador(evento: Event) {
+    evento.preventDefault();
+    (evento.target as HTMLInputElement).blur();
+    if (!pantallaTactil()) this.buscadorRef?.nativeElement.focus();
   }
 
   // ─── COBRO ───
   abrirModalCobro() {
-    if (!this.carrito().length) return;
+    if (!this.carrito().length || this.cobrando()) return;
+    if (this.errorCotizacion()) { this.programarCotizacion(this.clave()); return; }
+    if (this.excedidos().size) {
+      this.dialogo.error('Hay productos con más unidades que el stock. Corrige las cantidades marcadas.');
+      return;
+    }
     if (!this.puedeVender()) {
       this.dialogo.error('La caja está cerrada. No puedes registrar ventas.');
       return;
@@ -458,6 +536,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   quitarDescuento() { this.descuento.set(null); }
 
   confirmarVenta() {
+    if (!this.cotizacion() || this.cobrando()) return;
     if (this.metodoPago() === METODO_PAGO.efectivo && this.pagado() < this.total()) {
       this.montoPagado.set(this.total());
     }
@@ -466,10 +545,10 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   }
 
   registrarVenta() {
-    this.cargando.set(true);
+    this.cobrando.set(true);
 
     const datosVenta = {
-      id_sucursal:       this.sesion.idSucursal(),
+      id_sucursal:       this.sucursal(),
       id_cliente:        null,
       id_pedido_mesa:    null,
       monto_total_venta: this.total(),
@@ -509,16 +588,16 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
         this.mostrarTicket.set(true);
         this.carrito.set([]);
         this.descuento.set(null);
-        this.cargarCatalogo();
+        this.fijarStock(res.stock || []);
         this.cargarVentasHoy();
-        this.cargando.set(false);
+        this.cobrando.set(false);
       },
       error: (e: any) => {
+        this.cobrando.set(false);
         // CAJA_CERRADA → reverificar estado y bloquear
         if (e?.error?.error === 'CAJA_CERRADA') {
           this.dialogo.error(e?.error?.detalle || 'La caja fue cerrada. Pide al administrador que la reabra.');
           this.verificarAccesoCaja();
-          this.cargando.set(false);
           return;
         }
         // PRECIO_DESACTUALIZADO → un precio cambió en la BD: actualizar el carrito y volver a cobrar
@@ -532,13 +611,13 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
           }));
           if (e.error.cotizacion) this.cotizacionGuardada.set({ clave: this.clave(), datos: e.error.cotizacion });
           this.dialogo.error(`Los precios cambiaron. Nuevo total: ${this.moneda()} ${Number(e.error.total).toFixed(2)}. Revisa el carrito y vuelve a cobrar.`);
-          this.cargarCatalogo();
-          this.cargando.set(false);
+          this.cargarCatalogo(true);
           return;
         }
-        const msg = e?.error?.detalle || e?.error?.error || 'Error desconocido al registrar la venta.';
+        // Stock o productos cambiaron mientras se armaba la venta: se recarga el catálogo
+        if (e?.error?.error === 'STOCK_INSUFICIENTE' || e?.error?.error === 'VENTA_INVALIDA') this.cargarCatalogo(true);
+        const msg = e?.error?.detalle || (e?.status === 0 ? 'Sin conexión con el servidor.' : 'Error desconocido al registrar la venta.');
         this.dialogo.error(`No se pudo registrar la venta: ${msg}`);
-        this.cargando.set(false);
       }
     });
   }
@@ -546,9 +625,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   // ─── HISTORIAL VENTAS DEL DÍA ───
   cargarVentasHoy() {
     this.cargandoVentas.set(true);
-    const id_sucursal   = this.sesion.idSucursal();
 
-    this.cajaService.obtenerVentasHoy(id_sucursal).subscribe({
+    this.cajaService.obtenerVentasHoy(this.sucursal()).subscribe({
       next: (v: any[]) => {
         this.ventasHoy.set((v || []).map(x => ({
           ...x,

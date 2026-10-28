@@ -309,6 +309,31 @@ describe('Punto de venta', () => {
         assert.equal(await stock(queque), antesQ);
         assert.equal(await stock(torta), antesT);
     });
+
+    test('«Ventas de hoy» trae todas las ventas del día (antes se cortaba en 30)', async () => {
+        const pan = await crearProducto('Pan POS', 1, 40);
+        for (let i = 0; i < 31; i++) {
+            const r = await cobrar({ monto_total_venta: 1, detalles: [{ id_producto: pan, cantidad: 1 }] });
+            assert.equal(r.status, 201, JSON.stringify(r.body));
+        }
+        const [total] = await bd.sql(`SELECT COUNT(*)::int AS n FROM venta_caja v JOIN usuario u ON u.id_usuario = v.id_usuario_cajero
+                                      WHERE u.correo_electronico = 'cajero.pos@prueba.com'`);
+        const r = await api('GET', '/caja/ventas-hoy/1', { token: tCajero });
+        assert.equal(r.status, 200);
+        assert.equal(r.body.length, total.n);
+        assert.ok(total.n > 30);
+    });
+
+    test('la cobranza devuelve el stock que quedó y la cotización nombra el producto inactivo', async () => {
+        const r = await cobrar({ monto_total_venta: 25.5, detalles: [{ id_producto: torta, cantidad: 1 }] });
+        assert.deepEqual(r.body.stock, [{ id_producto: torta, id_sucursal: 1, nuevo_stock: await stock(torta) }]);
+
+        const pie = await crearProducto('Pie POS', 5, 5);
+        await bd.sql(`UPDATE producto SET estado_activo = FALSE WHERE id_producto = $1`, [pie]);
+        const c = await api('POST', '/caja/cotizar', { token: tCajero, body: { detalles: [{ id_producto: pie, cantidad: 1 }] } });
+        assert.equal(c.status, 400);
+        assert.equal(c.body.detalle, '«Pie POS» ya no está a la venta.');
+    });
 });
 
 // ─── Mesas y cuentas ───
@@ -353,6 +378,44 @@ describe('Mesas y cuentas', () => {
         assert.equal(await stock(producto), 7);              // no se descuenta dos veces
         const [mesa] = await bd.sql(`SELECT estado_mesa FROM mesa_local WHERE id_mesa = $1`, [id_mesa]);
         assert.equal(mesa.estado_mesa, 'Libre');
+    });
+
+    test('cambiar la cantidad reserva o devuelve solo la diferencia y deja historial', async () => {
+        const abrir = await api('POST', '/cuentas/abrir', { token: tCajero, body: { id_mesa } });
+        const id_cuenta = abrir.body.cuenta.id_cuenta;
+        const base = await stock(producto);
+        const ag = await api('POST', `/cuentas/${id_cuenta}/producto`, { token: tCajero, body: { id_producto: producto, cantidad: 1 } });
+        const id = ag.body.detalle.id_detalle_cuenta;
+        assert.equal(ag.body.stock, base - 1);
+
+        const subir = await api('PATCH', `/cuentas/detalle/${id}`, { token: tCajero, body: { cantidad: 4 } });
+        assert.equal(subir.status, 200, JSON.stringify(subir.body));
+        assert.equal(subir.body.stock, base - 4);
+        assert.equal(Number(subir.body.total), 32);
+        assert.equal(await stock(producto), base - 4);
+
+        const exceso = await api('PATCH', `/cuentas/detalle/${id}`, { token: tCajero, body: { cantidad: base + 1 } });
+        assert.equal(exceso.status, 409);
+        assert.equal(exceso.body.disponible, base);
+        assert.equal(await stock(producto), base - 4);
+
+        for (const cantidad of [0, -2, 1.5, 'x'])
+            assert.equal((await api('PATCH', `/cuentas/detalle/${id}`, { token: tCajero, body: { cantidad } })).status, 400);
+
+        const bajar = await api('PATCH', `/cuentas/detalle/${id}`, { token: tCajero, body: { cantidad: 2 } });
+        assert.equal(bajar.status, 200);
+        assert.equal(await stock(producto), base - 2);
+        const [det] = await bd.sql(`SELECT cantidad, subtotal FROM detalle_cuenta WHERE id_detalle_cuenta = $1`, [id]);
+        assert.deepEqual([det.cantidad, Number(det.subtotal)], [2, 16]);
+
+        const hist = await bd.sql(`SELECT h.tipo_movimiento, h.cantidad_movida, h.stock_resultante FROM historial_inventario h
+                                   JOIN inventario_sucursal i USING (id_inventario)
+                                   WHERE i.id_producto = $1 AND i.id_sucursal = 1 ORDER BY h.id_historial DESC LIMIT 2`, [producto]);
+        assert.deepEqual(hist.map(h => [h.tipo_movimiento, h.cantidad_movida, h.stock_resultante]),
+                         [['INGRESO', 2, base - 2], ['SALIDA', 3, base - 4]]);
+
+        await api('DELETE', `/cuentas/detalle/${id}`, { token: tCajero });
+        assert.equal(await stock(producto), base);
     });
 });
 

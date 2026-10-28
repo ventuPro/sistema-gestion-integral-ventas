@@ -28,6 +28,10 @@ export class CuentaService {
     return this.http.delete(`${this.apiUrl}/cuentas/detalle/${id_detalle}`);
   }
 
+  cambiarCantidad(id_detalle: number, cantidad: number): Observable<any> {
+    return this.http.patch(`${this.apiUrl}/cuentas/detalle/${id_detalle}`, { cantidad });
+  }
+
   /** cliente_mesa: sin enviar = toda la cuenta; código o null = solo la parte de ese cliente */
   cerrarCuenta(id_cuenta: number, metodo_pago: string, cliente_mesa?: string | null, descuento: any = null): Observable<any> {
     const body = cliente_mesa === undefined ? { metodo_pago, descuento } : { metodo_pago, cliente_mesa, descuento };

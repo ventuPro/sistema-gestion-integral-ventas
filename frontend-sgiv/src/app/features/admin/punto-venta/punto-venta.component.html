@@ -226,8 +226,22 @@
                 @if (linea?.descuento_promocion) {
                   <p class="promo-linea truncate">{{ linea!.promociones.join(', ') }} · −{{ moneda() }} {{ cifra(linea!.descuento_promocion) }}</p>
                 }
+                @if (excedidos().has(item.id_producto)) {
+                  <p class="aviso-stock">{{ excedidos().get(item.id_producto) ? 'Solo hay ' + excedidos().get(item.id_producto) : 'Sin stock' }}</p>
+                }
               </div>
-              <span class="cantidad">×{{ item.cantidad }}</span>
+              <div class="selector-cantidad" [class.excede]="excedidos().has(item.id_producto)">
+                <button type="button" (click)="fijarCantidad(item, item.cantidad - 1)" [disabled]="item.cantidad <= 1" aria-label="Uno menos">
+                  <lucide-icon [img]="icons.menos" class="w-3.5 h-3.5"></lucide-icon>
+                </button>
+                <input type="number" step="1" min="1" inputmode="numeric" [value]="item.cantidad" aria-label="Cantidad"
+                       (focus)="$any($event.target).select()"
+                       (change)="fijarCantidad(item, $any($event.target).value, $any($event.target))"
+                       (keydown.enter)="volverAlBuscador($event)">
+                <button type="button" (click)="fijarCantidad(item, item.cantidad + 1)" aria-label="Uno más">
+                  <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon>
+                </button>
+              </div>
               <div class="flex items-center gap-1">
                 <span class="flex flex-col items-end">
                   @if (linea?.descuento_promocion) { <s class="inf-sutil text-[length:calc(12px*var(--escala-texto))]">{{ moneda() }} {{ cifra(item.subtotal) }}</s> }
@@ -270,6 +284,7 @@
               </dl>
             }
           }
+          @if (errorCotizacion()) { <p class="aviso-stock mb-3" role="alert">{{ errorCotizacion() }}</p> }
           <div class="flex items-end justify-between gap-3 mb-4">
             <span class="inf-etiqueta">Total</span>
             <span class="inf-valor mt-0! text-[length:calc(28px*var(--escala-texto))]!" [class.inf-refrescando]="cotizando()">
@@ -277,12 +292,12 @@
             </span>
           </div>
           <div class="flex gap-2">
-            <button class="inf-boton py-3! px-4!" [disabled]="carrito().length === 0 || cotizando()" (click)="abrirDescuento()"
+            <button class="inf-boton py-3! px-4!" [disabled]="carrito().length === 0 || !cotizacion() || cobrando()" (click)="abrirDescuento()"
                     [attr.aria-label]="'Descuento'">
               <lucide-icon [img]="icons.descuento" class="w-4 h-4"></lucide-icon> Descuento
             </button>
-            <button class="boton-primario flex-1 py-3!" [disabled]="carrito().length === 0 || cotizando()" (click)="abrirModalCobro()">
-              Cobrar
+            <button class="boton-primario flex-1 py-3!" [disabled]="carrito().length === 0 || cotizando() || cobrando()" (click)="abrirModalCobro()">
+              {{ cobrando() ? 'Registrando…' : 'Cobrar' }}
             </button>
           </div>
         </div>
@@ -396,7 +411,7 @@
 
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalCobro()">Cancelar</button>
-        <button class="boton-primario" data-enter (click)="confirmarVenta()">
+        <button class="boton-primario" data-enter (click)="confirmarVenta()" [disabled]="!cotizacion() || cobrando()">
           <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> Confirmar venta
         </button>
       </div>

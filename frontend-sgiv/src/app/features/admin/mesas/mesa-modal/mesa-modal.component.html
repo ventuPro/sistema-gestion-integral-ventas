@@ -10,7 +10,22 @@
       <p class="inf-sub mt-0!">{{ moneda() }} {{ cifra(item.precio_unitario) }} c/u</p>
       @if (item.nota) { <p class="text-[length:calc(12px*var(--escala-texto))] inf-aviso">Nota: {{ item.nota }}</p> }
     </div>
-    <span class="cantidad">×{{ item.cantidad }}</span>
+    @if (item.pagado) {
+      <span class="cantidad">×{{ item.cantidad }}</span>
+    } @else {
+      <div class="selector-cantidad">
+        <button type="button" (click)="fijarCantidad(item, item.cantidad - 1)" [disabled]="item.cantidad <= 1 || guardandoCantidad()" aria-label="Uno menos">
+          <lucide-icon [img]="icons.menos" class="w-3.5 h-3.5"></lucide-icon>
+        </button>
+        <input type="number" step="1" min="1" inputmode="numeric" [value]="item.cantidad" aria-label="Cantidad"
+               (focus)="$any($event.target).select()"
+               (change)="fijarCantidad(item, $any($event.target).value, $any($event.target))"
+               (keydown.enter)="volverAlBuscador($event)">
+        <button type="button" (click)="fijarCantidad(item, item.cantidad + 1)" [disabled]="guardandoCantidad()" aria-label="Uno más">
+          <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon>
+        </button>
+      </div>
+    }
     <div class="flex items-center gap-1">
       <span class="inf-tinta font-semibold text-[length:calc(14px*var(--escala-texto))] whitespace-nowrap">{{ moneda() }} {{ cifra(item.subtotal) }}</span>
       @if (!item.pagado) {

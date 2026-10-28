@@ -98,6 +98,44 @@
   color: var(--i-texto);
   background: var(--i-linea-suave);
 }
+/* Cantidad editable de una línea: − [n] + */
+.selector-cantidad {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--i-linea);
+  border-radius: 6px;
+  background: var(--i-papel);
+}
+.selector-cantidad.excede { border-color: var(--i-baja); }
+.selector-cantidad button {
+  display: inline-flex;
+  padding: 5px;
+  color: var(--i-tenue);
+  transition: color 120ms ease;
+}
+.selector-cantidad button:hover:not(:disabled) { color: var(--i-acento); }
+.selector-cantidad button:disabled { opacity: 0.35; cursor: not-allowed; }
+.selector-cantidad input {
+  width: 3.2em;
+  padding: 2px 0;
+  text-align: center;
+  font-size: calc(13px * var(--escala-texto));
+  font-weight: 600;
+  color: var(--i-tinta);
+  background: transparent;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.selector-cantidad input::-webkit-inner-spin-button,
+.selector-cantidad input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.selector-cantidad:focus-within { border-color: var(--i-acento); box-shadow: 0 0 0 3px var(--i-acento-suave); }
+.aviso-stock {
+  font-size: calc(12px * var(--escala-texto));
+  font-weight: 600;
+  color: var(--i-baja);
+}
+
 .quitar {
   display: inline-flex;
   padding: 4px;

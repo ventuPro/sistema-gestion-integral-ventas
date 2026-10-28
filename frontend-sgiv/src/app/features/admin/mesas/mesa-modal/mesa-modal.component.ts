@@ -9,7 +9,7 @@ import { TicketComponent } from '../../../shared/ticket/ticket.component';
 import { AjustesService } from '../../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../../core/services/impresion.service';
 import { cifra } from '../../../../core/utils/informe';
-import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent } from 'lucide-angular';
+import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent, Minus, Plus } from 'lucide-angular';
 import { DialogoService } from '../../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
 import { Cotizacion, DescuentoManual, FormDescuento, PromocionService } from '../../../../core/services/promocion.service';
@@ -58,7 +58,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   readonly icons = {
     cerrar: X, buscar: Search, quitar: Trash2, carrito: ShoppingCart, efectivo: Banknote,
-    qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User, descuento: BadgePercent
+    qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User, descuento: BadgePercent,
+    menos: Minus, mas: Plus
   };
 
   readonly esAdmin = this.sesion.esAdmin;
@@ -136,7 +137,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   readonly productosFiltrados = computed(() => {
     const texto = this.busqueda().toLowerCase();
-    return this.productos().filter(p => !texto || p.nombre_producto.toLowerCase().includes(texto));
+    return this.productos().filter(p => Number(p.stock_actual) > 0 && (!texto || p.nombre_producto.toLowerCase().includes(texto)));
   });
 
   /** Por categoría en el orden del menú; los que se agotan pasan al final */
@@ -156,6 +157,9 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly cuentaCerrada = signal(true);
 
   private subs: Subscription[] = [];
+  private esperaRecarga: any;
+  /** Un cambio de cantidad a la vez */
+  readonly guardandoCantidad = signal(false);
 
   constructor() {
     effect(() => {
@@ -170,7 +174,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     if (!clave || !cuenta || !this.itemsPendientes().length) return this.cotizacionCuenta.set(null);
     this.esperaCotizacion = setTimeout(() =>
       this.promociones.cotizarCuenta(cuenta.id_cuenta).subscribe({
-        next: (c) => { if (this.claveCuenta() === clave) this.cotizacionCuenta.set(c); }
+        next: (c) => { if (this.claveCuenta() === clave) this.cotizacionCuenta.set(c); },
+        error: () => this.cotizacionCuenta.set(null)
       }), 150);
   }
 
@@ -216,6 +221,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearTimeout(this.esperaCotizacion);
+    clearTimeout(this.esperaRecarga);
     this.subs.forEach(s => s.unsubscribe());
   }
 
@@ -229,10 +235,19 @@ export class MesaModalComponent implements OnInit, OnDestroy {
       if (!payload || Number(payload.id_sucursal) !== (Number(this.mesa?.id_sucursal) || 1)) return;
       this.fijarStock(Number(payload.id_producto), Number(payload.nueva_cantidad_disponible) || 0);
     }));
+
+    // Productos nuevos, editados o desactivados
+    this.subs.push(this.socketService.escuchar<any>('catalogo:actualizado').subscribe(() => this.recargarProductos()));
   }
 
   private fijarStock(id_producto: number, stock: number) {
+    if (!this.productos().some(p => Number(p.id_producto) === id_producto)) return this.recargarProductos();
     this.productos.update(ps => ps.map(p => Number(p.id_producto) === id_producto ? { ...p, stock_actual: stock } : p));
+  }
+
+  private recargarProductos() {
+    clearTimeout(this.esperaRecarga);
+    this.esperaRecarga = setTimeout(() => this.cargarProductos(), 400);
   }
 
   cargarEstadoMesa() {
@@ -276,7 +291,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
     this.cuentaService.getProductos(id_sucursal).subscribe({
       next: (prods: any[]) => {
-        this.productos.set(prods.filter(p => Number(p.stock_actual) > 0));
+        this.productos.set(prods.map(p => ({ ...p, stock_actual: Number(p.stock_actual) || 0 })));
       },
       error: () => {
         console.error('Error al cargar catálogo de la mesa');
@@ -342,7 +357,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
           }
           return { ...c, items, total_acumulado: res.total ?? totalPendiente(items) };
         });
-        this.fijarStock(Number(producto.id_producto), stockDisponible - 1);
+        this.fijarStock(Number(producto.id_producto), res.stock ?? stockDisponible - 1);
         this.notaProducto.set('');
       },
       error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo agregar el producto.')
@@ -360,11 +375,45 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         });
         if (itemQuitado) {
           const prod = this.productos().find(p => p.id_producto === itemQuitado.id_producto);
-          if (prod) this.fijarStock(Number(prod.id_producto), Number(prod.stock_actual) + Number(itemQuitado.cantidad || 1));
+          if (prod) this.fijarStock(Number(prod.id_producto), res.stock ?? Number(prod.stock_actual) + Number(itemQuitado.cantidad || 1));
         }
       },
       error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo quitar el producto.')
     });
+  }
+
+  /** Cantidad escrita o con −/+ (el backend reserva o devuelve la diferencia de stock) */
+  fijarCantidad(item: any, valor: any, campo?: HTMLInputElement) {
+    let cantidad = Math.floor(Number(valor));
+    if (!(cantidad >= 1) || cantidad === item.cantidad || this.guardandoCantidad()) {
+      if (campo) campo.value = String(item.cantidad);
+      return;
+    }
+    this.guardandoCantidad.set(true);
+    this.cuentaService.cambiarCantidad(item.id_detalle_cuenta, cantidad).subscribe({
+      next: (res: any) => {
+        this.guardandoCantidad.set(false);
+        this.cuentaActiva.update(c => {
+          const items = (c.items || []).map((i: any) => i.id_detalle_cuenta === item.id_detalle_cuenta
+            ? { ...i, cantidad, subtotal: cantidad * Number(i.precio_unitario) } : i);
+          return { ...c, items, total_acumulado: res.total ?? totalPendiente(items) };
+        });
+        if (res.stock != null) this.fijarStock(Number(item.id_producto), Number(res.stock));
+      },
+      error: (e: any) => {
+        this.guardandoCantidad.set(false);
+        if (campo) campo.value = String(item.cantidad);
+        this.dialogo.error(e?.error?.error || 'No se pudo cambiar la cantidad.');
+      }
+    });
+  }
+
+  /** Enter en la cantidad: vuelve al buscador */
+  volverAlBuscador(evento: Event) {
+    evento.preventDefault();
+    evento.stopPropagation();
+    (evento.target as HTMLInputElement).blur();
+    if (!pantallaTactil()) this.buscadorRef?.nativeElement.focus();
   }
 
   irAPago(parte: GrupoCuenta | null = null) {
@@ -373,7 +422,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     this.descuento.set(null);
     this.editandoDescuento.set(false);
     this.promociones.cotizarCuenta(this.cuentaActiva().id_cuenta, parte ? parte.clave : undefined).subscribe({
-      next: (c) => { if (this.parteCobro() === parte) this.cotizacionPago.set(c); }
+      next: (c) => { if (this.parteCobro() === parte) this.cotizacionPago.set(c); },
+      error: (e) => this.dialogo.error(e?.error?.detalle || e?.error?.error || 'No se pudo calcular el total.')
     });
     this.montoPagado.set(null);
     this.metodoPago.set(this.ajustes.config().pago_efectivo ? METODO_PAGO.efectivo : METODO_PAGO.qr);

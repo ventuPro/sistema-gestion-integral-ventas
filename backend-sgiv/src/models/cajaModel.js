@@ -16,7 +16,7 @@ const obtenerEstadoCaja = async (id_usuario) => {
 
 const obtenerEstadoCompleto = async (id_usuario) => {
     const rAbierto = await db.query(`
-        SELECT id_turno, fecha_hora_apertura, monto_inicial, estado_turno
+        SELECT id_turno, id_sucursal, fecha_hora_apertura, monto_inicial, estado_turno
         FROM turno_caja
         WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto'
         ORDER BY fecha_hora_apertura DESC
@@ -40,7 +40,7 @@ const obtenerEstadoCompleto = async (id_usuario) => {
 
     // 2. No hay turno abierto → buscar último turno cerrado de HOY
     const rCerradoHoy = await db.query(`
-        SELECT id_turno, fecha_hora_apertura, fecha_hora_cierre, monto_inicial, estado_turno
+        SELECT id_turno, id_sucursal, fecha_hora_apertura, fecha_hora_cierre, monto_inicial, estado_turno
         FROM turno_caja
         WHERE id_usuario_cajero = $1
           AND estado_turno      = 'Cerrado'
@@ -356,8 +356,7 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
         FROM venta_caja
         WHERE id_sucursal       = $1
           AND id_usuario_cajero = $2
-          AND (fecha_venta AT TIME ZONE 'America/La_Paz')::date
-            = (NOW()        AT TIME ZONE 'America/La_Paz')::date
+          AND fecha_venta >= CURRENT_DATE AND fecha_venta < CURRENT_DATE + 1
     `, [id_sucursal, id_usuario_cajero]);
 
     const ventas = await db.query(`
@@ -371,8 +370,7 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
         LEFT JOIN detalle_venta dv ON v.id_venta = dv.id_venta
         WHERE v.id_sucursal       = $1
           AND v.id_usuario_cajero = $2
-          AND (v.fecha_venta AT TIME ZONE 'America/La_Paz')::date
-            = (NOW()          AT TIME ZONE 'America/La_Paz')::date
+          AND v.fecha_venta >= CURRENT_DATE AND v.fecha_venta < CURRENT_DATE + 1
         GROUP BY v.id_venta, v.monto_total_venta, v.metodo_pago, v.fecha_venta
         ORDER BY v.fecha_venta DESC
     `, [id_sucursal, id_usuario_cajero]);
@@ -491,10 +489,8 @@ const obtenerVentasHoyPOS = async (id_sucursal, id_usuario_cajero) => {
         FROM venta_caja v
         WHERE v.id_sucursal       = $1
           AND v.id_usuario_cajero = $2
-          AND (v.fecha_venta AT TIME ZONE 'America/La_Paz')::date
-            = (NOW()          AT TIME ZONE 'America/La_Paz')::date
+          AND v.fecha_venta >= CURRENT_DATE AND v.fecha_venta < CURRENT_DATE + 1
         ORDER BY v.fecha_venta DESC
-        LIMIT 30
     `, [id_sucursal, id_usuario_cajero]);
 
     if (resVentas.rows.length === 0) return [];
@@ -540,19 +536,20 @@ const calcularItemsVenta = async (client, detalles) => {
 
     const ids = [...new Set(detalles.map(d => Number(d.id_producto)))];
     const r = await client.query(
-        `SELECT id_producto, id_categoria, nombre_producto, precio_unitario
-         FROM producto WHERE id_producto = ANY($1::int[]) AND estado_activo = TRUE`,
-        [ids]
+        `SELECT id_producto, id_categoria, nombre_producto, precio_unitario, estado_activo
+         FROM producto WHERE id_producto = ANY($1::int[])`,
+        [ids.filter(Number.isInteger)]
     );
     const precios = new Map(r.rows.map(p => [Number(p.id_producto), p]));
 
     return detalles.map(d => {
         const id_producto = Number(d.id_producto);
         const cantidad    = Number(d.cantidad);
-        if (!Number.isInteger(cantidad) || cantidad <= 0)
-            throw invalida(`Cantidad inválida para el producto ${id_producto}.`);
         const prod = precios.get(id_producto);
-        if (!prod) throw invalida(`El producto ${id_producto} no existe o está inactivo.`);
+        if (!prod) throw invalida('Un producto del carrito ya no existe.');
+        if (!prod.estado_activo) throw invalida(`«${prod.nombre_producto}» ya no está a la venta.`);
+        if (!Number.isInteger(cantidad) || cantidad <= 0 || cantidad > 100000)
+            throw invalida(`Cantidad inválida de «${prod.nombre_producto}».`);
         const precioCentavos = Math.round(Number(prod.precio_unitario) * 100);
         return {
             id_producto, cantidad,

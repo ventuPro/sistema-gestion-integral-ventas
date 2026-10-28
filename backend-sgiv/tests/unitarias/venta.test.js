@@ -4,8 +4,9 @@ const { calcularItemsVenta } = require('../../src/models/cajaModel');
 
 // Cliente de BD simulado: devuelve los productos activos del "catálogo"
 const catalogo = [
-    { id_producto: 1, id_categoria: 3, nombre_producto: 'Torta',  precio_unitario: '25.50' },
-    { id_producto: 2, id_categoria: 3, nombre_producto: 'Queque', precio_unitario: '10.10' }
+    { id_producto: 1, id_categoria: 3, nombre_producto: 'Torta',  precio_unitario: '25.50', estado_activo: true },
+    { id_producto: 2, id_categoria: 3, nombre_producto: 'Queque', precio_unitario: '10.10', estado_activo: true },
+    { id_producto: 3, id_categoria: 3, nombre_producto: 'Pie',    precio_unitario: '5.00',  estado_activo: false }
 ];
 const clienteFalso = {
     query: async (_sql, [ids]) => ({ rows: catalogo.filter(p => ids.includes(p.id_producto)) })
@@ -41,5 +42,9 @@ test('rechaza productos inexistentes o inactivos', async () => {
     await assert.rejects(
         calcularItemsVenta(clienteFalso, [{ id_producto: 99, cantidad: 1 }]),
         { code: 'VENTA_INVALIDA' }
+    );
+    await assert.rejects(
+        calcularItemsVenta(clienteFalso, [{ id_producto: 3, cantidad: 1 }]),
+        { code: 'VENTA_INVALIDA', message: '«Pie» ya no está a la venta.' }
     );
 });
