@@ -1,9 +1,39 @@
-.bloque-linea { border-color: var(--i-linea); border-bottom: 1px solid var(--i-linea); }
-@media (min-width: 1024px) { .bloque-linea { border-bottom: none; } }
-
-/* La tira del resumen ocupa la columna derecha: 3 por fila en escritorio */
-.tira-resumen { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-@media (min-width: 1024px) { .tira-resumen { grid-template-columns: repeat(3, 1fr); } }
+/* Resumen del período: cifras centradas y del mismo alto
+   (celular: 2 por fila · tableta: ingresos arriba y 5 debajo · escritorio: una sola fila) */
+.resumen-periodo { display: grid; grid-template-columns: repeat(2, 1fr); overflow: hidden; }
+.resumen-periodo > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 2px;
+  padding: 20px 12px;
+  border-left: 1px solid var(--i-linea);
+  margin-left: -1px;
+  border-top: 1px solid var(--i-linea);
+  margin-top: -1px;
+}
+.resumen-periodo > .principal { grid-column: 1 / -1; background: var(--i-acento-suave); }
+.resumen-periodo > div:last-child { grid-column: 1 / -1; }
+.resumen-periodo .inf-valor, .resumen-periodo .inf-sub { margin-top: 0; }
+.cifra-principal {
+  font-size: calc(32px * var(--escala-texto));
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--i-tinta);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cifra-principal .inf-moneda { margin-right: 4px; }
+@media (min-width: 640px) {
+  .resumen-periodo { grid-template-columns: repeat(5, 1fr); }
+  .resumen-periodo > div:last-child { grid-column: auto; }
+}
+@media (min-width: 1280px) {
+  .resumen-periodo { grid-template-columns: minmax(0, 1.7fr) repeat(5, minmax(0, 1fr)); }
+  .resumen-periodo > .principal { grid-column: auto; }
+}
 
 .leyenda-linea {
   display: inline-block;

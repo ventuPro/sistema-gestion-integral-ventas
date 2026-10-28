@@ -29,44 +29,29 @@
 
     <!-- Turno abierto: lo que debe haber en caja -->
     @if (abierto()) {
-      <section class="inf-hoja grid lg:grid-cols-2">
-        <div class="p-6 bloque-linea lg:border-r">
-          <p class="inf-etiqueta">Efectivo que debe haber en caja</p>
-          <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(tr().efectivo_esperado) }}</p>
-          <dl class="inf-pares mt-5 pt-4 separador">
-            <div><dt>Fondo inicial</dt><dd>{{ moneda() }} {{ cifra(turno().monto_inicial) }}</dd></div>
-            <div><dt>+ Cobrado en efectivo</dt><dd>{{ moneda() }} {{ cifra(tr().efectivo) }}</dd></div>
-            <div class="total"><dt>= Esperado en caja</dt><dd>{{ moneda() }} {{ cifra(tr().efectivo_esperado) }}</dd></div>
-          </dl>
-          <p class="inf-sub mt-4">Turno #{{ turno().id_turno }} · abierto desde {{ desde(turno().fecha_hora_apertura) }}</p>
+      <section class="inf-hoja p-6">
+        <div class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+          <p class="inf-etiqueta">Turno #{{ turno().id_turno }}</p>
+          <p class="inf-tenue text-xs">desde {{ desde(turno().fecha_hora_apertura) }}</p>
         </div>
-
-        <div class="p-6">
-          <div class="flex items-baseline justify-between gap-3">
-            <p class="inf-etiqueta">Cobros del turno</p>
-            <p class="inf-tenue text-xs">{{ entero(tr().ventas) }} ventas</p>
-          </div>
-          <p class="inf-valor">{{ moneda() }} {{ cifra(tr().total) }}</p>
-          @if (tr().metodos.length) {
-            <div class="inf-apilada my-4">
-              @for (m of tr().metodos; track m.metodo_pago; let i = $index) {
-                <span [style.width.%]="porcentaje(m.total, tr().total)" [style.background]="colorSerie(i)"></span>
-              }
+        <div class="inf-montos grandes">
+          @if (ajustes.config().pago_efectivo) {
+            <div class="inf-monto">
+              <p class="inf-etiqueta"><lucide-icon [img]="icons.efectivo" class="w-4 h-4"></lucide-icon> Efectivo en caja</p>
+              <p class="inf-monto-valor">{{ moneda() }} {{ cifra(tr().efectivo_esperado) }}</p>
+              <p class="inf-monto-detalle">Fondo {{ cifra(turno().monto_inicial) }} + ventas {{ cifra(tr().efectivo) }}</p>
             </div>
-            <table class="inf-tabla">
-              <tbody>
-                @for (m of tr().metodos; track m.metodo_pago; let i = $index) {
-                  <tr>
-                    <td class="pl-0!"><span class="flex items-center gap-2"><i class="inf-muestra" [style.background]="colorSerie(i)"></i>{{ m.metodo_pago }}</span></td>
-                    <td class="num inf-tenue">{{ m.ventas }} vta.</td>
-                    <td class="num fuerte pr-0!">{{ moneda() }} {{ cifra(m.total) }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          } @else {
-            <p class="inf-vacio">Todavía no hay cobros en este turno.</p>
           }
+          @if (ajustes.config().pago_qr) {
+            <div class="inf-monto">
+              <p class="inf-etiqueta"><lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon> QR</p>
+              <p class="inf-monto-valor">{{ moneda() }} {{ cifra(cobradoQr()) }}</p>
+            </div>
+          }
+          <div class="inf-monto total">
+            <p class="inf-etiqueta"><lucide-icon [img]="icons.total" class="w-4 h-4"></lucide-icon> Total</p>
+            <p class="inf-monto-valor">{{ moneda() }} {{ cifra(tr().efectivo_esperado + cobradoQr()) }}</p>
+          </div>
         </div>
       </section>
 
@@ -149,25 +134,6 @@
       </section>
     }
 
-    <!-- Hoy -->
-    <section class="inf-hoja inf-tira overflow-hidden">
-      <div>
-        <p class="inf-etiqueta">Ventas de hoy</p>
-        <p class="inf-valor">{{ entero(hoy().total_ventas) }}</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Ingresos de hoy</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(hoy().ingresos_totales) }}</p>
-        <p class="inf-sub">ticket promedio {{ moneda() }} {{ cifra(hoy().total_ventas ? hoy().ingresos_totales / hoy().total_ventas : 0) }}</p>
-      </div>
-      @for (m of metodosHoy(); track m.metodo) {
-        <div>
-          <p class="inf-etiqueta">{{ m.metodo }}</p>
-          <p class="inf-valor">{{ moneda() }} {{ cifra(m.total) }}</p>
-          <p class="inf-sub">{{ m.ventas }} {{ m.ventas === 1 ? 'venta' : 'ventas' }}</p>
-        </div>
-      }
-    </section>
 
     <!-- Ventas del día -->
     <section class="inf-hoja overflow-hidden">

@@ -411,3 +411,27 @@
 @keyframes inf-brillo { to { background-position: -200% 0; } }
 
 .inf-refrescando { opacity: 0.55; transition: opacity 150ms ease; pointer-events: none; }
+
+/* Montos destacados en recuadros (Panel y Arqueo) */
+.inf-montos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.inf-monto {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--i-acento-suave);
+  border: 1px solid color-mix(in oklab, var(--i-acento) 25%, transparent);
+}
+.inf-monto .inf-etiqueta { display: flex; align-items: center; gap: 6px; color: var(--i-acento); font-weight: 600; }
+.inf-monto-valor {
+  margin-top: 4px;
+  font-size: calc(24px * var(--escala-texto));
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--i-tinta);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.inf-monto-detalle { margin-top: 4px; font-size: calc(12.5px * var(--escala-texto)); color: var(--i-tenue); font-variant-numeric: tabular-nums; }
+.inf-monto.total { background: var(--i-acento); border-color: var(--i-acento); }
+.inf-monto.total .inf-etiqueta, .inf-monto.total .inf-monto-valor { color: #fff; }
+.inf-montos.grandes .inf-monto { padding: 18px 20px; }
+.inf-montos.grandes .inf-monto-valor { font-size: calc(32px * var(--escala-texto)); }

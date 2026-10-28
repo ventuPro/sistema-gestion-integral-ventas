@@ -1,10 +1,11 @@
 import { Component, computed, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X, Printer } from 'lucide-angular';
+import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X, Printer, Banknote, QrCode, Wallet } from 'lucide-angular';
+import { METODO_PAGO } from '../../../core/utils/metodos-pago';
 import { CajaService } from '../../../core/services/caja.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
-import { cifra, entero, porcentaje, fechaLarga, fechaHora, hora, temaGrafico } from '../../../core/utils/informe';
+import { cifra, entero, fechaLarga, fechaHora, hora } from '../../../core/utils/informe';
 import { SesionService } from '../../../core/services/sesion.service';
 import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 import { DatosTicket, TicketComponent } from '../../shared/ticket/ticket.component';
@@ -24,17 +25,17 @@ const DENOMINACIONES = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1];
 export class ArqueoComponent implements OnInit {
   private readonly sesion = inject(SesionService);
   private cajaService = inject(CajaService);
-  private ajustes     = inject(AjustesService);
+  readonly ajustes    = inject(AjustesService);
   private impresion   = inject(ImpresionService);
   private dialogo     = inject(DialogoService);
   readonly moneda     = this.ajustes.moneda;
 
-  readonly icons = { actualizar: RotateCw, abajo: ChevronDown, derecha: ChevronRight, cerrar: X, imprimir: Printer };
+  readonly icons = { actualizar: RotateCw, abajo: ChevronDown, derecha: ChevronRight, cerrar: X, imprimir: Printer,
+                     efectivo: Banknote, qr: QrCode, total: Wallet };
   readonly cifra = cifra;
   readonly entero = entero;
   readonly hora = hora;
   readonly fechaHora = fechaHora;
-  readonly porcentaje = porcentaje;
   readonly hoyTexto = fechaLarga(new Date());
   readonly denominaciones = DENOMINACIONES;
 
@@ -82,17 +83,9 @@ export class ArqueoComponent implements OnInit {
     return new Date(f).toDateString() === new Date().toDateString() ? hora(f) : fechaHora(f);
   }
 
-  readonly metodosHoy = computed(() => {
-    const m = new Map<string, { metodo: string; ventas: number; total: number }>();
-    for (const v of this.arqueo().ventas || []) {
-      const x = m.get(v.metodo_pago) || { metodo: v.metodo_pago, ventas: 0, total: 0 };
-      x.ventas++; x.total += Number(v.monto_total_venta);
-      m.set(v.metodo_pago, x);
-    }
-    return [...m.values()].sort((a, b) => b.total - a.total);
-  });
-
-  colorSerie(i: number): string { return temaGrafico(this.ajustes).serie[i % 6]; }
+  /** Cobrado por QR en el turno */
+  readonly cobradoQr = computed(() =>
+    Number(this.tr().metodos.find((m: any) => m.metodo_pago === METODO_PAGO.qr)?.total) || 0);
 
   // ─── Conteo de efectivo ───
   readonly conBilletes = computed(() => /^bs/i.test(this.moneda().trim()));
