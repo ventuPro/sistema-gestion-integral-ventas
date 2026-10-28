@@ -156,7 +156,9 @@ const cerrarCuenta = async (req, res) => {
         if (e.message === 'NADA_POR_COBRAR')
             return res.status(409).json({ error: 'No hay nada pendiente de cobro para ese cliente' });
         if (e.message === 'CAJA_CERRADA')
-            return res.status(403).json({ error: 'Tu caja está cerrada. Abre un turno para cobrar.' });
+            return res.status(403).json({ error: Number(req.usuario.id_rol) === 1
+                ? 'No tienes una caja abierta. Ábrela en «Punto de venta» para cobrar.'
+                : 'Tu caja está cerrada. Pide al administrador que la reabra.' });
         if (e.code === 'DESCUENTO_INVALIDO')
             return res.status(400).json({ error: e.message });
         console.error('cerrarCuenta:', e);

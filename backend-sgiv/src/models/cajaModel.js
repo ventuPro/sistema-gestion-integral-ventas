@@ -573,15 +573,17 @@ const registrarVenta = async ({
     try {
         await client.query('BEGIN');
 
-        // 1. VALIDACIÓN OBLIGATORIA: el cajero debe tener turno abierto
+        // 1. VALIDACIÓN OBLIGATORIA: el cajero debe tener turno abierto.
+        //    La venta y el stock son siempre de la sucursal del turno (no de lo que diga la pantalla).
         const rTurno = await client.query(`
-            SELECT id_turno FROM turno_caja
+            SELECT id_turno, id_sucursal FROM turno_caja
             WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto'
             ORDER BY fecha_hora_apertura DESC LIMIT 1
         `, [id_usuario_cajero]);
 
         if (rTurno.rows.length === 0) throw new Error('CAJA_CERRADA');
         const id_turno = rTurno.rows[0].id_turno;
+        id_sucursal = rTurno.rows[0].id_sucursal;
 
         // 2. Precios, promociones y total se calculan con la BD; del cliente solo se toman
         //    producto, cantidad y el descuento manual. Si el total que vio el cajero no

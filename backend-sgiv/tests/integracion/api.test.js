@@ -246,6 +246,28 @@ describe('Punto de venta', () => {
         assert.equal(await stock(queque), 19);
     });
 
+    test('la venta queda en la sucursal del turno aunque la pantalla mande otra', async () => {
+        const [otra] = await bd.sql(`INSERT INTO sucursal (nombre_sucursal) VALUES ('Sucursal ajena POS') RETURNING id_sucursal`);
+        await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES ($1, $2, 50)`, [otra.id_sucursal, queque]);
+        const antes = await stock(queque);
+        const r = await cobrar({ id_sucursal: otra.id_sucursal, monto_total_venta: 10, detalles: [{ id_producto: queque, cantidad: 1 }] });
+        assert.equal(r.status, 201, JSON.stringify(r.body));
+        const [v] = await bd.sql(`SELECT v.id_sucursal, t.id_sucursal AS turno FROM venta_caja v JOIN turno_caja t USING (id_turno) WHERE v.id_venta = $1`, [r.body.id_venta]);
+        assert.deepEqual(v, { id_sucursal: 1, turno: 1 });
+        assert.equal(await stock(queque), antes - 1, 'descuenta de la sucursal del turno');
+        const [ajena] = await bd.sql(`SELECT cantidad_actual FROM inventario_sucursal WHERE id_sucursal = $1 AND id_producto = $2`, [otra.id_sucursal, queque]);
+        assert.equal(ajena.cantidad_actual, 50, 'la otra sucursal no se toca');
+    });
+
+    test('el cajero solo abre caja en su sucursal', async () => {
+        await crearUsuario('cajero.abre@prueba.com', 2);
+        const t = await login('cajero.abre@prueba.com');
+        const [otra] = await bd.sql(`INSERT INTO sucursal (nombre_sucursal) VALUES ('Sucursal ajena caja') RETURNING id_sucursal`);
+        const r = await api('POST', '/caja/turnos/abrir', { token: t, body: { id_sucursal: otra.id_sucursal, monto_inicial: 50 } });
+        assert.equal(r.status, 201, JSON.stringify(r.body));
+        assert.equal(Number(r.body.turno.id_sucursal), 1);
+    });
+
     test('precio unitario manipulado en el detalle → se guarda el precio real', async () => {
         const r = await cobrar({
             monto_total_venta: 25.5,

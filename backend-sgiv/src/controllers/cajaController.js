@@ -92,7 +92,7 @@ const getTurnoHoy = async (req, res) => {
 const abrirCaja = async (req, res) => {
     try {
         const { id_sucursal, monto_inicial } = req.body;
-        const sucursal = Number(id_sucursal) || req.usuario.id_sucursal;
+        const sucursal = sucursalDe(req, id_sucursal);
         if (!(await sucursalModel.estaActiva(sucursal)))
             return res.status(400).json({ error: 'La sucursal está desactivada: no se puede abrir caja.' });
         const turno = await cajaModel.abrirTurno(
@@ -206,7 +206,9 @@ const cobrarVenta = async (req, res) => {
         if (e.message === 'CAJA_CERRADA')
             return res.status(403).json({
                 error: 'CAJA_CERRADA',
-                detalle: 'Tu caja está cerrada. Pide al administrador que la reabra.'
+                detalle: Number(req.usuario.id_rol) === 1
+                    ? 'No tienes una caja abierta. Ábrela en «Punto de venta» para cobrar.'
+                    : 'Tu caja está cerrada. Pide al administrador que la reabra.'
             });
         if (e.code === 'STOCK_INSUFICIENTE')
             return res.status(409).json({ error: 'STOCK_INSUFICIENTE', detalle: e.message });

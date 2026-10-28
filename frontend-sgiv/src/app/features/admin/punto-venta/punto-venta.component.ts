@@ -245,16 +245,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   verificarAccesoCaja() {
     this.verificandoCaja.set(true);
 
-    // Admin: acceso libre (no opera caja)
-    if (this.sesion.esAdmin()) {
-      this.estadoCaja.set('ABIERTA');
-      this.puedeVender.set(true);
-      this.verificandoCaja.set(false);
-      this.cargarCatalogo();
-      this.cargarVentasHoy();
-      return;
-    }
-
+    // Admin y cajero por igual: para vender hay que tener la caja propia abierta
     this.cajaService.obtenerEstadoCompleto().subscribe({
       next: (res) => this.aplicarEstado(res),
       error: () => {
@@ -294,7 +285,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.detenerSondeo?.();
     // Cada 30s reverificar — si el admin cierra desde Usuarios, bloqueamos rápido
     this.detenerSondeo = sondeo(() => {
-      if (this.sesion.esAdmin()) return;
       this.cajaService.obtenerEstadoCompleto().subscribe({
         next: (res) => {
           if (res.estado !== this.estadoCaja()) this.aplicarEstado(res);
@@ -526,7 +516,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       error: (e: any) => {
         // CAJA_CERRADA → reverificar estado y bloquear
         if (e?.error?.error === 'CAJA_CERRADA') {
-          this.dialogo.error('La caja fue cerrada. Pide al administrador que la reabra.');
+          this.dialogo.error(e?.error?.detalle || 'La caja fue cerrada. Pide al administrador que la reabra.');
           this.verificarAccesoCaja();
           this.cargando.set(false);
           return;
