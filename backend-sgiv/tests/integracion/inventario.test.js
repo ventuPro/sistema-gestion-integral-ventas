@@ -121,7 +121,7 @@ describe('Inventario: entradas y mermas', () => {
         assert.equal(m.tipo_movimiento, 'INGRESO');
         assert.equal(m.cantidad_movida, 12);
         assert.equal(m.motivo_movimiento, 'Producción');
-        assert.equal(m.detalle, 'Hornada de la mañana');
+        assert.equal(m.detalle, 'HORNADA DE LA MAÑANA', 'el inventario se guarda en mayúsculas');
         assert.equal(m.stock_resultante, 15);
         assert.ok(m.usuario);
     });
@@ -330,13 +330,26 @@ describe('Menú QR: orden de categorías y ficha del producto', () => {
         assert.ok(menu.indexOf('Prod B') < menu.indexOf('Prod A'));
     });
 
+    test('nombre, descripción y categoría se guardan en mayúsculas; la categoría solo admite letras', async () => {
+        const id = await crearProducto('Torta mayus', 1);
+        const r = await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: {
+            nombre_producto: 'Fanta 500 ml', descripcion_producto: 'Bien fría', precio_unitario: 7 } });
+        assert.equal(r.status, 200);
+        assert.equal(r.body.producto.nombre_producto, 'FANTA 500 ML');
+        assert.equal(r.body.producto.descripcion_producto, 'BIEN FRÍA');
+        const c = await api('POST', '/catalogo/categorias', { token: tAdmin, body: { nombre_categoria: ' Tés y cafés ' } });
+        assert.equal(c.status, 201, JSON.stringify(c.body));
+        assert.equal(c.body.categoria.nombre_categoria, 'TÉS Y CAFÉS');
+        assert.equal((await api('POST', '/catalogo/categorias', { token: tAdmin, body: { nombre_categoria: 'Bebidas 2' } })).status, 400);
+    });
+
     test('ingredientes, preparación, recomendado y visibilidad en el menú se guardan y llegan al cliente', async () => {
         const id = await crearProducto('Torta ficha', 4);
         const r = await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: {
             nombre_producto: 'Torta ficha', precio_unitario: 10,
             ingredientes: '  Harina, huevo, chocolate  ', preparacion: 'Horneamos\nRellenamos', destacado: true } });
         assert.equal(r.status, 200);
-        assert.equal(r.body.producto.ingredientes, 'Harina, huevo, chocolate');
+        assert.equal(r.body.producto.ingredientes, 'HARINA, HUEVO, CHOCOLATE');
         assert.equal(r.body.producto.destacado, true);
         assert.ok(r.body.producto.id_categoria, 'lo que no se envía no se borra');
 
@@ -344,7 +357,7 @@ describe('Menú QR: orden de categorías y ficha del producto', () => {
                                      VALUES (1, 92, md5(random()::text)) RETURNING codigo_qr`);
         const enMenu = async () => (await api('GET', `/menu/m/${mesa.codigo_qr}/catalogo`)).body.find(p => p.id_producto === id);
         const p = await enMenu();
-        assert.deepEqual([p.ingredientes, p.preparacion, p.destacado], ['Harina, huevo, chocolate', 'Horneamos\nRellenamos', true]);
+        assert.deepEqual([p.ingredientes, p.preparacion, p.destacado], ['HARINA, HUEVO, CHOCOLATE', 'HORNEAMOS\nRELLENAMOS', true]);
 
         await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: { ingredientes: '', mostrar_en_menu: false } });
         assert.equal(await enMenu(), undefined);
@@ -382,7 +395,7 @@ describe('Transferencias entre sucursales', () => {
 
         const det = await api('GET', `/inventario/transferencias/${id}`, { token: tCajero });
         assert.equal(det.status, 200);
-        assert.equal(det.body.observacion, 'Para el sábado');
+        assert.equal(det.body.observacion, 'PARA EL SÁBADO');
         assert.equal(det.body.usuario, 'cajero.inv@prueba.com');
         assert.deepEqual(det.body.items.map(i => [i.nombre_producto, i.cantidad]),
                          [['Pie transferido', 3], ['Torta transferida', 20]]);

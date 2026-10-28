@@ -1,4 +1,5 @@
 const inventarioModel = require('../models/inventarioModel');
+const { mayusculas } = require('../utils/texto');
 const transferenciaModel = require('../models/transferenciaModel');
 const listaDiaModel = require('../models/listaDiaModel');
 const { emitirStock, emitirCajeros } = require('../utils/tiempoReal');
@@ -21,7 +22,7 @@ const registrarMovimiento = async (req, res) => {
     try {
         const { id_producto, tipo, motivo } = req.body || {};
         const cantidad = Number(req.body?.cantidad);
-        const detalle  = String(req.body?.detalle ?? '').trim() || null;
+        const detalle  = mayusculas(String(req.body?.detalle ?? '').trim() || null);
 
         const id_sucursal = sucursalPermitida(req, req.body?.id_sucursal);
         if (!id_sucursal) return res.status(403).json({ error: 'Solo puedes mover el inventario de tu sucursal' });

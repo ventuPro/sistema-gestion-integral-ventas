@@ -1,6 +1,23 @@
 /* You can add global styles to this file, and also import other style files */
 
 @import 'tailwindcss';
+@import '@fontsource-variable/atkinson-hyperlegible-next';
+
+/* ─── Letra del sistema ───
+   Atkinson Hyperlegible: hecha para leerse fácil (distingue 0/O y 1/l/I).
+   Todos los tamaños de letra se multiplican por --escala-texto; el menú QR del cliente usa 1. */
+:root { --escala-texto: 1.1; }
+
+@theme inline {
+  --font-sans: 'Atkinson Hyperlegible Next Variable', ui-sans-serif, system-ui, sans-serif;
+  --text-xs:   calc(0.75rem * var(--escala-texto));
+  --text-sm:   calc(0.875rem * var(--escala-texto));
+  --text-base: calc(1rem * var(--escala-texto));
+  --text-lg:   calc(1.125rem * var(--escala-texto));
+  --text-xl:   calc(1.25rem * var(--escala-texto));
+  --text-2xl:  calc(1.5rem * var(--escala-texto));
+  --text-3xl:  calc(1.875rem * var(--escala-texto));
+}
 
 /* ─── Modo oscuro (Ajustes → Apariencia) ───
    AjustesService pone la clase .tema-oscuro en <html>. Las reglas usan :where()

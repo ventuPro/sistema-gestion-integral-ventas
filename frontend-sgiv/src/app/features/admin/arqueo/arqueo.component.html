@@ -98,7 +98,7 @@
                     @for (d of denominaciones; track d) {
                       <label>
                         <span class="inf-tenue">{{ d >= 1 ? d : (d * 100) + ' ctv.' }}</span>
-                        <input type="number" min="0" step="1" placeholder="0" [(ngModel)]="conteo()[d]" (ngModelChange)="actualizarConteo()">
+                        <input type="number" min="0" step="1" inputmode="numeric" placeholder="0" [(ngModel)]="conteo()[d]" (ngModelChange)="actualizarConteo()">
                       </label>
                     }
                   </div>
@@ -145,7 +145,7 @@
     @if (!turno()) {
       <section class="inf-hoja p-6 flex items-start gap-4">
         <span class="inf-estado aviso mt-1"></span>
-        <p class="inf-tinta font-semibold text-[14px]">No abriste caja hoy</p>
+        <p class="inf-tinta font-semibold text-[length:calc(14px*var(--escala-texto))]">No abriste caja hoy</p>
       </section>
     }
 
@@ -215,7 +215,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="mostrarConfirmCierre.set(false)">
     <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">¿Cerrar la caja?</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">¿Cerrar la caja?</h3>
         <button class="inf-tenue" (click)="mostrarConfirmCierre.set(false)" aria-label="Cancelar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
@@ -244,7 +244,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="comprobante.set(null)">
     <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">Comprobante #{{ c.id_venta }}</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Comprobante #{{ c.id_venta }}</h3>
         <button class="quitar" (click)="comprobante.set(null)" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>

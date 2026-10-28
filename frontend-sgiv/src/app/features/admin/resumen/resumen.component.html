@@ -185,7 +185,7 @@
         @for (t of datos().turnos_abiertos; track t.id_turno) {
           <div class="turno">
             <div class="flex items-baseline justify-between gap-2">
-              <p class="inf-tinta font-semibold text-[13.5px] truncate">{{ t.cajero }}</p>
+              <p class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))] truncate">{{ t.cajero }}</p>
               <p class="inf-tenue text-xs whitespace-nowrap">desde {{ desde(t.fecha_hora_apertura) }}</p>
             </div>
             @if (todas()) { <p class="inf-sub mt-0!">{{ t.nombre_sucursal }}</p> }
@@ -215,7 +215,7 @@
         @for (p of datos().stock_critico; track $index) {
           <div class="flex items-center gap-3 py-2 fila-stock">
             <div class="min-w-0 flex-1">
-              <p class="text-[13px] inf-tinta truncate">{{ p.nombre_producto }}</p>
+              <p class="text-[length:calc(13px*var(--escala-texto))] inf-tinta truncate">{{ p.nombre_producto }}</p>
               @if (todas()) { <p class="inf-sub mt-0!">{{ p.nombre_sucursal }}</p> }
             </div>
             @if (p.cantidad_actual <= 0) {
@@ -276,10 +276,10 @@
               <li class="venta">
                 <span class="venta-hora">{{ hora(v.fecha_venta) }}</span>
                 <div class="min-w-0 flex-1">
-                  <p class="text-[13px] inf-tinta truncate">{{ v.cajero || 'Sin cajero' }}</p>
+                  <p class="text-[length:calc(13px*var(--escala-texto))] inf-tinta truncate">{{ v.cajero || 'Sin cajero' }}</p>
                   <p class="inf-sub mt-0! truncate">{{ v.unidades }} uds. · {{ v.metodo_pago }}@if (todas()) { · {{ v.nombre_sucursal }} }</p>
                 </div>
-                <span class="inf-tinta font-semibold text-[13.5px] whitespace-nowrap">{{ moneda() }} {{ cifra(v.monto) }}</span>
+                <span class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))] whitespace-nowrap">{{ moneda() }} {{ cifra(v.monto) }}</span>
               </li>
             }
           </ul>

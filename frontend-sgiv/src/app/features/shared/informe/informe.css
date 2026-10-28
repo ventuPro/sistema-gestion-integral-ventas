@@ -39,7 +39,7 @@
 
 /* Encabezado de pantalla */
 .inf-antetitulo {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   color: var(--i-tenue);
   display: flex;
   align-items: center;
@@ -47,7 +47,7 @@
   gap: 6px 10px;
 }
 .inf-titulo {
-  font-size: 24px;
+  font-size: calc(24px * var(--escala-texto));
   line-height: 1.2;
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -81,7 +81,7 @@
 .inf-pie-hoja {
   border-top: 1px solid var(--i-linea);
   padding: 10px 20px;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-texto));
   color: var(--i-tenue);
 }
 
@@ -93,7 +93,7 @@
   margin-bottom: 14px;
 }
 .inf-seccion h2 {
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--escala-texto));
   font-weight: 600;
   color: var(--i-tinta);
   white-space: nowrap;
@@ -107,25 +107,25 @@
 }
 .inf-seccion .inf-nota { order: 3; }
 .inf-indice {
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-texto));
   font-weight: 600;
   color: var(--i-acento);
   letter-spacing: 0.04em;
 }
 .inf-nota {
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-texto));
   color: var(--i-tenue);
   white-space: nowrap;
 }
 
 /* Cifras */
 .inf-etiqueta {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   font-weight: 500;
   color: var(--i-tenue);
 }
 .inf-cifra-xl {
-  font-size: 44px;
+  font-size: calc(44px * var(--escala-texto));
   line-height: 1.05;
   font-weight: 600;
   letter-spacing: -0.025em;
@@ -141,7 +141,7 @@
   vertical-align: 0.65em;
 }
 .inf-valor {
-  font-size: 21px;
+  font-size: calc(21px * var(--escala-texto));
   line-height: 1.2;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -149,7 +149,7 @@
   margin-top: 4px;
 }
 .inf-sub {
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-texto));
   color: var(--i-sutil);
   margin-top: 3px;
 }
@@ -161,7 +161,7 @@
   gap: 3px;
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-texto));
   font-weight: 600;
   white-space: nowrap;
 }
@@ -169,7 +169,7 @@
 .inf-delta.baja { color: var(--i-baja); background: color-mix(in oklab, var(--i-baja) 12%, transparent); }
 .inf-delta.igual { color: var(--i-tenue); background: var(--i-linea-suave); }
 .inf-comparacion {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   color: var(--i-tenue);
   display: flex;
   align-items: center;
@@ -196,15 +196,15 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-texto));
 }
 .inf-pares dt { color: var(--i-tenue); }
 .inf-pares dd { color: var(--i-tinta); font-weight: 600; text-align: right; }
 
 /* Tablas */
-.inf-tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.inf-tabla { width: 100%; border-collapse: collapse; font-size: calc(13.5px * var(--escala-texto)); }
 .inf-tabla th {
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--escala-texto));
   font-weight: 500;
   color: var(--i-tenue);
   text-align: left;
@@ -229,8 +229,8 @@
 }
 .inf-tabla .num { text-align: right; white-space: nowrap; }
 .inf-tabla .fuerte { color: var(--i-tinta); font-weight: 600; }
-.inf-tabla .rango { color: var(--i-sutil); font-size: 12px; width: 36px; }
-.inf-secundario { display: block; font-size: 12px; color: var(--i-sutil); margin-top: 1px; }
+.inf-tabla .rango { color: var(--i-sutil); font-size: calc(12px * var(--escala-texto)); width: 36px; }
+.inf-secundario { display: block; font-size: calc(12px * var(--escala-texto)); color: var(--i-sutil); margin-top: 1px; }
 
 /* Barras de proporción */
 .inf-barra {
@@ -274,7 +274,7 @@
 .inf-pestanas::-webkit-scrollbar { display: none; }
 .inf-pestanas button {
   padding: 4px 0 7px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   font-weight: 500;
   color: var(--i-tenue);
   border-bottom: 2px solid transparent;
@@ -298,7 +298,7 @@
 .inf-segmentos button {
   padding: 5px 11px;
   border-radius: 6px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   font-weight: 500;
   color: var(--i-tenue);
   white-space: nowrap;
@@ -322,7 +322,7 @@
   border: 1px solid var(--i-linea);
   background: var(--i-papel);
   color: var(--i-texto);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   font-weight: 500;
   white-space: nowrap;
   transition: background-color 120ms ease, border-color 120ms ease;
@@ -330,7 +330,7 @@
 .inf-boton:hover { background: var(--i-fondo); border-color: var(--i-sutil); }
 .inf-boton.activo { border-color: var(--i-acento); color: var(--i-acento); background: var(--i-acento-suave); }
 .inf-enlace {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   font-weight: 500;
   color: var(--i-acento);
 }
@@ -342,7 +342,7 @@
   border: 1px solid var(--i-linea);
   background: var(--i-papel);
   color: var(--i-tinta);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   outline: none;
 }
 .inf-campo:focus { border-color: var(--i-acento); box-shadow: 0 0 0 3px var(--i-acento-suave); }
@@ -352,7 +352,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--escala-texto));
   font-weight: 600;
   white-space: nowrap;
 }
@@ -372,7 +372,7 @@
   display: inline-block;
   padding: 1px 7px;
   border-radius: 4px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--escala-texto));
   font-weight: 500;
   color: var(--i-texto);
   background: var(--i-linea-suave);
@@ -382,7 +382,7 @@
 .inf-vacio {
   padding: 22px 8px;
   text-align: center;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   color: var(--i-sutil);
 }
 
@@ -390,7 +390,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--escala-texto));
   color: var(--i-tenue);
 }
 .inf-leyenda span { display: inline-flex; align-items: center; gap: 6px; }

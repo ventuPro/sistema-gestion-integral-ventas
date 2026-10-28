@@ -11,7 +11,7 @@
     <div class="flex items-center gap-2">
       <input class="campo w-28!" [id]="c.clave" [name]="c.clave" type="number" [min]="c.min" [max]="c.max" step="1"
              [(ngModel)]="$any(p())[c.clave]">
-      <span class="inf-tenue text-[13px]">{{ c.unidad }}</span>
+      <span class="inf-tenue text-[length:calc(13px*var(--escala-texto))]">{{ c.unidad }}</span>
     </div>
   </div>
 </ng-template>
@@ -81,7 +81,7 @@
               @else { <lucide-icon [img]="icons.imagen" class="w-8 h-8"></lucide-icon> }
             </div>
             <div class="space-y-2">
-              <p class="inf-tinta text-[13.5px] font-medium">QR de cobro <span class="inf-sutil font-normal">(opcional)</span></p>
+              <p class="inf-tinta text-[length:calc(13.5px*var(--escala-texto))] font-medium">QR de cobro <span class="inf-sutil font-normal">(opcional)</span></p>
               <div class="flex gap-2">
                 <label class="inf-boton cursor-pointer">
                   <lucide-icon [img]="icons.subir" class="w-3.5 h-3.5"></lucide-icon> {{ qrVista() ? 'Cambiar' : 'Subir' }}

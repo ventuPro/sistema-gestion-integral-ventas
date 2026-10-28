@@ -332,7 +332,7 @@
             </div>
           } @else {
             <form class="flex gap-2" (submit)="$event.preventDefault(); guardarNombre()">
-              <input class="campo flex-1" [(ngModel)]="nombreEditado" name="nombre" maxlength="40" placeholder="Tu nombre"
+              <input class="campo flex-1" data-solo-letras [(ngModel)]="nombreEditado" name="nombre" maxlength="40" placeholder="Tu nombre"
                      aria-label="Tu nombre" autocomplete="given-name">
               <button type="submit" class="boton-primario py-2!">Listo</button>
             </form>

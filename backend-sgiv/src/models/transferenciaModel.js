@@ -29,7 +29,7 @@ const normalizarItems = (items) => {
 
 const crear = async ({ id_origen, id_destino, id_usuario, items, observacion }) => {
     const lista = normalizarItems(items);
-    const nota = String(observacion ?? '').trim().slice(0, MAX_OBSERVACION) || null;
+    const nota = String(observacion ?? '').trim().slice(0, MAX_OBSERVACION).toLocaleUpperCase('es') || null;
     if (!Number.isInteger(id_origen) || !Number.isInteger(id_destino)) throw error('INVALIDA', 'Sucursal inválida');
     if (id_origen === id_destino) throw error('INVALIDA', 'El origen y el destino deben ser sucursales distintas');
 

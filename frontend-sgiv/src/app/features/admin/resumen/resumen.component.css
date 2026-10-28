@@ -26,7 +26,7 @@
 .venta + .venta { border-top: 1px solid var(--i-linea-suave); }
 
 .venta-hora {
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-texto));
   font-weight: 500;
   color: var(--i-tenue);
   width: 38px;

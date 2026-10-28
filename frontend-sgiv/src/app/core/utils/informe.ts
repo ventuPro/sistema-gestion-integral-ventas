@@ -69,6 +69,10 @@ export function temaGrafico(ajustes: AjustesService): TemaGrafico {
   };
 }
 
+/** Tamaño de letra de los gráficos con la escala de letra del sistema */
+const letra = (px: number) =>
+  Math.round(px * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--escala-texto')) || 1));
+
 /** Opciones comunes de Chart.js con el estilo del informe */
 export function opcionesBase(t: TemaGrafico, formatoY: (v: number) => string): any {
   return {
@@ -83,20 +87,20 @@ export function opcionesBase(t: TemaGrafico, formatoY: (v: number) => string): a
         titleColor: t.fondoTooltip === '#0f172a' ? '#f8fafc' : '#0f172a',
         bodyColor:  t.fondoTooltip === '#0f172a' ? '#e2e8f0' : '#1e293b',
         padding: 10, cornerRadius: 6, displayColors: false,
-        titleFont: { size: 11, weight: '600' }, bodyFont: { size: 12 }
+        titleFont: { size: letra(11), weight: '600' }, bodyFont: { size: letra(12) }
       }
     },
     scales: {
       x: {
         grid: { display: false },
         border: { color: t.rejilla },
-        ticks: { color: t.texto, font: { size: 11 }, maxRotation: 0, autoSkipPadding: 8 }
+        ticks: { color: t.texto, font: { size: letra(11) }, maxRotation: 0, autoSkipPadding: 8 }
       },
       y: {
         beginAtZero: true,
         grid: { color: t.rejilla },
         border: { display: false },
-        ticks: { color: t.texto, font: { size: 11 }, maxTicksLimit: 5, callback: (v: number) => formatoY(v) }
+        ticks: { color: t.texto, font: { size: letra(11) }, maxTicksLimit: 5, callback: (v: number) => formatoY(v) }
       }
     }
   };

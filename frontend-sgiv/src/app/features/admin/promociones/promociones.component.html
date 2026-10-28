@@ -8,7 +8,7 @@
       </p>
       <h1 class="inf-titulo">Promociones</h1>
     </div>
-    <button class="boton-primario py-1.5! text-[12.5px]!" (click)="abrirNueva()">
+    <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!" (click)="abrirNueva()">
       <lucide-icon [img]="icons.nueva" class="w-3.5 h-3.5"></lucide-icon> Nueva promoción
     </button>
   </header>
@@ -107,7 +107,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModal()">
     <form class="inf-hoja ventana w-full max-w-2xl max-h-[92vh] flex flex-col" (ngSubmit)="guardar()" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">{{ formulario().id_promocion ? 'Editar promoción' : 'Nueva promoción' }}</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">{{ formulario().id_promocion ? 'Editar promoción' : 'Nueva promoción' }}</h3>
         <button type="button" class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
@@ -153,11 +153,11 @@
             <div class="flex items-end gap-3">
               <div class="grupo">
                 <label class="inf-etiqueta" for="promo-lleva">Lleva</label>
-                <input id="promo-lleva" name="lleva" type="number" min="2" max="20" class="campo w-24!" [(ngModel)]="formulario().lleva">
+                <input id="promo-lleva" name="lleva" type="number" min="2" max="20" step="1" inputmode="numeric" class="campo w-24!" [(ngModel)]="formulario().lleva">
               </div>
               <div class="grupo">
                 <label class="inf-etiqueta" for="promo-paga">Paga</label>
-                <input id="promo-paga" name="paga" type="number" min="1" max="19" class="campo w-24!" [(ngModel)]="formulario().paga">
+                <input id="promo-paga" name="paga" type="number" min="1" max="19" step="1" inputmode="numeric" class="campo w-24!" [(ngModel)]="formulario().paga">
               </div>
               @if (formulario().lleva && formulario().paga) {
                 <span class="inf-ficha mb-2">{{ formulario().lleva }}×{{ formulario().paga }}</span>

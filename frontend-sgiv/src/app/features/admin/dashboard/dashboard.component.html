@@ -24,7 +24,7 @@
     <nav class="flex-1 px-3 py-4 overflow-y-auto">
       @for (seccion of secciones(); track seccion.titulo; let primera = $first) {
         @if (!primera) { <div class="border-t border-gray-800 my-3"></div> }
-        <p class="text-gray-500 text-[11px] font-semibold uppercase tracking-widest px-3 pb-2">{{ seccion.titulo }}</p>
+        <p class="text-gray-500 text-[length:calc(11px*var(--escala-texto))] font-semibold uppercase tracking-widest px-3 pb-2">{{ seccion.titulo }}</p>
         <div class="space-y-1">
           @for (item of seccion.enlaces; track item.ruta) {
             @if (!item.modulo || tiene(item.modulo)) {
@@ -102,13 +102,13 @@
         <lucide-icon [img]="icons.menu" class="w-5 h-5"></lucide-icon>
       </button>
       @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="w-8 h-8 object-contain rounded-md bg-white/10 p-0.5"> }
-      <span class="font-semibold text-[15px] truncate flex-1">{{ ajustes.nombre() }}</span>
+      <span class="font-semibold text-[length:calc(15px*var(--escala-texto))] truncate flex-1">{{ ajustes.nombre() }}</span>
       @if (bandeja(); as b) {
         <button class="relative p-2 rounded-md hover:bg-gray-800" (click)="abrirBandeja()" aria-label="Pedidos QR"
                 [class.text-amber-300]="b.conteo().pendientes">
           <lucide-icon [img]="icons.pedidos" class="w-5 h-5"></lucide-icon>
           @if (b.conteo().pendientes + b.conteo().porEntregar) {
-            <span class="absolute top-0.5 right-0.5 contador-pedidos min-w-4! h-4! text-[10px]!"
+            <span class="absolute top-0.5 right-0.5 contador-pedidos min-w-4! h-4! text-[length:calc(10px*var(--escala-texto))]!"
                   [class]="b.conteo().pendientes ? 'bg-amber-500 text-gray-900' : 'bg-blue-600 text-white'">
               {{ b.conteo().pendientes || b.conteo().porEntregar }}
             </span>

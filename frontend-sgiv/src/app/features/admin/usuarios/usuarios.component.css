@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-texto));
   font-weight: 600;
   color: var(--i-acento);
   background: var(--i-acento-suave);
@@ -24,7 +24,7 @@ tr.inactivo .avatar { color: var(--i-sutil); background: var(--i-linea-suave); }
   padding: 8px 11px;
   border: 1px solid var(--i-linea);
   border-radius: 7px;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--escala-texto));
   color: var(--i-texto);
   cursor: pointer;
   transition: border-color 120ms ease, background-color 120ms ease;

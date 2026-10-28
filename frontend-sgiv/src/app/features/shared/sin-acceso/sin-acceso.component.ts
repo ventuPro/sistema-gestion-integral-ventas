@@ -44,7 +44,7 @@ import { SesionService } from '../../../core/services/sesion.service';
               <lucide-icon [img]="icons.cart" class="w-5 h-5"></lucide-icon>
             </div>
             <p class="text-xs font-bold text-slate-700">Toma pedidos</p>
-            <p class="text-[11px] text-slate-500 mt-0.5">desde Mesas o POS</p>
+            <p class="text-[length:calc(11px*var(--escala-texto))] text-slate-500 mt-0.5">desde Mesas o POS</p>
           </div>
 
           <div class="group bg-white/80 backdrop-blur border border-indigo-100 hover:border-indigo-300 rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
@@ -52,7 +52,7 @@ import { SesionService } from '../../../core/services/sesion.service';
               <lucide-icon [img]="icons.wallet" class="w-5 h-5"></lucide-icon>
             </div>
             <p class="text-xs font-bold text-slate-700">Registra ventas</p>
-            <p class="text-[11px] text-slate-500 mt-0.5">en Punto de Venta</p>
+            <p class="text-[length:calc(11px*var(--escala-texto))] text-slate-500 mt-0.5">en Punto de Venta</p>
           </div>
 
           <div class="group bg-white/80 backdrop-blur border border-sky-100 hover:border-sky-300 rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
@@ -60,7 +60,7 @@ import { SesionService } from '../../../core/services/sesion.service';
               <lucide-icon [img]="icons.receipt" class="w-5 h-5"></lucide-icon>
             </div>
             <p class="text-xs font-bold text-slate-700">Cierra tu caja</p>
-            <p class="text-[11px] text-slate-500 mt-0.5">al fin del turno</p>
+            <p class="text-[length:calc(11px*var(--escala-texto))] text-slate-500 mt-0.5">al fin del turno</p>
           </div>
         </div>
 

@@ -238,7 +238,7 @@
         <div class="inf-seccion"><span class="inf-indice">06</span><h2>Ventas por categoría</h2></div>
         @for (c of datos().por_categoria; track c.id_categoria) {
           <div class="categoria">
-            <div class="flex items-baseline justify-between gap-3 text-[13px]">
+            <div class="flex items-baseline justify-between gap-3 text-[length:calc(13px*var(--escala-texto))]">
               <span class="inf-tinta font-medium truncate">{{ c.nombre_categoria }}</span>
               <span class="inf-tinta font-semibold whitespace-nowrap">{{ moneda() }} {{ cifra(c.ingresos) }}</span>
             </div>
@@ -293,7 +293,7 @@
         <button class="sin-ventas-cabecera" (click)="verSinVentas.set(!verSinVentas())" [attr.aria-expanded]="verSinVentas()">
           <lucide-icon [img]="verSinVentas() ? icons.abajo : icons.derecha" class="w-4 h-4 inf-tenue"></lucide-icon>
           <span class="flex-1 text-left">
-            <span class="inf-tinta font-semibold text-[13.5px]">
+            <span class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))]">
               {{ datos().sin_ventas.length }} {{ datos().sin_ventas.length === 1 ? 'producto activo no se vendió' : 'productos activos no se vendieron' }}
             </span>
             <span class="inf-sub block">
@@ -342,7 +342,7 @@
                 @for (c of turnosVisibles(); track c.id_turno) {
                   <tr>
                     <td><span class="fuerte">{{ c.cajero }}</span>@if (todas()) { <span class="inf-secundario">{{ c.nombre_sucursal }}</span> }</td>
-                    <td class="inf-tenue text-[12.5px] whitespace-nowrap">
+                    <td class="inf-tenue text-[length:calc(12.5px*var(--escala-texto))] whitespace-nowrap">
                       {{ fechaHora(c.fecha_hora_apertura) }} → {{ hora(c.fecha_hora_cierre) }}
                       @if (c.cerrado_por === 'Sistema') { <span class="inf-estado aviso block">Cerrado por el sistema</span> }
                     </td>
@@ -502,7 +502,7 @@
                       <div class="inf-esqueleto h-16 my-1"></div>
                     } @else {
                       @for (c of desglosePorDia()[d.dia]?.desglose; track c.id_categoria) {
-                        <div class="flex items-center gap-3 py-1 text-[12.5px]">
+                        <div class="flex items-center gap-3 py-1 text-[length:calc(12.5px*var(--escala-texto))]">
                           <span class="w-40 truncate">{{ c.nombre_categoria }}</span>
                           <div class="inf-barra flex-1"><span [style.width.%]="c.porcentaje_dia"></span></div>
                           <span class="inf-tenue w-16 text-right">{{ c.unidades }} uds.</span>

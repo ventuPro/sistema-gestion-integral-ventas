@@ -29,8 +29,8 @@
 .acciones-mesa { display: flex; gap: 6px; margin-top: 6px; }
 .acciones-mesa .inf-boton { flex: 1; justify-content: center; }
 .acciones-mesa .inf-boton:has(> lucide-icon:only-child) { flex: 0 0 auto; }
-.mesa .numero { font-size: 26px; line-height: 1.1; font-weight: 600; letter-spacing: -0.02em; color: var(--i-tinta); }
-.mesa .total { font-size: 15px; font-weight: 600; color: var(--i-tinta); margin-top: 8px; }
+.mesa .numero { font-size: calc(26px * var(--escala-texto)); line-height: 1.1; font-weight: 600; letter-spacing: -0.02em; color: var(--i-tinta); }
+.mesa .total { font-size: calc(15px * var(--escala-texto)); font-weight: 600; color: var(--i-tinta); margin-top: 8px; }
 
 .eliminar {
   position: absolute;
@@ -43,7 +43,7 @@
 .contenedor-mesa:hover .eliminar, .eliminar:focus-visible { opacity: 1; }
 
 .aviso-local {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   padding: 8px 12px;
   border-radius: 6px;
   color: var(--i-aviso);

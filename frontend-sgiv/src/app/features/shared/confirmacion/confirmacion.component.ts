@@ -11,8 +11,8 @@ import { FondoModalDirective } from '../../../core/directives/fondo-modal.direct
     <div class="fixed inset-0 z-[70] flex items-center justify-center p-4 fondo-modal" (fondoModal)="!ocupado() && cancelar.emit()">
       <div class="inf-hoja ventana w-full max-w-sm" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
         <div class="p-5">
-          <h3 class="inf-tinta font-semibold text-[15px]">{{ titulo() }}</h3>
-          @if (mensaje()) { <p class="text-[13.5px] mt-2 leading-relaxed">{{ mensaje() }}</p> }
+          <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">{{ titulo() }}</h3>
+          @if (mensaje()) { <p class="text-[length:calc(13.5px*var(--escala-texto))] mt-2 leading-relaxed">{{ mensaje() }}</p> }
           @if (error()) { <p class="error-formulario mt-3">{{ error() }}</p> }
         </div>
         <div class="inf-pie-hoja flex justify-end gap-2">

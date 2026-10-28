@@ -5,7 +5,7 @@
       <button [class.activa]="periodo() === '7'" (click)="cambiarPeriodo('7')">7 días</button>
       <button [class.activa]="periodo() === '30'" (click)="cambiarPeriodo('30')">30 días</button>
     </div>
-    <button class="boton-primario py-1.5! text-[12.5px]! ml-auto" (click)="abrirNueva()">
+    <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]! ml-auto" (click)="abrirNueva()">
       <lucide-icon [img]="icons.transferir" class="w-3.5 h-3.5"></lucide-icon> Nueva transferencia
     </button>
   </div>
@@ -59,7 +59,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarNueva()">
     <div class="inf-hoja ventana w-full max-w-lg max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">Nueva transferencia</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Nueva transferencia</h3>
         <button class="quitar" (click)="cerrarNueva()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
@@ -97,10 +97,10 @@
             @for (l of lineas(); track l.id_producto) {
               <div class="linea-transferencia">
                 <div class="min-w-0">
-                  <p class="inf-tinta text-[13.5px] font-medium truncate">{{ l.nombre_producto }}</p>
+                  <p class="inf-tinta text-[length:calc(13.5px*var(--escala-texto))] font-medium truncate">{{ l.nombre_producto }}</p>
                   <p class="inf-sub mt-0!" [class.inf-baja]="l.cantidad > l.disponible">{{ l.disponible }} en stock</p>
                 </div>
-                <input type="number" min="1" [max]="l.disponible" class="campo cantidad" [ngModel]="l.cantidad"
+                <input type="number" min="1" step="1" inputmode="numeric" [max]="l.disponible" class="campo cantidad" [ngModel]="l.cantidad"
                        (ngModelChange)="cambiarCantidad(l, $event)" [attr.aria-label]="'Cantidad de ' + l.nombre_producto">
                 <button class="quitar" (click)="quitar(l)" aria-label="Quitar producto">
                   <lucide-icon [img]="icons.quitar" class="w-4 h-4"></lucide-icon>
@@ -112,14 +112,14 @@
 
         <div class="grupo">
           <label class="inf-etiqueta" for="obs-transferencia">Observación <span class="inf-sutil">(opcional)</span></label>
-          <input id="obs-transferencia" class="campo" [(ngModel)]="observacion" maxlength="200">
+          <input id="obs-transferencia" data-mayusculas class="campo" [(ngModel)]="observacion" maxlength="200">
         </div>
 
         @if (errorNueva()) { <p class="error-formulario">{{ errorNueva() }}</p> }
       </div>
 
       <div class="inf-pie-hoja flex items-center justify-between gap-2">
-        <span class="inf-tinta text-[13px]">{{ unidades() }} unidad(es)</span>
+        <span class="inf-tinta text-[length:calc(13px*var(--escala-texto))]">{{ unidades() }} unidad(es)</span>
         <div class="flex gap-2">
           <button class="inf-boton" (click)="cerrarNueva()">Cancelar</button>
           <button class="boton-primario" data-enter (click)="transferir()" [disabled]="enviando()">
@@ -138,7 +138,7 @@
     <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[85vh]" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <div>
-          <h3 class="inf-tinta font-semibold text-[15px]">Transferencia #{{ t.id_transferencia }}</h3>
+          <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Transferencia #{{ t.id_transferencia }}</h3>
           <p class="inf-sub mt-0! flex items-center gap-1">
             {{ t.nombre_origen }} <lucide-icon [img]="icons.hacia" class="w-3 h-3"></lucide-icon> {{ t.nombre_destino }}
           </p>

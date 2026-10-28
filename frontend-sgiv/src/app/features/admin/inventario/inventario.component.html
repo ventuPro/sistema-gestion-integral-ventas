@@ -18,7 +18,7 @@
       <button class="inf-boton" (click)="abrirModalCategoria()">
         <lucide-icon [img]="icons.etiqueta" class="w-3.5 h-3.5"></lucide-icon> Nueva categoría
       </button>
-      <button class="boton-primario py-1.5! text-[12.5px]!" (click)="abrirModalNuevo()">
+      <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!" (click)="abrirModalNuevo()">
         <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon> Nuevo producto
       </button>
     </div>
@@ -235,7 +235,7 @@
     <div class="inf-hoja ventana w-full max-w-lg max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
         <div>
-          <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId() ? 'Editar producto' : 'Nuevo producto' }}</h3>
+          <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">{{ editandoId() ? 'Editar producto' : 'Nuevo producto' }}</h3>
           <p class="inf-sub mt-0.5!">{{ sucursalSeleccionada()?.nombre_sucursal }}</p>
         </div>
         <button class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
@@ -261,12 +261,12 @@
 
         <div class="grupo">
           <label class="inf-etiqueta" for="nombre-producto">Nombre</label>
-          <input id="nombre-producto" type="text" class="campo" [(ngModel)]="formulario().nombre_producto" placeholder="Ej.: Torta de chocolate">
+          <input id="nombre-producto" type="text" data-mayusculas class="campo" [(ngModel)]="formulario().nombre_producto" placeholder="Ej.: Torta de chocolate">
         </div>
 
         <div class="grupo">
           <label class="inf-etiqueta" for="descripcion-producto">Descripción <span class="inf-sutil">(opcional)</span></label>
-          <textarea id="descripcion-producto" rows="2" class="campo" [(ngModel)]="formulario().descripcion_producto"></textarea>
+          <textarea id="descripcion-producto" data-mayusculas rows="2" class="campo" [(ngModel)]="formulario().descripcion_producto"></textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -286,7 +286,7 @@
         </div>
 
         <section class="menu-qr space-y-3" aria-labelledby="titulo-menu-qr">
-          <h4 id="titulo-menu-qr" class="inf-tinta font-semibold text-[13.5px]">Menú QR</h4>
+          <h4 id="titulo-menu-qr" class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))]">Menú QR</h4>
           <div class="flex flex-wrap gap-x-6 gap-y-3">
             <button type="button" class="interruptor" role="switch" [attr.aria-checked]="formulario().mostrar_en_menu"
                     (click)="formulario().mostrar_en_menu = !formulario().mostrar_en_menu">
@@ -299,12 +299,12 @@
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="ingredientes-producto">Ingredientes</label>
-            <textarea id="ingredientes-producto" rows="2" maxlength="400" class="campo" [(ngModel)]="formulario().ingredientes"
+            <textarea id="ingredientes-producto" data-mayusculas rows="2" maxlength="400" class="campo" [(ngModel)]="formulario().ingredientes"
                       placeholder="Ej.: harina, huevo, chocolate, crema"></textarea>
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="preparacion-producto">Preparación</label>
-            <textarea id="preparacion-producto" rows="3" maxlength="500" class="campo" [(ngModel)]="formulario().preparacion"
+            <textarea id="preparacion-producto" data-mayusculas rows="3" maxlength="500" class="campo" [(ngModel)]="formulario().preparacion"
                       placeholder="Ej.: Horneamos el bizcocho cada mañana&#10;Lo rellenamos con crema de chocolate"></textarea>
           </div>
         </section>
@@ -312,7 +312,7 @@
         @if (!editandoId()) {
           <div class="grupo">
             <label class="inf-etiqueta" for="stock-inicial">Stock inicial</label>
-            <input id="stock-inicial" type="number" min="0" class="campo" [(ngModel)]="formulario().stock_inicial" placeholder="0">
+            <input id="stock-inicial" type="number" min="0" step="1" inputmode="numeric" class="campo" [(ngModel)]="formulario().stock_inicial" placeholder="0">
           </div>
         }
       </div>
@@ -333,7 +333,7 @@
     <div class="inf-hoja ventana w-full max-w-md max-h-[92vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
         <div class="min-w-0">
-          <h3 class="inf-tinta font-semibold text-[15px]">Movimiento de inventario</h3>
+          <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Movimiento de inventario</h3>
           <p class="inf-sub mt-0.5! truncate">{{ productoMov().nombre_producto }} · {{ sucursalSeleccionada()?.nombre_sucursal }}</p>
         </div>
         <button class="quitar" (click)="cerrarMovimiento()" aria-label="Cerrar">
@@ -356,7 +356,7 @@
             <label class="inf-etiqueta" for="mov-cantidad">Cantidad</label>
             <div class="campo-monto">
               <span>{{ mov().tipo === 'INGRESO' ? '+' : '−' }}</span>
-              <input id="mov-cantidad" type="number" min="1" step="1" [(ngModel)]="mov().cantidad" placeholder="0">
+              <input id="mov-cantidad" type="number" min="1" step="1" inputmode="numeric" [(ngModel)]="mov().cantidad" placeholder="0">
             </div>
           </div>
           <div class="grupo">
@@ -371,7 +371,7 @@
           <label class="inf-etiqueta" for="mov-detalle">
             Observación <span class="inf-sutil">{{ mov().motivo === 'Otro' ? '(obligatoria)' : '(opcional)' }}</span>
           </label>
-          <textarea id="mov-detalle" class="campo" rows="2" maxlength="200" [(ngModel)]="mov().detalle"
+          <textarea id="mov-detalle" data-mayusculas class="campo" rows="2" maxlength="200" [(ngModel)]="mov().detalle"
                     placeholder="Ej.: hornada de la mañana"></textarea>
         </div>
 
@@ -401,7 +401,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="ordenCategorias.set(null)">
     <div class="inf-hoja ventana w-full max-w-sm max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">Orden de categorías</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Orden de categorías</h3>
         <button class="quitar" (click)="ordenCategorias.set(null)" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
@@ -409,8 +409,8 @@
       <ol class="flex-1 overflow-y-auto py-2">
         @for (cat of lista; track cat.id_categoria; let i = $index, primero = $first, ultimo = $last) {
           <li class="flex items-center gap-3 px-5 py-1.5">
-            <span class="w-5 text-right inf-sutil text-[12px] tabular-nums">{{ i + 1 }}</span>
-            <span class="flex-1 inf-tinta text-[13.5px] truncate">{{ cat.nombre_categoria }}</span>
+            <span class="w-5 text-right inf-sutil text-[length:calc(12px*var(--escala-texto))] tabular-nums">{{ i + 1 }}</span>
+            <span class="flex-1 inf-tinta text-[length:calc(13.5px*var(--escala-texto))] truncate">{{ cat.nombre_categoria }}</span>
             <button class="accion peligro" (click)="ordenCategorias.set(null); abrirModalBorrarCategoria(cat)" [attr.aria-label]="'Eliminar ' + cat.nombre_categoria">
               <lucide-icon [img]="icons.quitarCategoria" class="w-4 h-4"></lucide-icon>
             </button>
@@ -438,7 +438,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModalCategoria()">
     <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">Nueva categoría</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Nueva categoría</h3>
         <button class="quitar" (click)="cerrarModalCategoria()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
@@ -446,7 +446,7 @@
       <div class="p-5 space-y-3">
         <div class="grupo">
           <label class="inf-etiqueta" for="nombre-categoria">Nombre</label>
-          <input id="nombre-categoria" type="text" class="campo" [(ngModel)]="nombreCategoria"
+          <input id="nombre-categoria" type="text" data-solo-letras data-mayusculas class="campo" [(ngModel)]="nombreCategoria"
                  placeholder="Ej.: Tortas, Bebidas">
         </div>
         @if (errorCategoria()) { <p class="error-formulario">{{ errorCategoria() }}</p> }
@@ -464,7 +464,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModalBorrarCategoria()">
     <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">Eliminar categoría «{{ catABorrar().nombre_categoria }}»</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Eliminar categoría «{{ catABorrar().nombre_categoria }}»</h3>
         <button class="quitar" (click)="cerrarModalBorrarCategoria()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
@@ -476,11 +476,11 @@
             <p class="error-formulario">
               No se puede eliminar: tiene {{ productosBloqueantes().length }} producto(s). Cámbialos de categoría primero.
             </p>
-            <ul class="text-[13px] space-y-1 max-h-36 overflow-y-auto pl-4 list-disc">
+            <ul class="text-[length:calc(13px*var(--escala-texto))] space-y-1 max-h-36 overflow-y-auto pl-4 list-disc">
               @for (p of productosBloqueantes(); track p.id_producto) { <li>{{ p.nombre_producto }}</li> }
             </ul>
           } @else {
-            <p class="text-[13.5px]">La categoría está vacía y se eliminará de forma permanente. Las ventas registradas no cambian.</p>
+            <p class="text-[length:calc(13.5px*var(--escala-texto))]">La categoría está vacía y se eliminará de forma permanente. Las ventas registradas no cambian.</p>
           }
         </div>
         <div class="inf-pie-hoja flex justify-end gap-2">
@@ -493,7 +493,7 @@
         <div class="p-5 space-y-3">
           <div class="grupo">
             <label class="inf-etiqueta" for="confirmar-categoria">Escribe <b class="inf-tinta">{{ catABorrar().nombre_categoria }}</b> para confirmar</label>
-            <input id="confirmar-categoria" type="text" class="campo" [(ngModel)]="inputConfirmacionCat" [placeholder]="catABorrar().nombre_categoria">
+            <input id="confirmar-categoria" type="text" data-mayusculas class="campo" [(ngModel)]="inputConfirmacionCat" [placeholder]="catABorrar().nombre_categoria">
           </div>
           @if (errorBorrarCat()) { <p class="error-formulario">{{ errorBorrarCat() }}</p> }
         </div>

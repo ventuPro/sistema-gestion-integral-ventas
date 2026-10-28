@@ -3,14 +3,14 @@
     <div>
       <h2>Propietarios</h2>
     </div>
-    <button class="boton-primario py-1.5! text-[12.5px]!" (click)="abrirNuevo()">
+    <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!" (click)="abrirNuevo()">
       <lucide-icon [img]="icons.nuevo" class="w-3.5 h-3.5"></lucide-icon> Nuevo propietario
     </button>
   </div>
 
   @if (propietarios().length) {
     <div class="px-5 py-4 separador-inferior">
-      <div class="flex justify-between text-[12.5px] mb-2">
+      <div class="flex justify-between text-[length:calc(12.5px*var(--escala-texto))] mb-2">
         <span class="inf-etiqueta">Participación asignada</span>
         <span class="font-semibold" [class.inf-sube]="totalParticipacion() === 100" [class.inf-aviso]="totalParticipacion() !== 100">
           {{ totalParticipacion() | number:'1.0-2' }} % de 100 %
@@ -78,7 +78,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModal()">
     <form class="inf-hoja ventana w-full max-w-lg max-h-[90vh] flex flex-col" (ngSubmit)="guardar()" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">{{ formulario().id_propietario ? 'Editar propietario' : 'Nuevo propietario' }}</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">{{ formulario().id_propietario ? 'Editar propietario' : 'Nuevo propietario' }}</h3>
         <button type="button" class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
@@ -87,7 +87,7 @@
         @if (errorFormulario()) { <p class="error-formulario sm:col-span-2" role="alert">{{ errorFormulario() }}</p> }
         <div class="grupo sm:col-span-2">
           <label class="inf-etiqueta" for="prop-nombre">Nombre completo</label>
-          <input id="prop-nombre" name="nombre" class="campo" [(ngModel)]="formulario().nombre_completo" maxlength="100" required>
+          <input id="prop-nombre" data-solo-letras name="nombre" class="campo" [(ngModel)]="formulario().nombre_completo" maxlength="100" required>
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="prop-ci">CI</label>
@@ -95,7 +95,7 @@
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="prop-cargo">Cargo</label>
-          <input id="prop-cargo" name="cargo" class="campo" [(ngModel)]="formulario().cargo" maxlength="60" placeholder="Gerente propietario">
+          <input id="prop-cargo" data-solo-letras name="cargo" class="campo" [(ngModel)]="formulario().cargo" maxlength="60" placeholder="Gerente propietario">
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="prop-telefono">Teléfono</label>

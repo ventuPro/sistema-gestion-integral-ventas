@@ -9,6 +9,8 @@
 
 /* Sin zoom por doble toque: en el celular los toques rápidos al "+" se perdían */
 :host, button { touch-action: manipulation; }
+/* El menú del cliente conserva sus tamaños (la escala de letra es para el personal) */
+:host { --escala-texto: 1; }
 button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
 
 .estado-pantalla {

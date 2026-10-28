@@ -4,7 +4,7 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-texto));
   color: var(--i-aviso);
   background: color-mix(in oklab, var(--i-aviso) 10%, transparent);
 }
@@ -17,7 +17,7 @@
   padding: 8px 10px;
   border: 1px solid var(--i-linea);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-texto));
   color: var(--i-tinta);
   background: var(--i-papel);
 }

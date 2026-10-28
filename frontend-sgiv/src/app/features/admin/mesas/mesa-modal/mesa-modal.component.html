@@ -2,17 +2,17 @@
 <ng-template #lineaConsumo let-item>
   <div class="linea-carrito" [class.opacity-55]="item.pagado">
     <div class="min-w-0">
-      <p class="inf-tinta text-[13.5px] font-medium truncate">
+      <p class="inf-tinta text-[length:calc(13.5px*var(--escala-texto))] font-medium truncate">
         {{ item.nombre_producto }}
         @if (item.origen === 'qr') { <span class="inf-ficha ml-1">QR</span> }
         @if (item.pagado) { <span class="inf-estado ok ml-1">Pagado</span> }
       </p>
       <p class="inf-sub mt-0!">{{ moneda() }} {{ cifra(item.precio_unitario) }} c/u</p>
-      @if (item.nota) { <p class="text-[12px] inf-aviso">Nota: {{ item.nota }}</p> }
+      @if (item.nota) { <p class="text-[length:calc(12px*var(--escala-texto))] inf-aviso">Nota: {{ item.nota }}</p> }
     </div>
     <span class="cantidad">×{{ item.cantidad }}</span>
     <div class="flex items-center gap-1">
-      <span class="inf-tinta font-semibold text-[14px] whitespace-nowrap">{{ moneda() }} {{ cifra(item.subtotal) }}</span>
+      <span class="inf-tinta font-semibold text-[length:calc(14px*var(--escala-texto))] whitespace-nowrap">{{ moneda() }} {{ cifra(item.subtotal) }}</span>
       @if (!item.pagado) {
         <button class="quitar" (click)="quitarProducto(item.id_detalle_cuenta)" title="Quitar" aria-label="Quitar producto">
           <lucide-icon [img]="icons.quitar" class="w-4 h-4"></lucide-icon>
@@ -29,7 +29,7 @@
     <!-- Encabezado -->
     <div class="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 separador-inferior flex-shrink-0">
       <div class="pb-3">
-        <h2 class="inf-tinta font-semibold text-[17px]">Mesa {{ mesa?.numero_mesa }}</h2>
+        <h2 class="inf-tinta font-semibold text-[length:calc(17px*var(--escala-texto))]">Mesa {{ mesa?.numero_mesa }}</h2>
         @if (cuentaActiva()) { <span class="inf-estado aviso">Cuenta abierta</span> }
         @else { <span class="inf-estado ok">Disponible</span> }
       </div>
@@ -109,7 +109,7 @@
 
         <div class="flex flex-col min-h-0">
           <div class="flex items-center justify-between px-5 py-3 separador-inferior flex-shrink-0">
-            <h3 class="inf-tinta font-semibold text-[14px]">Consumo actual</h3>
+            <h3 class="inf-tinta font-semibold text-[length:calc(14px*var(--escala-texto))]">Consumo actual</h3>
             <span class="inf-nota">{{ itemsPendientes().length }} por cobrar</span>
           </div>
 
@@ -117,7 +117,7 @@
             @if (!cuentaActiva()?.items?.length) {
               <div class="h-full flex flex-col items-center justify-center gap-2 py-12 inf-sutil">
                 <lucide-icon [img]="icons.carrito" class="w-7 h-7"></lucide-icon>
-                <p class="text-[13px]">Agrega productos del catálogo.</p>
+                <p class="text-[length:calc(13px*var(--escala-texto))]">Agrega productos del catálogo.</p>
               </div>
             } @else if (porCliente()) {
               <!-- Por cliente: cada uno puede pagar lo suyo -->
@@ -126,7 +126,7 @@
                   <div class="grupo-cliente-cabeza">
                     <lucide-icon [img]="icons.cliente" class="w-4 h-4 inf-tenue shrink-0"></lucide-icon>
                     <div class="min-w-0 flex-1">
-                      <p class="inf-tinta text-[13.5px] font-semibold truncate">{{ g.nombre }}</p>
+                      <p class="inf-tinta text-[length:calc(13.5px*var(--escala-texto))] font-semibold truncate">{{ g.nombre }}</p>
                       <p class="inf-sub mt-0!">
                         @if (g.pendiente > 0) { Por cobrar {{ moneda() }} {{ cifra(g.pendiente) }} }
                         @if (g.pendiente > 0 && g.pagado > 0) { · }
@@ -158,7 +158,7 @@
             }
             <div class="flex items-end justify-between gap-3 mb-4">
               <span class="inf-etiqueta">{{ porCliente() ? 'Total por cobrar' : 'Total' }}</span>
-              <span class="inf-valor mt-0! text-[28px]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCuenta()) }}</span>
+              <span class="inf-valor mt-0! text-[length:calc(28px*var(--escala-texto))]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCuenta()) }}</span>
             </div>
             <button class="boton-primario w-full py-3!" (click)="irAPago()" [disabled]="!itemsPendientes().length">
               {{ porCliente() ? 'Cobrar todo y cerrar mesa' : 'Cobrar y cerrar mesa' }}
@@ -173,7 +173,7 @@
       <div class="absolute inset-0 z-10 flex items-center justify-center p-4 fondo-modal" (fondoModal)="vista.set('comanda')">
         <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
           <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-            <h3 class="inf-tinta font-semibold text-[15px]">Cobrar · {{ parteCobro()?.nombre ?? 'Mesa ' + mesa?.numero_mesa }}</h3>
+            <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Cobrar · {{ parteCobro()?.nombre ?? 'Mesa ' + mesa?.numero_mesa }}</h3>
             <button class="quitar" (click)="vista.set('comanda')" aria-label="Cancelar">
               <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
             </button>
@@ -254,7 +254,7 @@
                 @if (pagado() > 0) {
                   <dl class="inf-pares mt-3">
                     @if (pagado() >= totalCobro()) {
-                      <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio()) }}</dd></div>
+                      <div><dt>Cambio</dt><dd class="text-[length:calc(18px*var(--escala-texto))] inf-sube">{{ moneda() }} {{ cifra(cambio()) }}</dd></div>
                     } @else {
                       <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(totalCobro() - pagado()) }}</dd></div>
                     }
@@ -287,7 +287,7 @@
         <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[85vh]">
           <div class="flex items-center justify-between px-5 py-4 separador-inferior">
             <div>
-              <h3 class="inf-tinta font-semibold text-[15px]">{{ cuentaCerrada() ? 'Mesa cerrada' : 'Cobro registrado' }}</h3>
+              <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">{{ cuentaCerrada() ? 'Mesa cerrada' : 'Cobro registrado' }}</h3>
               <p class="inf-sub mt-0!">Comprobante #{{ datosTicket()?.id_venta }}</p>
             </div>
             <button class="quitar" (click)="cerrarTicket()" aria-label="Cerrar">

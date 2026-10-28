@@ -19,7 +19,7 @@
       <div class="flex items-start gap-4">
         <lucide-icon [img]="icons.shieldAlert" class="w-6 h-6 inf-baja flex-shrink-0 mt-0.5"></lucide-icon>
         <div>
-          <h2 class="inf-tinta font-semibold text-[15px]">Tu caja ya fue cerrada hoy</h2>
+          <h2 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Tu caja ya fue cerrada hoy</h2>
         </div>
       </div>
       @if (turnoActivo()) {
@@ -48,9 +48,9 @@
         <div class="flex items-start gap-4">
           <lucide-icon [img]="icons.landmark" class="w-6 h-6 flex-shrink-0 mt-0.5" style="color: var(--i-acento)"></lucide-icon>
           <div>
-            <h2 class="inf-tinta font-semibold text-[15px]">Abrir la caja del día</h2>
+            <h2 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Abrir la caja del día</h2>
             @if (cierreSistema(); as c) {
-              <p class="inf-aviso text-[13px] mt-1">Tu caja del {{ c.fecha_hora_apertura | date:'dd/MM' }} la cerró el sistema a las 00:00.</p>
+              <p class="inf-aviso text-[length:calc(13px*var(--escala-texto))] mt-1">Tu caja del {{ c.fecha_hora_apertura | date:'dd/MM' }} la cerró el sistema a las 00:00.</p>
             }
           </div>
         </div>
@@ -150,7 +150,7 @@
           <div class="historial">
             <div class="flex items-center justify-between px-5 py-4 separador-inferior flex-shrink-0">
               <div>
-                <h2 class="inf-tinta font-semibold text-[15px]">Ventas de hoy</h2>
+                <h2 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Ventas de hoy</h2>
                 <p class="inf-sub">{{ ventasHoy().length }} venta(s) · {{ moneda() }} {{ cifra(totalVentasHoy()) }}</p>
               </div>
               <button class="quitar" (click)="toggleHistorial()" aria-label="Cerrar">
@@ -179,7 +179,7 @@
                         </td>
                         <td>
                           @for (item of venta.items; track $index) {
-                            <span class="block text-[13px]">{{ item.cantidad_vendida }} × {{ item.nombre_producto }}</span>
+                            <span class="block text-[length:calc(13px*var(--escala-texto))]">{{ item.cantidad_vendida }} × {{ item.nombre_producto }}</span>
                           } @empty {
                             <span class="inf-sutil">Sin detalle</span>
                           }
@@ -200,7 +200,7 @@
                     <span>{{ m.metodo }}: <strong class="inf-tinta">{{ moneda() }} {{ cifra(m.total) }}</strong></span>
                   }
                 </span>
-                <strong class="inf-tinta text-[13px]">Total {{ moneda() }} {{ cifra(totalVentasHoy()) }}</strong>
+                <strong class="inf-tinta text-[length:calc(13px*var(--escala-texto))]">Total {{ moneda() }} {{ cifra(totalVentasHoy()) }}</strong>
               </div>
             }
           </div>
@@ -210,7 +210,7 @@
       <!-- Carrito -->
       <section class="inf-hoja flex flex-col min-h-0 overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 separador-inferior flex-shrink-0">
-          <h2 class="inf-tinta font-semibold text-[15px]">Venta actual</h2>
+          <h2 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Venta actual</h2>
           @if (carrito().length) {
             <span class="inf-nota">{{ unidades() }} producto(s)</span>
           }
@@ -221,7 +221,7 @@
             @let linea = lineas().get(item.id_producto);
             <div class="linea-carrito">
               <div class="min-w-0">
-                <p class="inf-tinta text-[13.5px] font-medium truncate">{{ item.nombre_producto }}</p>
+                <p class="inf-tinta text-[length:calc(13.5px*var(--escala-texto))] font-medium truncate">{{ item.nombre_producto }}</p>
                 <p class="inf-sub mt-0!">{{ moneda() }} {{ cifra(item.precio_unitario) }} c/u</p>
                 @if (linea?.descuento_promocion) {
                   <p class="promo-linea truncate">{{ linea!.promociones.join(', ') }} · −{{ moneda() }} {{ cifra(linea!.descuento_promocion) }}</p>
@@ -230,8 +230,8 @@
               <span class="cantidad">×{{ item.cantidad }}</span>
               <div class="flex items-center gap-1">
                 <span class="flex flex-col items-end">
-                  @if (linea?.descuento_promocion) { <s class="inf-sutil text-[12px]">{{ moneda() }} {{ cifra(item.subtotal) }}</s> }
-                  <span class="inf-tinta font-semibold text-[14px] whitespace-nowrap">
+                  @if (linea?.descuento_promocion) { <s class="inf-sutil text-[length:calc(12px*var(--escala-texto))]">{{ moneda() }} {{ cifra(item.subtotal) }}</s> }
+                  <span class="inf-tinta font-semibold text-[length:calc(14px*var(--escala-texto))] whitespace-nowrap">
                     {{ moneda() }} {{ cifra(linea ? linea.subtotal_bruto - linea.descuento_promocion : item.subtotal) }}
                   </span>
                 </span>
@@ -243,7 +243,7 @@
           } @empty {
             <div class="h-full flex flex-col items-center justify-center gap-2 py-12 inf-sutil">
               <lucide-icon [img]="icons.carrito" class="w-7 h-7"></lucide-icon>
-              <p class="text-[13px]">Toca un producto para agregarlo.</p>
+              <p class="text-[length:calc(13px*var(--escala-texto))]">Toca un producto para agregarlo.</p>
             </div>
           }
         </div>
@@ -272,7 +272,7 @@
           }
           <div class="flex items-end justify-between gap-3 mb-4">
             <span class="inf-etiqueta">Total</span>
-            <span class="inf-valor mt-0! text-[28px]!" [class.inf-refrescando]="cotizando()">
+            <span class="inf-valor mt-0! text-[length:calc(28px*var(--escala-texto))]!" [class.inf-refrescando]="cotizando()">
               <span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total()) }}
             </span>
           </div>
@@ -296,7 +296,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarDescuento()">
     <form class="inf-hoja ventana w-full max-w-sm" (ngSubmit)="aplicarDescuento()" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">Descuento</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Descuento</h3>
         <button type="button" class="quitar" (click)="cerrarDescuento()" aria-label="Cancelar">
           <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
         </button>
@@ -339,7 +339,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModalCobro()">
     <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">Cobrar venta</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Cobrar venta</h3>
         <button class="quitar" (click)="cerrarModalCobro()" aria-label="Cancelar">
           <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>
         </button>
@@ -378,7 +378,7 @@
             @if (pagado() > 0) {
               <dl class="inf-pares mt-3">
                 @if (pagado() >= total()) {
-                  <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio()) }}</dd></div>
+                  <div><dt>Cambio</dt><dd class="text-[length:calc(18px*var(--escala-texto))] inf-sube">{{ moneda() }} {{ cifra(cambio()) }}</dd></div>
                 } @else {
                   <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(total() - pagado()) }}</dd></div>
                 }
@@ -410,7 +410,7 @@
     <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[90vh]" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <div>
-          <h3 class="inf-tinta font-semibold text-[15px]">Venta registrada</h3>
+          <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Venta registrada</h3>
           <p class="inf-sub mt-0!">Comprobante #{{ datosTicket()?.id_venta }}</p>
         </div>
         <button class="quitar" (click)="cerrarTicket()" aria-label="Cerrar">

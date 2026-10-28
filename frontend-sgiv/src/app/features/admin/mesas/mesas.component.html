@@ -18,7 +18,7 @@
         <button class="inf-boton" (click)="abrirModalQR()" [disabled]="mesas().length === 0">
           <lucide-icon [img]="icons.qr" class="w-3.5 h-3.5"></lucide-icon> Códigos QR
         </button>
-        <button class="boton-primario py-1.5! text-[12.5px]!" (click)="abrirModalMesa()">
+        <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!" (click)="abrirModalMesa()">
           <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon> Nueva mesa
         </button>
       </div>
@@ -36,7 +36,7 @@
       <div class="flex items-start gap-4">
         <lucide-icon [img]="icons.shieldAlert" class="w-6 h-6 inf-baja flex-shrink-0 mt-0.5"></lucide-icon>
         <div>
-          <h2 class="inf-tinta font-semibold text-[15px]">Tu caja ya fue cerrada hoy</h2>
+          <h2 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Tu caja ya fue cerrada hoy</h2>
         </div>
       </div>
       @if (turnoCajero()) {
@@ -57,7 +57,7 @@
       <div class="flex items-start gap-4">
         <lucide-icon [img]="icons.landmark" class="w-6 h-6 flex-shrink-0 mt-0.5" style="color: var(--i-acento)"></lucide-icon>
         <div>
-          <h2 class="inf-tinta font-semibold text-[15px]">Aún no abriste tu caja</h2>
+          <h2 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Aún no abriste tu caja</h2>
         </div>
       </div>
       <a routerLink="/dashboard/punto-venta" class="inf-boton mt-5">Ir a Punto de venta</a>
@@ -67,20 +67,6 @@
   <!-- ═══ PLANO ═══ -->
   @if (!verificandoCaja() && cajaHabilitada()) {
 
-    <section class="inf-hoja inf-tira overflow-hidden">
-      <div>
-        <p class="inf-etiqueta">Libres</p>
-        <p class="inf-valor">{{ resumen().libres }} <span class="inf-tenue text-sm font-normal">de {{ mesas().length }}</span></p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Con cuenta abierta</p>
-        <p class="inf-valor">{{ resumen().conCuenta }}</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Consumo por cobrar</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(resumen().porCobrar) }}</p>
-      </div>
-    </section>
 
     <section class="inf-hoja p-5">
       <div class="inf-seccion">
@@ -149,7 +135,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModalMesa()">
     <div class="inf-hoja ventana w-full max-w-sm" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">Nueva mesa</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Nueva mesa</h3>
         <button class="quitar" (click)="cerrarModalMesa()" aria-label="Cancelar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>
@@ -158,7 +144,7 @@
         <label class="inf-etiqueta block mb-2">Número de mesa</label>
         <div class="campo-monto">
           <span>N.º</span>
-          <input type="number" min="1" [(ngModel)]="nuevaMesaNum" placeholder="1">
+          <input type="number" min="1" step="1" inputmode="numeric" [(ngModel)]="nuevaMesaNum" placeholder="1">
         </div>
         @if (errorMesa()) { <p class="text-sm inf-baja mt-3">{{ errorMesa() }}</p> }
       </div>
@@ -176,7 +162,7 @@
     <div class="inf-hoja ventana w-full max-w-4xl max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
       <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
         <div>
-          <h3 class="inf-tinta font-semibold text-[15px]">Códigos QR de las mesas</h3>
+          <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Códigos QR de las mesas</h3>
         </div>
         <button class="quitar" (click)="cerrarModalQR()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
@@ -199,7 +185,7 @@
             del local (por ejemplo <b>http://192.168.1.10:4200</b>) para que funcione en el celular del cliente.
           </p>
         }
-        @if (errorQR()) { <p class="text-[12.5px] inf-baja">{{ errorQR() }}</p> }
+        @if (errorQR()) { <p class="text-[length:calc(12.5px*var(--escala-texto))] inf-baja">{{ errorQR() }}</p> }
       </div>
 
       <div class="flex-1 overflow-y-auto p-5">

@@ -42,7 +42,7 @@
 
     <form class="tarjeta aparecer" style="--d: 3" (submit)="$event.preventDefault(); entrar.emit()">
       <label for="nombre-cliente" class="etiqueta">¿Cómo te llamas? <span class="opcional">(opcional)</span></label>
-      <input id="nombre-cliente" class="campo" [(ngModel)]="nombre" name="nombre" maxlength="40"
+      <input id="nombre-cliente" class="campo" data-solo-letras [(ngModel)]="nombre" name="nombre" maxlength="40"
              autocomplete="given-name" placeholder="Tu nombre">
       <button type="submit" class="boton-primario boton-entrar w-full py-3! text-base! mt-4">
         Ver el menú <lucide-icon [img]="icons.entrar" class="w-5 h-5"></lucide-icon>

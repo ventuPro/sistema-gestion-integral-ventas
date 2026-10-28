@@ -16,7 +16,7 @@
   gap: 12px;
   padding: 9px 12px;
   text-align: left;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--escala-texto));
   color: var(--i-tinta);
 }
 .sugerencias button:hover { background: var(--i-acento-suave); }

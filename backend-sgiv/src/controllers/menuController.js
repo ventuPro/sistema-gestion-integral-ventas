@@ -53,7 +53,7 @@ const responderError = (res, e, contexto) => {
 const CLIENTE_MESA = /^[0-9a-f]{32}$/;
 const clienteMesa  = (valor) => CLIENTE_MESA.test(String(valor || '')) ? String(valor) : null;
 const nombreCliente = (valor) =>
-    String(valor ?? '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) || null;
+    String(valor ?? '').replace(/[^\p{L}\s.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 40) || null;
 
 // Middleware
 const cargarMesa = async (req, res, next) => {

@@ -7,7 +7,7 @@
   border-radius: 7px;
   background: var(--i-papel);
   color: var(--i-tinta);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--escala-texto));
   outline: none;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
@@ -16,9 +16,9 @@
 textarea.campo { resize: none; }
 
 .grupo { display: flex; flex-direction: column; gap: 6px; }
-.ayuda { font-size: 12px; color: var(--i-tenue); }
+.ayuda { font-size: calc(12px * var(--escala-texto)); color: var(--i-tenue); }
 .error-formulario {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   padding: 8px 12px;
   border-radius: 6px;
   color: var(--i-baja);
@@ -47,7 +47,7 @@ textarea.campo { resize: none; }
   gap: 8px;
   padding: 10px 18px;
   border-radius: 7px;
-  font-size: 14px;
+  font-size: calc(14px * var(--escala-texto));
   font-weight: 600;
   color: #fff;
   background: var(--i-baja);
@@ -87,8 +87,8 @@ textarea.campo { resize: none; }
 }
 .interruptor[aria-checked='true'] .pista { background: var(--i-acento); }
 .interruptor[aria-checked='true'] .pista::after { transform: translateX(16px); }
-.interruptor .texto { display: block; font-size: 13.5px; font-weight: 500; color: var(--i-tinta); }
-.interruptor .detalle { display: block; font-size: 12px; color: var(--i-tenue); margin-top: 1px; }
+.interruptor .texto { display: block; font-size: calc(13.5px * var(--escala-texto)); font-weight: 500; color: var(--i-tinta); }
+.interruptor .detalle { display: block; font-size: calc(12px * var(--escala-texto)); color: var(--i-tenue); margin-top: 1px; }
 
 /* Opción elegible en forma de tarjeta (tema, ancho de ticket, paleta) */
 .eleccion {
@@ -101,7 +101,7 @@ textarea.campo { resize: none; }
   border-radius: 8px;
   background: var(--i-papel);
   text-align: left;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-texto));
   color: var(--i-texto);
   transition: border-color 120ms ease, background-color 120ms ease;
 }
@@ -109,7 +109,7 @@ textarea.campo { resize: none; }
 .eleccion.activa { border-color: var(--i-acento); background: var(--i-acento-suave); color: var(--i-tinta); box-shadow: 0 0 0 1px var(--i-acento); }
 
 .aviso-suave {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   padding: 8px 12px;
   border-radius: 6px;
   color: var(--i-aviso);

@@ -14,13 +14,13 @@
   left: 6px;
   padding: 2px 7px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: calc(11px * var(--escala-texto));
   font-weight: 700;
   color: #fff;
   background: var(--i-baja);
   box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.35);
 }
-.promo-linea { font-size: 11.5px; font-weight: 600; color: var(--i-sube); }
+.promo-linea { font-size: calc(11.5px * var(--escala-texto)); font-weight: 600; color: var(--i-sube); }
 .campo-texto {
   width: 100%;
   padding: 9px 12px;
@@ -28,12 +28,12 @@
   border-radius: 8px;
   background: var(--i-papel);
   color: var(--i-tinta);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--escala-texto));
   outline: none;
 }
 .campo-texto:focus { border-color: var(--i-acento); box-shadow: 0 0 0 3px var(--i-acento-suave); }
 .error-descuento {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   padding: 8px 12px;
   border-radius: 6px;
   color: var(--i-baja);

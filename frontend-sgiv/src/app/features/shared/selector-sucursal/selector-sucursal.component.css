@@ -32,7 +32,7 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--escala-texto));
   font-weight: 500;
   color: var(--s-tenue);
 }
@@ -58,7 +58,7 @@
   flex-shrink: 0;
   padding: 6px 13px 7px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-texto));
   font-weight: 500;
   white-space: nowrap;
   color: var(--s-tenue);
@@ -93,7 +93,7 @@
 .opcion.inactiva { opacity: 0.6; }
 
 .marca {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--escala-texto));
   font-weight: 500;
   color: var(--s-tenue);
 }

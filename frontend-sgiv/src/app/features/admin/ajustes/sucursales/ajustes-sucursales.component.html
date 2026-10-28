@@ -3,7 +3,7 @@
     <div>
       <h2>Sucursales</h2>
     </div>
-    <button class="boton-primario py-1.5! text-[12.5px]!" (click)="abrirNueva()">
+    <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!" (click)="abrirNueva()">
       <lucide-icon [img]="icons.nuevo" class="w-3.5 h-3.5"></lucide-icon> Nueva sucursal
     </button>
   </div>
@@ -19,7 +19,7 @@
           <article class="sucursal" [class.inactiva]="!s.estado_activo">
             <div class="flex justify-between items-start gap-3">
               <div class="min-w-0">
-                <h3 class="inf-tinta font-semibold text-[14px] truncate">{{ s.nombre_sucursal }}</h3>
+                <h3 class="inf-tinta font-semibold text-[length:calc(14px*var(--escala-texto))] truncate">{{ s.nombre_sucursal }}</h3>
                 @if (s.estado_activo) { <span class="inf-estado ok">Activa</span> }
                 @else { <span class="inf-estado neutro">Inactiva</span> }
               </div>
@@ -59,7 +59,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModal()">
     <form class="inf-hoja ventana w-full max-w-2xl max-h-[92vh] flex flex-col" (ngSubmit)="guardar()" (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[15px]">{{ editandoId() ? 'Editar sucursal' : 'Nueva sucursal' }}</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">{{ editandoId() ? 'Editar sucursal' : 'Nueva sucursal' }}</h3>
         <button type="button" class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>

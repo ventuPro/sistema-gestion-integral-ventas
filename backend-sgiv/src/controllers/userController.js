@@ -1,4 +1,5 @@
 const bcrypt      = require('bcryptjs');
+const { soloLetras } = require('../utils/texto');
 const jwt         = require('jsonwebtoken');
 const userModel   = require('../models/userModel');
 const ajusteModel = require('../models/ajusteModel');
@@ -34,6 +35,7 @@ const registrarUsuario = async (req, res) => {
         const correo_electronico = normalizarCorreo(req.body?.correo_electronico);
         if (!String(nombre_completo || '').trim() || !correo_electronico || !contrasena || !id_rol)
             return res.status(400).json({ error: 'Faltan datos obligatorios' });
+        if (!soloLetras(String(nombre_completo).trim())) return res.status(400).json({ error: 'El nombre solo admite letras' });
         if (!CORREO.test(correo_electronico)) return res.status(400).json({ error: 'El correo no es válido' });
         if (!esAdmin(req) && await tocaAdmin(null, id_rol))
             return res.status(403).json({ error: 'Solo un administrador puede crear administradores' });
@@ -179,6 +181,7 @@ const actualizarUsuario = async (req, res) => {
         const { id_rol, id_sucursal } = req.body || {};
         if (!nombre_completo || !correo_electronico || !id_rol || !id_sucursal)
             return res.status(400).json({ error: 'Completa todos los campos' });
+        if (!soloLetras(nombre_completo)) return res.status(400).json({ error: 'El nombre solo admite letras' });
         if (!CORREO.test(correo_electronico)) return res.status(400).json({ error: 'El correo no es válido' });
         if (!esAdmin(req) && await tocaAdmin(id, id_rol))
             return res.status(403).json({ error: 'Solo un administrador puede modificar administradores' });

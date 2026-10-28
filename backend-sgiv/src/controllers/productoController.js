@@ -3,6 +3,7 @@ const { guardarImagen, borrarImagen } = require('../utils/imagenes');
 const { emitirCatalogo } = require('../utils/tiempoReal');
 const db = require('../config/db');
 const { registrarHistorial } = require('../models/inventarioModel');
+const { soloLetras, mayusculas } = require('../utils/texto');
 
 // Fotos de productos: el navegador ya las comprime (WebP, 800 px); el tope es por si llegan de otro cliente
 const FOTO = { carpeta: 'productos', prefijo: 'prod', maxBytes: 1024 * 1024, formatos: ['png', 'jpg', 'webp'] };
@@ -20,18 +21,21 @@ const booleano = (v) => v === undefined ? undefined : v === true || v === 'true'
 
 const datosProducto = (b) => ({
     id_categoria:         b.id_categoria,
-    nombre_producto:      b.nombre_producto,
-    descripcion_producto: b.descripcion_producto,
+    nombre_producto:      mayusculas(b.nombre_producto),
+    descripcion_producto: mayusculas(b.descripcion_producto),
     precio_unitario:      b.precio_unitario,
-    ingredientes:         texto(b.ingredientes, 400),
-    preparacion:          texto(b.preparacion, 500),
+    ingredientes:         mayusculas(texto(b.ingredientes, 400)),
+    preparacion:          mayusculas(texto(b.preparacion, 500)),
     destacado:            booleano(b.destacado),
     mostrar_en_menu:      booleano(b.mostrar_en_menu)
 });
 
 const agregarCategoria  = async (req, res) => {
     try {
-        const cat = await m.crearCategoria(req.body.nombre_categoria, req.body.descripcion_categoria || '');
+        const nombre = mayusculas(String(req.body?.nombre_categoria ?? '').trim());
+        if (!nombre) return res.status(400).json({ error: 'Escribe el nombre de la categoría' });
+        if (!soloLetras(nombre)) return res.status(400).json({ error: 'El nombre de la categoría solo admite letras' });
+        const cat = await m.crearCategoria(nombre, req.body.descripcion_categoria || '');
         res.status(201).json({ categoria: cat });
     } catch(e) { res.status(500).json({ error: e.message }); }
 };
@@ -75,7 +79,7 @@ const eliminarCategoria = async (req, res) => {
         }
 
         const confirmacion = (req.body && req.body.confirmacion) || '';
-        if (confirmacion.trim() !== cat.nombre_categoria) {
+        if (mayusculas(confirmacion.trim()) !== mayusculas(cat.nombre_categoria)) {
             return res.status(400).json({
                 error: 'Debes escribir el nombre exacto de la categoría para confirmar'
             });

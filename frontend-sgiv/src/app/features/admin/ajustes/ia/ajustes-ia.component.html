@@ -1,5 +1,5 @@
 <ng-template #resultado let-nombre="nombre" let-r="r">
-  <div class="flex flex-wrap items-baseline gap-x-2 text-[12.5px]">
+  <div class="flex flex-wrap items-baseline gap-x-2 text-[length:calc(12.5px*var(--escala-texto))]">
     <span class="inf-tinta font-medium">{{ nombre }}</span>
     <span class="inf-sube">respondió en {{ (r.ms / 1000).toFixed(1) }} s</span>
     <span class="inf-sutil">· {{ r.modelo }}</span>
@@ -35,7 +35,7 @@
             <lucide-icon [img]="icons.probar" class="w-3.5 h-3.5"></lucide-icon>
             {{ probando() ? 'Probando…' : 'Probar conexión' }}
           </button>
-          @if (errorPrueba()) { <span class="text-[12.5px] inf-baja">{{ errorPrueba() }}</span> }
+          @if (errorPrueba()) { <span class="text-[length:calc(12.5px*var(--escala-texto))] inf-baja">{{ errorPrueba() }}</span> }
         </div>
         @if (prueba(); as p) {
           <div class="space-y-2">

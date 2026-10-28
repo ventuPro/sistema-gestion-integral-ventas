@@ -33,7 +33,7 @@
               @for (c of cierresFiltrados(); track c.id_turno) {
                 <tr>
                   <td><span class="fuerte">{{ c.nombre_cajero }}</span><span class="inf-secundario">{{ c.nombre_sucursal }}</span></td>
-                  <td class="inf-tenue text-[12.5px] whitespace-nowrap">
+                  <td class="inf-tenue text-[length:calc(12.5px*var(--escala-texto))] whitespace-nowrap">
                     {{ fechaHora(c.fecha_hora_apertura) }} → {{ mismoDia(c) ? hora(c.fecha_hora_cierre) : fechaHora(c.fecha_hora_cierre) }}
                     @if (c.cerrado_por === 'Sistema') { <span class="inf-estado aviso block">Cerrado por el sistema</span> }
                     @else if (c.cerrado_por === 'Administrador') { <span class="inf-secundario">Cerrado por el administrador</span> }

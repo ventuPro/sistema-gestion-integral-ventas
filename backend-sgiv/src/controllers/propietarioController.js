@@ -1,4 +1,5 @@
 const propietarioModel = require('../models/propietarioModel');
+const { soloLetras } = require('../utils/texto');
 
 class ErrorValidacion extends Error {}
 
@@ -23,6 +24,8 @@ const validar = (body) => {
         correo:          texto(body.correo, 100, 'correo')
     };
     if (!p.nombre_completo) throw new ErrorValidacion('El nombre es obligatorio');
+    if (!soloLetras(p.nombre_completo)) throw new ErrorValidacion('El nombre solo admite letras');
+    if (p.cargo && !soloLetras(p.cargo)) throw new ErrorValidacion('El cargo solo admite letras');
     if (p.ci && !CI.test(p.ci)) throw new ErrorValidacion('CI inválido. Ejemplo: 1234567 LP o 1234567-1A LP');
     if (p.telefono && !TELEFONO.test(p.telefono)) throw new ErrorValidacion('Teléfono inválido');
     if (p.correo && !CORREO.test(p.correo)) throw new ErrorValidacion('Correo inválido');

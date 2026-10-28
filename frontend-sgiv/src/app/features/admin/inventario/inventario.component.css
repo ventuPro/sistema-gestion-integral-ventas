@@ -7,7 +7,7 @@
   border: 1px solid var(--i-linea-suave);
   background: var(--i-fondo);
   color: var(--i-sutil);
-  font-size: 15px;
+  font-size: calc(15px * var(--escala-texto));
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -18,7 +18,7 @@
 
 tr.fila-seccion td {
   padding-top: 14px;
-  font-size: 13px;
+  font-size: calc(13px * var(--escala-texto));
   font-weight: 600;
   color: var(--i-acento);
   background: var(--i-fondo);

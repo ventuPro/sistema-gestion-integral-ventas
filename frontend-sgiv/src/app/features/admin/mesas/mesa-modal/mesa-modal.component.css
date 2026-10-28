@@ -21,12 +21,12 @@
   border-radius: 7px;
   background: var(--i-papel);
   color: var(--i-tinta);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--escala-texto));
   outline: none;
 }
 .campo-texto:focus { border-color: var(--i-acento); box-shadow: 0 0 0 3px var(--i-acento-suave); }
 .error-descuento {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--escala-texto));
   padding: 8px 12px;
   border-radius: 6px;
   color: var(--i-baja);

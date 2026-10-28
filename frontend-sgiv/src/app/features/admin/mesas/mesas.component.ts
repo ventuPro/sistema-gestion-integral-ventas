@@ -179,15 +179,6 @@ export class MesasComponent implements OnInit, OnDestroy {
     return mesa.estado_mesa === 'Ocupada' ? 'ocupada' : 'libre';
   }
 
-  readonly resumen = computed(() => {
-    const mesas = this.mesas();
-    const conCuenta = mesas.filter(m => m.id_cuenta);
-    return {
-      libres:    mesas.filter(m => this.claseMesa(m) === 'libre').length,
-      conCuenta: conCuenta.length,
-      porCobrar: conCuenta.reduce((s, m) => s + (Number(m.total_acumulado) || 0), 0)
-    };
-  });
 
   // ─── HABILITAR / LIBERAR (menú QR: con la mesa habilitada sus clientes piden sin verificación) ───
   readonly procesandoMesa = signal<number | null>(null);

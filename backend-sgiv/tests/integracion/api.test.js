@@ -363,6 +363,17 @@ describe('Usuarios: edición y correos', () => {
         assert.match(r.body.error, /usuario desactivado/);
     });
 
+    test('el nombre de un usuario solo admite letras', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        const r = await api('POST', '/usuarios/registro', { token: tAdmin, body: {
+            nombre_completo: 'Juan 2', correo_electronico: 'nombre.numeros@prueba.com', contrasena: 'Clave123', id_rol: 2, id_sucursal: 1 } });
+        assert.equal(r.status, 400);
+        const id = await crearUsuario('nombre.letras@prueba.com', 2);
+        const datos = (nombre) => ({ nombre_completo: nombre, correo_electronico: 'nombre.letras@prueba.com', id_rol: 2, id_sucursal: 1 });
+        assert.equal((await api('PUT', `/usuarios/${id}`, { token: tAdmin, body: datos('Ana3') })).status, 400);
+        assert.equal((await api('PUT', `/usuarios/${id}`, { token: tAdmin, body: datos("María José O'Connor-Peña") })).status, 200);
+    });
+
     test('nadie puede cambiar su propio rol', async () => {
         const id = await crearUsuario('admin.propio@prueba.com', 1);
         const t = await login('admin.propio@prueba.com');
