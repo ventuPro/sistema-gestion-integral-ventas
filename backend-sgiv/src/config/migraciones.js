@@ -255,7 +255,10 @@ const MIGRACIONES = [
         id_producto INT NOT NULL REFERENCES producto(id_producto),
         cantidad    INT NOT NULL,
         PRIMARY KEY (id_foto, id_producto)
-    );`
+    );`,
+
+    // Reimpresión de comprobantes: mesa y cliente de una venta
+    `CREATE INDEX IF NOT EXISTS idx_detalle_cuenta_venta ON detalle_cuenta (id_venta);`
 ];
 
 const aplicarMigraciones = async () => {

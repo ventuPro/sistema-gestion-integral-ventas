@@ -78,7 +78,8 @@
           <label class="inf-etiqueta" for="buscar-transferencia">Productos</label>
           <div class="buscador">
             <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
-            <input id="buscar-transferencia" type="text" [(ngModel)]="busqueda" placeholder="Buscar producto" autocomplete="off">
+            <input id="buscar-transferencia" type="text" [(ngModel)]="busqueda" placeholder="Buscar producto" autocomplete="off"
+                   (keydown.enter)="$event.preventDefault(); sugerencias()[0] && agregar(sugerencias()[0])">
           </div>
           @if (sugerencias().length) {
             <ul class="sugerencias">
@@ -121,7 +122,7 @@
         <span class="inf-tinta text-[13px]">{{ unidades() }} unidad(es)</span>
         <div class="flex gap-2">
           <button class="inf-boton" (click)="cerrarNueva()">Cancelar</button>
-          <button class="boton-primario" (click)="transferir()" [disabled]="enviando()">
+          <button class="boton-primario" data-enter (click)="transferir()" [disabled]="enviando()">
             <lucide-icon [img]="icons.transferir" class="w-4 h-4"></lucide-icon>
             {{ enviando() ? 'Transfiriendo…' : 'Transferir' }}
           </button>
@@ -151,7 +152,7 @@
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="detalle.set(null)">Cerrar</button>
-        <button class="boton-primario" (click)="imprimir()">
+        <button class="boton-primario" data-enter (click)="imprimir()">
           <lucide-icon [img]="icons.imprimir" class="w-4 h-4"></lucide-icon> Imprimir
         </button>
       </div>

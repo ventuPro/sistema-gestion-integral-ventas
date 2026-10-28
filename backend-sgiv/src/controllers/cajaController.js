@@ -3,6 +3,7 @@ const sucursalModel = require('../models/sucursalModel');
 const ajusteModel   = require('../models/ajusteModel');
 const promocionModel = require('../models/promocionModel');
 const db            = require('../config/db');
+const { marcarEvento } = require('../auditoria/registroAcceso');
 
 // ─── ESTADO COMPLETO (la fuente de verdad para el front) ──────────
 const getEstadoCompleto = async (req, res) => {
@@ -144,6 +145,22 @@ const getArqueoHoy = async (req, res) => {
     }
 };
 
+// ─── Reimprimir el comprobante de una venta (el cajero, solo de su sucursal) ───
+const getComprobante = async (req, res) => {
+    try {
+        const id_venta = Number(req.params.id_venta);
+        if (!Number.isInteger(id_venta) || id_venta < 1) return res.status(400).json({ error: 'Venta inválida.' });
+        const esAdmin = Number(req.usuario.id_rol) === 1;
+        const comprobante = await cajaModel.obtenerComprobante(id_venta, esAdmin ? null : Number(req.usuario.id_sucursal));
+        if (!comprobante) return res.status(404).json({ error: 'No se encontró la venta.' });
+        marcarEvento(res, 'REIMPRESION_COMPROBANTE', { id_venta });
+        res.json(comprobante);
+    } catch (e) {
+        console.error('getComprobante:', e.message);
+        res.status(500).json({ error: 'No se pudo obtener el comprobante.' });
+    }
+};
+
 const getVentasHoyPOS = async (req, res) => {
     try {
         const ventas = await cajaModel.obtenerVentasHoyPOS(
@@ -257,6 +274,6 @@ module.exports = {
     getEstadoCaja, getEstadoCompleto,
     habilitarCajaUsuario, deshabilitarCajaUsuario, reabrirCajaAdmin,
     getTurnoHoy, abrirCaja, cerrarCaja,
-    getArqueoHoy, getVentasHoyPOS, getCierresCaja, cobrarVenta, cotizarVenta, promocionesVigentes,
+    getArqueoHoy, getVentasHoyPOS, getComprobante, getCierresCaja, cobrarVenta, cotizarVenta, promocionesVigentes,
     getEstadoCajaSucursal
 };

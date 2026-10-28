@@ -478,6 +478,7 @@ CREATE INDEX idx_venta_caja_turno         ON venta_caja (id_turno);
 CREATE INDEX idx_detalle_venta_venta      ON detalle_venta (id_venta);
 CREATE INDEX idx_detalle_venta_producto   ON detalle_venta (id_producto);
 CREATE INDEX idx_detalle_cuenta_cuenta    ON detalle_cuenta (id_cuenta);
+CREATE INDEX idx_detalle_cuenta_venta     ON detalle_cuenta (id_venta);
 CREATE INDEX idx_detalle_pedido_pedido    ON detalle_pedido (id_pedido);
 CREATE INDEX idx_turno_sucursal_estado    ON turno_caja (id_sucursal, estado_turno);
 CREATE INDEX idx_historial_inv_fecha      ON historial_inventario (id_inventario, fecha_registro);

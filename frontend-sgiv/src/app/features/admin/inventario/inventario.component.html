@@ -319,7 +319,7 @@
 
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModal()">Cancelar</button>
-        <button class="boton-primario" (click)="guardarProducto()" [disabled]="guardando()">
+        <button class="boton-primario" data-enter (click)="guardarProducto()" [disabled]="guardando()">
           {{ guardando() ? 'Guardando…' : (editandoId() ? 'Guardar cambios' : 'Crear producto') }}
         </button>
       </div>
@@ -387,8 +387,8 @@
 
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarMovimiento()">Cancelar</button>
-        <button [class]="mov().tipo === 'SALIDA' ? 'boton-peligro' : 'boton-primario'" (click)="guardarMovimiento()"
-                [disabled]="guardando() || !(mov().cantidad > 0) || stockTrasMovimiento < 0">
+        <button [class]="mov().tipo === 'SALIDA' ? 'boton-peligro' : 'boton-primario'" data-enter (click)="guardarMovimiento()"
+                [disabled]="guardando() || !((mov().cantidad ?? 0) > 0) || stockTrasMovimiento < 0">
           {{ guardando() ? 'Guardando…' : (mov().tipo === 'INGRESO' ? 'Registrar entrada' : 'Registrar merma') }}
         </button>
       </div>
@@ -425,7 +425,7 @@
       </ol>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="ordenCategorias.set(null)">Cancelar</button>
-        <button class="boton-primario" (click)="guardarOrdenCategorias()" [disabled]="guardandoOrden()">
+        <button class="boton-primario" data-enter (click)="guardarOrdenCategorias()" [disabled]="guardandoOrden()">
           {{ guardandoOrden() ? 'Guardando…' : 'Guardar orden' }}
         </button>
       </div>
@@ -447,13 +447,13 @@
         <div class="grupo">
           <label class="inf-etiqueta" for="nombre-categoria">Nombre</label>
           <input id="nombre-categoria" type="text" class="campo" [(ngModel)]="nombreCategoria"
-                 placeholder="Ej.: Tortas, Bebidas" (keyup.enter)="crearCategoria()">
+                 placeholder="Ej.: Tortas, Bebidas">
         </div>
         @if (errorCategoria()) { <p class="error-formulario">{{ errorCategoria() }}</p> }
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalCategoria()">Cancelar</button>
-        <button class="boton-primario" (click)="crearCategoria()">Crear</button>
+        <button class="boton-primario" data-enter (click)="crearCategoria()">Crear</button>
       </div>
     </div>
   </div>

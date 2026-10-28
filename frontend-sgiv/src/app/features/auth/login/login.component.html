@@ -20,10 +20,10 @@
 
       @if (mensajeError()) { <p class="error-formulario mb-4" role="alert">{{ mensajeError() }}</p> }
 
-      <form (ngSubmit)="iniciarSesion()" autocomplete="on" class="space-y-4">
+      <form #formulario (ngSubmit)="iniciarSesion()" (keydown.enter)="siguienteCampo($event, formulario)" autocomplete="on" class="space-y-4">
         <div class="grupo">
           <label class="inf-etiqueta" for="correo">Correo</label>
-          <input class="campo" type="email" id="correo" name="correo" [(ngModel)]="correo" autocomplete="username"
+          <input #campoCorreo class="campo" type="email" id="correo" name="correo" [(ngModel)]="correo" autocomplete="username"
                  placeholder="nombre@correo.com">
         </div>
 

@@ -17,6 +17,8 @@ export interface DatosTicket {
   numero_mesa?: number;
   /** Cobro por separado: a nombre de quién */
   cliente?: string;
+  /** Copia impresa después: fecha y hora de la reimpresión */
+  reimpreso?: Date;
 }
 
 // ─── Comprobante de venta (Punto de venta y Mesas) ───
@@ -40,6 +42,7 @@ export class TicketComponent {
   readonly metodo = METODO_PAGO;
 
   get textoFecha(): string { return fechaHora(this.fecha().toISOString()); }
+  get textoReimpreso(): string { const r = this.datos().reimpreso; return r ? fechaHora(r.toISOString()) : ''; }
 
   readonly ahorro = computed(() => (this.datos().descuento_promociones || 0) + (this.datos().descuento_manual || 0));
   readonly subtotal = computed(() => this.datos().items.reduce((s, i) => s + i.subtotal, 0));

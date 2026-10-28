@@ -120,12 +120,12 @@ export class InventarioComponent implements OnInit, OnDestroy {
     nombre_producto: '', descripcion_producto: '',
     precio_unitario: '', id_categoria: '',
     ingredientes: '', preparacion: '', destacado: false, mostrar_en_menu: true,
-    stock_inicial: 0
+    stock_inicial: null
   });
 
   // ─── Modal movimiento (entrada o merma) ───
   readonly productoMov = signal<any>(null);
-  readonly mov         = signal({ tipo: 'INGRESO' as TipoMovimiento, cantidad: 0, motivo: '', detalle: '' });
+  readonly mov         = signal({ tipo: 'INGRESO' as TipoMovimiento, cantidad: null as number | null, motivo: '', detalle: '' });
   readonly motivos     = signal<Record<TipoMovimiento, string[]>>({ INGRESO: [], SALIDA: [] });
   readonly errorMov    = signal('');
 
@@ -260,7 +260,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
       nombre_producto: '', descripcion_producto: '',
       precio_unitario: '', id_categoria: '',
       ingredientes: '', preparacion: '', destacado: false, mostrar_en_menu: true,
-      stock_inicial: 0
+      stock_inicial: null
     });
     this.mostrarModal.set(true);
   }
@@ -279,7 +279,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
       preparacion:          prod.preparacion || '',
       destacado:            !!prod.destacado,
       mostrar_en_menu:      prod.mostrar_en_menu !== false,
-      stock_inicial:        0
+      stock_inicial:        null
     });
     this.mostrarModal.set(true);
   }
@@ -357,7 +357,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.productoMov.set(prod);
     this.errorMov.set('');
     this.guardando.set(false);
-    this.mov.set({ tipo: 'INGRESO', cantidad: 0, motivo: '', detalle: '' });
+    this.mov.set({ tipo: 'INGRESO', cantidad: null, motivo: '', detalle: '' });
     this.inventarioService.motivos$.subscribe({
       next:  (m) => { this.motivos.set(m); this.cambiarTipoMov(this.mov().tipo); },
       error: () => this.errorMov.set('No se pudieron cargar los motivos.')

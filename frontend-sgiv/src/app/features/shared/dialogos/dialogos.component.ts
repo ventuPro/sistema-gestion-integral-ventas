@@ -1,4 +1,4 @@
-import { Component, HostListener, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { ConfirmacionComponent } from '../confirmacion/confirmacion.component';
 
@@ -20,7 +20,4 @@ import { ConfirmacionComponent } from '../confirmacion/confirmacion.component';
 })
 export class DialogosComponent {
   readonly dialogo = inject(DialogoService);
-
-  @HostListener('document:keydown.escape')
-  alPresionarEscape() { this.dialogo.confirmacion()?.responder(false); }
 }

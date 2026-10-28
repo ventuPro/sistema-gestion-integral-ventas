@@ -324,6 +324,62 @@ describe('Promociones en el menú QR', () => {
     });
 });
 
+describe('Reimpresión de comprobantes', () => {
+    test('devuelve la venta como se cobró: precios de lista, promoción, descuento manual y mesa', async () => {
+        const [{ id_usuario }] = await bd.sql(`SELECT id_usuario FROM usuario WHERE correo_electronico = 'cajero.promo@prueba.com'`);
+        await api('PUT', `/permisos/usuario/${id_usuario}`,
+            { token: tAdmin, body: { permisos: { promociones: true, punto_venta: true, mesas: true, arqueo: true } } });
+        const cat = await crearCategoria('Reimpresión');
+        const id = await crearProducto('Alfajor', 20, cat);
+        await crearPromo(tAdmin, { nombre: 'Alfajores -25 %', valor: 25, productos: [{ id_producto: id }] });
+        const detalles = [{ id_producto: id, cantidad: 2 }];
+        const descuento = { tipo: 'MONTO', valor: 5, motivo: 'Cliente frecuente' };
+        const c = await cotizar(tCajero, detalles, descuento);
+        assert.equal(c.body.total, 25);
+        const venta = await api('POST', '/caja/cobrar', { token: tCajero, body: {
+            id_sucursal: 1, metodo_pago: 'Efectivo', monto_total_venta: c.body.total, descuento, detalles } });
+        assert.equal(venta.status, 201, JSON.stringify(venta.body));
+
+        const r = await api('GET', `/caja/ventas/${venta.body.id_venta}/comprobante`, { token: tCajero });
+        assert.equal(r.status, 200, JSON.stringify(r.body));
+        assert.equal(r.body.id_venta, venta.body.id_venta);
+        assert.deepEqual(r.body.items, [{ nombre_producto: 'Alfajor', cantidad: 2, precio_unitario: 20, subtotal: 40,
+                                          descuento: 10, promocion: 'Alfajores -25 %' }]);
+        assert.equal(r.body.total, 25);
+        assert.equal(r.body.descuento_promociones, 10);
+        assert.equal(r.body.descuento_manual, 5);
+        assert.equal(r.body.motivo_descuento, 'Cliente frecuente');
+        assert.equal(r.body.metodo, 'Efectivo');
+        assert.equal(r.body.numero_mesa, undefined);
+
+        const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
+                                     VALUES (1, 64, md5(random()::text)) RETURNING id_mesa`);
+        const cuenta = (await api('POST', '/cuentas/abrir', { token: tCajero, body: { id_mesa: mesa.id_mesa } })).body.cuenta;
+        await api('POST', `/cuentas/${cuenta.id_cuenta}/producto`, { token: tCajero, body: { id_producto: id, cantidad: 1 } });
+        const cierre = await api('POST', `/cuentas/${cuenta.id_cuenta}/cerrar`, { token: tCajero, body: { metodo_pago: 'Efectivo' } });
+        assert.equal(cierre.status, 200, JSON.stringify(cierre.body));
+        const m = await api('GET', `/caja/ventas/${cierre.body.id_venta}/comprobante`, { token: tAdmin });
+        assert.equal(m.status, 200);
+        assert.equal(m.body.numero_mesa, 64);
+        assert.equal(m.body.items[0].cantidad, 1);
+    });
+
+    test('el cajero solo reimprime ventas de su sucursal; datos inválidos o sin sesión se rechazan', async () => {
+        const id = await crearProducto('Brownie', 8, await crearCategoria('Reimpresión 2'));
+        const venta = await api('POST', '/caja/cobrar', { token: tCajero, body: {
+            id_sucursal: 1, metodo_pago: 'Efectivo', monto_total_venta: 8, detalles: [{ id_producto: id, cantidad: 1 }] } });
+        assert.equal(venta.status, 201, JSON.stringify(venta.body));
+        const ruta = `/caja/ventas/${venta.body.id_venta}/comprobante`;
+
+        await crearUsuario('cajero.reimp.otra@prueba.com', 2, idOtraSucursal);
+        const tOtra = await iniciarSesion('cajero.reimp.otra@prueba.com', CLAVE);
+        assert.equal((await api('GET', ruta, { token: tOtra })).status, 404);
+        assert.equal((await api('GET', ruta)).status, 401);
+        assert.equal((await api('GET', '/caja/ventas/abc/comprobante', { token: tAdmin })).status, 400);
+        assert.equal((await api('GET', '/caja/ventas/999999/comprobante', { token: tAdmin })).status, 404);
+    });
+});
+
 describe('Promociones en informes', () => {
     test('el informe y el panel muestran lo ahorrado con promociones y los descuentos manuales', async () => {
         const inf = await api('GET', `/reportes/periodo/1?fecha_inicio=${hoy}&fecha_fin=${hoy}`, { token: tAdmin });

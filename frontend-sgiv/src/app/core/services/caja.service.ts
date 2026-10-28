@@ -52,6 +52,10 @@ export class CajaService {
   obtenerArqueo(id_sucursal: number): Observable<any> {
     return this.http.get(`${this.apiUrl}/caja/arqueo/${id_sucursal}`);
   }
+  /** Comprobante de una venta ya registrada, para reimprimirlo */
+  obtenerComprobante(id_venta: number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/caja/ventas/${id_venta}/comprobante`);
+  }
   obtenerVentasHoy(id_sucursal: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/caja/ventas-hoy/${id_sucursal}`);
   }

@@ -54,6 +54,11 @@ export interface DescuentoManual {
   motivo: string;
 }
 
+/** Formulario del descuento: el valor empieza vacío */
+export interface FormDescuento extends Omit<DescuentoManual, 'valor'> {
+  valor:  number | null;
+}
+
 export interface LineaCotizada {
   id_producto:         number;
   cantidad:            number;

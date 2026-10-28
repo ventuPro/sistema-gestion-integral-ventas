@@ -57,7 +57,7 @@
         <label class="inf-etiqueta block mt-6 mb-2">Fondo inicial</label>
         <div class="campo-monto">
           <span>{{ moneda() }}</span>
-          <input type="number" min="0" step="0.01" [(ngModel)]="montoInicial" placeholder="0.00"
+          <input #inputTurno type="number" min="0" step="0.01" [(ngModel)]="montoInicial" placeholder="0.00"
                  (keyup.enter)="confirmarAbrirTurno()">
         </div>
         @if (errorTurno()) { <p class="text-sm inf-baja mt-3">{{ errorTurno() }}</p> }
@@ -99,7 +99,8 @@
         <div class="p-4 pb-3 separador-inferior flex-shrink-0 space-y-3">
           <div class="buscador">
             <lucide-icon [img]="icons.search" class="w-4 h-4 inf-tenue"></lucide-icon>
-            <input type="text" [(ngModel)]="busqueda" placeholder="Buscar producto o categoría">
+            <input #buscador type="text" [(ngModel)]="busqueda" placeholder="Buscar producto o categoría"
+                   (keydown.enter)="enterBuscador($event)" (keydown.escape)="limpiarBusqueda($event)">
             @if (busqueda()) {
               <button class="quitar" (click)="busqueda.set('')" aria-label="Limpiar búsqueda">
                 <lucide-icon [img]="icons.close" class="w-3.5 h-3.5"></lucide-icon>
@@ -126,7 +127,7 @@
             </h3>
             <div class="catalogo">
               @for (prod of sec.productos; track prod.id_producto) {
-                <button class="producto" (click)="agregarAlCarrito(prod)" [disabled]="prod.stock_actual <= 0">
+                <button class="producto" [class.siguiente]="prod === primero()" (click)="agregarAlCarrito(prod)" [disabled]="prod.stock_actual <= 0">
                   <div class="foto">
                     @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
                     @else { {{ prod.nombre_producto?.charAt(0) }} }
@@ -314,7 +315,7 @@
           </p>
           <div class="campo-monto">
             <span>{{ formDescuento().tipo === 'PORCENTAJE' ? '%' : moneda() }}</span>
-            <input type="number" name="valor" inputmode="decimal" min="0" [(ngModel)]="formDescuento().valor" aria-label="Descuento">
+            <input type="number" name="valor" inputmode="decimal" min="0" [(ngModel)]="formDescuento().valor" placeholder="0" aria-label="Descuento">
           </div>
         </div>
         <div>
@@ -354,12 +355,12 @@
           <p class="inf-etiqueta mb-2">Método de pago</p>
           <div class="metodos">
             @if (ajustes.config().pago_efectivo) {
-              <button class="metodo" [class.activo]="metodoPago() === metodo.efectivo" (click)="metodoPago.set(metodo.efectivo)">
+              <button class="metodo" [class.activo]="metodoPago() === metodo.efectivo" (click)="elegirMetodo(metodo.efectivo)">
                 <lucide-icon [img]="icons.efectivo" class="w-4 h-4"></lucide-icon> Efectivo
               </button>
             }
             @if (ajustes.config().pago_qr) {
-              <button class="metodo" [class.activo]="metodoPago() === metodo.qr" (click)="metodoPago.set(metodo.qr)">
+              <button class="metodo" [class.activo]="metodoPago() === metodo.qr" (click)="elegirMetodo(metodo.qr)">
                 <lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon> QR
               </button>
             }
@@ -371,15 +372,15 @@
             <p class="inf-etiqueta mb-2">Monto recibido <span class="inf-sutil font-normal">· opcional</span></p>
             <div class="campo-monto">
               <span>{{ moneda() }}</span>
-              <input #inputMonto type="number" inputmode="decimal" [(ngModel)]="montoPagado"
-                     (focus)="inputMonto.select()" (keyup.enter)="confirmarVenta()">
+              <input #inputMonto type="number" inputmode="decimal" [(ngModel)]="montoPagado" placeholder="0.00"
+                     (focus)="inputMonto.select()">
             </div>
-            @if (montoPagado() > 0) {
+            @if (pagado() > 0) {
               <dl class="inf-pares mt-3">
-                @if (montoPagado() >= total()) {
+                @if (pagado() >= total()) {
                   <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio()) }}</dd></div>
                 } @else {
-                  <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(total() - montoPagado()) }}</dd></div>
+                  <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(total() - pagado()) }}</dd></div>
                 }
               </dl>
             }
@@ -395,7 +396,7 @@
 
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalCobro()">Cancelar</button>
-        <button class="boton-primario" (click)="confirmarVenta()">
+        <button class="boton-primario" data-enter (click)="confirmarVenta()">
           <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> Confirmar venta
         </button>
       </div>
@@ -421,7 +422,7 @@
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarTicket()">Cerrar</button>
-        <button class="boton-primario" (click)="imprimirVenta()">
+        <button class="boton-primario" data-enter (click)="imprimirVenta()">
           <lucide-icon [img]="icons.imprimir" class="w-4 h-4"></lucide-icon> Imprimir
         </button>
       </div>

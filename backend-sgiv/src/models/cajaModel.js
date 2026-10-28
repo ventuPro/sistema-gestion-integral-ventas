@@ -430,6 +430,57 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
     };
 };
 
+// ─── Comprobante de una venta ya registrada (reimpresión) ───
+// id_sucursal: si viene, la venta debe ser de esa sucursal (cajero). Devuelve null si no existe.
+const obtenerComprobante = async (id_venta, id_sucursal = null) => {
+    const venta = await db.query(`
+        SELECT v.id_venta, v.id_sucursal, v.fecha_venta, v.monto_total_venta, v.metodo_pago,
+               v.descuento_promociones, v.descuento_manual, v.motivo_descuento,
+               mesa.numero_mesa, mesa.clientes
+        FROM venta_caja v
+        LEFT JOIN LATERAL (
+            SELECT MIN(m.numero_mesa) AS numero_mesa,
+                   ARRAY_REMOVE(ARRAY_AGG(DISTINCT dc.nombre_cliente), NULL) AS clientes
+            FROM detalle_cuenta dc
+            JOIN cuenta_mesa c ON c.id_cuenta = dc.id_cuenta
+            JOIN mesa_local m  ON m.id_mesa   = c.id_mesa
+            WHERE dc.id_venta = v.id_venta
+        ) mesa ON TRUE
+        WHERE v.id_venta = $1 AND ($2::int IS NULL OR v.id_sucursal = $2)
+    `, [id_venta, id_sucursal]);
+    const v = venta.rows[0];
+    if (!v) return null;
+
+    const lineas = await db.query(`
+        SELECT p.nombre_producto, dv.cantidad_vendida, dv.precio_unitario, dv.descuento_promocion, pr.nombre AS promocion
+        FROM detalle_venta dv
+        JOIN producto p        ON p.id_producto   = dv.id_producto
+        LEFT JOIN promocion pr ON pr.id_promocion = dv.id_promocion
+        WHERE dv.id_venta = $1
+        ORDER BY dv.id_detalle_venta
+    `, [id_venta]);
+
+    return {
+        id_venta: v.id_venta,
+        fecha_venta: v.fecha_venta,
+        items: lineas.rows.map(l => ({
+            nombre_producto: l.nombre_producto,
+            cantidad:        l.cantidad_vendida,
+            precio_unitario: Number(l.precio_unitario),
+            subtotal:        Number(l.precio_unitario) * l.cantidad_vendida,
+            descuento:       Number(l.descuento_promocion) || 0,
+            promocion:       l.promocion || undefined
+        })),
+        total:                 Number(v.monto_total_venta),
+        descuento_promociones: Number(v.descuento_promociones) || 0,
+        descuento_manual:      Number(v.descuento_manual) || 0,
+        motivo_descuento:      v.motivo_descuento,
+        metodo:                v.metodo_pago,
+        numero_mesa:           v.numero_mesa || undefined,
+        cliente:               v.clientes?.length === 1 ? v.clientes[0] : undefined
+    };
+};
+
 const obtenerVentasHoyPOS = async (id_sucursal, id_usuario_cajero) => {
     const resVentas = await db.query(`
         SELECT
@@ -724,7 +775,7 @@ module.exports = {
     obtenerEstadoCaja,
     obtenerEstadoCompleto,
     habilitarCaja, deshabilitarCaja,
-    obtenerArqueoHoy, obtenerVentasHoyPOS,
+    obtenerArqueoHoy, obtenerVentasHoyPOS, obtenerComprobante,
     abrirTurno, cerrarCaja, reabrirTurno, cerrarTurnosVencidos, registrarVenta, calcularItemsVenta,
     obtenerCierresCaja,
     verificarTurnoHoy,

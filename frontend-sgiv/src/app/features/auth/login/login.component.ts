@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { AfterViewInit, Component, computed, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -7,6 +7,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SesionService } from '../../../core/services/sesion.service';
+import { enfocar, pantallaTactil, pasarAlSiguienteVacio } from '../../../core/directives/fondo-modal.directive';
 
 // ─── Login: correo, contraseña y CAPTCHA ───
 @Component({
@@ -17,7 +18,7 @@ import { SesionService } from '../../../core/services/sesion.service';
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './login.component.css']
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, AfterViewInit {
   readonly icons = { refrescar: RefreshCw, ver: Eye, ocultar: EyeOff };
 
   readonly correo        = signal('');
@@ -53,7 +54,14 @@ export class LoginComponent implements OnInit {
 
   readonly usaCaptcha = computed(() => this.ajustes.config().captcha_activo || this.forzarCaptcha());
 
+  @ViewChild('campoCorreo') campoCorreo?: ElementRef<HTMLInputElement>;
+
   ngOnInit() { if (this.usaCaptcha()) this.cargarCaptcha(); }
+
+  ngAfterViewInit() { if (!pantallaTactil()) enfocar(this.campoCorreo?.nativeElement); }
+
+  /** Enter pasa al siguiente campo vacío; con todo lleno, entra */
+  siguienteCampo(evento: Event, formulario: HTMLElement) { pasarAlSiguienteVacio(evento, formulario); }
 
   cargarCaptcha() {
     this.cargandoCaptcha.set(true);

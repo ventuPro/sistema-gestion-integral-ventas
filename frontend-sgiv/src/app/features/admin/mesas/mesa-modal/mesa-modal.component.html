@@ -22,7 +22,7 @@
   </div>
 </ng-template>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModal()">
+<div #fondoMesa class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModal()">
 
   <div class="inf-hoja ventana w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden relative">
 
@@ -67,7 +67,8 @@
           <div class="p-4 pb-3 separador-inferior space-y-3 flex-shrink-0">
             <div class="buscador">
               <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
-              <input type="text" [(ngModel)]="busqueda" placeholder="Buscar producto">
+              <input #buscador type="text" [(ngModel)]="busqueda" placeholder="Buscar producto"
+                     (keydown.enter)="enterBuscador($event)" (keydown.escape)="limpiarBusqueda($event)">
               @if (busqueda()) {
                 <button class="quitar" (click)="busqueda.set('')" aria-label="Limpiar búsqueda">
                   <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
@@ -88,7 +89,7 @@
               </h3>
               <div class="catalogo">
                 @for (prod of sec.productos; track prod.id_producto) {
-                  <button class="producto" (click)="agregarProducto(prod)" [disabled]="prod.stock_actual <= 0">
+                  <button class="producto" [class.siguiente]="prod === primero()" (click)="agregarProducto(prod)" [disabled]="prod.stock_actual <= 0">
                     <div class="foto">
                       @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
                       @else { {{ prod.nombre_producto?.charAt(0) }} }
@@ -213,7 +214,7 @@
                     <p class="inf-etiqueta mb-1">
                       Descuento
                     </p>
-                    <input type="number" name="valor" min="0" class="campo-texto" [(ngModel)]="formDescuento().valor" aria-label="Descuento">
+                    <input type="number" name="valor" min="0" class="campo-texto" [(ngModel)]="formDescuento().valor" placeholder="0" aria-label="Descuento">
                   </div>
                 </div>
                 <input name="motivo" class="campo-texto" maxlength="120" [(ngModel)]="formDescuento().motivo" placeholder="Motivo" aria-label="Motivo">
@@ -230,12 +231,12 @@
               <p class="inf-etiqueta mb-2">Método de pago</p>
               <div class="metodos">
                 @if (ajustes.config().pago_efectivo) {
-                  <button class="metodo" [class.activo]="metodoPago() === metodo.efectivo" (click)="metodoPago.set(metodo.efectivo)">
+                  <button class="metodo" [class.activo]="metodoPago() === metodo.efectivo" (click)="elegirMetodo(metodo.efectivo)">
                     <lucide-icon [img]="icons.efectivo" class="w-4 h-4"></lucide-icon> Efectivo
                   </button>
                 }
                 @if (ajustes.config().pago_qr) {
-                  <button class="metodo" [class.activo]="metodoPago() === metodo.qr" (click)="metodoPago.set(metodo.qr)">
+                  <button class="metodo" [class.activo]="metodoPago() === metodo.qr" (click)="elegirMetodo(metodo.qr)">
                     <lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon> QR
                   </button>
                 }
@@ -247,15 +248,15 @@
                 <p class="inf-etiqueta mb-2">Monto recibido <span class="inf-sutil font-normal">· opcional</span></p>
                 <div class="campo-monto">
                   <span>{{ moneda() }}</span>
-                  <input #inputMontoMesa type="number" inputmode="decimal" [(ngModel)]="montoPagado"
-                         (focus)="inputMontoMesa.select()" (keyup.enter)="confirmarPago()">
+                  <input #inputMontoMesa type="number" inputmode="decimal" [(ngModel)]="montoPagado" placeholder="0.00"
+                         (focus)="inputMontoMesa.select()">
                 </div>
-                @if (montoPagado() > 0) {
+                @if (pagado() > 0) {
                   <dl class="inf-pares mt-3">
-                    @if (montoPagado() >= totalCobro()) {
+                    @if (pagado() >= totalCobro()) {
                       <div><dt>Cambio</dt><dd class="text-[18px] inf-sube">{{ moneda() }} {{ cifra(cambio()) }}</dd></div>
                     } @else {
-                      <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(totalCobro() - montoPagado()) }}</dd></div>
+                      <div><dt>Falta</dt><dd class="inf-aviso">{{ moneda() }} {{ cifra(totalCobro() - pagado()) }}</dd></div>
                     }
                   </dl>
                 }
@@ -271,7 +272,7 @@
 
           <div class="inf-pie-hoja flex justify-end gap-2">
             <button class="inf-boton" (click)="vista.set('comanda')">Cancelar</button>
-            <button class="boton-primario" (click)="confirmarPago()" [disabled]="cargando() || !cotizacionPago() || editandoDescuento()">
+            <button class="boton-primario" data-enter (click)="confirmarPago()" [disabled]="cargando() || !cotizacionPago() || editandoDescuento()">
               <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon>
               {{ cargando() ? 'Procesando…' : 'Confirmar pago' }}
             </button>
@@ -282,7 +283,7 @@
 
     <!-- Comprobante -->
     @if (vista() === 'ticket') {
-      <div class="absolute inset-0 z-10 flex items-center justify-center p-4 fondo-modal">
+      <div class="absolute inset-0 z-10 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarTicket()">
         <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[85vh]">
           <div class="flex items-center justify-between px-5 py-4 separador-inferior">
             <div>
@@ -298,7 +299,7 @@
           </div>
           <div class="inf-pie-hoja flex justify-end gap-2">
             <button class="inf-boton" (click)="cerrarTicket()">{{ cuentaCerrada() ? 'Cerrar' : 'Volver a la mesa' }}</button>
-            <button class="boton-primario" (click)="imprimirTicket()">
+            <button class="boton-primario" data-enter (click)="imprimirTicket()">
               <lucide-icon [img]="icons.imprimir" class="w-4 h-4"></lucide-icon> Imprimir
             </button>
           </div>

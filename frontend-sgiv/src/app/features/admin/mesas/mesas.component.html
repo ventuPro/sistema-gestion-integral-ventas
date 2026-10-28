@@ -158,13 +158,13 @@
         <label class="inf-etiqueta block mb-2">Número de mesa</label>
         <div class="campo-monto">
           <span>N.º</span>
-          <input type="number" min="1" [(ngModel)]="nuevaMesaNum" placeholder="1" (keyup.enter)="crearMesa()">
+          <input type="number" min="1" [(ngModel)]="nuevaMesaNum" placeholder="1">
         </div>
         @if (errorMesa()) { <p class="text-sm inf-baja mt-3">{{ errorMesa() }}</p> }
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalMesa()">Cancelar</button>
-        <button class="boton-primario" (click)="crearMesa()">Crear mesa</button>
+        <button class="boton-primario" data-enter (click)="crearMesa()">Crear mesa</button>
       </div>
     </div>
   </div>

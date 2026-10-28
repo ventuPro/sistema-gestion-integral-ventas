@@ -162,7 +162,7 @@
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModal()">Cancelar</button>
-        <button class="boton-primario" (click)="guardarUsuario()" [disabled]="guardando()">
+        <button class="boton-primario" data-enter (click)="guardarUsuario()" [disabled]="guardando()">
           {{ guardando() ? 'Guardando…' : (editandoId() ? 'Guardar cambios' : 'Crear usuario') }}
         </button>
       </div>
@@ -192,12 +192,12 @@
         <div class="grupo">
           <label class="inf-etiqueta" for="confirmar-contrasena">Repetir contraseña</label>
           <input id="confirmar-contrasena" type="password" class="campo" [(ngModel)]="cambioContrasena().confirmar"
-                 autocomplete="new-password" (keyup.enter)="confirmarCambioContrasena()">
+                 autocomplete="new-password">
         </div>
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalContrasena()">Cancelar</button>
-        <button class="boton-primario" (click)="confirmarCambioContrasena()" [disabled]="cargandoContrasena()">
+        <button class="boton-primario" data-enter (click)="confirmarCambioContrasena()" [disabled]="cargandoContrasena()">
           {{ cargandoContrasena() ? 'Guardando…' : 'Cambiar' }}
         </button>
       </div>
@@ -235,7 +235,7 @@
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button class="inf-boton" (click)="cerrarModalPermisos()">Cancelar</button>
-        <button class="boton-primario" (click)="guardarPermisos()" [disabled]="cargandoPermisos() || !modulosCargados()">
+        <button class="boton-primario" data-enter (click)="guardarPermisos()" [disabled]="cargandoPermisos() || !modulosCargados()">
           {{ cargandoPermisos() && modulosCargados() ? 'Guardando…' : 'Guardar' }}
         </button>
       </div>

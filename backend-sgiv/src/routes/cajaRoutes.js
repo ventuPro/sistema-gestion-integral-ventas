@@ -23,6 +23,7 @@ router.post  ('/cerrar',                       verificarToken, ctrl.cerrarCaja);
 // Arqueo y ventas
 router.get   ('/arqueo/:id_sucursal',          verificarToken, ctrl.getArqueoHoy);
 router.get   ('/ventas-hoy/:id_sucursal',      verificarToken, ctrl.getVentasHoyPOS);
+router.get   ('/ventas/:id_venta/comprobante', verificarToken, verificarPermiso('arqueo'), ctrl.getComprobante);
 router.get   ('/cierres',                      verificarToken, soloAdministrador, ctrl.getCierresCaja);
 router.post  ('/cobrar',                       verificarToken, verificarPermiso('punto_venta'), ctrl.cobrarVenta);
 router.post  ('/cotizar',                      verificarToken, verificarPermiso('punto_venta'), ctrl.cotizarVenta);

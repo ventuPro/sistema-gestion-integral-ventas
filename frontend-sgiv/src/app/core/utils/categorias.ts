@@ -29,3 +29,17 @@ export function agruparPorCategoria<T extends ConCategoria>(lista: T[], { stockP
   }
   return secciones;
 }
+
+/**
+ * Producto que se agrega con Enter al buscar: el primero con stock (en el orden de la lista)
+ * cuyo nombre empieza con el texto; si no, una de sus palabras; si no, cualquiera que lo contenga.
+ */
+export function mejorCoincidencia<T extends ConCategoria & { nombre_producto?: string }>(secciones: Seccion<T>[], texto: string): T | null {
+  const q = texto.trim().toLowerCase();
+  if (!q) return null;
+  const disponibles = secciones.flatMap(s => s.productos).filter(p => Number(p.stock_actual) > 0);
+  const nombre = (p: T) => (p.nombre_producto || '').toLowerCase();
+  return disponibles.find(p => nombre(p).startsWith(q))
+      ?? disponibles.find(p => nombre(p).split(/\s+/).some(w => w.startsWith(q)))
+      ?? disponibles[0] ?? null;
+}

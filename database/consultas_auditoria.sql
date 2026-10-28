@@ -326,6 +326,11 @@ SELECT fecha, usuario, operacion, id_registro AS id_pedido,
 FROM v_cambios WHERE tabla = 'pedido_mesa'
 ORDER BY id_cambio DESC LIMIT 30;
 
+-- 7.6 Reimpresiones de comprobantes de venta (quién reimprimió qué venta y cuándo)
+SELECT fecha, usuario, ip, (detalle ->> 'id_venta')::int AS id_venta
+FROM v_accesos WHERE evento = 'REIMPRESION_COMPROBANTE'
+ORDER BY id_acceso DESC LIMIT 50;
+
 
 -- ════════════════════ 8. USUARIOS, PERMISOS Y AJUSTES ════════════════════
 

@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, OnInit, OnDestroy, signal, untracked, ViewChild, ElementRef } from '@angular/core';
+import { afterNextRender, Component, computed, effect, inject, Injector, OnInit, OnDestroy, signal, untracked, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProductoService } from '../../../core/services/producto.service';
@@ -7,7 +7,7 @@ import { SocketService } from '../../../core/services/socket.service';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { Subscription } from 'rxjs';
-import { Cotizacion, DescuentoManual, PromocionService, PromocionVigente, etiquetaPromocion } from '../../../core/services/promocion.service';
+import { Cotizacion, DescuentoManual, FormDescuento, PromocionService, PromocionVigente, etiquetaPromocion } from '../../../core/services/promocion.service';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { TicketComponent } from '../../shared/ticket/ticket.component';
 import { LucideAngularModule,
@@ -21,8 +21,8 @@ import { DialogoService } from '../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../core/utils/metodos-pago';
 import { SesionService } from '../../../core/services/sesion.service';
 import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
-import { agruparPorCategoria } from '../../../core/utils/categorias';
-import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
+import { agruparPorCategoria, mejorCoincidencia } from '../../../core/utils/categorias';
+import { enfocar, focoOcupado, FondoModalDirective, pantallaTactil } from '../../../core/directives/fondo-modal.directive';
 
 @Component({
   selector: 'app-punto-venta',
@@ -75,7 +75,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   // ─── Turno ───
   readonly turnoActivo       = signal<any>(null);
   readonly mostrarAbrirTurno = signal(false);   // se muestra cuando SIN_APERTURA
-  readonly montoInicial      = signal(0);
+  readonly montoInicial      = signal<number | null>(null);
   readonly abriendoTurno     = signal(false);
   readonly errorTurno        = signal('');
 
@@ -93,6 +93,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   /** Por categoría en el orden del menú; los que se agotan pasan al final */
   readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados()));
+  /** El que se agrega con Enter al buscar */
+  readonly primero = computed(() => mejorCoincidencia(this.secciones(), this.busqueda()));
   readonly barra = computed(() => this.secciones().map(s => ({ id: s.id, nombre: s.nombre, icono: s.icono, cantidad: s.productos.length })));
 
   // ─── Carrito ───
@@ -140,7 +142,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── Modal del descuento manual ───
   readonly mostrarDescuento = signal(false);
-  readonly formDescuento    = signal<DescuentoManual>({ tipo: 'PORCENTAJE', valor: 0, motivo: '' });
+  readonly formDescuento    = signal<FormDescuento>({ tipo: 'PORCENTAJE', valor: null, motivo: '' });
   readonly errorDescuento   = signal('');
   readonly aplicandoDescuento = signal(false);
 
@@ -148,10 +150,15 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly mostrarModalCobro = signal(false);
   readonly metodo = METODO_PAGO;
   readonly metodoPago  = signal<MetodoPago>(METODO_PAGO.efectivo);
-  readonly montoPagado = signal(0);
+  readonly montoPagado = signal<number | null>(null);
+  /** Monto recibido como número (vacío = 0) */
+  readonly pagado      = computed(() => Number(this.montoPagado()) || 0);
+  @ViewChild('buscador') buscadorRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('inputTurno') inputTurnoRef?: ElementRef<HTMLInputElement>;
   @ViewChild('inputMonto') inputMontoRef?: ElementRef<HTMLInputElement>;
+  private readonly injector = inject(Injector);
   @ViewChild('zonaTicket') zonaTicket?: ElementRef<HTMLElement>;
-  readonly cambio = computed(() => Math.max(0, this.montoPagado() - this.total()));
+  readonly cambio = computed(() => Math.max(0, this.pagado() - this.total()));
 
   // ─── Ticket ───
   readonly mostrarTicket = signal(false);
@@ -275,6 +282,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       // Apertura automática del día — mostrar modal para monto inicial
       this.mostrarAbrirTurno.set(true);
       this.cargando.set(false);
+      this.enfocarCampo(() => this.inputTurnoRef?.nativeElement);
     } else {
       // CERRADA — bloquear y mostrar mensaje al cajero
       this.mostrarAbrirTurno.set(false);
@@ -297,13 +305,13 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── APERTURA AUTOMÁTICA DIARIA ───
   confirmarAbrirTurno() {
-    if (this.montoInicial() < 0) return this.errorTurno.set('Monto inválido.');
+    if ((this.montoInicial() ?? 0) < 0) return this.errorTurno.set('Monto inválido.');
     this.abriendoTurno.set(true);
     this.errorTurno.set('');
 
     this.cajaService.abrirTurno({
       id_sucursal:   this.sesion.idSucursal(),
-      monto_inicial: this.montoInicial()
+      monto_inicial: Number(this.montoInicial()) || 0
     }).subscribe({
       next: (res) => {
         this.turnoActivo.set(res.turno);
@@ -337,12 +345,42 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
           }))
           .filter(p => p.stock_actual > 0);
         this.productosDisponibles.set(productos);
+        this.enfocarBuscador();
 
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false)
     });
     this.promociones.vigentesPuntoVenta().subscribe({ next: (v) => this.vigentes.set(v) });
+  }
+
+  // ─── TECLADO ───
+  // Escribir + Enter agrega el producto marcado; Enter con el buscador vacío abre el cobro
+  enterBuscador(evento: Event) {
+    evento.preventDefault();
+    const producto = this.primero();
+    if (producto) {
+      this.agregarAlCarrito(producto);
+      this.buscadorRef?.nativeElement.select();
+    } else if (!this.busqueda().trim() && this.carrito().length) {
+      this.abrirModalCobro();
+    }
+  }
+
+  limpiarBusqueda(evento: Event) {
+    if (!this.busqueda()) return;
+    evento.stopPropagation();
+    this.busqueda.set('');
+  }
+
+  /** Deja el cursor en el buscador si no está en otro campo */
+  enfocarBuscador() {
+    this.enfocarCampo(() => this.buscadorRef?.nativeElement);
+  }
+
+  private enfocarCampo(campo: () => HTMLElement | undefined) {
+    if (pantallaTactil()) return;
+    afterNextRender(() => { if (!focoOcupado()) enfocar(campo()); }, { injector: this.injector });
   }
 
   // ─── CARRITO ───
@@ -383,19 +421,23 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       return;
     }
     this.metodoPago.set(this.ajustes.config().pago_efectivo ? METODO_PAGO.efectivo : METODO_PAGO.qr);
-    this.montoPagado.set(0);
+    this.montoPagado.set(null);
     this.mostrarModalCobro.set(true);
-    setTimeout(() => {
-      const el = this.inputMontoRef?.nativeElement;
-      if (el) { el.focus(); el.select(); }
-    }, 60);
   }
 
-  cerrarModalCobro() { this.mostrarModalCobro.set(false); }
+  /** Efectivo: cursor en el monto; QR: en «Confirmar venta» (Enter cobra) */
+  elegirMetodo(metodo: MetodoPago) {
+    this.metodoPago.set(metodo);
+    afterNextRender(() => enfocar(metodo === METODO_PAGO.efectivo
+      ? this.inputMontoRef?.nativeElement
+      : document.querySelector<HTMLElement>('.ventana [data-enter]')), { injector: this.injector });
+  }
+
+  cerrarModalCobro() { this.mostrarModalCobro.set(false); this.enfocarBuscador(); }
 
   // ─── DESCUENTO MANUAL ───
   abrirDescuento() {
-    this.formDescuento.set({ ...(this.descuento() ?? { tipo: 'PORCENTAJE', valor: 0, motivo: '' }) });
+    this.formDescuento.set({ ...(this.descuento() ?? { tipo: 'PORCENTAJE', valor: null, motivo: '' }) });
     this.errorDescuento.set('');
     this.mostrarDescuento.set(true);
   }
@@ -403,7 +445,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   cerrarDescuento() { if (!this.aplicandoDescuento()) this.mostrarDescuento.set(false); }
 
   aplicarDescuento() {
-    const d = { ...this.formDescuento(), valor: Number(this.formDescuento().valor) };
+    const d: DescuentoManual = { ...this.formDescuento(), valor: Number(this.formDescuento().valor) || 0 };
     if (!(d.valor > 0)) return this.errorDescuento.set('Indica el descuento.');
     if (d.motivo.trim().length < 3) return this.errorDescuento.set('Indica el motivo del descuento.');
     // Se valida con el backend antes de aplicarlo (tope del cajero, total)
@@ -414,6 +456,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
         this.descuento.set(d);
         this.cotizacionGuardada.set({ clave: this.clave(), datos });
         this.mostrarDescuento.set(false);
+        this.enfocarBuscador();
       },
       error: (e) => {
         this.aplicandoDescuento.set(false);
@@ -425,7 +468,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   quitarDescuento() { this.descuento.set(null); }
 
   confirmarVenta() {
-    if (this.metodoPago() === METODO_PAGO.efectivo && (!this.montoPagado() || this.montoPagado() < this.total())) {
+    if (this.metodoPago() === METODO_PAGO.efectivo && this.pagado() < this.total()) {
       this.montoPagado.set(this.total());
     }
     this.mostrarModalCobro.set(false);
@@ -541,9 +584,12 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   cerrarTicket() {
     this.mostrarTicket.set(false);
     this.datosTicket.set(null);
+    this.enfocarBuscador();
   }
 
+  /** Imprime y deja la caja lista para la siguiente venta */
   imprimirVenta() {
     this.impresion.imprimirTicket(this.zonaTicket?.nativeElement, this.ajustes.config().ticket_ancho);
+    this.cerrarTicket();
   }
 }

@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, computed, effect, inject, signal, untracked, ViewChild, ElementRef } from '@angular/core';
+import { afterNextRender, Component, Input, Output, EventEmitter, OnInit, OnDestroy, computed, effect, inject, Injector, signal, untracked, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CuentaService } from '../../../../core/services/cuenta.service';
@@ -12,11 +12,11 @@ import { cifra } from '../../../../core/utils/informe';
 import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent } from 'lucide-angular';
 import { DialogoService } from '../../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
-import { Cotizacion, DescuentoManual, PromocionService } from '../../../../core/services/promocion.service';
+import { Cotizacion, DescuentoManual, FormDescuento, PromocionService } from '../../../../core/services/promocion.service';
 import { SesionService } from '../../../../core/services/sesion.service';
 import { BarraCategoriasComponent } from '../../../shared/barra-categorias/barra-categorias.component';
-import { agruparPorCategoria } from '../../../../core/utils/categorias';
-import { FondoModalDirective } from '../../../../core/directives/fondo-modal.directive';
+import { agruparPorCategoria, mejorCoincidencia } from '../../../../core/utils/categorias';
+import { enfocar, focoOcupado, FondoModalDirective, pantallaTactil } from '../../../../core/directives/fondo-modal.directive';
 
 /** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
 export interface GrupoCuenta {
@@ -71,8 +71,13 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   readonly metodo = METODO_PAGO;
   readonly metodoPago  = signal<MetodoPago>(METODO_PAGO.efectivo);
-  readonly montoPagado = signal(0);
+  readonly montoPagado = signal<number | null>(null);
+  /** Monto recibido como número (vacío = 0) */
+  readonly pagado      = computed(() => Number(this.montoPagado()) || 0);
   @ViewChild('inputMontoMesa') inputMontoMesaRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('buscador') buscadorRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('fondoMesa') fondoMesaRef?: ElementRef<HTMLElement>;
+  private readonly injector = inject(Injector);
   @ViewChild('zonaTicket') zonaTicket?: ElementRef<HTMLElement>;
 
   /** A precio de lista */
@@ -93,7 +98,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   // ─── Descuento manual al cobrar ───
   readonly descuento          = signal<DescuentoManual | null>(null);
   readonly editandoDescuento  = signal(false);
-  readonly formDescuento      = signal<DescuentoManual>({ tipo: 'PORCENTAJE', valor: 0, motivo: '' });
+  readonly formDescuento      = signal<FormDescuento>({ tipo: 'PORCENTAJE', valor: null, motivo: '' });
   readonly errorDescuento     = signal('');
   readonly aplicandoDescuento = signal(false);
 
@@ -102,7 +107,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly parteCobro = signal<GrupoCuenta | null>(null);
 
   readonly totalCobro = computed(() => this.cotizacionPago()?.total ?? this.parteCobro()?.pendiente ?? this.totalCuenta());
-  readonly cambio     = computed(() => Math.max(0, this.montoPagado() - this.totalCobro()));
+  readonly cambio     = computed(() => Math.max(0, this.pagado() - this.totalCobro()));
 
   readonly itemsPendientes = computed<any[]>(() => (this.cuentaActiva()?.items || []).filter((i: any) => !i.pagado));
 
@@ -136,6 +141,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   /** Por categoría en el orden del menú; los que se agotan pasan al final */
   readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados()));
+  /** El que se agrega con Enter al buscar */
+  readonly primero = computed(() => mejorCoincidencia(this.secciones(), this.busqueda()));
   readonly barra = computed(() => this.secciones().map(s => ({ id: s.id, nombre: s.nombre, icono: s.icono, cantidad: s.productos.length })));
 
   readonly datosTicket = signal<any>(null);
@@ -165,6 +172,40 @@ export class MesaModalComponent implements OnInit, OnDestroy {
       this.promociones.cotizarCuenta(cuenta.id_cuenta).subscribe({
         next: (c) => { if (this.claveCuenta() === clave) this.cotizacionCuenta.set(c); }
       }), 150);
+  }
+
+  // Con el consumo a la vista, el cursor queda en el buscador
+  private readonly enfocarBuscador = effect(() => {
+    if (this.vista() !== 'comanda' || this.cargando() || pantallaTactil()) return;
+    afterNextRender(() => {
+      if (!focoOcupado(this.fondoMesaRef?.nativeElement)) enfocar(this.buscadorRef?.nativeElement);
+    }, { injector: this.injector });
+  });
+
+  // ─── Teclado: escribir + Enter agrega el marcado; Enter con el buscador vacío va a cobrar ───
+  enterBuscador(evento: Event) {
+    evento.preventDefault();
+    const producto = this.primero();
+    if (producto) {
+      this.agregarProducto(producto);
+      this.buscadorRef?.nativeElement.select();
+    } else if (!this.busqueda().trim() && this.itemsPendientes().length) {
+      this.irAPago();
+    }
+  }
+
+  limpiarBusqueda(evento: Event) {
+    if (!this.busqueda()) return;
+    evento.stopPropagation();
+    this.busqueda.set('');
+  }
+
+  /** Efectivo: cursor en el monto; QR: en «Confirmar» (Enter cobra) */
+  elegirMetodo(metodo: MetodoPago) {
+    this.metodoPago.set(metodo);
+    afterNextRender(() => enfocar(metodo === METODO_PAGO.efectivo
+      ? this.inputMontoMesaRef?.nativeElement
+      : this.fondoMesaRef?.nativeElement.querySelector<HTMLElement>('.ventana .ventana [data-enter]')), { injector: this.injector });
   }
 
   ngOnInit() {
@@ -334,25 +375,21 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     this.promociones.cotizarCuenta(this.cuentaActiva().id_cuenta, parte ? parte.clave : undefined).subscribe({
       next: (c) => { if (this.parteCobro() === parte) this.cotizacionPago.set(c); }
     });
-    this.montoPagado.set(0);
+    this.montoPagado.set(null);
     this.metodoPago.set(this.ajustes.config().pago_efectivo ? METODO_PAGO.efectivo : METODO_PAGO.qr);
     this.vista.set('pago');
-    setTimeout(() => {
-      const el = this.inputMontoMesaRef?.nativeElement;
-      if (el) { el.focus(); el.select(); }
-    }, 60);
   }
 
   abrirDescuento() {
-    this.formDescuento.set({ tipo: 'PORCENTAJE', valor: 0, motivo: '' });
+    this.formDescuento.set({ tipo: 'PORCENTAJE', valor: null, motivo: '' });
     this.errorDescuento.set('');
     this.editandoDescuento.set(true);
   }
 
   /** Se valida con el backend (tope del cajero, total) antes de aplicarlo */
-  aplicarDescuento(d: DescuentoManual | null) {
+  aplicarDescuento(form: FormDescuento | null) {
+    const d: DescuentoManual | null = form && { ...form, valor: Number(form.valor) || 0 };
     if (d) {
-      d = { ...d, valor: Number(d.valor) };
       if (!(d.valor > 0)) return this.errorDescuento.set('Indica el descuento.');
       if (d.motivo.trim().length < 3) return this.errorDescuento.set('Indica el motivo del descuento.');
     }
@@ -375,7 +412,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   confirmarPago() {
     const totalReq = this.totalCobro();
     const metodo = this.metodoPago();
-    if (metodo === METODO_PAGO.efectivo && (!this.montoPagado() || this.montoPagado() < totalReq)) {
+    if (metodo === METODO_PAGO.efectivo && this.pagado() < totalReq) {
       this.montoPagado.set(totalReq);
     }
 
@@ -441,8 +478,10 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     this.cargarEstadoMesa();
   }
 
+  /** Imprime y sigue: vuelve a la mesa o la cierra si ya no queda nada */
   imprimirTicket() {
     this.impresion.imprimirTicket(this.zonaTicket?.nativeElement, this.ajustes.config().ticket_ancho);
+    this.cerrarTicket();
   }
 
   cerrarModal() {

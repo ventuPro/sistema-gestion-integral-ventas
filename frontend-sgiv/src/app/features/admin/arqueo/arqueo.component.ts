@@ -1,12 +1,15 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X } from 'lucide-angular';
+import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X, Printer } from 'lucide-angular';
 import { CajaService } from '../../../core/services/caja.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { cifra, entero, porcentaje, fechaLarga, fechaHora, hora, temaGrafico } from '../../../core/utils/informe';
 import { SesionService } from '../../../core/services/sesion.service';
 import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
+import { DatosTicket, TicketComponent } from '../../shared/ticket/ticket.component';
+import { ImpresionService } from '../../../core/services/impresion.service';
+import { DialogoService } from '../../../core/services/dialogo.service';
 
 // Billetes y monedas en circulación (boliviano)
 const DENOMINACIONES = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1];
@@ -14,17 +17,19 @@ const DENOMINACIONES = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1];
 @Component({
   selector: 'app-arqueo',
   standalone: true,
-  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, TicketComponent],
   templateUrl: './arqueo.component.html',
-  styleUrls: ['../../shared/informe/informe.css', './arqueo.component.css']
+  styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './arqueo.component.css']
 })
 export class ArqueoComponent implements OnInit {
   private readonly sesion = inject(SesionService);
   private cajaService = inject(CajaService);
   private ajustes     = inject(AjustesService);
+  private impresion   = inject(ImpresionService);
+  private dialogo     = inject(DialogoService);
   readonly moneda     = this.ajustes.moneda;
 
-  readonly icons = { actualizar: RotateCw, abajo: ChevronDown, derecha: ChevronRight, cerrar: X };
+  readonly icons = { actualizar: RotateCw, abajo: ChevronDown, derecha: ChevronRight, cerrar: X, imprimir: Printer };
   readonly cifra = cifra;
   readonly entero = entero;
   readonly hora = hora;
@@ -37,6 +42,12 @@ export class ArqueoComponent implements OnInit {
   readonly cerrando = signal(false);
   readonly error    = signal('');
   readonly mostrarConfirmCierre = signal(false);
+
+  // ─── Reimpresión de comprobantes ───
+  readonly comprobante      = signal<DatosTicket | null>(null);
+  readonly fechaComprobante = signal(new Date());
+  readonly buscandoVenta    = signal<number | null>(null);
+  @ViewChild('zonaComprobante') zonaComprobante?: ElementRef<HTMLElement>;
 
   readonly esAdmin = this.sesion.esAdmin;
   readonly arqueo = signal<any>({ resumen: {}, ventas: [], turno_activo: null, turno_resumen: null });
@@ -138,5 +149,26 @@ export class ArqueoComponent implements OnInit {
         this.mostrarConfirmCierre.set(false);
       }
     });
+  }
+
+  reimprimir(id_venta: number) {
+    if (this.buscandoVenta()) return;
+    this.buscandoVenta.set(id_venta);
+    this.cajaService.obtenerComprobante(id_venta).subscribe({
+      next: (c) => {
+        this.buscandoVenta.set(null);
+        this.fechaComprobante.set(new Date(c.fecha_venta));
+        this.comprobante.set({ ...c, reimpreso: new Date() });
+      },
+      error: (e) => {
+        this.buscandoVenta.set(null);
+        this.dialogo.error(e?.error?.error || 'No se pudo obtener el comprobante.');
+      }
+    });
+  }
+
+  imprimirComprobante() {
+    this.impresion.imprimirTicket(this.zonaComprobante?.nativeElement, this.ajustes.config().ticket_ancho);
+    this.comprobante.set(null);
   }
 }
