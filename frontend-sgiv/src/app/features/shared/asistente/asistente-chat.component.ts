@@ -59,6 +59,8 @@ export class AsistenteChatComponent {
   readonly clave       = input.required<string>();
   /** Sube el botón (el menú QR tiene la barra del carrito abajo) */
   readonly elevado     = input(false);
+  /** A la izquierda (Punto de venta: abajo a la derecha está «Cobrar») */
+  readonly izquierda   = input(false);
   readonly enviar      = input.required<(mensajes: MensajeChat[]) => Observable<{ respuesta: string }>>();
 
   readonly icons = { chat: Sparkles, cerrar: X, enviar: SendHorizontal, limpiar: RotateCcw };

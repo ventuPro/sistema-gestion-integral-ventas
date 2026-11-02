@@ -12,7 +12,6 @@
 @if (!verificandoCaja() && estadoCaja() === 'CERRADA') {
   <div class="space-y-5">
     <header>
-      <p class="inf-antetitulo"><span>{{ hoyTexto }}</span><span class="inf-estado mal">Caja cerrada</span></p>
       <h1 class="inf-titulo">Punto de venta</h1>
     </header>
     <section class="inf-hoja max-w-lg p-6">
@@ -40,7 +39,6 @@
 @if (!verificandoCaja() && estadoCaja() === 'SIN_APERTURA' && mostrarAbrirTurno()) {
   <div class="space-y-5">
     <header>
-      <p class="inf-antetitulo"><span>{{ hoyTexto }}</span><span class="inf-estado neutro">Sin abrir</span></p>
       <h1 class="inf-titulo">Punto de venta</h1>
     </header>
     <section class="inf-hoja max-w-lg">
@@ -58,15 +56,12 @@
         <div class="campo-monto">
           <span>{{ moneda() }}</span>
           <input #inputTurno type="number" min="0" step="0.01" [(ngModel)]="montoInicial" placeholder="0.00"
-                 [attr.inputmode]="teclado.visible() ? 'none' : 'decimal'" (keyup.enter)="confirmarAbrirTurno()">
+                 inputmode="none" (keyup.enter)="confirmarAbrirTurno()">
         </div>
         @if (errorTurno()) { <p class="text-sm inf-baja mt-3">{{ errorTurno() }}</p> }
-        @if (teclado.visible()) { <app-teclado-numerico class="mt-4" [entrada]="entradaFondo" [billetes]="billetes" [pantalla]="false" /> }
+        <app-teclado-numerico class="mt-4" [entrada]="entradaFondo" [billetes]="billetes" [pantalla]="false" />
       </div>
-      <div class="inf-pie-hoja flex justify-between gap-2">
-        <button class="inf-boton" [class.activo]="teclado.visible()" (click)="teclado.alternar()">
-          <lucide-icon [img]="icons.teclado" class="w-3.5 h-3.5"></lucide-icon> Teclado
-        </button>
+      <div class="inf-pie-hoja flex justify-end">
         <button class="boton-primario" (click)="confirmarAbrirTurno()" [disabled]="abriendoTurno()">
           @if (!abriendoTurno()) { <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> }
           {{ abriendoTurno() ? 'Abriendo…' : 'Abrir caja y comenzar' }}
@@ -82,17 +77,9 @@
 
     <header class="flex flex-wrap items-end justify-between gap-4 flex-shrink-0">
       <div>
-        <p class="inf-antetitulo">
-          <span>{{ hoyTexto }}</span>
-          <span class="inf-vivo">Caja abierta</span>
-          @if (turnoActivo()) { <span>Turno #{{ turnoActivo().id_turno }}</span> }
-        </p>
         <h1 class="inf-titulo">Punto de venta</h1>
       </div>
       <div class="flex gap-2">
-        <button class="inf-boton" [class.activo]="teclado.visible()" (click)="teclado.alternar()">
-          <lucide-icon [img]="icons.teclado" class="w-3.5 h-3.5"></lucide-icon> Teclado
-        </button>
         <button class="inf-boton" [class.activo]="mostrarHistorial()" (click)="toggleHistorial()">
           <lucide-icon [img]="icons.historial" class="w-3.5 h-3.5"></lucide-icon>
           Ventas de hoy
@@ -230,7 +217,7 @@
         <div class="flex-1 overflow-y-auto">
           @for (item of carrito(); track item.id_producto; let i = $index) {
             @let linea = lineas().get(item.id_producto);
-            <div class="linea-carrito" [class.seleccionada]="teclado.visible() && item === lineaSel()" (click)="seleccionar(item)">
+            <div class="linea-carrito" [class.seleccionada]="item === lineaSel()" (click)="seleccionar(item)">
               <div class="min-w-0">
                 <p class="inf-tinta text-[length:calc(13.5px*var(--escala-texto))] font-medium truncate">{{ item.nombre_producto }}</p>
                 <p class="inf-sub mt-0!">{{ moneda() }} {{ cifra(item.precio_unitario) }} c/u</p>
@@ -245,7 +232,7 @@
                 <button type="button" (click)="fijarCantidad(item, item.cantidad - 1); enfocarBuscador()" [disabled]="item.cantidad <= 1" aria-label="Uno menos">
                   <lucide-icon [img]="icons.menos" class="w-3.5 h-3.5"></lucide-icon>
                 </button>
-                <input type="number" step="1" min="1" [attr.inputmode]="teclado.visible() ? 'none' : 'numeric'" [value]="item.cantidad" aria-label="Cantidad"
+                <input type="number" step="1" min="1" inputmode="none" [value]="item.cantidad" aria-label="Cantidad"
                        (focus)="$any($event.target).select()"
                        (change)="fijarCantidad(item, $any($event.target).value, $any($event.target))"
                        (keydown.enter)="volverAlBuscador($event)">
@@ -273,12 +260,7 @@
           }
         </div>
 
-        @if (teclado.visible() && lineaSel(); as sel) {
-          <div class="px-5 pt-4 separador flex-shrink-0">
-            <app-teclado-numerico [entrada]="entradaCantidad" [etiqueta]="sel.nombre_producto" [deshabilitado]="cobrando()" />
-          </div>
-        }
-        <div class="p-5 separador flex-shrink-0">
+        <div class="p-4 separador flex-shrink-0">
           @if (cotizacion(); as c) {
             @if (c.descuento_promociones || c.descuento_manual) {
               <dl class="inf-pares mb-3">
@@ -301,20 +283,22 @@
             }
           }
           @if (errorCotizacion()) { <p class="aviso-stock mb-3" role="alert">{{ errorCotizacion() }}</p> }
-          <div class="flex items-end justify-between gap-3 mb-4">
+          <div class="flex items-end justify-between gap-3 mb-3">
             <span class="inf-etiqueta">Total</span>
             <span class="inf-valor mt-0! text-[length:calc(28px*var(--escala-texto))]!" [class.inf-refrescando]="cotizando()">
               <span class="inf-moneda">{{ moneda() }}</span>{{ cifra(total()) }}
             </span>
           </div>
-          <div class="flex gap-2">
-            <button class="inf-boton py-3! px-4!" [disabled]="carrito().length === 0 || !cotizacion() || cobrando()" (click)="abrirDescuento()"
-                    [attr.aria-label]="'Descuento'">
-              <lucide-icon [img]="icons.descuento" class="w-4 h-4"></lucide-icon> Descuento
-            </button>
-            <button class="boton-primario flex-1 py-3!" [disabled]="carrito().length === 0 || cotizando() || cobrando()" (click)="abrirModalCobro()">
-              {{ cobrando() ? 'Registrando…' : 'Cobrar' }}
-            </button>
+          <div class="pie-venta">
+            <app-teclado-numerico [entrada]="entradaCantidad" [pantalla]="false" [deshabilitado]="!lineaSel() || cobrando()" />
+            <div class="acciones">
+              <button class="inf-boton justify-center py-3!" [disabled]="carrito().length === 0 || !cotizacion() || cobrando()" (click)="abrirDescuento()">
+                <lucide-icon [img]="icons.descuento" class="w-4 h-4"></lucide-icon> Descuento
+              </button>
+              <button class="boton-primario cobrar" [disabled]="carrito().length === 0 || cotizando() || cobrando()" (click)="abrirModalCobro()">
+                {{ cobrando() ? 'Registrando…' : 'Cobrar' }}
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -405,7 +389,7 @@
             <p class="inf-etiqueta mb-2">Monto recibido <span class="inf-sutil font-normal">· opcional</span></p>
             <div class="campo-monto">
               <span>{{ moneda() }}</span>
-              <input #inputMonto type="number" [attr.inputmode]="teclado.visible() ? 'none' : 'decimal'" [(ngModel)]="montoPagado" placeholder="0.00"
+              <input #inputMonto type="number" inputmode="none" [(ngModel)]="montoPagado" placeholder="0.00"
                      (focus)="inputMonto.select()">
             </div>
             @if (pagado() > 0) {

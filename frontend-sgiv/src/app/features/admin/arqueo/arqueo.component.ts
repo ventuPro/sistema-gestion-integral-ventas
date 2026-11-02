@@ -1,14 +1,13 @@
 import { Component, computed, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X, Printer, Banknote, QrCode, Wallet, Calculator } from 'lucide-angular';
-import { TecladoService } from '../../../core/services/teclado.service';
+import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X, Printer, Banknote, QrCode, Wallet } from 'lucide-angular';
 import { TecladoNumericoComponent } from '../../shared/teclado-numerico/teclado-numerico.component';
 import { EntradaMonto } from '../../shared/teclado-numerico/entrada-numero';
 import { METODO_PAGO } from '../../../core/utils/metodos-pago';
 import { CajaService } from '../../../core/services/caja.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
-import { cifra, entero, fechaLarga, fechaHora, hora } from '../../../core/utils/informe';
+import { cifra, entero, fechaHora, hora } from '../../../core/utils/informe';
 import { SesionService } from '../../../core/services/sesion.service';
 import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 import { DatosTicket, TicketComponent } from '../../shared/ticket/ticket.component';
@@ -34,12 +33,11 @@ export class ArqueoComponent implements OnInit {
   readonly moneda     = this.ajustes.moneda;
 
   readonly icons = { actualizar: RotateCw, abajo: ChevronDown, derecha: ChevronRight, cerrar: X, imprimir: Printer,
-                     efectivo: Banknote, qr: QrCode, total: Wallet, teclado: Calculator };
+                     efectivo: Banknote, qr: QrCode, total: Wallet };
   readonly cifra = cifra;
   readonly entero = entero;
   readonly hora = hora;
   readonly fechaHora = fechaHora;
-  readonly hoyTexto = fechaLarga(new Date());
   readonly denominaciones = DENOMINACIONES;
 
   readonly cargando = signal(true);
@@ -57,7 +55,6 @@ export class ArqueoComponent implements OnInit {
   readonly arqueo = signal<any>({ resumen: {}, ventas: [], turno_activo: null, turno_resumen: null });
 
   readonly efectivoContado = signal<number | null>(null);
-  readonly teclado         = inject(TecladoService);
   readonly entradaContado  = new EntradaMonto(this.efectivoContado);
   readonly billetes        = [10, 20, 50, 100, 200];
   readonly mostrarConteo   = signal(false);

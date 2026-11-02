@@ -3,12 +3,6 @@
   <!-- Encabezado -->
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div>
-      <p class="inf-antetitulo">
-        <span>{{ hoyTexto }}</span>
-        @if (actualizado(); as act) {
-          <span class="inf-vivo">En vivo · {{ hora(act) }}</span>
-        }
-      </p>
       <h1 class="inf-titulo">Panel del día</h1>
     </div>
     <app-selector-sucursal [sucursales]="sucursales()" [seleccionada]="sucursalActual()"

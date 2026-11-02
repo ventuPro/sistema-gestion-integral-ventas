@@ -111,7 +111,6 @@ export class AjustesComponent implements OnInit, OnDestroy {
   readonly pestana            = signal<Pestana>('empresa');
   readonly cargando           = signal(true);
   readonly guardando          = signal(false);
-  readonly fechaActualizacion = signal<string | null>(null);
 
   readonly empresa    = signal<Record<string, string>>({});
   readonly apariencia = signal({ color_primario: null as string | null, color_secundario: null as string | null, tema: 'claro' as Tema });
@@ -153,7 +152,6 @@ export class AjustesComponent implements OnInit, OnDestroy {
 
   private llenar(c: Configuracion) {
     this.guardado.set(c);
-    this.fechaActualizacion.set(c.fecha_actualizacion || null);
     const empresa: Record<string, string> = {};
     CAMPOS_EMPRESA.forEach(k => empresa[k] = (c as any)[k] ?? '');
     this.empresa.set(empresa);

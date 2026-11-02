@@ -51,7 +51,7 @@
 
 .teclas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .teclas button {
-  min-height: 50px;
+  min-height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;

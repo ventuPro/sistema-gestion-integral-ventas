@@ -13,7 +13,7 @@ import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, QrCode, Printer, Download, Plus, Trash2, X,
          DoorOpen, DoorClosed, Ticket } from 'lucide-angular';
 import { sondeo } from '../../../core/utils/sondeo';
-import { cifra, fechaLarga } from '../../../core/utils/informe';
+import { cifra } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
 import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
@@ -51,7 +51,6 @@ export class MesasComponent implements OnInit, OnDestroy {
   };
 
   readonly cifra    = cifra;
-  readonly hoyTexto = fechaLarga(new Date());
 
   // ─── Control de acceso (basado en estado real del turno) ───
   readonly verificandoCaja = signal(true);

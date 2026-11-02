@@ -99,6 +99,11 @@
   .cobro-teclado { padding: 20px 20px 20px 0; }
 }
 
+/* Pie del carrito: tablero a la izquierda, Descuento y Cobrar a la derecha (como Odoo) */
+.pie-venta { display: grid; grid-template-columns: minmax(0, 1fr) minmax(112px, 0.42fr); gap: 8px; }
+.pie-venta .acciones { display: flex; flex-direction: column; gap: 8px; }
+.pie-venta .cobrar { flex: 1; justify-content: center; text-align: center; font-size: calc(16px * var(--escala-texto)); white-space: normal; }
+
 /* Carrito */
 .linea-carrito.seleccionada { background: var(--i-acento-suave); box-shadow: inset 3px 0 0 var(--i-acento); }
 .linea-carrito {

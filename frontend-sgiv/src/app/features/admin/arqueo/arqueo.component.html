@@ -3,11 +3,6 @@
   <!-- Encabezado -->
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div>
-      <p class="inf-antetitulo">
-        <span>{{ hoyTexto }}</span>
-        @if (abierto()) { <span class="inf-vivo">Caja abierta</span> }
-        @if (cerrado()) { <span class="inf-estado mal">Caja cerrada</span> }
-      </p>
       <h1 class="inf-titulo">Arqueo de caja</h1>
     </div>
     <button class="inf-boton" (click)="cargarArqueo()">
@@ -58,12 +53,7 @@
       <!-- Cierre (solo cajero) -->
       @if (!esAdmin()) {
         <section class="inf-hoja p-6">
-          <div class="inf-seccion">
-            <h2>Cerrar el turno</h2>
-            <button class="inf-boton py-1!" [class.activo]="teclado.visible()" (click)="teclado.alternar()">
-              <lucide-icon [img]="icons.teclado" class="w-3.5 h-3.5"></lucide-icon> Teclado
-            </button>
-          </div>
+          <div class="inf-seccion"><h2>Cerrar el turno</h2></div>
           <div class="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6">
             <div>
               <p class="paso"><span>1</span>Cuenta el efectivo de la caja</p>
@@ -71,13 +61,13 @@
                 <div class="campo-monto">
                   <span>{{ moneda() }}</span>
                   <input type="number" min="0" step="0.1" placeholder="0.00" [(ngModel)]="efectivoContado" aria-label="Efectivo contado"
-                         [attr.inputmode]="teclado.visible() ? 'none' : 'decimal'" (keydown.enter)="confirmarCierre()">
+                         inputmode="none" (keydown.enter)="confirmarCierre()">
                 </div>
                 @if (diferencia() !== null) {
                   <span class="inf-estado" [ngClass]="claseDiferencia(diferencia())">{{ textoDiferencia(diferencia()) }}</span>
                 }
               </div>
-              @if (teclado.visible()) { <app-teclado-numerico class="mt-4 max-w-sm" [entrada]="entradaContado" [billetes]="billetes" [pantalla]="false" /> }
+              <app-teclado-numerico class="mt-4 max-w-sm" [entrada]="entradaContado" [billetes]="billetes" [pantalla]="false" />
 
               @if (conBilletes()) {
                 <button class="flex items-center gap-1.5 inf-enlace mt-4" (click)="mostrarConteo.set(!mostrarConteo())">

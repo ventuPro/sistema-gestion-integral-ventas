@@ -1,6 +1,6 @@
 <!-- Una línea del consumo -->
 <ng-template #lineaConsumo let-item>
-  <div class="linea-carrito" [class.opacity-55]="item.pagado" [class.seleccionada]="teclado.visible() && item === lineaSel()"
+  <div class="linea-carrito" [class.opacity-55]="item.pagado" [class.seleccionada]="item === lineaSel()"
        (click)="!item.pagado && seleccionar(item)">
     <div class="min-w-0">
       <p class="inf-tinta text-[length:calc(13.5px*var(--escala-texto))] font-medium truncate">
@@ -18,7 +18,7 @@
         <button type="button" (click)="fijarCantidad(item, item.cantidad - 1); enfocarBuscadorTrasClic()" [disabled]="item.cantidad <= 1 || guardandoCantidad()" aria-label="Uno menos">
           <lucide-icon [img]="icons.menos" class="w-3.5 h-3.5"></lucide-icon>
         </button>
-        <input type="number" step="1" min="1" [attr.inputmode]="teclado.visible() ? 'none' : 'numeric'" [value]="item.cantidad" aria-label="Cantidad"
+        <input type="number" step="1" min="1" inputmode="none" [value]="item.cantidad" aria-label="Cantidad"
                (focus)="$any($event.target).select()"
                (change)="fijarCantidad(item, $any($event.target).value, $any($event.target))"
                (keydown.enter)="volverAlBuscador($event)">
@@ -62,9 +62,6 @@
           @if (esAdmin() && (cuentaActiva() || mesa?.estado_mesa === 'Ocupada')) {
             <button class="inf-boton inf-baja py-1!" (click)="forzarReset()" title="Cancela la cuenta y libera la mesa">Reiniciar mesa</button>
           }
-          <button class="inf-boton py-1!" [class.activo]="teclado.visible()" (click)="teclado.alternar()">
-            <lucide-icon [img]="icons.teclado" class="w-3.5 h-3.5"></lucide-icon> Teclado
-          </button>
           <button class="quitar" (click)="cerrarModal()" aria-label="Cerrar">
             <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
           </button>
@@ -170,25 +167,25 @@
             }
           </div>
 
-          @if (teclado.visible() && lineaSel(); as sel) {
-            <div class="px-5 pt-4 separador flex-shrink-0">
-              <app-teclado-numerico [entrada]="entradaCantidad" [etiqueta]="sel.nombre_producto" />
-            </div>
-          }
-          <div class="p-5 separador flex-shrink-0">
+          <div class="p-4 separador flex-shrink-0">
             @if (cotizacionCuenta()?.descuento_promociones) {
               <dl class="inf-pares mb-3">
                 <div><dt>Subtotal</dt><dd>{{ moneda() }} {{ cifra(cotizacionCuenta()!.subtotal_bruto) }}</dd></div>
                 <div><dt>Promociones</dt><dd class="inf-sube">−{{ moneda() }} {{ cifra(cotizacionCuenta()!.descuento_promociones) }}</dd></div>
               </dl>
             }
-            <div class="flex items-end justify-between gap-3 mb-4">
+            <div class="flex items-end justify-between gap-3 mb-3">
               <span class="inf-etiqueta">{{ porCliente() ? 'Total por cobrar' : 'Total' }}</span>
               <span class="inf-valor mt-0! text-[length:calc(28px*var(--escala-texto))]!"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(totalCuenta()) }}</span>
             </div>
-            <button class="boton-primario w-full py-3!" (click)="irAPago()" [disabled]="!itemsPendientes().length">
-              {{ porCliente() ? 'Cobrar todo y cerrar mesa' : 'Cobrar y cerrar mesa' }}
-            </button>
+            <div class="pie-venta">
+              <app-teclado-numerico [entrada]="entradaCantidad" [pantalla]="false" [deshabilitado]="!lineaSel()" />
+              <div class="acciones">
+                <button class="boton-primario cobrar" (click)="irAPago()" [disabled]="!itemsPendientes().length">
+                  {{ porCliente() ? 'Cobrar todo y cerrar mesa' : 'Cobrar y cerrar mesa' }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -276,7 +273,7 @@
                 <p class="inf-etiqueta mb-2">Monto recibido <span class="inf-sutil font-normal">· opcional</span></p>
                 <div class="campo-monto">
                   <span>{{ moneda() }}</span>
-                  <input #inputMontoMesa type="number" [attr.inputmode]="teclado.visible() ? 'none' : 'decimal'" [(ngModel)]="montoPagado" placeholder="0.00"
+                  <input #inputMontoMesa type="number" inputmode="none" [(ngModel)]="montoPagado" placeholder="0.00"
                          (focus)="inputMontoMesa.select()">
                 </div>
                 @if (pagado() > 0) {

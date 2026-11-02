@@ -38,21 +38,12 @@
 }
 
 /* Encabezado de pantalla */
-.inf-antetitulo {
-  font-size: calc(12.5px * var(--escala-texto));
-  color: var(--i-tenue);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-}
 .inf-titulo {
-  font-size: calc(24px * var(--escala-texto));
+  font-size: calc(19px * var(--escala-texto));
   line-height: 1.2;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
   color: var(--i-tinta);
-  margin-top: 2px;
 }
 .inf-vivo {
   display: inline-flex;

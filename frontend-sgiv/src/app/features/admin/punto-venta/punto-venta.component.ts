@@ -12,18 +12,17 @@ import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { TicketComponent } from '../../shared/ticket/ticket.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Search, X, ReceiptText, Trash2,
-         ShoppingCart, Banknote, QrCode, Printer, BadgePercent, Minus, Plus, Calculator } from 'lucide-angular';
+         ShoppingCart, Banknote, QrCode, Printer, BadgePercent, Minus, Plus } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../core/services/impresion.service';
 import { sondeo } from '../../../core/utils/sondeo';
-import { cifra, fechaLarga } from '../../../core/utils/informe';
+import { cifra } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../core/utils/metodos-pago';
 import { SesionService } from '../../../core/services/sesion.service';
 import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria, mejorCoincidencia } from '../../../core/utils/categorias';
 import { enfocar, focoOcupado, FondoModalDirective, pantallaTactil } from '../../../core/directives/fondo-modal.directive';
-import { TecladoService } from '../../../core/services/teclado.service';
 import { TecladoNumericoComponent } from '../../shared/teclado-numerico/teclado-numerico.component';
 import { aplicarTecla, EntradaMonto, EntradaNumero } from '../../shared/teclado-numerico/entrada-numero';
 
@@ -67,12 +66,10 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     imprimir:    Printer,
     descuento:   BadgePercent,
     menos:       Minus,
-    mas:         Plus,
-    teclado:     Calculator
+    mas:         Plus
   };
 
   readonly cifra    = cifra;
-  readonly hoyTexto = fechaLarga(new Date());
 
   // ─── Estado de acceso (fuente: backend) ───
   readonly verificandoCaja = signal(true);
@@ -88,7 +85,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly errorTurno        = signal('');
 
   // ─── Tablero numérico en pantalla ───
-  readonly teclado      = inject(TecladoService);
   readonly entradaFondo = new EntradaMonto(this.montoInicial);
   readonly billetes     = [10, 20, 50, 100, 200];
 
@@ -210,7 +206,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly montoPagado = signal<number | null>(null);
   readonly entradaPago = new EntradaMonto(this.montoPagado);
   /** Con el tablero visible, la ventana de cobro en efectivo va en dos columnas */
-  readonly tecladoCobro = computed(() => this.teclado.visible() && this.metodoPago() === METODO_PAGO.efectivo);
+  readonly tecladoCobro = computed(() => this.metodoPago() === METODO_PAGO.efectivo);
   /** Monto recibido como número (vacío = 0) */
   readonly pagado      = computed(() => Number(this.montoPagado()) || 0);
   @ViewChild('buscador') buscadorRef?: ElementRef<HTMLInputElement>;

@@ -65,6 +65,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly menuAbierto = signal(false);
   /** Menú de la cuenta (abajo en la barra lateral) */
   readonly menuCuenta = signal(false);
+  /** En Punto de venta el Asistente va abajo a la izquierda para no tapar «Cobrar» */
+  readonly enPuntoVenta = signal(false);
   readonly bandeja = viewChild(BandejaPedidosComponent);
   readonly secciones = computed(() => this.armarMenu());
 
@@ -90,7 +92,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     // En celular el menú se cierra al cambiar de pantalla
-    this.subRuta = this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => this.cerrarMenu());
+    this.enPuntoVenta.set(this.router.url.startsWith('/dashboard/punto-venta'));
+    this.subRuta = this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => {
+      this.cerrarMenu();
+      this.enPuntoVenta.set(this.router.url.startsWith('/dashboard/punto-venta'));
+    });
 
     // Inicializar cache con lo que haya en localStorage
     try {

@@ -9,7 +9,7 @@ import { TicketComponent } from '../../../shared/ticket/ticket.component';
 import { AjustesService } from '../../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../../core/services/impresion.service';
 import { cifra } from '../../../../core/utils/informe';
-import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent, Minus, Plus, Calculator } from 'lucide-angular';
+import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent, Minus, Plus } from 'lucide-angular';
 import { DialogoService } from '../../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
 import { Cotizacion, DescuentoManual, FormDescuento, PromocionService } from '../../../../core/services/promocion.service';
@@ -17,7 +17,6 @@ import { SesionService } from '../../../../core/services/sesion.service';
 import { BarraCategoriasComponent } from '../../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria, mejorCoincidencia } from '../../../../core/utils/categorias';
 import { enfocar, focoOcupado, FondoModalDirective, pantallaTactil } from '../../../../core/directives/fondo-modal.directive';
-import { TecladoService } from '../../../../core/services/teclado.service';
 import { TecladoNumericoComponent } from '../../../shared/teclado-numerico/teclado-numerico.component';
 import { aplicarTecla, EntradaMonto, EntradaNumero } from '../../../shared/teclado-numerico/entrada-numero';
 
@@ -62,7 +61,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly icons = {
     cerrar: X, buscar: Search, quitar: Trash2, carrito: ShoppingCart, efectivo: Banknote,
     qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User, descuento: BadgePercent,
-    menos: Minus, mas: Plus, teclado: Calculator
+    menos: Minus, mas: Plus
   };
 
   readonly esAdmin = this.sesion.esAdmin;
@@ -76,9 +75,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly metodo = METODO_PAGO;
   readonly metodoPago  = signal<MetodoPago>(METODO_PAGO.efectivo);
   readonly montoPagado = signal<number | null>(null);
-  readonly teclado     = inject(TecladoService);
   readonly entradaPago = new EntradaMonto(this.montoPagado);
-  readonly tecladoCobro = computed(() => this.teclado.visible() && this.metodoPago() === METODO_PAGO.efectivo);
+  readonly tecladoCobro = computed(() => this.metodoPago() === METODO_PAGO.efectivo);
   readonly billetes    = [10, 20, 50, 100, 200];
   /** Monto recibido como número (vacío = 0) */
   readonly pagado      = computed(() => Number(this.montoPagado()) || 0);

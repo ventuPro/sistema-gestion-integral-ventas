@@ -1,7 +1,7 @@
 <ng-template #lineaTexto let-partes>@for (p of partes; track $index) {@if (p.negrita) {<strong>{{ p.texto }}</strong>} @else {{{ p.texto }}}}</ng-template>
 
 @if (!abierto()) {
-  <button type="button" class="chat-boton" [class.elevado]="elevado()" (click)="abrir()" [attr.aria-label]="'Abrir ' + titulo()">
+  <button type="button" class="chat-boton" [class.elevado]="elevado()" [class.izquierda]="izquierda()" (click)="abrir()" [attr.aria-label]="'Abrir ' + titulo()">
     <lucide-icon [img]="icons.chat" class="w-5 h-5"></lucide-icon>
     <span>{{ etiqueta() }}</span>
   </button>

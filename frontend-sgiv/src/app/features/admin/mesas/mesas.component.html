@@ -2,12 +2,6 @@
 
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div>
-      <p class="inf-antetitulo">
-        <span>{{ hoyTexto }}</span>
-        @if (!verificandoCaja() && cajaHabilitada()) { <span class="inf-vivo">Actualización automática</span> }
-        @if (!verificandoCaja() && !cajaHabilitada() && estadoCaja() === 'CERRADA') { <span class="inf-estado mal">Caja cerrada</span> }
-        @if (!verificandoCaja() && !cajaHabilitada() && estadoCaja() === 'SIN_APERTURA') { <span class="inf-estado neutro">Caja sin abrir</span> }
-      </p>
       <h1 class="inf-titulo">Mesas</h1>
     </div>
     @if (!verificandoCaja() && cajaHabilitada()) {

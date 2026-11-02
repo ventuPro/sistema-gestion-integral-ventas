@@ -8,7 +8,7 @@ import { SucursalService } from '../../../core/services/sucursal.service';
 import { ProductoService } from '../../../core/services/producto.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
-import { cifra, entero, porcentaje, fechaLarga, fechaHora, hora, temaGrafico, opcionesBase } from '../../../core/utils/informe';
+import { cifra, entero, porcentaje, fechaHora, hora, temaGrafico, opcionesBase } from '../../../core/utils/informe';
 import { METODO_PAGO } from '../../../core/utils/metodos-pago';
 import { sondeo } from '../../../core/utils/sondeo';
 import { SesionService } from '../../../core/services/sesion.service';
@@ -41,8 +41,6 @@ export class ResumenComponent implements OnInit, OnDestroy {
   readonly refrescando = signal(false);
   readonly esAdmin = this.sesion.esAdmin;
   readonly datos       = signal<any>(null);
-  readonly actualizado = signal<Date | null>(null);
-  readonly hoyTexto = fechaLarga(new Date());
 
   readonly sucursales     = signal<any[]>([]);
   readonly sucursalActual = signal<number | null>(1);   // null = todas
@@ -93,7 +91,6 @@ export class ResumenComponent implements OnInit, OnDestroy {
         this.datos.set(d);
         this.cargando.set(false);
         this.refrescando.set(false);
-        this.actualizado.set(new Date());
         afterNextRender(() => this.renderizarGraficos(), { injector: this.injector });
       },
       error: () => { this.cargando.set(false); this.refrescando.set(false); }
