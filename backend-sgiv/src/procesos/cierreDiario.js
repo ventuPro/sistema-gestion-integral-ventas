@@ -1,5 +1,4 @@
 const cajaModel = require('../models/cajaModel');
-const listaDiaModel = require('../models/listaDiaModel');
 const contexto  = require('../auditoria/contexto');
 const { emitirUsuario, emitirCajeros } = require('../utils/tiempoReal');
 
@@ -16,9 +15,6 @@ const ejecutar = () => contexto.ejecutar({ ...CONTEXTO }, async () => {
             emitirCajeros('caja:cerrada', datos);
         }
         if (turnos.length) console.log(`Cierre del día: ${turnos.length} turno(s) cerrados por el sistema`);
-        // Después de cerrar las cajas: foto del stock con el que terminó el día
-        const fotos = await listaDiaModel.tomarFotos();
-        if (fotos.length) emitirCajeros('lista_dia:actualizada', {});
     } catch (e) {
         console.error('cierreDiario:', e.message);
     }
