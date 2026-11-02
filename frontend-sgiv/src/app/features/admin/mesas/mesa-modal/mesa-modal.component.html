@@ -14,14 +14,14 @@
       <span class="cantidad">×{{ item.cantidad }}</span>
     } @else {
       <div class="selector-cantidad">
-        <button type="button" (click)="fijarCantidad(item, item.cantidad - 1)" [disabled]="item.cantidad <= 1 || guardandoCantidad()" aria-label="Uno menos">
+        <button type="button" (click)="fijarCantidad(item, item.cantidad - 1); enfocarBuscadorTrasClic()" [disabled]="item.cantidad <= 1 || guardandoCantidad()" aria-label="Uno menos">
           <lucide-icon [img]="icons.menos" class="w-3.5 h-3.5"></lucide-icon>
         </button>
         <input type="number" step="1" min="1" inputmode="numeric" [value]="item.cantidad" aria-label="Cantidad"
                (focus)="$any($event.target).select()"
                (change)="fijarCantidad(item, $any($event.target).value, $any($event.target))"
                (keydown.enter)="volverAlBuscador($event)">
-        <button type="button" (click)="fijarCantidad(item, item.cantidad + 1)" [disabled]="guardandoCantidad()" aria-label="Uno más">
+        <button type="button" (click)="fijarCantidad(item, item.cantidad + 1); enfocarBuscadorTrasClic()" [disabled]="guardandoCantidad()" aria-label="Uno más">
           <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon>
         </button>
       </div>
@@ -29,7 +29,7 @@
     <div class="flex items-center gap-1">
       <span class="inf-tinta font-semibold text-[length:calc(14px*var(--escala-texto))] whitespace-nowrap">{{ moneda() }} {{ cifra(item.subtotal) }}</span>
       @if (!item.pagado) {
-        <button class="quitar" (click)="quitarProducto(item.id_detalle_cuenta)" title="Quitar" aria-label="Quitar producto">
+        <button class="quitar" (click)="quitarProducto(item.id_detalle_cuenta); enfocarBuscadorTrasClic()" title="Quitar" aria-label="Quitar producto">
           <lucide-icon [img]="icons.quitar" class="w-4 h-4"></lucide-icon>
         </button>
       } @else { <span class="w-8"></span> }
@@ -104,15 +104,17 @@
               </h3>
               <div class="catalogo">
                 @for (prod of sec.productos; track prod.id_producto) {
-                  <button class="producto" [class.siguiente]="prod === primero()" (click)="agregarProducto(prod)" [disabled]="prod.stock_actual <= 0">
+                  <button class="producto" [class.siguiente]="prod === primero()" [class.agotado]="prod.stock_actual <= 0"
+                          (mousedown)="$event.preventDefault()" (click)="agregarProducto(prod); enfocarBuscadorTrasClic()">
                     <div class="foto">
                       @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
                       @else { {{ prod.nombre_producto?.charAt(0) }} }
+                      @if (prod.stock_actual <= 0) { <span class="sello-agotado">Agotado</span> }
                     </div>
                     <div class="datos">
                       <span class="nombre">{{ prod.nombre_producto }}</span>
                       <span class="precio">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</span>
-                      <span class="stock" [class.bajo]="prod.stock_actual <= 3">{{ prod.stock_actual }} disponibles</span>
+                      <span class="stock" [class.bajo]="prod.stock_actual <= 3">{{ prod.stock_actual > 0 ? prod.stock_actual + ' disponibles' : 'Sin stock' }}</span>
                     </div>
                   </button>
                 }
@@ -313,10 +315,10 @@
             @if (datosTicket()) { <div class="shadow-sm"><app-ticket [datos]="datosTicket()" [fecha]="fechaTicket()" /></div> }
           </div>
           <div class="inf-pie-hoja flex justify-end gap-2">
-            <button class="inf-boton" (click)="cerrarTicket()">{{ cuentaCerrada() ? 'Cerrar' : 'Volver a la mesa' }}</button>
-            <button class="boton-primario" data-enter (click)="imprimirTicket()">
+            <button class="inf-boton" (click)="imprimirTicket()">
               <lucide-icon [img]="icons.imprimir" class="w-4 h-4"></lucide-icon> Imprimir
             </button>
+            <button class="boton-primario" data-enter (click)="cerrarTicket()">{{ cuentaCerrada() ? 'Cerrar' : 'Volver a la mesa' }}</button>
           </div>
         </div>
       </div>

@@ -57,8 +57,24 @@
 .producto:hover { border-color: var(--i-acento); box-shadow: 0 0 0 3px var(--i-acento-suave); }
 .producto:active { transform: scale(0.98); }
 .producto.siguiente { border-color: var(--i-acento); box-shadow: 0 0 0 3px var(--i-acento-suave); }
-.producto:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; border-color: var(--i-linea); }
+.producto.agotado { cursor: not-allowed; box-shadow: none; border-color: var(--i-linea); }
+.producto.agotado .foto img, .producto.agotado .datos { opacity: 0.45; }
+.producto.agotado .stock { color: var(--i-baja); font-weight: 600; }
+.producto .sello-agotado {
+  position: absolute;
+  padding: 4px 12px;
+  border: 2px solid var(--i-baja);
+  border-radius: 6px;
+  background: var(--i-papel);
+  color: var(--i-baja);
+  font-size: calc(13px * var(--escala-texto));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(-8deg);
+}
 .producto .foto {
+  position: relative;
   aspect-ratio: 16 / 10;
   background: var(--i-fondo);
   border-bottom: 1px solid var(--i-linea-suave);

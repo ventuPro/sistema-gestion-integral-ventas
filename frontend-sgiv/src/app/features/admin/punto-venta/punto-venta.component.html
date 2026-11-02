@@ -127,16 +127,18 @@
             </h3>
             <div class="catalogo">
               @for (prod of sec.productos; track prod.id_producto) {
-                <button class="producto" [class.siguiente]="prod === primero()" (click)="agregarAlCarrito(prod)" [disabled]="prod.stock_actual <= 0">
+                <button class="producto" [class.siguiente]="prod === primero()" [class.agotado]="prod.stock_actual <= 0"
+                        (mousedown)="$event.preventDefault()" (click)="agregarAlCarrito(prod); enfocarBuscador()">
                   <div class="foto">
                     @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
                     @else { {{ prod.nombre_producto?.charAt(0) }} }
                     @if (etiquetas().get(prod.id_producto); as etiqueta) { <span class="etiqueta-promo">{{ etiqueta }}</span> }
+                    @if (prod.stock_actual <= 0) { <span class="sello-agotado">Agotado</span> }
                   </div>
                   <div class="datos">
                     <span class="nombre">{{ prod.nombre_producto }}</span>
                     <span class="precio">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</span>
-                    <span class="stock" [class.bajo]="prod.stock_actual <= 3">{{ prod.stock_actual }} disponibles</span>
+                    <span class="stock" [class.bajo]="prod.stock_actual <= 3">{{ prod.stock_actual > 0 ? prod.stock_actual + ' disponibles' : 'Sin stock' }}</span>
                   </div>
                 </button>
               }
@@ -231,14 +233,14 @@
                 }
               </div>
               <div class="selector-cantidad" [class.excede]="excedidos().has(item.id_producto)">
-                <button type="button" (click)="fijarCantidad(item, item.cantidad - 1)" [disabled]="item.cantidad <= 1" aria-label="Uno menos">
+                <button type="button" (click)="fijarCantidad(item, item.cantidad - 1); enfocarBuscador()" [disabled]="item.cantidad <= 1" aria-label="Uno menos">
                   <lucide-icon [img]="icons.menos" class="w-3.5 h-3.5"></lucide-icon>
                 </button>
                 <input type="number" step="1" min="1" inputmode="numeric" [value]="item.cantidad" aria-label="Cantidad"
                        (focus)="$any($event.target).select()"
                        (change)="fijarCantidad(item, $any($event.target).value, $any($event.target))"
                        (keydown.enter)="volverAlBuscador($event)">
-                <button type="button" (click)="fijarCantidad(item, item.cantidad + 1)" aria-label="Uno más">
+                <button type="button" (click)="fijarCantidad(item, item.cantidad + 1); enfocarBuscador()" aria-label="Uno más">
                   <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon>
                 </button>
               </div>
@@ -249,7 +251,7 @@
                     {{ moneda() }} {{ cifra(linea ? linea.subtotal_bruto - linea.descuento_promocion : item.subtotal) }}
                   </span>
                 </span>
-                <button class="quitar" (click)="quitarDelCarrito(i)" title="Quitar" aria-label="Quitar producto">
+                <button class="quitar" (click)="quitarDelCarrito(i); enfocarBuscador()" title="Quitar" aria-label="Quitar producto">
                   <lucide-icon [img]="icons.quitar" class="w-4 h-4"></lucide-icon>
                 </button>
               </div>
@@ -436,10 +438,10 @@
         @if (datosTicket()) { <div class="shadow-sm"><app-ticket [datos]="datosTicket()" [fecha]="fechaTicket()" /></div> }
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
-        <button class="inf-boton" (click)="cerrarTicket()">Cerrar</button>
-        <button class="boton-primario" data-enter (click)="imprimirVenta()">
+        <button class="inf-boton" (click)="imprimirVenta()">
           <lucide-icon [img]="icons.imprimir" class="w-4 h-4"></lucide-icon> Imprimir
         </button>
+        <button class="boton-primario" data-enter (click)="cerrarTicket()">Cerrar</button>
       </div>
     </div>
   </div>

@@ -135,13 +135,21 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   /** Se agrupa cuando algún producto vino del celular de un cliente */
   readonly porCliente = computed(() => (this.cuentaActiva()?.items || []).some((i: any) => i.cliente_mesa));
 
-  readonly productosFiltrados = computed(() => {
-    const texto = this.busqueda().toLowerCase();
-    return this.productos().filter(p => Number(p.stock_actual) > 0 && (!texto || p.nombre_producto.toLowerCase().includes(texto)));
+  /** Agotados mientras la mesa está abierta: siguen en su lugar */
+  private readonly retenidos = signal<ReadonlySet<number>>(new Set());
+
+  private readonly productosVisibles = computed(() => {
+    const retenidos = this.retenidos();
+    return this.productos().filter(p => Number(p.stock_actual) > 0 || retenidos.has(Number(p.id_producto)));
   });
 
-  /** Por categoría en el orden del menú; los que se agotan pasan al final */
-  readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados()));
+  readonly productosFiltrados = computed(() => {
+    const texto = this.busqueda().toLowerCase();
+    return this.productosVisibles().filter(p => !texto || p.nombre_producto.toLowerCase().includes(texto));
+  });
+
+  /** Por categoría en el orden del menú; el que se agota no se mueve (se marca «Agotado») */
+  readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados(), { stockPrimero: false }));
   /** El que se agrega con Enter al buscar */
   readonly primero = computed(() => mejorCoincidencia(this.secciones(), this.busqueda()));
   readonly barra = computed(() => this.secciones().map(s => ({ id: s.id, nombre: s.nombre, icono: s.icono, cantidad: s.productos.length })));
@@ -242,7 +250,15 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   private fijarStock(id_producto: number, stock: number) {
     if (!this.productos().some(p => Number(p.id_producto) === id_producto)) return this.recargarProductos();
+    this.retener(new Map([[id_producto, stock]]));
     this.productos.update(ps => ps.map(p => Number(p.id_producto) === id_producto ? { ...p, stock_actual: stock } : p));
+  }
+
+  /** Los que estaban a la vista y quedan en 0 no desaparecen */
+  private retener(stock: Map<number, number>) {
+    const visibles = new Set(this.productosVisibles().map(p => Number(p.id_producto)));
+    const agotados = [...stock].filter(([id, s]) => s <= 0 && visibles.has(id)).map(([id]) => id);
+    if (agotados.length) this.retenidos.update(r => new Set([...r, ...agotados]));
   }
 
   private recargarProductos() {
@@ -291,7 +307,9 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
     this.cuentaService.getProductos(id_sucursal).subscribe({
       next: (prods: any[]) => {
-        this.productos.set(prods.map(p => ({ ...p, stock_actual: Number(p.stock_actual) || 0 })));
+        const productos = prods.map(p => ({ ...p, stock_actual: Number(p.stock_actual) || 0 }));
+        this.retener(new Map(productos.map(p => [Number(p.id_producto), p.stock_actual])));
+        this.productos.set(productos);
       },
       error: () => {
         console.error('Error al cargar catálogo de la mesa');
@@ -406,6 +424,14 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         this.dialogo.error(e?.error?.error || 'No se pudo cambiar la cantidad.');
       }
     });
+  }
+
+  /** Tras un clic en el catálogo o la cuenta, Enter vuelve a ser del buscador */
+  enfocarBuscadorTrasClic() {
+    if (pantallaTactil()) return;
+    afterNextRender(() => {
+      if (!focoOcupado(this.fondoMesaRef?.nativeElement)) enfocar(this.buscadorRef?.nativeElement);
+    }, { injector: this.injector });
   }
 
   /** Enter en la cantidad: vuelve al buscador */
@@ -523,6 +549,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   cerrarTicket() {
     if (this.cuentaCerrada()) { this.cerrarModal(); return; }
     this.datosTicket.set(null);
+    this.retenidos.set(new Set());
     this.parteCobro.set(null);
     this.vista.set('comanda');
     this.cargarEstadoMesa();

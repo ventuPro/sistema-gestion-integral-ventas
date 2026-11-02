@@ -93,11 +93,14 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   private readonly enCarrito = computed(() => new Map(this.carrito().map(i => [i.id_producto, Number(i.cantidad)])));
   private readonly stockServidor = computed(() => new Map(this.catalogo().map(p => [p.id_producto, p.stock_actual])));
+  /** Agotados durante la venta: siguen en su lugar hasta cerrar el comprobante */
+  private readonly retenidos = signal<ReadonlySet<number>>(new Set());
 
   readonly productosDisponibles = computed(() => {
     const enCarrito = this.enCarrito();
+    const retenidos = this.retenidos();
     return this.catalogo()
-      .filter(p => p.stock_actual > 0)
+      .filter(p => p.stock_actual > 0 || retenidos.has(p.id_producto))
       .map(p => enCarrito.has(p.id_producto) ? { ...p, stock_actual: Math.max(0, p.stock_actual - enCarrito.get(p.id_producto)!) } : p);
   });
 
@@ -108,8 +111,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       (p.nombre_categoria || '').toLowerCase().includes(q));
   });
 
-  /** Por categoría en el orden del menú; los que se agotan pasan al final */
-  readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados()));
+  /** Por categoría en el orden del menú; el que se agota no se mueve (se marca «Agotado») */
+  readonly secciones = computed(() => agruparPorCategoria(this.productosFiltrados(), { stockPrimero: false }));
   /** El que se agrega con Enter al buscar */
   readonly primero = computed(() => mejorCoincidencia(this.secciones(), this.busqueda()));
   readonly barra = computed(() => this.secciones().map(s => ({ id: s.id, nombre: s.nombre, icono: s.icono, cantidad: s.productos.length })));
@@ -279,8 +282,16 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     if (this.estadoCaja() !== 'ABIERTA' || !cambios.length) return;
     const nuevos = new Map(cambios.map(c => [Number(c.id_producto), Number(c.nuevo_stock) || 0]));
     const conocidos = new Set(this.catalogo().map(p => p.id_producto));
+    this.retener(nuevos);
     this.catalogo.update(ps => ps.map(p => nuevos.has(p.id_producto) ? { ...p, stock_actual: nuevos.get(p.id_producto) } : p));
     if ([...nuevos.keys()].some(id => !conocidos.has(id))) this.recargarCatalogo();
+  }
+
+  /** Los que estaban a la vista y quedan en 0 no desaparecen */
+  private retener(stock: Map<number, number>) {
+    const visibles = new Set(this.productosDisponibles().map(p => p.id_producto));
+    const agotados = [...stock].filter(([id, s]) => s <= 0 && visibles.has(id)).map(([id]) => id);
+    if (agotados.length) this.retenidos.update(r => new Set([...r, ...agotados]));
   }
 
   private recargarCatalogo() {
@@ -381,6 +392,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
           stock_actual:    Number(p.stock_actual)    || 0,
           precio_unitario: Number(p.precio_unitario) || 0
         }));
+        this.retener(new Map(productos.map(p => [p.id_producto, p.stock_actual])));
         this.catalogo.set(productos);
         this.sincronizarCarrito(productos);
         if (!silencioso) this.enfocarBuscador();
@@ -652,6 +664,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   cerrarTicket() {
     this.mostrarTicket.set(false);
     this.datosTicket.set(null);
+    this.retenidos.set(new Set());
     this.enfocarBuscador();
   }
 
