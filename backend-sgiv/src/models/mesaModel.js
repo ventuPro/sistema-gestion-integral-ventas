@@ -143,7 +143,7 @@ const eliminarMesa = async (id_mesa, id_usuario = null) => {
         // Cancelar cualquier cuenta activa devolviendo su stock reservado
         let cambiosStock = [];
         const rCuentas = await client.query(
-            `SELECT id_cuenta FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta'`, [id_mesa]);
+            `SELECT id_cuenta FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta' FOR UPDATE`, [id_mesa]);
         for (const { id_cuenta } of rCuentas.rows) {
             cambiosStock = cambiosStock.concat(await cuentaModel.devolverStockCuenta(client, id_cuenta, id_usuario));
             await pedidoModel.finalizarPedidosDeCuenta(client, id_cuenta, 'Cancelado');

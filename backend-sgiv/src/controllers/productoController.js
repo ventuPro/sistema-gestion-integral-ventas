@@ -110,19 +110,29 @@ const agregarProducto   = async (req, res) => {
 
         url_imagen = fotoNueva(req.body.url_imagen) ?? null;
 
-        // 1. Crear el producto en el catálogo global
-        const prod = await m.crearProducto({ ...datosProducto(req.body), url_imagen });
+        const datos     = { ...datosProducto(req.body), url_imagen };
+        const id_suc    = Number(id_sucursal) || 1;
+        const stock_ini = Math.max(Math.trunc(Number(stock_inicial)) || 0, 0);
 
-        // 2. ASIGNAR el producto a la sucursal seleccionada con su stock inicial
-        //    Sin este paso el producto NO aparece en ninguna sucursal
-        const id_suc      = Number(id_sucursal) || 1;
-        const stock_ini   = Math.max(Math.trunc(Number(stock_inicial)) || 0, 0);
-        const inv = await m.asignarProductoASucursal(prod.id_producto, id_suc, stock_ini);
-        if (stock_ini > 0) {
-            await registrarHistorial(db, {
-                id_inventario: inv.id_inventario, id_usuario: req.usuario?.id_usuario, tipo: 'INGRESO',
-                cantidad: stock_ini, motivo: 'Stock inicial', stock_resultante: stock_ini
-            });
+        // Producto, su fila de inventario en la sucursal y el historial del stock inicial: todo o nada
+        const client = await db.connect();
+        let prod;
+        try {
+            await client.query('BEGIN');
+            prod = await m.crearProducto(datos, client);
+            const inv = await m.asignarProductoASucursal(prod.id_producto, id_suc, stock_ini, client);
+            if (stock_ini > 0) {
+                await registrarHistorial(client, {
+                    id_inventario: inv.id_inventario, id_usuario: req.usuario?.id_usuario, tipo: 'INGRESO',
+                    cantidad: stock_ini, motivo: 'Stock inicial', stock_resultante: stock_ini
+                });
+            }
+            await client.query('COMMIT');
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
         }
 
         emitirCatalogo();

@@ -4,6 +4,7 @@ const ajusteModel   = require('../models/ajusteModel');
 const promocionModel = require('../models/promocionModel');
 const db            = require('../config/db');
 const { marcarEvento } = require('../auditoria/registroAcceso');
+const { emitirUsuario, emitirCajeros } = require('../utils/tiempoReal');
 
 // ─── ESTADO COMPLETO (la fuente de verdad para el front) ──────────
 const getEstadoCompleto = async (req, res) => {
@@ -51,9 +52,17 @@ const deshabilitarCajaUsuario = async (req, res) => {
     try {
         if (Number(req.usuario.id_rol) !== 1)
             return res.status(403).json({ error: 'Solo el administrador puede cerrar la caja' });
-        const r = await cajaModel.deshabilitarCaja(Number(req.params.id_usuario));
+        const id_usuario = Number(req.params.id_usuario);
+        const r = await cajaModel.deshabilitarCaja(id_usuario);
         if (!r) return res.status(404).json({ error: 'Usuario no encontrado' });
-        res.json({ mensaje: 'Caja cerrada', usuario: r });
+        // Su Punto de venta y Mesas se bloquean al instante
+        const { turnos, ...usuario } = r;
+        for (const t of turnos) {
+            const datos = { id_turno: t.id_turno, id_usuario, id_sucursal: t.id_sucursal, por: 'Administrador' };
+            emitirUsuario(id_usuario, 'caja:cerrada', datos);
+            emitirCajeros('caja:cerrada', datos);
+        }
+        res.json({ mensaje: 'Caja cerrada', usuario });
     } catch (e) {
         console.error('deshabilitarCaja:', e.message);
         res.status(500).json({ error: e.message });
@@ -91,14 +100,17 @@ const getTurnoHoy = async (req, res) => {
 
 const abrirCaja = async (req, res) => {
     try {
-        const { id_sucursal, monto_inicial } = req.body;
+        const { id_sucursal } = req.body;
+        const monto_inicial = Number(req.body?.monto_inicial ?? 0);
+        if (!Number.isFinite(monto_inicial) || monto_inicial < 0 || monto_inicial > 10000000)
+            return res.status(400).json({ error: 'Fondo inicial inválido' });
         const sucursal = sucursalDe(req, id_sucursal);
         if (!(await sucursalModel.estaActiva(sucursal)))
             return res.status(400).json({ error: 'La sucursal está desactivada: no se puede abrir caja.' });
         const turno = await cajaModel.abrirTurno(
             sucursal,
             req.usuario.id_usuario,
-            Number(monto_inicial) || 0
+            Math.round(monto_inicial * 100) / 100
         );
         res.status(201).json({ mensaje: 'Turno abierto', turno });
     } catch (e) {

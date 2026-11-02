@@ -151,7 +151,8 @@ CREATE TABLE inventario_sucursal (
     id_producto INT REFERENCES producto(id_producto),
     cantidad_actual INT NOT NULL DEFAULT 0,
     stock_minimo_alerta INT NOT NULL DEFAULT 10,
-    UNIQUE(id_sucursal, id_producto)
+    UNIQUE(id_sucursal, id_producto),
+    CONSTRAINT inventario_sucursal_cantidad_no_negativa CHECK (cantidad_actual >= 0)
 );
 
 CREATE TABLE historial_inventario (
@@ -464,6 +465,8 @@ CREATE INDEX idx_turno_cajero_estado      ON turno_caja (id_usuario_cajero, esta
 CREATE INDEX idx_venta_caja_cajero_fecha  ON venta_caja (id_usuario_cajero, fecha_venta);
 CREATE INDEX idx_cuenta_mesa_estado       ON cuenta_mesa (id_mesa, estado);
 CREATE UNIQUE INDEX uq_cuenta_abierta_mesa ON cuenta_mesa (id_mesa) WHERE estado = 'Abierta';
+-- Un solo turno abierto por cajero (abrir caja dos veces a la vez)
+CREATE UNIQUE INDEX uq_turno_abierto_cajero ON turno_caja (id_usuario_cajero) WHERE estado_turno = 'Abierto';
 CREATE INDEX idx_pedido_sucursal_estado   ON pedido_mesa (id_sucursal, estado_pedido);
 CREATE INDEX idx_pedido_mesa_estado       ON pedido_mesa (id_mesa, estado_pedido);
 CREATE INDEX idx_pedido_cuenta            ON pedido_mesa (id_cuenta);

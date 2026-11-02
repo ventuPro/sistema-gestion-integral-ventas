@@ -258,7 +258,27 @@ const MIGRACIONES = [
     );`,
 
     // Reimpresión de comprobantes: mesa y cliente de una venta
-    `CREATE INDEX IF NOT EXISTS idx_detalle_cuenta_venta ON detalle_cuenta (id_venta);`
+    `CREATE INDEX IF NOT EXISTS idx_detalle_cuenta_venta ON detalle_cuenta (id_venta);`,
+
+    // Última defensa: el stock nunca negativo y un solo turno abierto por cajero.
+    // Si una BD vieja tuviera datos que no cumplen, se avisa y el sistema arranca igual.
+    `DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventario_sucursal_cantidad_no_negativa') THEN
+            ALTER TABLE inventario_sucursal
+                ADD CONSTRAINT inventario_sucursal_cantidad_no_negativa CHECK (cantidad_actual >= 0) NOT VALID;
+        END IF;
+        BEGIN
+            ALTER TABLE inventario_sucursal VALIDATE CONSTRAINT inventario_sucursal_cantidad_no_negativa;
+        EXCEPTION WHEN check_violation THEN
+            RAISE WARNING 'Hay stock negativo: la restricción solo se aplica a los cambios nuevos';
+        END;
+        BEGIN
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_turno_abierto_cajero ON turno_caja (id_usuario_cajero)
+                WHERE estado_turno = 'Abierto';
+        EXCEPTION WHEN unique_violation THEN
+            RAISE WARNING 'Hay cajeros con más de un turno abierto: no se creó uq_turno_abierto_cajero';
+        END;
+    END $$;`
 ];
 
 const aplicarMigraciones = async () => {

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
-import { Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 // ─── Socket compartido del personal; solo se desconecta al cerrar sesión ───
@@ -9,12 +9,20 @@ export class SocketService {
   private socket: Socket | null = null;
   private salas = new Set<string>();
   private readonly URL = environment.apiUrl.replace('/api', '');
+  private readonly reconectado = new Subject<void>();
+  /** Volvió la conexión: lo que pasó mientras estaba cortada no llegó, cada pantalla recarga sus datos */
+  readonly reconexiones = this.reconectado.asObservable();
 
   private asegurarSocket(): Socket {
     if (!this.socket) {
       // withCredentials: la cookie de sesión va en el handshake (sala 'cajeros')
       this.socket = io(this.URL, { transports: ['websocket'], withCredentials: true });
-      this.socket.on('connect', () => this.salas.forEach(s => this.unirse(s)));
+      let primera = true;
+      this.socket.on('connect', () => {
+        this.salas.forEach(s => this.unirse(s));
+        if (!primera) this.reconectado.next();
+        primera = false;
+      });
     }
     return this.socket;
   }

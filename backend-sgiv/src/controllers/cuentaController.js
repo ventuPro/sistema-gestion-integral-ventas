@@ -191,6 +191,8 @@ const cerrarCuenta = async (req, res) => {
             return res.status(404).json({ error: 'No hay cuenta activa en esta mesa' });
         if (e.message === 'NADA_POR_COBRAR')
             return res.status(409).json({ error: 'No hay nada pendiente de cobro para ese cliente' });
+        if (e.message === 'CAJA_OTRA_SUCURSAL')
+            return res.status(409).json({ error: 'Tu caja abierta es de otra sucursal: abre caja en la sucursal de esta mesa para cobrarla.' });
         if (e.message === 'CAJA_CERRADA')
             return res.status(403).json({ error: Number(req.usuario.id_rol) === 1
                 ? 'No tienes una caja abierta. Ábrela en «Punto de venta» para cobrar.'

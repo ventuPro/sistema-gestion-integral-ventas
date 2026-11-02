@@ -361,9 +361,13 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   // ─── Tiempo real ───
   private conectarSocket() {
     this.socket = io(this.socketUrl, { transports: ['websocket'] });
+    let primera = true;
     this.socket.on('connect', () => {
       this.socket?.emit('unirse_mesa', this.codigo);
       this.refrescarEstado();
+      // Tras un corte de conexión: stock del menú al día
+      if (!primera) this.cargarCatalogo();
+      primera = false;
     });
 
     this.socket.on('actualizacion_stock_global', (d: any) => {

@@ -3,6 +3,7 @@ const { finalizarPedidosDeCuenta } = require('./pedidoModel');
 const { registrarHistorial } = require('./inventarioModel');
 const promocionModel = require('./promocionModel');
 const visitaModel = require('./visitaModel');
+const { turnoParaVender } = require('./cajaModel');
 
 // total_acumulado = lo que falta cobrar (las partes ya pagadas tienen id_venta)
 const recalcularTotal = (client, id_cuenta) => client.query(`
@@ -83,12 +84,14 @@ const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_un
         if (rPrecio.rows.length === 0) throw new Error('PRODUCTO_SIN_INVENTARIO');
         precio_unitario = Number(rPrecio.rows[0].precio_unitario);
 
-        // 1. Obtener id_sucursal desde la mesa vinculada a la cuenta
+        // 1. Obtener id_sucursal desde la mesa vinculada a la cuenta.
+        //    Se bloquea la cuenta: si otro la está cobrando, se espera y se vuelve a ver si sigue abierta
         const rSuc = await client.query(`
             SELECT ml.id_sucursal, cm.id_mesa, ml.numero_mesa
             FROM cuenta_mesa cm
             JOIN mesa_local  ml ON cm.id_mesa = ml.id_mesa
             WHERE cm.id_cuenta = $1 AND cm.estado = 'Abierta'
+            FOR UPDATE OF cm
         `, [id_cuenta]);
         if (rSuc.rows.length === 0) throw new Error('CUENTA_NO_ACTIVA');
         const { id_sucursal, id_mesa, numero_mesa } = rSuc.rows[0];
@@ -166,7 +169,7 @@ const quitarProductoCuenta = async (id_detalle_cuenta, id_usuario = null) => {
             JOIN cuenta_mesa cm ON dc.id_cuenta = cm.id_cuenta
             JOIN mesa_local  ml ON cm.id_mesa   = ml.id_mesa
             WHERE dc.id_detalle_cuenta = $1 AND cm.estado = 'Abierta'
-            FOR UPDATE OF dc
+            FOR UPDATE OF dc, cm
         `, [id_detalle_cuenta]);
         if (rDet.rows.length === 0) throw new Error('DETALLE_NO_ENCONTRADO');
         if (rDet.rows[0].id_venta) throw new Error('DETALLE_PAGADO');
@@ -221,7 +224,7 @@ const cambiarCantidadDetalle = async (id_detalle_cuenta, cantidad, id_usuario = 
             JOIN cuenta_mesa cm ON dc.id_cuenta = cm.id_cuenta
             JOIN mesa_local  ml ON cm.id_mesa   = ml.id_mesa
             WHERE dc.id_detalle_cuenta = $1 AND cm.estado = 'Abierta'
-            FOR UPDATE OF dc
+            FOR UPDATE OF dc, cm
         `, [id_detalle_cuenta]);
         if (rDet.rows.length === 0) throw new Error('DETALLE_NO_ENCONTRADO');
         const det = rDet.rows[0];
@@ -321,12 +324,11 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         if (!rCuenta.rows.length) throw new Error('CUENTA_NO_ACTIVA');
         const cuenta = rCuenta.rows[0];
 
-        const rTurno = await client.query(
-            `SELECT id_turno FROM turno_caja WHERE id_usuario_cajero=$1 AND estado_turno='Abierto' ORDER BY fecha_hora_apertura DESC LIMIT 1`,
-            [id_usuario_cajero]
-        );
-        if (rTurno.rows.length === 0) throw new Error('CAJA_CERRADA');
-        const id_turno = rTurno.rows[0].id_turno;
+        const turno = await turnoParaVender(client, id_usuario_cajero);
+        if (!turno) throw new Error('CAJA_CERRADA');
+        // La venta es de la sucursal de la mesa: la caja abierta debe ser de esa sucursal
+        if (Number(turno.id_sucursal) !== Number(cuenta.id_sucursal)) throw new Error('CAJA_OTRA_SUCURSAL');
+        const id_turno = turno.id_turno;
 
         const rItems = await client.query(`
             SELECT dc.*, p.id_categoria FROM detalle_cuenta dc

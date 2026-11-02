@@ -45,6 +45,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
   private stockSub?:      Subscription;
+  private reconexionSub?: Subscription;
   readonly cifra          = cifra;
 
   // ─── Iconos ───
@@ -161,11 +162,13 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.suscribirStock();
   }
 
-  ngOnDestroy() { this.stockSub?.unsubscribe(); clearTimeout(this.recargaMov); clearTimeout(this.recargaProductos); }
+  ngOnDestroy() { this.stockSub?.unsubscribe(); this.reconexionSub?.unsubscribe(); clearTimeout(this.recargaMov); clearTimeout(this.recargaProductos); }
 
   // Ventas de POS, mesas y menú QR actualizan el stock sin recargar
   private suscribirStock() {
     this.socketService.conectar('cajeros');
+    // Tras un corte de conexión: stock al día
+    this.reconexionSub = this.socketService.reconexiones.subscribe(() => this.cargarProductos());
     this.stockSub = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(p => {
       if (!p || Number(p.id_sucursal) !== this.idSucursal()) return;
       // Un producto que la sucursal no tenía (llegó por transferencia): se recarga la lista

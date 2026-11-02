@@ -68,6 +68,8 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
     this.cargar();
     this.socketService.conectar('cajeros');
 
+    // Tras un corte de conexión: pedidos al día
+    this.subs.push(this.socketService.reconexiones.subscribe(() => this.cargar()));
     this.subs.push(this.socketService.escuchar<any>('pedido:nuevo').subscribe(d => {
       if (!this.esDeMiSucursal(d)) return;
       this.sonar();

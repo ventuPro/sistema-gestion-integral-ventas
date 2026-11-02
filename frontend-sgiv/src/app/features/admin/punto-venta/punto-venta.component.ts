@@ -50,6 +50,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   private stockSub?: Subscription;
   private cierreSub?: Subscription;
   private catalogoSub?: Subscription;
+  private reconexionSub?: Subscription;
   private esperaRecarga: any;
 
   readonly icons = {
@@ -281,6 +282,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.stockSub?.unsubscribe();
     this.cierreSub?.unsubscribe();
     this.catalogoSub?.unsubscribe();
+    this.reconexionSub?.unsubscribe();
   }
 
   private suscribirStockGlobal() {
@@ -295,6 +297,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     });
     // Productos nuevos, editados o desactivados y promociones
     this.catalogoSub = this.socketService.escuchar<any>('catalogo:actualizado').subscribe(() => this.recargarCatalogo());
+    // Tras un corte de conexión: estado de la caja y stock al día (verificarAccesoCaja recarga el catálogo)
+    this.reconexionSub = this.socketService.reconexiones.subscribe(() => this.verificarAccesoCaja());
   }
 
   /** Stock que informa el servidor; un producto que no estaba en pantalla obliga a recargar */

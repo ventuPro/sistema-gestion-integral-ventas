@@ -33,9 +33,9 @@ const eliminarCategoria = async (id) =>
 const CAMPOS = ['id_categoria', 'nombre_producto', 'descripcion_producto', 'precio_unitario', 'url_imagen',
                 'ingredientes', 'preparacion', 'destacado', 'mostrar_en_menu'];
 
-const crearProducto = async (datos) => {
+const crearProducto = async (datos, cliente = db) => {
     const campos = CAMPOS.filter(c => datos[c] !== undefined && datos[c] !== null);
-    const r = await db.query(`
+    const r = await cliente.query(`
         INSERT INTO producto(${campos.join(', ')})
         VALUES(${campos.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING *
     `, campos.map(c => datos[c]));
@@ -92,14 +92,11 @@ const actualizarProducto = async (id, datos) => {
     return r.rows[0];
 };
 
-// ─── Agregar o actualizar stock para una sucursal específica ───
-// ─── Crear entrada en inventario con stock 0 (para asignar producto a sucursal) ───
-const asignarProductoASucursal = async (id_producto, id_sucursal, stock_inicial = 0) => {
-    const r = await db.query(`
+// ─── Fila de inventario de un producto nuevo en una sucursal (nunca pisa un stock existente) ───
+const asignarProductoASucursal = async (id_producto, id_sucursal, stock_inicial = 0, cliente = db) => {
+    const r = await cliente.query(`
         INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual, stock_minimo_alerta)
         VALUES ($1, $2, $3, COALESCE((SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1), 5))
-        ON CONFLICT (id_sucursal, id_producto)
-        DO UPDATE SET cantidad_actual = $3
         RETURNING *
     `, [id_sucursal, id_producto, stock_inicial]);
     return r.rows[0];

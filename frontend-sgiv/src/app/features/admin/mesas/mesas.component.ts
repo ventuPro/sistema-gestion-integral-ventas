@@ -146,6 +146,7 @@ export class MesasComponent implements OnInit, OnDestroy {
                       'cuenta:producto_agregado', 'pedido:actualizado'];
     for (const evento of recargar)
       this.subs.push(this.socketService.escuchar<any>(evento).subscribe(() => this.cargarMesas()));
+    this.subs.push(this.socketService.reconexiones.subscribe(() => { this.cargarMesas(); this.verificarAccesoCaja(); }));
 
     // Cierre automático de las 00:00
     this.subs.push(this.socketService.escuchar<any>('caja:cerrada').subscribe(d => {

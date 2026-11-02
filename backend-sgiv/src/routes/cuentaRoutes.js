@@ -18,63 +18,66 @@ router.post ('/:id_cuenta/cerrar',        mesas, ctrl.cerrarCuenta);
 router.get  ('/:id_cuenta/cotizacion',    mesas, ctrl.cotizarCuenta);
 router.post ('/:id_cuenta/cotizar',       mesas, ctrl.cotizarCuenta);
 router.post('/:id_cuenta/cancelar-si-vacia', mesas, async (req, res) => {
+    const id_cuenta = Number(req.params.id_cuenta);
+    const db = require('../config/db');
+    const client = await db.connect();
+    let id_mesa;
     try {
-        const id_cuenta = Number(req.params.id_cuenta);
-        const db = require('../config/db');
-
-        const c = await db.query(
-            `SELECT id_cuenta, id_mesa, estado FROM cuenta_mesa WHERE id_cuenta=$1`,
+        await client.query('BEGIN');
+        // La cuenta se bloquea antes de contar: si en ese momento llega un pedido, se espera y se cuenta
+        const c = await client.query(
+            `SELECT id_cuenta, id_mesa, estado FROM cuenta_mesa WHERE id_cuenta=$1 FOR UPDATE`,
             [id_cuenta]
         );
-        if (c.rows.length === 0)
+        if (c.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ error: 'Cuenta no encontrada' });
-        if (c.rows[0].estado !== 'Abierta')
+        }
+        if (c.rows[0].estado !== 'Abierta') {
+            await client.query('ROLLBACK');
             return res.status(400).json({ error: 'La cuenta no está abierta' });
+        }
 
-        const items = await db.query(
+        const items = await client.query(
             `SELECT COUNT(*) FILTER (WHERE id_venta IS NULL)::int AS n, COUNT(id_venta)::int AS pagados
              FROM detalle_cuenta WHERE id_cuenta=$1`,
             [id_cuenta]
         );
-        if (items.rows[0].n > 0)
+        if (items.rows[0].n > 0) {
+            await client.query('ROLLBACK');
             return res.status(400).json({ error: 'CUENTA_NO_VACIA' });
+        }
         // Si alguien ya pagó su parte, la cuenta queda como pagada
         const estadoFinal = items.rows[0].pagados > 0 ? 'Pagada' : 'Cancelada';
+        id_mesa = c.rows[0].id_mesa;
 
-        const id_mesa = c.rows[0].id_mesa;
-        const client = await db.connect();
-        try {
-            await client.query('BEGIN');
-            // Si el cajero quitó todos los productos de pedidos QR, esos pedidos quedan cancelados
-            await pedidoModel.finalizarPedidosDeCuenta(client, id_cuenta, 'Cancelado');
-            // Si el cajero ya había habilitado la mesa antes de abrir esta cuenta, sigue habilitada
-            const rMesa = await client.query(`
-                SELECT m.fecha_habilitacion < c.fecha_apertura AS ya_habilitada
-                FROM cuenta_mesa c JOIN mesa_local m ON m.id_mesa = c.id_mesa WHERE c.id_cuenta = $1
-            `, [id_cuenta]);
-            await client.query(
-                `UPDATE cuenta_mesa SET estado=$2, fecha_cierre=NOW() WHERE id_cuenta=$1`,
-                [id_cuenta, estadoFinal]
-            );
-            // Pagada = los clientes terminaron; si no, solo se deshace la apertura y sus visitas siguen
-            if (estadoFinal === 'Pagada') await visitaModel.liberar(client, id_mesa);
-            else if (!rMesa.rows[0]?.ya_habilitada) await visitaModel.liberar(client, id_mesa, { terminarVisitas: false });
-            await client.query('COMMIT');
-        } catch (e) {
-            await client.query('ROLLBACK');
-            throw e;
-        } finally {
-            client.release();
-        }
-
-        global.io?.to('cajeros').emit('mesa:actualizada', { id_mesa });
-        global.io?.to('cajeros').emit('cuenta:cerrada', { id_mesa });
-        emitirMesa(id_mesa, 'cuenta:cerrada', {});
-        res.json({ mensaje: 'Cuenta vacía cancelada — mesa liberada', id_mesa });
-    } catch(e) {
+        // Si el cajero quitó todos los productos de pedidos QR, esos pedidos quedan cancelados
+        await pedidoModel.finalizarPedidosDeCuenta(client, id_cuenta, 'Cancelado');
+        // Si el cajero ya había habilitado la mesa antes de abrir esta cuenta, sigue habilitada
+        const rMesa = await client.query(`
+            SELECT m.fecha_habilitacion < c.fecha_apertura AS ya_habilitada
+            FROM cuenta_mesa c JOIN mesa_local m ON m.id_mesa = c.id_mesa WHERE c.id_cuenta = $1
+        `, [id_cuenta]);
+        await client.query(
+            `UPDATE cuenta_mesa SET estado=$2, fecha_cierre=NOW() WHERE id_cuenta=$1`,
+            [id_cuenta, estadoFinal]
+        );
+        // Pagada = los clientes terminaron; si no, solo se deshace la apertura y sus visitas siguen
+        if (estadoFinal === 'Pagada') await visitaModel.liberar(client, id_mesa);
+        else if (!rMesa.rows[0]?.ya_habilitada) await visitaModel.liberar(client, id_mesa, { terminarVisitas: false });
+        await client.query('COMMIT');
+    } catch (e) {
+        await client.query('ROLLBACK');
         console.error('cancelar-si-vacia:', e);
-        res.status(500).json({ error: e.message });
+        return res.status(500).json({ error: e.message });
+    } finally {
+        client.release();
     }
+
+    global.io?.to('cajeros').emit('mesa:actualizada', { id_mesa });
+    global.io?.to('cajeros').emit('cuenta:cerrada', { id_mesa });
+    emitirMesa(id_mesa, 'cuenta:cerrada', {});
+    res.json({ mensaje: 'Cuenta vacía cancelada — mesa liberada', id_mesa });
 });
 
 router.post('/reset-mesa', mesas, async (req, res) => {
@@ -87,9 +90,11 @@ router.post('/reset-mesa', mesas, async (req, res) => {
         await client.query('BEGIN');
         const { id_mesa } = req.body;
 
+        // Bloqueada: un cobro o un pedido que llega en ese momento termina antes de devolver el stock
         const rC = await client.query(`
             SELECT id_cuenta FROM cuenta_mesa
             WHERE id_mesa=$1 AND estado='Abierta'
+            FOR UPDATE
         `, [id_mesa]);
 
         let cambiosStock = [];

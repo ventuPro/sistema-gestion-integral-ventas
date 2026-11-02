@@ -270,6 +270,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
     // Productos nuevos, editados o desactivados
     this.subs.push(this.socketService.escuchar<any>('catalogo:actualizado').subscribe(() => this.recargarProductos()));
+    // Tras un corte de conexión: cuenta y stock al día
+    this.subs.push(this.socketService.reconexiones.subscribe(() => { this.cargarEstadoMesa(); this.cargarProductos(); }));
   }
 
   private fijarStock(id_producto: number, stock: number) {

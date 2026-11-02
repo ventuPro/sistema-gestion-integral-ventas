@@ -81,6 +81,8 @@ export class IngresosDiaComponent implements OnInit, OnDestroy {
       clearTimeout(this.recarga);
       this.recarga = setTimeout(() => this.cargar(), 500);
     });
+    // Tras un corte de conexión: lo que entró mientras tanto
+    this.sub.add(this.socket.reconexiones.subscribe(() => this.cargar()));
   }
 
   ngOnDestroy() { this.sub?.unsubscribe(); clearTimeout(this.recarga); }
