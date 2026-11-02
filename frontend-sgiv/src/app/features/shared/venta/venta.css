@@ -92,12 +92,29 @@
 .producto .stock { font-size: calc(11.5px * var(--escala-texto)); color: var(--i-tenue); }
 .producto .stock.bajo { color: var(--i-aviso); font-weight: 600; }
 
-/* Cobro en efectivo con el tablero: datos y tablero lado a lado */
+/* Ventana de cobro: datos a la izquierda; tablero (efectivo) o QR a la derecha. Sin scroll. */
+.cobro { display: grid; }
+.cobro-datos { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+.cobro-datos .inf-cifra-xl { font-size: calc(40px * var(--escala-texto)); }
 .cobro-teclado { padding: 0 20px 20px; }
+.cobro-qr { display: flex; align-items: center; justify-content: center; min-height: 260px; }
+.cobro-qr img { width: 240px; height: 240px; object-fit: contain; background: #fff; border-radius: 8px; padding: 8px; border: 1px solid var(--i-linea); }
 @media (min-width: 768px) {
-  .cobro.con-teclado { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .cobro { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
   .cobro-teclado { padding: 20px 20px 20px 0; }
 }
+.descuento-aplicado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: calc(13px * var(--escala-texto));
+  color: var(--i-texto);
+  background: color-mix(in oklab, var(--i-sube) 10%, transparent);
+}
+.descuento-aplicado b { margin-left: auto; color: var(--i-sube); font-weight: 600; white-space: nowrap; }
 
 /* Pie del carrito: tablero a la izquierda, Descuento y Cobrar a la derecha (como Odoo) */
 .pie-venta { display: grid; grid-template-columns: minmax(0, 1fr) minmax(112px, 0.42fr); gap: 8px; }

@@ -19,6 +19,7 @@ import { agruparPorCategoria, mejorCoincidencia } from '../../../../core/utils/c
 import { enfocar, focoOcupado, FondoModalDirective, pantallaTactil } from '../../../../core/directives/fondo-modal.directive';
 import { TecladoNumericoComponent } from '../../../shared/teclado-numerico/teclado-numerico.component';
 import { aplicarTecla, EntradaMonto, EntradaNumero } from '../../../shared/teclado-numerico/entrada-numero';
+import { VentanaDescuentoComponent } from '../../../shared/venta/ventana-descuento.component';
 
 /** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
 export interface GrupoCuenta {
@@ -39,7 +40,7 @@ const totalPendiente = (items: any[]) =>
   selector: 'app-mesa-modal',
   standalone: true,
   imports: [FondoModalDirective, CommonModule, NgTemplateOutlet, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule,
-            BarraCategoriasComponent, TecladoNumericoComponent],
+            BarraCategoriasComponent, TecladoNumericoComponent, VentanaDescuentoComponent],
   templateUrl: './mesa-modal.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css', './mesa-modal.component.css']
 })
@@ -76,7 +77,6 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly metodoPago  = signal<MetodoPago>(METODO_PAGO.efectivo);
   readonly montoPagado = signal<number | null>(null);
   readonly entradaPago = new EntradaMonto(this.montoPagado);
-  readonly tecladoCobro = computed(() => this.metodoPago() === METODO_PAGO.efectivo);
   readonly billetes    = [10, 20, 50, 100, 200];
   /** Monto recibido como número (vacío = 0) */
   readonly pagado      = computed(() => Number(this.montoPagado()) || 0);
@@ -521,6 +521,12 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     this.montoPagado.set(null);
     this.metodoPago.set(this.ajustes.config().pago_efectivo ? METODO_PAGO.efectivo : METODO_PAGO.qr);
     this.vista.set('pago');
+  }
+
+  /** «Descuento» junto a Cobrar: abre el cobro con el descuento listo para escribir */
+  irADescuento() {
+    this.irAPago();
+    this.abrirDescuento();
   }
 
   abrirDescuento() {

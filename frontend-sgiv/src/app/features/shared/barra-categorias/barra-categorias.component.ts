@@ -7,16 +7,19 @@ export interface CategoriaBarra { id: number; nombre: string; icono: LucideIconD
 // Queda fija arriba al bajar, muestra la categoría que se está viendo y abre la lista para saltar a otra.
 // Cada sección de la página lleva [attr.data-seccion]="id". Se mueve con el contenedor que tenga scroll
 // (la página del panel o la lista de un modal); las posiciones se miden solo cuando cambia el contenido.
+// Con [contenedor] va fuera de la lista (por ejemplo junto al buscador) y no queda fija.
 @Component({
   selector: 'app-barra-categorias',
   standalone: true,
   imports: [LucideAngularModule],
   templateUrl: './barra-categorias.component.html',
   styleUrls: ['./barra-categorias.component.css'],
-  host: { '(document:click)': 'alClicFuera($event)', '(document:keydown.escape)': 'abierta.set(false)' }
+  host: { '(document:click)': 'alClicFuera($event)', '(document:keydown.escape)': 'abierta.set(false)', '[class.externa]': '!!externo()' }
 })
 export class BarraCategoriasComponent {
   readonly categorias = input.required<CategoriaBarra[]>();
+  /** Lista con scroll cuando la barra está fuera de ella */
+  readonly externo = input<HTMLElement | null>(null, { alias: 'contenedor' });
 
   readonly icons = { abrir: ChevronDown, todas: LayoutGrid };
   readonly abierta = signal(false);
@@ -36,7 +39,7 @@ export class BarraCategoriasComponent {
     if (!c) return;
     // Al llegar al final de la página se marca la última sección que se ve
     const alFinal = c.scrollTop + c.clientHeight >= c.scrollHeight - 2;
-    const y = alFinal ? c.scrollTop + c.clientHeight - 40 : c.scrollTop + this.host.offsetHeight + 12;
+    const y = alFinal ? c.scrollTop + c.clientHeight - 40 : c.scrollTop + this.alto() + 12;
     let actual: number | null = null;
     for (const p of this.posiciones) { if (p.top > y) break; actual = p.id; }
     if (actual !== this.actual()) this.actual.set(actual);
@@ -44,21 +47,29 @@ export class BarraCategoriasComponent {
 
   constructor() {
     afterNextRender(() => {
-      this.contenedor = this.buscarContenedor();
+      this.contenedor = this.externo() ?? this.buscarContenedor();
       this.contenedor?.addEventListener('scroll', this.alDesplazar, { passive: true });
       // Fotos que cargan o filtros que cambian el alto: se vuelve a medir
-      const contenido = this.host.parentElement;
-      if (contenido) {
-        this.tamano = new ResizeObserver(() => this.medir());
-        this.tamano.observe(contenido);
-      }
+      this.tamano = new ResizeObserver(() => this.medir());
+      this.observar();
       this.medir();
     });
-    afterRenderEffect(() => { this.categorias(); untracked(() => this.medir()); });
+    afterRenderEffect(() => { this.categorias(); untracked(() => { this.observar(); this.medir(); }); });
     inject(DestroyRef).onDestroy(() => {
       this.contenedor?.removeEventListener('scroll', this.alDesplazar);
       this.tamano?.disconnect();
     });
+  }
+
+  /** Alto que tapa la barra dentro de la lista (fuera de ella, nada) */
+  private alto() { return this.externo() ? 0 : this.host.offsetHeight; }
+
+  private observar() {
+    if (!this.tamano) return;
+    this.tamano.disconnect();
+    const externo = this.externo();
+    const elementos = externo ? Array.from(externo.children) : [this.host.parentElement];
+    for (const el of elementos) if (el) this.tamano.observe(el);
   }
 
   /** El ancestro más cercano con scroll vertical */
@@ -74,7 +85,7 @@ export class BarraCategoriasComponent {
     const c = this.contenedor;
     if (!c) return;
     // Pegada al borde visible aunque el contenedor tenga margen interior
-    this.host.style.top = `-${parseFloat(getComputedStyle(c).paddingTop) || 0}px`;
+    if (!this.externo()) this.host.style.top = `-${parseFloat(getComputedStyle(c).paddingTop) || 0}px`;
     const base = c.getBoundingClientRect().top - c.scrollTop;
     this.posiciones = Array.from(c.querySelectorAll<HTMLElement>('[data-seccion]'), el =>
       ({ id: Number(el.dataset['seccion']), top: el.getBoundingClientRect().top - base }))
@@ -87,7 +98,7 @@ export class BarraCategoriasComponent {
     const c = this.contenedor;
     const destino = this.posiciones.find(p => p.id === id);
     if (!c || !destino) return;
-    c.scrollTo({ top: Math.max(0, destino.top - this.host.offsetHeight - 4), behavior: this.sinAnimacion ? 'auto' : 'smooth' });
+    c.scrollTo({ top: Math.max(0, destino.top - this.alto() - 4), behavior: this.sinAnimacion ? 'auto' : 'smooth' });
   }
 
   alClicFuera(e: Event) {

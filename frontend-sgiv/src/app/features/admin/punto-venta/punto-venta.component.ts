@@ -25,11 +25,12 @@ import { agruparPorCategoria, mejorCoincidencia } from '../../../core/utils/cate
 import { enfocar, focoOcupado, FondoModalDirective, pantallaTactil } from '../../../core/directives/fondo-modal.directive';
 import { TecladoNumericoComponent } from '../../shared/teclado-numerico/teclado-numerico.component';
 import { aplicarTecla, EntradaMonto, EntradaNumero } from '../../shared/teclado-numerico/entrada-numero';
+import { VentanaDescuentoComponent } from '../../shared/venta/ventana-descuento.component';
 
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
-  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent, BarraCategoriasComponent, TecladoNumericoComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent, BarraCategoriasComponent, TecladoNumericoComponent, VentanaDescuentoComponent],
   templateUrl: './punto-venta.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './punto-venta.component.css']
 })
@@ -139,7 +140,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     tecla: (t) => this.teclaCantidad(t)
   };
 
-  readonly unidades = computed(() => this.carrito().reduce((s, i) => s + Number(i.cantidad), 0));
   readonly cobrando = signal(false);
 
   /** Líneas con más unidades que el stock (id → disponible) */
@@ -205,8 +205,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly metodoPago  = signal<MetodoPago>(METODO_PAGO.efectivo);
   readonly montoPagado = signal<number | null>(null);
   readonly entradaPago = new EntradaMonto(this.montoPagado);
-  /** Con el tablero visible, la ventana de cobro en efectivo va en dos columnas */
-  readonly tecladoCobro = computed(() => this.metodoPago() === METODO_PAGO.efectivo);
   /** Monto recibido como número (vacío = 0) */
   readonly pagado      = computed(() => Number(this.montoPagado()) || 0);
   @ViewChild('buscador') buscadorRef?: ElementRef<HTMLInputElement>;

@@ -1,5 +1,15 @@
 import { computed, Signal, signal, WritableSignal } from '@angular/core';
 
+/** Un número que se lee y se escribe (una señal o un campo de un formulario en una señal) */
+export type CampoNumero = (() => number | null) & { set(valor: number | null): void };
+
+/** Campo numérico de un formulario guardado en una señal (por ejemplo formDescuento().valor) */
+export function campoDe<T>(form: WritableSignal<T>, clave: keyof T): CampoNumero {
+  const campo = (() => (form()[clave] ?? null) as number | null) as CampoNumero;
+  campo.set = (valor) => form.update(f => ({ ...f, [clave]: valor }));
+  return campo;
+}
+
 /** Lo que edita el tablero: el texto que muestra y qué hacer con cada tecla */
 export interface EntradaNumero {
   readonly mostrado: Signal<string>;
@@ -29,15 +39,18 @@ export class EntradaMonto implements EntradaNumero {
   readonly decimales = true;
   // Texto escrito con el tablero ('12.' todavía no es un número); vale mientras la señal no cambie por otro lado
   private readonly escrito = signal<{ texto: string; valor: number | null } | null>(null);
-  readonly mostrado = computed(() => {
+  readonly mostrado = computed(() => this.texto());
+
+  constructor(private readonly valor: CampoNumero) {}
+
+  // Se lee en cada tecla: el campo del formulario también se edita escribiendo con el teclado físico
+  private texto() {
     const e = this.escrito(), v = this.valor();
     return e && e.valor === v ? e.texto : (v == null ? '' : String(v));
-  });
-
-  constructor(private readonly valor: WritableSignal<number | null>) {}
+  }
 
   tecla(tecla: string) {
-    const texto = aplicarTecla(this.mostrado(), tecla);
+    const texto = aplicarTecla(this.texto(), tecla);
     const valor = texto === '' ? null : Number(texto);
     this.escrito.set({ texto, valor });
     this.valor.set(valor);

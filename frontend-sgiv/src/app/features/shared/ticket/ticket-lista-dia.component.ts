@@ -20,7 +20,7 @@ export interface GrupoListaDia { categoria: string; items: { nombre_producto: st
       @for (g of grupos(); track g.categoria) {
         <hr class="tk-linea">
         <p class="tk-dato"><b>{{ g.categoria }}</b></p>
-        @for (i of g.items; track i.nombre_producto) {
+        @for (i of g.items; track $index) {
           <div class="tk-fila"><span>{{ i.nombre_producto }}</span><span>{{ i.cantidad }}</span></div>
         }
       }

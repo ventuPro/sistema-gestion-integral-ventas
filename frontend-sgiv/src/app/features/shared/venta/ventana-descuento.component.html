@@ -1,0 +1,44 @@
+@let f = form()();
+<div class="fixed inset-0 z-[60] flex items-center justify-center p-4 fondo-modal" (fondoModal)="cancelar.emit()">
+  <form class="inf-hoja ventana w-full max-w-2xl" (ngSubmit)="aplicar.emit()" (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+      <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Descuento</h3>
+      <button type="button" class="quitar" (click)="cancelar.emit()" aria-label="Cancelar">
+        <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+      </button>
+    </div>
+
+    <div class="cuerpo">
+      <div class="datos">
+        <div class="metodos">
+          <button type="button" class="metodo" [class.activo]="f.tipo === 'PORCENTAJE'" (click)="tipo('PORCENTAJE')">Porcentaje %</button>
+          <button type="button" class="metodo" [class.activo]="f.tipo === 'MONTO'" (click)="tipo('MONTO')">Monto {{ moneda() }}</button>
+        </div>
+
+        <div>
+          <p class="inf-etiqueta mb-2">{{ f.tipo === 'PORCENTAJE' ? 'Porcentaje' : 'Monto' }}</p>
+          <div class="campo-monto">
+            <span>{{ f.tipo === 'PORCENTAJE' ? '%' : moneda() }}</span>
+            <input type="number" name="valor" inputmode="none" min="0" [(ngModel)]="f.valor" placeholder="0" aria-label="Descuento">
+          </div>
+        </div>
+
+        <div>
+          <label class="inf-etiqueta mb-2 block" for="motivo-descuento">Motivo</label>
+          <input id="motivo-descuento" name="motivo" class="campo-texto" maxlength="120" [(ngModel)]="f.motivo" placeholder="Cliente frecuente">
+        </div>
+
+        @if (error()) { <p class="error-descuento" role="alert">{{ error() }}</p> }
+      </div>
+
+      <div class="tablero">
+        <app-teclado-numerico [entrada]="entrada()" [pantalla]="false" />
+      </div>
+    </div>
+
+    <div class="inf-pie-hoja flex justify-end gap-2">
+      <button type="button" class="inf-boton" (click)="cancelar.emit()">Cancelar</button>
+      <button type="submit" class="boton-primario" [disabled]="aplicando()">{{ aplicando() ? 'Aplicando…' : 'Aplicar' }}</button>
+    </div>
+  </form>
+</div>

@@ -1,14 +1,3 @@
-.bloqueo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: calc(13px * var(--escala-texto));
-  color: var(--i-aviso);
-  background: color-mix(in oklab, var(--i-aviso) 10%, transparent);
-}
-
 .categorias { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
 .categoria {
   display: flex;

@@ -8,9 +8,6 @@
       <button class="inf-boton" (click)="mostrarIngresos.set(true)">
         <lucide-icon [img]="icons.ingresos" class="w-3.5 h-3.5"></lucide-icon> Ingresos del día
       </button>
-      <button class="inf-boton" (click)="mostrarListaDia.set(true)">
-        <lucide-icon [img]="icons.listaDia" class="w-3.5 h-3.5"></lucide-icon> Lista del día anterior
-      </button>
       <button class="inf-boton" (click)="abrirOrdenCategorias()">
         <lucide-icon [img]="icons.ordenar" class="w-3.5 h-3.5"></lucide-icon> Ordenar categorías
       </button>
@@ -44,8 +41,9 @@
                       (cerrar)="mostrarIngresos.set(false)" />
   }
 
-  @if (mostrarListaDia()) {
-    <app-lista-dia [idSucursal]="idSucursal()" (cerrar)="mostrarListaDia.set(false)" />
+  @if (mostrarDescarga()) {
+    <app-descarga-inventario [idSucursal]="idSucursal()" [sucursales]="sucursales().length ? sucursales() : [sucursalSeleccionada()]"
+                             (cerrar)="mostrarDescarga.set(false)" />
   }
 
   @if (vista() === 'productos') {
@@ -66,6 +64,9 @@
             <button [class.activa]="filtroEstado() === f.valor" (click)="filtroEstado.set(f.valor)">{{ f.texto }}</button>
           }
         </div>
+        <button class="inf-boton" (click)="mostrarDescarga.set(true)">
+          <lucide-icon [img]="icons.descargar" class="w-3.5 h-3.5"></lucide-icon> Descargar
+        </button>
       </div>
     </div>
 

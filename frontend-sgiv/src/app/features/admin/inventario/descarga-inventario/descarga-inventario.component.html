@@ -1,0 +1,67 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrar.emit()">
+  <div class="inf-hoja ventana w-full max-w-2xl max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between gap-4 px-5 py-4 separador-inferior">
+      <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Descargar inventario</h3>
+      <button class="quitar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+      </button>
+    </div>
+
+    <div class="p-5 space-y-4 overflow-y-auto">
+      <div class="flex flex-wrap items-center gap-3">
+        <app-selector-sucursal [sucursales]="sucursales()" [seleccionada]="idSucursal()"
+                               [soloLectura]="sucursales().length <= 1" (cambio)="cambiarSucursal($event)" />
+        <div class="inf-segmentos">
+          @for (f of filtrosStock; track f.valor) {
+            <button [class.activa]="filtro() === f.valor" (click)="cambiarFiltro(f.valor)">{{ f.texto }}</button>
+          }
+        </div>
+      </div>
+
+      @switch (estado()) {
+        @case ('cargando') { <div class="inf-esqueleto h-40"></div> }
+        @case ('error') { <p class="inf-vacio">No se pudo cargar el inventario.</p> }
+        @default {
+          @if (!categorias().length) {
+            <p class="inf-vacio">Ningún producto coincide con el filtro.</p>
+          } @else {
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="inf-etiqueta">Categorías</span>
+                <button class="inf-boton py-1!" (click)="alternarTodas()">{{ todas() ? 'Quitar todas' : 'Elegir todas' }}</button>
+              </div>
+              <div class="categorias">
+                @for (c of categorias(); track c.id) {
+                  <button class="categoria" [class.activa]="elegidas().has(c.id)" (click)="alternar(c.id)"
+                          role="checkbox" [attr.aria-checked]="elegidas().has(c.id)">
+                    <span class="casilla">@if (elegidas().has(c.id)) { <lucide-icon [img]="icons.listo" class="w-3 h-3"></lucide-icon> }</span>
+                    <span class="flex-1 text-left truncate">{{ c.nombre }}</span>
+                    <span class="inf-tenue">{{ c.productos }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+            <p class="inf-tinta text-[length:calc(13px*var(--escala-texto))]">{{ totales().productos }} producto(s) · {{ totales().unidades }} unidad(es)</p>
+          }
+        }
+      }
+    </div>
+
+    <div class="inf-pie-hoja flex flex-wrap justify-end gap-2">
+      <button class="inf-boton" (click)="imprimirTicket()" [disabled]="!totales().productos">
+        <lucide-icon [img]="icons.ticket" class="w-4 h-4"></lucide-icon> Ticket
+      </button>
+      <button class="inf-boton" (click)="descargarExcel()" [disabled]="!totales().productos || ocupado()">
+        <lucide-icon [img]="icons.excel" class="w-4 h-4"></lucide-icon> Excel
+      </button>
+      <button class="boton-primario" (click)="descargarPDF()" [disabled]="!totales().productos || ocupado()">
+        <lucide-icon [img]="icons.pdf" class="w-4 h-4"></lucide-icon> PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Ticket fuera de la vista: solo se usa para imprimir -->
+<div #zonaTicket class="fuera-de-vista" aria-hidden="true">
+  <app-ticket-lista-dia [grupos]="grupos()" [sucursal]="nombreSucursal()" [fecha]="fechaTexto()" titulo="INVENTARIO" />
+</div>

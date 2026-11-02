@@ -67,6 +67,12 @@
 .lista button:hover { background: var(--i-acento-suave, #eff6ff); }
 .lista button.activa { background: var(--i-acento-suave, #eff6ff); color: var(--i-acento, #2563eb); font-weight: 600; }
 
+/* Fuera de la lista (junto al buscador) */
+:host(.externa) { position: relative; top: auto; flex-shrink: 0; background: none; }
+:host(.externa) .barra { padding: 0; }
+:host(.externa) .actual { height: 40px; max-width: 220px; }
+:host(.externa) .lista { left: auto; right: 0; top: calc(100% + 4px); width: 280px; }
+
 @media (prefers-reduced-motion: reduce) {
   .flecha { transition: none; }
 }

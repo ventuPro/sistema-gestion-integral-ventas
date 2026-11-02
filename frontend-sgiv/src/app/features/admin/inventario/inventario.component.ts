@@ -9,7 +9,7 @@ import { InventarioService, Movimiento, TipoMovimiento } from '../../../core/ser
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
          Pencil, ArrowUpDown, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban, History,
-         ChevronUp, ChevronDown, ListOrdered, Star, ClipboardList, Trash2, PackagePlus } from 'lucide-angular';
+         ChevronUp, ChevronDown, ListOrdered, Star, Download, Trash2, PackagePlus } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
@@ -18,7 +18,7 @@ import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
 import { comprimirImagen } from '../../../core/utils/imagen';
 import { TransferenciasComponent } from './transferencias/transferencias.component';
-import { ListaDiaComponent } from './lista-dia/lista-dia.component';
+import { DescargaInventarioComponent } from './descarga-inventario/descarga-inventario.component';
 import { IngresosDiaComponent } from './ingresos-dia/ingresos-dia.component';
 import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria } from '../../../core/utils/categorias';
@@ -30,7 +30,7 @@ type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
   selector: 'app-inventario',
   standalone: true,
   imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe, TransferenciasComponent,
-            ListaDiaComponent, IngresosDiaComponent, BarraCategoriasComponent],
+            DescargaInventarioComponent, IngresosDiaComponent, BarraCategoriasComponent],
   templateUrl: './inventario.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './inventario.component.css']
@@ -63,12 +63,12 @@ export class InventarioComponent implements OnInit, OnDestroy {
     bajar:      ChevronDown,
     ordenar:    ListOrdered,
     destacado:  Star,
-    listaDia:   ClipboardList,
+    descargar:  Download,
     ingresos:   PackagePlus,
     quitarCategoria: Trash2
   };
 
-  readonly mostrarListaDia = signal(false);
+  readonly mostrarDescarga = signal(false);
   readonly mostrarIngresos = signal(false);
 
   readonly filtrosEstado: { valor: FiltroEstado; texto: string }[] = [

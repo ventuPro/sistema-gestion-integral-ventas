@@ -1,5 +1,5 @@
 import { signal } from '@angular/core';
-import { aplicarTecla, EntradaMonto } from './entrada-numero';
+import { aplicarTecla, campoDe, EntradaMonto } from './entrada-numero';
 
 describe('Tablero numérico', () => {
   it('escribe cifras, punto y borra', () => {
@@ -32,5 +32,16 @@ describe('Tablero numérico', () => {
     expect(e.mostrado()).toBe('70.5');
     e.tecla('limpiar');
     expect(monto()).toBeNull();
+  });
+
+  it('descuento: escribe en el campo del formulario', () => {
+    const form = signal({ tipo: 'PORCENTAJE', valor: null as number | null, motivo: '' });
+    const e = new EntradaMonto(campoDe(form, 'valor'));
+    e.tecla('1'); e.tecla('5');
+    expect(form().valor).toBe(15);
+    form().valor = 3;            // escrito con el teclado físico (ngModel cambia el objeto)
+    e.tecla('0');
+    expect(form().valor).toBe(30);
+    expect(form().tipo).toBe('PORCENTAJE');
   });
 });
