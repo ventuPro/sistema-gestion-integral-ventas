@@ -92,7 +92,15 @@
 .producto .stock { font-size: calc(11.5px * var(--escala-texto)); color: var(--i-tenue); }
 .producto .stock.bajo { color: var(--i-aviso); font-weight: 600; }
 
+/* Cobro en efectivo con el tablero: datos y tablero lado a lado */
+.cobro-teclado { padding: 0 20px 20px; }
+@media (min-width: 768px) {
+  .cobro.con-teclado { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .cobro-teclado { padding: 20px 20px 20px 0; }
+}
+
 /* Carrito */
+.linea-carrito.seleccionada { background: var(--i-acento-suave); box-shadow: inset 3px 0 0 var(--i-acento); }
 .linea-carrito {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;

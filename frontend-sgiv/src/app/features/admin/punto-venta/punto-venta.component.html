@@ -58,11 +58,15 @@
         <div class="campo-monto">
           <span>{{ moneda() }}</span>
           <input #inputTurno type="number" min="0" step="0.01" [(ngModel)]="montoInicial" placeholder="0.00"
-                 (keyup.enter)="confirmarAbrirTurno()">
+                 [attr.inputmode]="teclado.visible() ? 'none' : 'decimal'" (keyup.enter)="confirmarAbrirTurno()">
         </div>
         @if (errorTurno()) { <p class="text-sm inf-baja mt-3">{{ errorTurno() }}</p> }
+        @if (teclado.visible()) { <app-teclado-numerico class="mt-4" [entrada]="entradaFondo" [billetes]="billetes" [pantalla]="false" /> }
       </div>
-      <div class="inf-pie-hoja flex justify-end">
+      <div class="inf-pie-hoja flex justify-between gap-2">
+        <button class="inf-boton" [class.activo]="teclado.visible()" (click)="teclado.alternar()">
+          <lucide-icon [img]="icons.teclado" class="w-3.5 h-3.5"></lucide-icon> Teclado
+        </button>
         <button class="boton-primario" (click)="confirmarAbrirTurno()" [disabled]="abriendoTurno()">
           @if (!abriendoTurno()) { <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> }
           {{ abriendoTurno() ? 'Abriendo…' : 'Abrir caja y comenzar' }}
@@ -85,11 +89,16 @@
         </p>
         <h1 class="inf-titulo">Punto de venta</h1>
       </div>
-      <button class="inf-boton" [class.activo]="mostrarHistorial()" (click)="toggleHistorial()">
-        <lucide-icon [img]="icons.historial" class="w-3.5 h-3.5"></lucide-icon>
-        Ventas de hoy
-        <span class="inf-ficha">{{ ventasHoy().length }}</span>
-      </button>
+      <div class="flex gap-2">
+        <button class="inf-boton" [class.activo]="teclado.visible()" (click)="teclado.alternar()">
+          <lucide-icon [img]="icons.teclado" class="w-3.5 h-3.5"></lucide-icon> Teclado
+        </button>
+        <button class="inf-boton" [class.activo]="mostrarHistorial()" (click)="toggleHistorial()">
+          <lucide-icon [img]="icons.historial" class="w-3.5 h-3.5"></lucide-icon>
+          Ventas de hoy
+          <span class="inf-ficha">{{ ventasHoy().length }}</span>
+        </button>
+      </div>
     </header>
 
     <div class="flex-1 min-h-0 grid lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)] gap-5">
@@ -221,7 +230,7 @@
         <div class="flex-1 overflow-y-auto">
           @for (item of carrito(); track item.id_producto; let i = $index) {
             @let linea = lineas().get(item.id_producto);
-            <div class="linea-carrito">
+            <div class="linea-carrito" [class.seleccionada]="teclado.visible() && item === lineaSel()" (click)="seleccionar(item)">
               <div class="min-w-0">
                 <p class="inf-tinta text-[length:calc(13.5px*var(--escala-texto))] font-medium truncate">{{ item.nombre_producto }}</p>
                 <p class="inf-sub mt-0!">{{ moneda() }} {{ cifra(item.precio_unitario) }} c/u</p>
@@ -236,7 +245,7 @@
                 <button type="button" (click)="fijarCantidad(item, item.cantidad - 1); enfocarBuscador()" [disabled]="item.cantidad <= 1" aria-label="Uno menos">
                   <lucide-icon [img]="icons.menos" class="w-3.5 h-3.5"></lucide-icon>
                 </button>
-                <input type="number" step="1" min="1" inputmode="numeric" [value]="item.cantidad" aria-label="Cantidad"
+                <input type="number" step="1" min="1" [attr.inputmode]="teclado.visible() ? 'none' : 'numeric'" [value]="item.cantidad" aria-label="Cantidad"
                        (focus)="$any($event.target).select()"
                        (change)="fijarCantidad(item, $any($event.target).value, $any($event.target))"
                        (keydown.enter)="volverAlBuscador($event)">
@@ -264,6 +273,11 @@
           }
         </div>
 
+        @if (teclado.visible() && lineaSel(); as sel) {
+          <div class="px-5 pt-4 separador flex-shrink-0">
+            <app-teclado-numerico [entrada]="entradaCantidad" [etiqueta]="sel.nombre_producto" [deshabilitado]="cobrando()" />
+          </div>
+        }
         <div class="p-5 separador flex-shrink-0">
           @if (cotizacion(); as c) {
             @if (c.descuento_promociones || c.descuento_manual) {
@@ -354,7 +368,8 @@
 <!-- ═══ COBRO ═══ -->
 @if (mostrarModalCobro()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModalCobro()">
-    <div class="inf-hoja ventana w-full max-w-md" (click)="$event.stopPropagation()">
+    <div class="inf-hoja ventana w-full max-h-[94vh] overflow-y-auto" [class.max-w-md]="!tecladoCobro()" [class.max-w-3xl]="tecladoCobro()"
+         (click)="$event.stopPropagation()">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Cobrar venta</h3>
         <button class="quitar" (click)="cerrarModalCobro()" aria-label="Cancelar">
@@ -362,6 +377,7 @@
         </button>
       </div>
 
+      <div class="cobro" [class.con-teclado]="tecladoCobro()">
       <div class="p-5 space-y-5">
         <div>
           <p class="inf-etiqueta">Total a cobrar</p>
@@ -389,7 +405,7 @@
             <p class="inf-etiqueta mb-2">Monto recibido <span class="inf-sutil font-normal">· opcional</span></p>
             <div class="campo-monto">
               <span>{{ moneda() }}</span>
-              <input #inputMonto type="number" inputmode="decimal" [(ngModel)]="montoPagado" placeholder="0.00"
+              <input #inputMonto type="number" [attr.inputmode]="teclado.visible() ? 'none' : 'decimal'" [(ngModel)]="montoPagado" placeholder="0.00"
                      (focus)="inputMonto.select()">
             </div>
             @if (pagado() > 0) {
@@ -409,6 +425,8 @@
             @if (ajustes.qrCobro()) { <img [src]="ajustes.qrCobro()" alt="QR de cobro" class="qr-cobro"> }
           </div>
         }
+      </div>
+      @if (tecladoCobro()) { <div class="cobro-teclado"><app-teclado-numerico [entrada]="entradaPago" [billetes]="billetes" [pantalla]="false" /></div> }
       </div>
 
       <div class="inf-pie-hoja flex justify-end gap-2">

@@ -1,0 +1,77 @@
+/* ─── Tablero numérico (usa los colores --i-* de la pantalla que lo contiene) ─── */
+:host { display: block; }
+
+.teclado { display: flex; flex-direction: column; gap: 6px; user-select: none; -webkit-user-select: none; }
+
+.pantalla {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--i-linea, #e2e8f0);
+  border-radius: 8px;
+  background: var(--i-fondo, #f8fafc);
+}
+.pantalla .etiqueta {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(12.5px * var(--escala-texto));
+  color: var(--i-tenue, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pantalla .valor {
+  font-size: calc(22px * var(--escala-texto));
+  font-weight: 600;
+  color: var(--i-tinta, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+.pantalla .limpiar {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  font-weight: 600;
+  color: var(--i-tenue, #64748b);
+}
+.pantalla .limpiar:active { background: var(--i-linea, #e2e8f0); }
+
+.billetes { display: grid; grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)); gap: 6px; }
+.billetes button {
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--i-acento, #2563eb) 35%, transparent);
+  background: var(--i-acento-suave, #eff6ff);
+  color: var(--i-acento, #2563eb);
+  font-size: calc(14px * var(--escala-texto));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.teclas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.teclas button {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--i-linea, #e2e8f0);
+  background: var(--i-papel, #fff);
+  color: var(--i-tinta, #0f172a);
+  font-size: calc(20px * var(--escala-texto));
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  touch-action: manipulation;
+  transition: background-color 80ms ease;
+}
+.teclas button.suave { background: var(--i-fondo, #f8fafc); color: var(--i-texto, #334155); }
+
+.teclas button:active:not(:disabled),
+.billetes button:active:not(:disabled) { background: var(--i-linea, #e2e8f0); }
+.billetes .limpiar { border-color: var(--i-linea, #e2e8f0); background: var(--i-fondo, #f8fafc); color: var(--i-texto, #334155); }
+.teclado button:disabled { opacity: 0.45; }
+
+@media (hover: hover) {
+  .teclas button:hover:not(:disabled) { border-color: var(--i-acento, #2563eb); }
+}

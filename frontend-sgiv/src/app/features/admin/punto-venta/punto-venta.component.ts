@@ -12,7 +12,7 @@ import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { TicketComponent } from '../../shared/ticket/ticket.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Search, X, ReceiptText, Trash2,
-         ShoppingCart, Banknote, QrCode, Printer, BadgePercent, Minus, Plus } from 'lucide-angular';
+         ShoppingCart, Banknote, QrCode, Printer, BadgePercent, Minus, Plus, Calculator } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../core/services/impresion.service';
 import { sondeo } from '../../../core/utils/sondeo';
@@ -23,11 +23,14 @@ import { SesionService } from '../../../core/services/sesion.service';
 import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria, mejorCoincidencia } from '../../../core/utils/categorias';
 import { enfocar, focoOcupado, FondoModalDirective, pantallaTactil } from '../../../core/directives/fondo-modal.directive';
+import { TecladoService } from '../../../core/services/teclado.service';
+import { TecladoNumericoComponent } from '../../shared/teclado-numerico/teclado-numerico.component';
+import { aplicarTecla, EntradaMonto, EntradaNumero } from '../../shared/teclado-numerico/entrada-numero';
 
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
-  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent, BarraCategoriasComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent, BarraCategoriasComponent, TecladoNumericoComponent],
   templateUrl: './punto-venta.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './punto-venta.component.css']
 })
@@ -64,7 +67,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     imprimir:    Printer,
     descuento:   BadgePercent,
     menos:       Minus,
-    mas:         Plus
+    mas:         Plus,
+    teclado:     Calculator
   };
 
   readonly cifra    = cifra;
@@ -82,6 +86,11 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly montoInicial      = signal<number | null>(null);
   readonly abriendoTurno     = signal(false);
   readonly errorTurno        = signal('');
+
+  // ─── Tablero numérico en pantalla ───
+  readonly teclado      = inject(TecladoService);
+  readonly entradaFondo = new EntradaMonto(this.montoInicial);
+  readonly billetes     = [10, 20, 50, 100, 200];
 
   // ─── Catálogo: stock del servidor; lo que está en el carrito se descuenta al mostrarlo ───
   private readonly catalogo = signal<any[]>([]);
@@ -119,6 +128,20 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── Carrito ───
   readonly carrito = signal<any[]>([]);
+
+  // El tablero cambia la cantidad de la línea elegida (la última agregada si no se tocó otra)
+  private readonly seleccionado = signal<number | null>(null);
+  readonly lineaSel = computed(() => this.carrito().find(i => i.id_producto === this.seleccionado()) ?? this.carrito().at(-1) ?? null);
+  private readonly edicion = signal<{ id: number; texto: string } | null>(null);
+  private reemplazarCantidad = true;
+  readonly entradaCantidad: EntradaNumero = {
+    decimales: false,
+    mostrado: computed(() => {
+      const item = this.lineaSel(), e = this.edicion();
+      return !item ? '' : e && e.id === item.id_producto ? e.texto : String(item.cantidad);
+    }),
+    tecla: (t) => this.teclaCantidad(t)
+  };
 
   readonly unidades = computed(() => this.carrito().reduce((s, i) => s + Number(i.cantidad), 0));
   readonly cobrando = signal(false);
@@ -185,6 +208,9 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly metodo = METODO_PAGO;
   readonly metodoPago  = signal<MetodoPago>(METODO_PAGO.efectivo);
   readonly montoPagado = signal<number | null>(null);
+  readonly entradaPago = new EntradaMonto(this.montoPagado);
+  /** Con el tablero visible, la ventana de cobro en efectivo va en dos columnas */
+  readonly tecladoCobro = computed(() => this.teclado.visible() && this.metodoPago() === METODO_PAGO.efectivo);
   /** Monto recibido como número (vacío = 0) */
   readonly pagado      = computed(() => Number(this.montoPagado()) || 0);
   @ViewChild('buscador') buscadorRef?: ElementRef<HTMLInputElement>;
@@ -455,9 +481,12 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     }
 
     const existe = this.carrito().find(i => i.id_producto === producto.id_producto);
-    if (existe) return this.fijarCantidad(existe, existe.cantidad + 1);
-    const { stock_actual, ...datos } = producto;
-    this.carrito.update(c => [...c, { ...datos, cantidad: 1, precio_unitario: precio, subtotal: precio }]);
+    if (existe) this.fijarCantidad(existe, existe.cantidad + 1);
+    else {
+      const { stock_actual, ...datos } = producto;
+      this.carrito.update(c => [...c, { ...datos, cantidad: 1, precio_unitario: precio, subtotal: precio }]);
+    }
+    this.seleccionar(producto);
   }
 
   /** Cantidad escrita o con −/+: entera, desde 1 y hasta el stock */
@@ -479,6 +508,30 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   quitarDelCarrito(index: number) {
     if (this.cobrando()) return;
     this.carrito.update(c => c.filter((_, i) => i !== index));
+    this.edicion.set(null);
+    this.reemplazarCantidad = true;
+  }
+
+  seleccionar(item: any) {
+    this.seleccionado.set(item.id_producto);
+    this.edicion.set(null);
+    this.reemplazarCantidad = true;
+  }
+
+  /** Tablero: la 1ª cifra reemplaza la cantidad; borrar con la cantidad vacía quita la línea */
+  private teclaCantidad(tecla: string) {
+    const item = this.lineaSel();
+    if (!item || this.cobrando()) return;
+    const actual = this.entradaCantidad.mostrado();
+    if (tecla === 'borrar' && actual === '') return this.quitarDelCarrito(this.carrito().indexOf(item));
+    const texto = aplicarTecla(actual, tecla, { decimales: false, reemplazar: this.reemplazarCantidad });
+    this.reemplazarCantidad = false;
+    this.edicion.set({ id: item.id_producto, texto });
+    if (Number(texto) >= 1) {
+      this.fijarCantidad(item, Number(texto));
+      const ahora = this.carrito().find(i => i.id_producto === item.id_producto)?.cantidad;
+      if (ahora !== Number(texto)) this.edicion.set({ id: item.id_producto, texto: String(ahora) });
+    }
   }
 
   /** Enter en la cantidad: vuelve al buscador */

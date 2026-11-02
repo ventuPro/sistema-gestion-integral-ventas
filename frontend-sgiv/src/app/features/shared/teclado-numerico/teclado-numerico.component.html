@@ -1,0 +1,37 @@
+<div class="teclado" (mousedown)="$event.preventDefault()">
+  @if (pantalla()) {
+    <div class="pantalla">
+      <span class="etiqueta">{{ etiqueta() }}</span>
+      <span class="valor">{{ entrada().mostrado() || '0' }}</span>
+      @if (entrada().decimales) {
+        <button type="button" class="limpiar" (click)="pulsar('limpiar')" [disabled]="deshabilitado()" aria-label="Borrar todo">C</button>
+      }
+    </div>
+  }
+
+  @if (billetes().length || (!pantalla() && entrada().decimales)) {
+    <div class="billetes">
+      @for (b of billetes(); track b) {
+        <button type="button" (click)="sumar(b)" [disabled]="deshabilitado()">+{{ b }}</button>
+      }
+      @if (!pantalla() && entrada().decimales) {
+        <button type="button" class="limpiar" (click)="pulsar('limpiar')" [disabled]="deshabilitado()" aria-label="Borrar todo">C</button>
+      }
+    </div>
+  }
+
+  <div class="teclas">
+    @for (d of digitos; track d) {
+      <button type="button" (click)="pulsar(d)" [disabled]="deshabilitado()">{{ d }}</button>
+    }
+    @if (entrada().decimales) {
+      <button type="button" (click)="pulsar('.')" [disabled]="deshabilitado()">.</button>
+    } @else {
+      <button type="button" class="suave" (click)="pulsar('limpiar')" [disabled]="deshabilitado()" aria-label="Borrar todo">C</button>
+    }
+    <button type="button" (click)="pulsar('0')" [disabled]="deshabilitado()">0</button>
+    <button type="button" class="suave" (click)="pulsar('borrar')" [disabled]="deshabilitado()" aria-label="Borrar">
+      <lucide-icon [img]="icons.borrar" class="w-5 h-5"></lucide-icon>
+    </button>
+  </div>
+</div>

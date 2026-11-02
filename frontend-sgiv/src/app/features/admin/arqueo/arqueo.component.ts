@@ -1,7 +1,10 @@
 import { Component, computed, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X, Printer, Banknote, QrCode, Wallet } from 'lucide-angular';
+import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X, Printer, Banknote, QrCode, Wallet, Calculator } from 'lucide-angular';
+import { TecladoService } from '../../../core/services/teclado.service';
+import { TecladoNumericoComponent } from '../../shared/teclado-numerico/teclado-numerico.component';
+import { EntradaMonto } from '../../shared/teclado-numerico/entrada-numero';
 import { METODO_PAGO } from '../../../core/utils/metodos-pago';
 import { CajaService } from '../../../core/services/caja.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
@@ -18,7 +21,7 @@ const DENOMINACIONES = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1];
 @Component({
   selector: 'app-arqueo',
   standalone: true,
-  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, TicketComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, TicketComponent, TecladoNumericoComponent],
   templateUrl: './arqueo.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './arqueo.component.css']
 })
@@ -31,7 +34,7 @@ export class ArqueoComponent implements OnInit {
   readonly moneda     = this.ajustes.moneda;
 
   readonly icons = { actualizar: RotateCw, abajo: ChevronDown, derecha: ChevronRight, cerrar: X, imprimir: Printer,
-                     efectivo: Banknote, qr: QrCode, total: Wallet };
+                     efectivo: Banknote, qr: QrCode, total: Wallet, teclado: Calculator };
   readonly cifra = cifra;
   readonly entero = entero;
   readonly hora = hora;
@@ -54,6 +57,9 @@ export class ArqueoComponent implements OnInit {
   readonly arqueo = signal<any>({ resumen: {}, ventas: [], turno_activo: null, turno_resumen: null });
 
   readonly efectivoContado = signal<number | null>(null);
+  readonly teclado         = inject(TecladoService);
+  readonly entradaContado  = new EntradaMonto(this.efectivoContado);
+  readonly billetes        = [10, 20, 50, 100, 200];
   readonly mostrarConteo   = signal(false);
   // Conteo por denominación: se reemplaza con set(); el template edita el objeto actual
   readonly conteo = signal<Record<number, number | null>>({});

@@ -9,7 +9,7 @@ import { TicketComponent } from '../../../shared/ticket/ticket.component';
 import { AjustesService } from '../../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../../core/services/impresion.service';
 import { cifra } from '../../../../core/utils/informe';
-import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent, Minus, Plus } from 'lucide-angular';
+import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent, Minus, Plus, Calculator } from 'lucide-angular';
 import { DialogoService } from '../../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
 import { Cotizacion, DescuentoManual, FormDescuento, PromocionService } from '../../../../core/services/promocion.service';
@@ -17,6 +17,9 @@ import { SesionService } from '../../../../core/services/sesion.service';
 import { BarraCategoriasComponent } from '../../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria, mejorCoincidencia } from '../../../../core/utils/categorias';
 import { enfocar, focoOcupado, FondoModalDirective, pantallaTactil } from '../../../../core/directives/fondo-modal.directive';
+import { TecladoService } from '../../../../core/services/teclado.service';
+import { TecladoNumericoComponent } from '../../../shared/teclado-numerico/teclado-numerico.component';
+import { aplicarTecla, EntradaMonto, EntradaNumero } from '../../../shared/teclado-numerico/entrada-numero';
 
 /** Consumo de una persona (por su celular) o lo cargado por el cajero (clave null) */
 export interface GrupoCuenta {
@@ -37,7 +40,7 @@ const totalPendiente = (items: any[]) =>
   selector: 'app-mesa-modal',
   standalone: true,
   imports: [FondoModalDirective, CommonModule, NgTemplateOutlet, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule,
-            BarraCategoriasComponent],
+            BarraCategoriasComponent, TecladoNumericoComponent],
   templateUrl: './mesa-modal.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css', './mesa-modal.component.css']
 })
@@ -59,7 +62,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly icons = {
     cerrar: X, buscar: Search, quitar: Trash2, carrito: ShoppingCart, efectivo: Banknote,
     qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User, descuento: BadgePercent,
-    menos: Minus, mas: Plus
+    menos: Minus, mas: Plus, teclado: Calculator
   };
 
   readonly esAdmin = this.sesion.esAdmin;
@@ -73,6 +76,10 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly metodo = METODO_PAGO;
   readonly metodoPago  = signal<MetodoPago>(METODO_PAGO.efectivo);
   readonly montoPagado = signal<number | null>(null);
+  readonly teclado     = inject(TecladoService);
+  readonly entradaPago = new EntradaMonto(this.montoPagado);
+  readonly tecladoCobro = computed(() => this.teclado.visible() && this.metodoPago() === METODO_PAGO.efectivo);
+  readonly billetes    = [10, 20, 50, 100, 200];
   /** Monto recibido como número (vacío = 0) */
   readonly pagado      = computed(() => Number(this.montoPagado()) || 0);
   @ViewChild('inputMontoMesa') inputMontoMesaRef?: ElementRef<HTMLInputElement>;
@@ -169,6 +176,24 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   /** Un cambio de cantidad a la vez */
   readonly guardandoCantidad = signal(false);
 
+  // ─── Tablero numérico: cantidad de la línea elegida (la última sin pagar si no se tocó otra) ───
+  private readonly seleccionado = signal<number | null>(null);
+  readonly lineaSel = computed(() => {
+    const editables = (this.cuentaActiva()?.items || []).filter((i: any) => !i.pagado && i.id_detalle_cuenta);
+    return editables.find((i: any) => i.id_detalle_cuenta === this.seleccionado()) ?? editables.at(-1) ?? null;
+  });
+  private readonly edicion = signal<{ id: number; texto: string } | null>(null);
+  private reemplazarCantidad = true;
+  private esperaTeclado: any;
+  readonly entradaCantidad: EntradaNumero = {
+    decimales: false,
+    mostrado: computed(() => {
+      const item = this.lineaSel(), e = this.edicion();
+      return !item ? '' : e && e.id === item.id_detalle_cuenta ? e.texto : String(item.cantidad);
+    }),
+    tecla: (t) => this.teclaCantidad(t)
+  };
+
   constructor() {
     effect(() => {
       const clave = this.claveCuenta();
@@ -230,6 +255,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     clearTimeout(this.esperaCotizacion);
     clearTimeout(this.esperaRecarga);
+    clearTimeout(this.esperaTeclado);
     this.subs.forEach(s => s.unsubscribe());
   }
 
@@ -376,6 +402,9 @@ export class MesaModalComponent implements OnInit, OnDestroy {
           return { ...c, items, total_acumulado: res.total ?? totalPendiente(items) };
         });
         this.fijarStock(Number(producto.id_producto), res.stock ?? stockDisponible - 1);
+        const linea = this.cuentaActiva()?.items?.find((x: any) =>
+          x.id_producto === producto.id_producto && x.origen === 'cajero' && !x.pagado && !x.cliente_mesa);
+        if (linea) this.seleccionar(linea);
         this.notaProducto.set('');
       },
       error: (e: any) => this.dialogo.error(e?.error?.error || 'No se pudo agregar el producto.')
@@ -420,6 +449,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
       },
       error: (e: any) => {
         this.guardandoCantidad.set(false);
+        this.edicion.set(null);
         if (campo) campo.value = String(item.cantidad);
         this.dialogo.error(e?.error?.error || 'No se pudo cambiar la cantidad.');
       }
@@ -434,6 +464,44 @@ export class MesaModalComponent implements OnInit, OnDestroy {
     }, { injector: this.injector });
   }
 
+  seleccionar(item: any) {
+    this.guardarTecladoYa();
+    this.seleccionado.set(item.id_detalle_cuenta);
+    this.edicion.set(null);
+    this.reemplazarCantidad = true;
+  }
+
+  /** Tablero: la 1ª cifra reemplaza la cantidad; se guarda al dejar de escribir; borrar con la cantidad vacía quita la línea */
+  private teclaCantidad(tecla: string) {
+    const item = this.lineaSel();
+    if (!item) return;
+    const actual = this.entradaCantidad.mostrado();
+    if (tecla === 'borrar' && actual === '') {
+      clearTimeout(this.esperaTeclado);
+      this.esperaTeclado = null;
+      this.edicion.set(null);
+      this.reemplazarCantidad = true;
+      return this.quitarProducto(item.id_detalle_cuenta);
+    }
+    const texto = aplicarTecla(actual, tecla, { decimales: false, reemplazar: this.reemplazarCantidad });
+    this.reemplazarCantidad = false;
+    this.edicion.set({ id: item.id_detalle_cuenta, texto });
+    clearTimeout(this.esperaTeclado);
+    this.esperaTeclado = Number(texto) >= 1 ? setTimeout(() => this.guardarTecladoYa(), 600) : null;
+  }
+
+  /** Guarda en el servidor la cantidad escrita con el tablero (antes de cobrar o de elegir otra línea) */
+  private guardarTecladoYa() {
+    if (!this.esperaTeclado) return;
+    clearTimeout(this.esperaTeclado);
+    this.esperaTeclado = null;
+    const e = this.edicion();
+    const item = e && (this.cuentaActiva()?.items || []).find((i: any) => i.id_detalle_cuenta === e.id);
+    if (!item || !(Number(e!.texto) >= 1)) return;
+    if (this.guardandoCantidad()) { this.esperaTeclado = setTimeout(() => this.guardarTecladoYa(), 300); return; }
+    this.fijarCantidad(item, Number(e!.texto));
+  }
+
   /** Enter en la cantidad: vuelve al buscador */
   volverAlBuscador(evento: Event) {
     evento.preventDefault();
@@ -443,6 +511,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   }
 
   irAPago(parte: GrupoCuenta | null = null) {
+    this.guardarTecladoYa();
     this.parteCobro.set(parte);
     this.cotizacionPago.set(null);
     this.descuento.set(null);
