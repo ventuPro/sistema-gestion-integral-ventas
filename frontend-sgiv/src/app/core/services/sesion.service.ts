@@ -7,6 +7,7 @@ export const ROL = { administrador: 1, cajero: 2 } as const;
 export interface UsuarioSesion {
   id_usuario:      number;
   nombre_completo: string;
+  correo_electronico?: string;
   id_rol:          number;
   id_sucursal:     number;
   nombre_sucursal: string;
@@ -38,6 +39,7 @@ export class SesionService {
     const usuario: UsuarioSesion = {
       id_usuario:      Number(u.id_usuario),
       nombre_completo: u.nombre_completo,
+      correo_electronico: u.correo_electronico,
       id_rol:          Number(u.id_rol),
       id_sucursal:     Number(u.id_sucursal),
       nombre_sucursal: u.nombre_sucursal

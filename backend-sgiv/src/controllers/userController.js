@@ -134,6 +134,7 @@ const loginUsuario = async (req, res) => {
             usuario: {
                 id_usuario:      u.id_usuario,
                 nombre_completo: u.nombre_completo,
+                correo_electronico: u.correo_electronico,
                 id_rol:          u.id_rol,
                 id_sucursal:     u.id_sucursal,
                 nombre_sucursal              // ← incluir aquí

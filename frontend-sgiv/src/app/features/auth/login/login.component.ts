@@ -40,12 +40,34 @@ export class LoginComponent implements OnInit, AfterViewInit {
   private route          = inject(ActivatedRoute);
   readonly ajustes       = inject(AjustesService);
 
+  /** Correo de la sesión que venció: se deja escrito para que vuelva a entrar la misma persona */
+  private correoAnterior = '';
+  private escribio = false;
+
   constructor() {
     // Redirigido por el interceptor: token vencido o usuario desactivado
     if (this.route.snapshot.queryParamMap.get('sesion') === 'expirada') {
-      this.mensajeError.set('Tu sesión terminó o tu usuario fue desactivado. Inicia sesión nuevamente.');
+      const antes = this.router.currentNavigation()?.extras.state as { nombre?: string; correo?: string } | undefined;
+      this.mensajeError.set(antes?.nombre
+        ? `La sesión de ${antes.nombre} terminó. Vuelve a ingresar con tu cuenta.`
+        : 'Tu sesión terminó o tu usuario fue desactivado. Inicia sesión nuevamente.');
+      if (antes?.correo) {
+        this.correoAnterior = antes.correo;
+        this.correo.set(antes.correo);
+        // Si el navegador rellena otra cuenta guardada, se vuelve a poner este correo
+        for (const ms of [300, 1000]) setTimeout(() => this.restaurarCorreo(), ms);
+      }
     }
   }
+
+  private restaurarCorreo() {
+    if (this.escribio || this.correo() === this.correoAnterior) return;
+    this.correo.set(this.correoAnterior);
+    this.contrasena.set('');
+  }
+
+  /** El usuario tocó el teclado: ya no se corrige el correo */
+  marcarEscritura() { this.escribio = true; }
 
   /** El servidor pidió CAPTCHA aunque la copia local de los ajustes dijera que no */
   private readonly forzarCaptcha = signal(false);
@@ -58,7 +80,10 @@ export class LoginComponent implements OnInit, AfterViewInit {
 
   ngOnInit() { if (this.usaCaptcha()) this.cargarCaptcha(); }
 
-  ngAfterViewInit() { if (!pantallaTactil()) enfocar(this.campoCorreo?.nativeElement); }
+  ngAfterViewInit() {
+    if (pantallaTactil()) return;
+    enfocar(this.correoAnterior ? document.getElementById('contrasena') : this.campoCorreo?.nativeElement);
+  }
 
   /** Enter pasa al siguiente campo vacío; con todo lleno, entra */
   siguienteCampo(evento: Event, formulario: HTMLElement) { pasarAlSiguienteVacio(evento, formulario); }
