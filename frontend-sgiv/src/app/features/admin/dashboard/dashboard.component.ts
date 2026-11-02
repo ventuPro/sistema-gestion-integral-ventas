@@ -5,7 +5,7 @@ import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
          Landmark, LogOut, Building2,
-         Settings, Menu, X, Bell, BadgePercent } from 'lucide-angular';
+         Settings, Menu, X, Bell, BadgePercent, ChevronsUpDown } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
@@ -63,6 +63,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   /** Menú lateral abierto (solo en celular y tablet) */
   readonly menuAbierto = signal(false);
+  /** Menú de la cuenta (abajo en la barra lateral) */
+  readonly menuCuenta = signal(false);
   readonly bandeja = viewChild(BandejaPedidosComponent);
   readonly secciones = computed(() => this.armarMenu());
 
@@ -82,7 +84,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     cerrar:     X,
     sucursal:   Building2,
     ajustes:    Settings,
-    promociones: BadgePercent
+    promociones: BadgePercent,
+    cuenta:     ChevronsUpDown
   };
 
   ngOnInit() {
@@ -189,7 +192,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   @HostListener('document:keydown.escape')
-  alPresionarEscape() { this.cerrarMenu(); }
+  alPresionarEscape() { this.cerrarMenu(); this.menuCuenta.set(false); }
 
   tiene(modulo: string): boolean {
     if (this.esAdmin()) return true;
@@ -206,6 +209,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   cerrarSesion() {
+    this.menuCuenta.set(false);
     this.authService.cerrarSesion(true);
     this.permisoService.limpiarPermisos();
     this.socketService.desconectar();

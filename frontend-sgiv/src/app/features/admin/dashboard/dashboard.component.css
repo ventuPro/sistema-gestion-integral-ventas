@@ -1,32 +1,3 @@
-/* ─── Colores (los mismos de Panel e Informes; siguen el color primario y el modo oscuro) ─── */
-:host {
-  --i-tinta: #0f172a;
-  --i-texto: #334155;
-  --i-tenue: #64748b;
-  --i-sutil: #94a3b8;
-  --i-linea: #e2e8f0;
-  --i-linea-suave: #f1f5f9;
-  --i-papel: #ffffff;
-  --i-fondo: #f8fafc;
-  --i-acento: var(--color-blue-600, #2563eb);
-  --i-acento-suave: color-mix(in oklab, var(--i-acento) 9%, transparent);
-  --i-baja: #b42318;
-  display: contents;
-}
-:host-context(html.tema-oscuro) {
-  --i-tinta: #f1f5f9;
-  --i-texto: #d5dde8;
-  --i-tenue: #94a3b8;
-  --i-sutil: #7b8aa0;
-  --i-linea: #2f3d52;
-  --i-linea-suave: #263449;
-  --i-papel: #1e293b;
-  --i-fondo: #172033;
-  --i-acento: color-mix(in oklab, var(--color-blue-500, #3b82f6) 80%, white);
-  --i-acento-suave: color-mix(in oklab, var(--i-acento) 14%, transparent);
-  --i-baja: #f87171;
-}
-
 /* ─── Barra lateral: fija en escritorio, menú deslizable en celular ─── */
 .lateral {
   position: fixed;
@@ -36,12 +7,9 @@
   max-width: 85vw;
   display: flex;
   flex-direction: column;
-  background: var(--i-papel);
-  border-right: 1px solid var(--i-linea);
-  color: var(--i-texto);
   transform: translateX(-100%);
   transition: transform 200ms ease;
-  box-shadow: 0 0 40px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
 }
 .lateral.abierta { transform: none; }
 
@@ -50,31 +18,32 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 22px 20px 18px;
+  padding: 20px 20px 18px;
+  border-bottom: 1px solid var(--color-gray-800, #1e2939);
 }
-.marca img { width: 46px; height: 46px; object-fit: contain; flex-shrink: 0; }
+.marca img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; border-radius: 8px; background: rgb(255 255 255 / 0.1); padding: 4px; }
 .marca .nombre {
   font-size: calc(17px * var(--escala-texto));
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.01em;
-  color: var(--i-tinta);
+  color: #fff;
   overflow-wrap: anywhere;
 }
 .marca .eslogan {
   margin-top: 2px;
   font-size: calc(12px * var(--escala-texto));
-  color: var(--i-tenue);
-  font-style: italic;
+  color: var(--color-blue-400, #60a5fa);
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.marca .cerrar { padding: 6px; border-radius: 6px; color: var(--i-tenue); }
-.marca .cerrar:hover { background: var(--i-linea-suave); color: var(--i-tinta); }
+.marca .cerrar { padding: 6px; border-radius: 6px; color: var(--color-gray-400, #99a1af); }
+.marca .cerrar:hover { background: var(--color-gray-800, #1e2939); color: #fff; }
 
 /* Enlaces */
-.navegacion { flex: 1; overflow-y: auto; padding: 4px 12px 16px; }
+.navegacion { flex: 1; overflow-y: auto; padding: 8px 12px 16px; }
 .grupo {
   display: flex;
   align-items: center;
@@ -82,10 +51,10 @@
   margin: 18px 8px 6px;
   font-size: calc(12px * var(--escala-texto));
   font-weight: 600;
-  color: var(--i-sutil);
+  color: var(--color-gray-500, #6a7282);
 }
 .grupo:first-child { margin-top: 6px; }
-.grupo::after { content: ''; flex: 1; height: 1px; background: var(--i-linea); }
+.grupo::after { content: ''; flex: 1; height: 1px; background: var(--color-gray-800, #1e2939); }
 
 .enlace {
   position: relative;
@@ -95,69 +64,81 @@
   gap: 12px;
   margin-top: 2px;
   padding: 9px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: calc(14px * var(--escala-texto));
   font-weight: 500;
-  color: var(--i-texto);
+  color: var(--color-gray-400, #99a1af);
   transition: background-color 120ms ease, color 120ms ease;
 }
-.enlace lucide-icon { color: var(--i-tenue); transition: color 120ms ease; }
-.enlace:hover { background: var(--i-linea-suave); color: var(--i-tinta); }
-.enlace:hover lucide-icon { color: var(--i-tinta); }
-.enlace.activo { background: var(--i-acento-suave); color: var(--i-tinta); font-weight: 600; }
-.enlace.activo lucide-icon { color: var(--i-acento); }
-.enlace.activo::before {
-  content: '';
-  position: absolute;
-  left: -12px;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--i-acento);
-}
-.enlace:focus-visible { outline: 2px solid var(--i-acento); outline-offset: -2px; }
+.enlace:hover { background: var(--color-gray-800, #1e2939); color: #fff; }
+.enlace.activo { background: var(--color-blue-600, #2563eb); color: #fff; font-weight: 600; }
+.enlace:focus-visible { outline: 2px solid var(--color-blue-400, #60a5fa); outline-offset: -2px; }
 
-.pedidos { margin-top: 14px; border: 1px solid var(--i-linea); }
-.pedidos.hay { border-color: #f59e0b; background: color-mix(in oklab, #f59e0b 12%, transparent); color: var(--i-tinta); font-weight: 600; }
-.pedidos.hay lucide-icon { color: #d97706; animation: latido 1.6s ease-in-out infinite; }
+.pedidos { margin-top: 14px; border: 1px solid var(--color-gray-800, #1e2939); }
+.pedidos.hay { border-color: rgb(245 158 11 / 0.5); background: rgb(245 158 11 / 0.15); color: #fcd34d; font-weight: 600; }
+.pedidos.hay:hover { background: rgb(245 158 11 / 0.25); }
+.pedidos.hay lucide-icon { animation: latido 1.6s ease-in-out infinite; }
 @keyframes latido { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .pedidos.hay lucide-icon { animation: none; } }
 
-/* Usuario y sesión */
-.pie { padding: 14px 20px 18px; border-top: 1px solid var(--i-linea); }
-.pie .usuario {
+/* Cuenta: el nombre abre un menú pequeño con «Cerrar sesión» */
+.pie { position: relative; padding: 10px 12px 14px; border-top: 1px solid var(--color-gray-800, #1e2939); }
+.cuenta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--color-gray-400, #99a1af);
+  transition: background-color 120ms ease;
+}
+.cuenta:hover, .cuenta.abierto { background: var(--color-gray-800, #1e2939); }
+.cuenta .usuario {
+  display: block;
   font-size: calc(14px * var(--escala-texto));
   font-weight: 600;
-  color: var(--i-tinta);
+  color: var(--color-gray-200, #e5e7eb);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.pie .sucursal {
+.cuenta .sucursal {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 2px;
-  font-size: calc(12.5px * var(--escala-texto));
-  color: var(--i-tenue);
+  gap: 5px;
+  margin-top: 1px;
+  font-size: calc(12px * var(--escala-texto));
+  color: var(--color-blue-400, #60a5fa);
 }
-.salir {
-  margin-top: 12px;
+.fuera-cuenta { position: fixed; inset: 0; z-index: 1; }
+.menu-cuenta {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(100% - 6px);
+  z-index: 2;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--color-gray-800, #1e2939);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  animation: subir 120ms ease;
+}
+@keyframes subir { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .menu-cuenta { animation: none; } }
+.opcion-salir {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--i-linea);
+  gap: 10px;
+  padding: 9px 10px;
   border-radius: 6px;
   font-size: calc(13.5px * var(--escala-texto));
   font-weight: 500;
-  color: var(--i-texto);
-  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+  color: #fca5a5;
 }
-.salir:hover { border-color: var(--i-baja); color: var(--i-baja); background: color-mix(in oklab, var(--i-baja) 6%, transparent); }
+.opcion-salir:hover, .opcion-salir:focus-visible { background: rgb(239 68 68 / 0.15); color: #fecaca; outline: none; }
 
 /* Barra superior (celular y tablet) */
 .barra-movil {
@@ -167,18 +148,15 @@
   height: 56px;
   padding: 0 12px;
   flex-shrink: 0;
-  background: var(--i-papel);
-  border-bottom: 1px solid var(--i-linea);
-  color: var(--i-tinta);
 }
-.boton-icono { padding: 8px; border-radius: 6px; color: var(--i-texto); }
-.boton-icono:hover { background: var(--i-linea-suave); }
+.boton-icono { padding: 8px; border-radius: 6px; }
+.boton-icono:hover { background: var(--color-gray-800, #1e2939); }
 
 .fondo-menu {
   position: fixed;
   inset: 0;
   z-index: 45;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.55);
   animation: aparecer 150ms ease;
 }
 @keyframes aparecer { from { opacity: 0; } }

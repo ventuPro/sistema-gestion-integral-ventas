@@ -1,10 +1,10 @@
-<div class="flex h-dvh font-sans" style="background: var(--i-fondo)">
+<div class="flex h-dvh bg-gray-50 font-sans">
 
   <!-- Fondo oscuro del menú en celular -->
   @if (menuAbierto()) { <div class="fondo-menu lg:hidden" (click)="cerrarMenu()"></div> }
 
   <!-- ═══ BARRA LATERAL ═══ -->
-  <aside class="lateral" [class.abierta]="menuAbierto()" aria-label="Menú principal">
+  <aside class="lateral bg-gray-900 text-white" [class.abierta]="menuAbierto()" aria-label="Menú principal">
 
     <div class="marca">
       @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="Logo"> }
@@ -40,14 +40,26 @@
       }
     </nav>
 
+    <!-- Cuenta: el nombre abre el menú con «Cerrar sesión» -->
     <div class="pie">
-      <p class="usuario">{{ usuario()?.nombre_completo }}</p>
-      <p class="sucursal">
-        <lucide-icon [img]="icons.sucursal" class="w-3.5 h-3.5 flex-shrink-0" [strokeWidth]="1.75"></lucide-icon> {{ nombreSucursal() }}
-      </p>
-      <button (click)="cerrarSesion()" class="salir">
-        <lucide-icon [img]="icons.logout" class="w-4 h-4 flex-shrink-0" [strokeWidth]="1.75"></lucide-icon>
-        Cerrar sesión
+      @if (menuCuenta()) {
+        <div class="fuera-cuenta" (click)="menuCuenta.set(false)"></div>
+        <div class="menu-cuenta" role="menu" (keydown.escape)="menuCuenta.set(false)">
+          <button role="menuitem" class="opcion-salir" (click)="cerrarSesion()">
+            <lucide-icon [img]="icons.logout" class="w-4 h-4 flex-shrink-0" [strokeWidth]="1.75"></lucide-icon>
+            Cerrar sesión
+          </button>
+        </div>
+      }
+      <button class="cuenta" [class.abierto]="menuCuenta()" (click)="menuCuenta.set(!menuCuenta())"
+              aria-haspopup="menu" [attr.aria-expanded]="menuCuenta()">
+        <span class="min-w-0 flex-1 text-left">
+          <span class="usuario">{{ usuario()?.nombre_completo }}</span>
+          <span class="sucursal">
+            <lucide-icon [img]="icons.sucursal" class="w-3.5 h-3.5 flex-shrink-0" [strokeWidth]="1.75"></lucide-icon> {{ nombreSucursal() }}
+          </span>
+        </span>
+        <lucide-icon [img]="icons.cuenta" class="w-4 h-4 flex-shrink-0 opacity-60"></lucide-icon>
       </button>
     </div>
   </aside>
@@ -68,7 +80,7 @@
   <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
 
     <!-- Barra superior (celular y tablet) -->
-    <header class="barra-movil">
+    <header class="barra-movil bg-gray-900 text-white">
       <button class="boton-icono" (click)="menuAbierto.set(true)" aria-label="Abrir menú" [attr.aria-expanded]="menuAbierto()">
         <lucide-icon [img]="icons.menu" class="w-5 h-5"></lucide-icon>
       </button>
@@ -88,7 +100,7 @@
       }
     </header>
 
-    <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+    <main class="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
       <router-outlet></router-outlet>
     </main>
   </div>
