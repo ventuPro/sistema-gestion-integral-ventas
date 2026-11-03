@@ -48,7 +48,7 @@
     </div>
 
     <div class="inf-pie-hoja flex flex-wrap justify-end gap-2">
-      <button class="inf-boton" (click)="imprimirTicket()" [disabled]="!totales().productos">
+      <button class="inf-boton" (click)="abrirTicket()" [disabled]="!totales().productos">
         <lucide-icon [img]="icons.ticket" class="w-4 h-4"></lucide-icon> Ticket
       </button>
       <button class="inf-boton" (click)="descargarExcel()" [disabled]="!totales().productos || ocupado()">
@@ -61,7 +61,8 @@
   </div>
 </div>
 
-<!-- Ticket fuera de la vista: solo se usa para imprimir -->
-<div #zonaTicket class="fuera-de-vista" aria-hidden="true">
-  <app-ticket-lista-dia [grupos]="grupos()" [sucursal]="nombreSucursal()" [fecha]="fechaTexto()" titulo="INVENTARIO" />
-</div>
+@if (verTicket()) {
+  <app-vista-ticket titulo="Inventario" [subtitulo]="nombreSucursal() + ' · ' + fechaTicket()" (cerrar)="verTicket.set(false)">
+    <app-ticket-lista-dia [grupos]="grupos()" [sucursal]="nombreSucursal()" [fecha]="fechaTicket()" titulo="INVENTARIO" />
+  </app-vista-ticket>
+}

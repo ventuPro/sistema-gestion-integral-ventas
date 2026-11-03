@@ -1,13 +1,12 @@
-import { Component, ElementRef, OnDestroy, OnInit, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { LucideAngularModule, X, Printer } from 'lucide-angular';
 import { InventarioService, IngresoDia } from '../../../../core/services/inventario.service';
 import { SocketService } from '../../../../core/services/socket.service';
-import { AjustesService } from '../../../../core/services/ajustes.service';
-import { ImpresionService } from '../../../../core/services/impresion.service';
-import { fechaLarga } from '../../../../core/utils/informe';
+import { fechaDia, fechaLarga } from '../../../../core/utils/informe';
 import { GrupoListaDia, TicketListaDiaComponent } from '../../../shared/ticket/ticket-lista-dia.component';
+import { VistaTicketComponent } from '../../../shared/ticket/vista-ticket.component';
 import { FondoModalDirective } from '../../../../core/directives/fondo-modal.directive';
 
 interface FilaProducto { id_producto: number; nombre_producto: string; cantidad: number; entradas: number; ultima: string }
@@ -19,15 +18,13 @@ const hoy = () => new Date().toLocaleDateString('en-CA');   // AAAA-MM-DD en hor
 @Component({
   selector: 'app-ingresos-dia',
   standalone: true,
-  imports: [FondoModalDirective, CommonModule, LucideAngularModule, TicketListaDiaComponent],
+  imports: [FondoModalDirective, CommonModule, LucideAngularModule, TicketListaDiaComponent, VistaTicketComponent],
   templateUrl: './ingresos-dia.component.html',
   styleUrls: ['../../../shared/informe/informe.css', './ingresos-dia.component.css']
 })
 export class IngresosDiaComponent implements OnInit, OnDestroy {
   private inventario = inject(InventarioService);
   private socket     = inject(SocketService);
-  private impresion  = inject(ImpresionService);
-  private ajustes    = inject(AjustesService);
 
   readonly idSucursal     = input.required<number>();
   readonly nombreSucursal = input('');
@@ -40,7 +37,7 @@ export class IngresosDiaComponent implements OnInit, OnDestroy {
   readonly vista    = signal<'productos' | 'detalle'>('productos');
   readonly ingresos = signal<IngresoDia[]>([]);
   readonly estado   = signal<'cargando' | 'listo' | 'error'>('cargando');
-  private zonaTicket = viewChild<ElementRef<HTMLElement>>('zonaTicket');
+  readonly verTicket = signal(false);
   private sub?: Subscription;
   private recarga?: ReturnType<typeof setTimeout>;
 
@@ -71,6 +68,7 @@ export class IngresosDiaComponent implements OnInit, OnDestroy {
     this.grupos().map(g => ({ categoria: g.categoria, items: g.productos })));
 
   readonly fechaTexto = computed(() => fechaLarga(this.fecha()));
+  readonly fechaTicket = computed(() => fechaDia(this.fecha()));
 
   ngOnInit() {
     this.cargar();
@@ -101,8 +99,7 @@ export class IngresosDiaComponent implements OnInit, OnDestroy {
     this.cargar();
   }
 
-  imprimirTicket() {
-    if (!this.totales().unidades) return;
-    requestAnimationFrame(() => this.impresion.imprimirTicket(this.zonaTicket()?.nativeElement, this.ajustes.config().ticket_ancho));
+  abrirTicket() {
+    if (this.totales().unidades) this.verTicket.set(true);
   }
 }

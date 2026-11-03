@@ -41,10 +41,15 @@ export function hora(f: string | Date): string {
     .format(typeof f === 'string' ? new Date(f) : f);
 }
 
+/** dd/mm/aaaa (el formato de los comprobantes) */
+export function fechaDia(f: string | Date): string {
+  const d = typeof f === 'string' ? fechaLocal(f) : f;
+  return new Intl.DateTimeFormat('es', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+}
+
 export function fechaHora(f: string): string {
   const d = new Date(f);
-  const dia = new Intl.DateTimeFormat('es', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
-  return `${dia} ${hora(d)}`;
+  return `${fechaDia(d)} ${hora(d)}`;
 }
 
 // ─── Colores de los gráficos: siguen Ajustes → Apariencia (color y modo oscuro) ───

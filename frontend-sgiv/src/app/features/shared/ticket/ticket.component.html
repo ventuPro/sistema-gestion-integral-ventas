@@ -1,12 +1,5 @@
 <div class="tk" [class]="'tk-' + ancho()">
-  <div class="tk-cabecera">
-    @if (ajustes.logo()) { <img class="tk-logo" [src]="ajustes.logo()" alt=""> }
-    <p class="tk-nombre">{{ c().nombre_comercial }}</p>
-    @if (c().razon_social) { <p class="tk-dato">{{ c().razon_social }}</p> }
-    @if (c().nit) { <p class="tk-dato">NIT: {{ c().nit }}</p> }
-    @if (c().direccion) { <p class="tk-dato">{{ c().direccion }}</p> }
-    @if (c().telefono || c().whatsapp) { <p class="tk-dato">Tel.: {{ c().telefono || c().whatsapp }}</p> }
-  </div>
+  <app-ticket-cabecera />
 
   <hr class="tk-linea">
   <div class="tk-fila"><span>Comprobante</span><span>#{{ datos().id_venta }}</span></div>

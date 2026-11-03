@@ -1,12 +1,12 @@
-import { Component, ElementRef, OnInit, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule, X, Printer, FileText, FileSpreadsheet, Check } from 'lucide-angular';
 import { ProductoService } from '../../../../core/services/producto.service';
 import { DialogoService } from '../../../../core/services/dialogo.service';
 import { AjustesService } from '../../../../core/services/ajustes.service';
-import { ImpresionService } from '../../../../core/services/impresion.service';
-import { fechaLarga, hora } from '../../../../core/utils/informe';
+import { fechaDia, fechaLarga, hora } from '../../../../core/utils/informe';
 import { GrupoListaDia, TicketListaDiaComponent } from '../../../shared/ticket/ticket-lista-dia.component';
+import { VistaTicketComponent } from '../../../shared/ticket/vista-ticket.component';
 import { FondoModalDirective } from '../../../../core/directives/fondo-modal.directive';
 import { SelectorSucursalComponent } from '../../../shared/selector-sucursal/selector-sucursal.component';
 
@@ -16,14 +16,13 @@ type FiltroStock = 'todos' | 'con' | 'sin' | 'bajo';
 @Component({
   selector: 'app-descarga-inventario',
   standalone: true,
-  imports: [FondoModalDirective, CommonModule, LucideAngularModule, TicketListaDiaComponent, SelectorSucursalComponent],
+  imports: [FondoModalDirective, CommonModule, LucideAngularModule, TicketListaDiaComponent, SelectorSucursalComponent, VistaTicketComponent],
   templateUrl: './descarga-inventario.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css', './descarga-inventario.component.css']
 })
 export class DescargaInventarioComponent implements OnInit {
   private productosApi = inject(ProductoService);
   private dialogo      = inject(DialogoService);
-  private impresion    = inject(ImpresionService);
   private ajustes      = inject(AjustesService);
 
   /** Sucursales que puede elegir (el cajero solo la suya) y la que está viendo en Inventario */
@@ -46,7 +45,7 @@ export class DescargaInventarioComponent implements OnInit {
   readonly elegidas   = signal<ReadonlySet<number>>(new Set());
   readonly ocupado    = signal(false);
   readonly generado   = signal(new Date());
-  private zonaTicket  = viewChild<ElementRef<HTMLElement>>('zonaTicket');
+  readonly verTicket  = signal(false);
 
   readonly nombreSucursal = computed(() =>
     this.sucursales().find(s => Number(s.id_sucursal) === this.idSucursal())?.nombre_sucursal ?? '');
@@ -93,6 +92,7 @@ export class DescargaInventarioComponent implements OnInit {
     { productos: 0, unidades: 0 }));
 
   readonly fechaTexto = computed(() => `${fechaLarga(this.generado())} ${hora(this.generado())}`);
+  readonly fechaTicket = computed(() => `${fechaDia(this.generado())} ${hora(this.generado())}`);
 
   ngOnInit() {
     this.idSucursal.set(this.idInicial());
@@ -135,10 +135,8 @@ export class DescargaInventarioComponent implements OnInit {
     this.elegidas.set(this.todas() ? new Set() : new Set(this.categorias().map(c => c.id)));
   }
 
-  imprimirTicket() {
-    if (!this.totales().productos) return;
-    // Espera a que se pinte el ticket con las categorías elegidas
-    requestAnimationFrame(() => this.impresion.imprimirTicket(this.zonaTicket()?.nativeElement, this.ajustes.config().ticket_ancho));
+  abrirTicket() {
+    if (this.totales().productos) this.verTicket.set(true);
   }
 
   private get nombreArchivo(): string {

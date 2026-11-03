@@ -3,20 +3,18 @@ import { AjustesService } from '../../../core/services/ajustes.service';
 import { Transferencia } from '../../../core/services/inventario.service';
 import { fechaHora } from '../../../core/utils/informe';
 import { ESTILOS_TICKET } from './ticket.estilos';
+import { TicketCabeceraComponent } from './ticket-cabecera.component';
 
 // ─── Comprobante de transferencia: viaja con la mercadería (se imprime con ImpresionService) ───
 @Component({
   selector: 'app-comprobante-transferencia',
   standalone: true,
   encapsulation: ViewEncapsulation.None,
+  imports: [TicketCabeceraComponent],
   styles: [ESTILOS_TICKET],
   template: `
     <div class="tk" [class]="'tk-' + ancho()">
-      <div class="tk-cabecera">
-        @if (ajustes.logo()) { <img class="tk-logo" [src]="ajustes.logo()" alt=""> }
-        <p class="tk-nombre">{{ ajustes.nombre() }}</p>
-        <p class="tk-dato">TRANSFERENCIA DE PRODUCTOS</p>
-      </div>
+      <app-ticket-cabecera titulo="TRANSFERENCIA DE PRODUCTOS" />
 
       <hr class="tk-linea">
       <div class="tk-fila"><span>Transferencia</span><span>#{{ t().id_transferencia }}</span></div>

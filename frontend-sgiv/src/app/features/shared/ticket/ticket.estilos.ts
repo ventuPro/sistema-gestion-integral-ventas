@@ -5,6 +5,9 @@ export const ESTILOS_TICKET = `
 .tk-80 { width: 80mm; padding: 4mm; font-size: 12px; }
 .tk-A4 { width: 120mm; padding: 10mm 8mm; font-size: 13px; }
 .tk-cabecera { text-align: center; }
+app-ticket-cabecera { display: block; }
+.tk-titulo { margin: 2mm 0 0; font-weight: 700; letter-spacing: 0.04em; }
+.tk-grupo { margin: 0 0 0.8mm; font-weight: 700; }
 .tk-logo { max-height: 14mm; max-width: 60%; margin: 0 auto 1.5mm; display: block; object-fit: contain; }
 .tk-nombre { font-size: 1.3em; font-weight: 700; margin: 0; }
 .tk-dato { margin: 0.4mm 0 0; font-size: 0.92em; }

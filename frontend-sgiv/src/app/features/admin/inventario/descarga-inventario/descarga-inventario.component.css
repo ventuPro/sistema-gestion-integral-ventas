@@ -23,4 +23,3 @@
 }
 .categoria.activa .casilla { background: var(--i-acento); border-color: var(--i-acento); }
 
-.fuera-de-vista { position: fixed; left: -10000px; top: 0; }

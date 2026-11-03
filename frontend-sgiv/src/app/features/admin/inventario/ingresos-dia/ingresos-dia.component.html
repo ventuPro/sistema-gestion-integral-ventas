@@ -83,7 +83,7 @@
     @if (estado() === 'listo' && ingresos().length) {
       <div class="inf-pie-hoja flex flex-wrap items-center justify-between gap-2">
         <span class="inf-tinta">{{ totales().productos }} producto(s) · {{ totales().unidades }} unidad(es)</span>
-        <button class="inf-boton" (click)="imprimirTicket()">
+        <button class="inf-boton" (click)="abrirTicket()">
           <lucide-icon [img]="icons.ticket" class="w-4 h-4"></lucide-icon> Ticket
         </button>
       </div>
@@ -91,7 +91,8 @@
   </div>
 </div>
 
-<!-- Ticket fuera de la vista: solo se usa para imprimir -->
-<div #zonaTicket class="fuera-de-vista" aria-hidden="true">
-  <app-ticket-lista-dia [grupos]="gruposTicket()" [sucursal]="nombreSucursal()" [fecha]="fecha()" titulo="INGRESOS DEL DÍA" />
-</div>
+@if (verTicket()) {
+  <app-vista-ticket titulo="Ingresos del día" [subtitulo]="nombreSucursal() + ' · ' + fechaTicket()" (cerrar)="verTicket.set(false)">
+    <app-ticket-lista-dia [grupos]="gruposTicket()" [sucursal]="nombreSucursal()" [fecha]="fechaTicket()" titulo="INGRESOS DEL DÍA" />
+  </app-vista-ticket>
+}
