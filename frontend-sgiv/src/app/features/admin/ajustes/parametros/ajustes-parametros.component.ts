@@ -157,7 +157,7 @@ export class AjustesParametrosComponent implements OnInit {
 
   guardar() {
     const fuera = [...this.camposMenu, ...this.camposSeguridad,
-                   { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo por defecto', min: 0, max: 10000 } as CampoNumero]
+                   { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo', min: 0, max: 10000 } as CampoNumero]
       .find(c => { const n = Number(this.p()[c.clave]); return !Number.isInteger(n) || n < c.min || n > c.max; });
     if (fuera) return this.dialogo.error(`${fuera.etiqueta}: debe ser un número entero entre ${fuera.min} y ${fuera.max}.`);
     if (!this.p().moneda_simbolo.trim()) return this.dialogo.error('El símbolo de moneda es obligatorio.');

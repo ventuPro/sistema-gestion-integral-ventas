@@ -66,17 +66,33 @@ const motivoMetodoPago = async (metodo) => {
     return p[h.campo] ? null : h.motivo;
 };
 
-// Solo se actualizan columnas de la lista permitida
+// Solo se actualizan columnas de la lista permitida.
+// El stock mínimo se aplica a todos los productos de todas las sucursales (no hay mínimo por producto).
 const actualizar = async (datos, permitidos) => {
     const campos = Object.keys(datos).filter(k => permitidos.includes(k));
     if (!campos.length) return obtener();
     const sets = campos.map((k, i) => `${k} = $${i + 1}`).join(', ');
-    const r = await db.query(
-        `UPDATE configuracion SET ${sets}, fecha_actualizacion = CURRENT_TIMESTAMP
-         WHERE id_configuracion = 1 RETURNING *`,
-        campos.map(k => datos[k]));
-    limpiarCache();
-    return r.rows[0];
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const r = await client.query(
+            `UPDATE configuracion SET ${sets}, fecha_actualizacion = CURRENT_TIMESTAMP
+             WHERE id_configuracion = 1 RETURNING *`,
+            campos.map(k => datos[k]));
+        if (campos.includes('stock_minimo_defecto')) {
+            await client.query(
+                `UPDATE inventario_sucursal SET stock_minimo_alerta = $1 WHERE stock_minimo_alerta IS DISTINCT FROM $1`,
+                [datos.stock_minimo_defecto]);
+        }
+        await client.query('COMMIT');
+        return r.rows[0];
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+        limpiarCache();
+    }
 };
 
 module.exports = {
