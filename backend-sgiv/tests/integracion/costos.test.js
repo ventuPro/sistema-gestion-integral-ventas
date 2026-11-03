@@ -133,6 +133,30 @@ describe('Costos de producción', () => {
         cerca(ultimo.por_unidad, Math.round(46.9826 / 20 * 10000) / 10000);
     });
 
+    test('vinculada a un producto muestra precio de venta, ganancia y margen; un producto tiene una sola receta', async () => {
+        const [{ id_producto }] = await bd.sql(`
+            INSERT INTO producto (id_categoria, nombre_producto, precio_unitario)
+            VALUES ((SELECT min(id_categoria) FROM categoria_producto), 'CROISSANT SIMPLE', 4) RETURNING id_producto`);
+        const receta = (await api('GET', `/costos/recetas/${id_receta}`, { token: tAdmin })).body;
+        const cuerpo = (extra) => ({ nombre: receta.nombre, rendimiento: receta.rendimiento, ...extra,
+            ingredientes: receta.ingredientes.map(x => ({ id_insumo: x.id_insumo, cantidad: x.cantidad, id_unidad: x.id_unidad })) });
+        assert.equal((await api('PUT', `/costos/recetas/${id_receta}`, { token: tAdmin, body: cuerpo({ id_producto }) })).status, 200);
+
+        const fila = (await api('GET', '/costos/recetas', { token: tAdmin })).body.find(r => r.id_receta === id_receta);
+        assert.equal(fila.nombre_producto, 'CROISSANT SIMPLE');
+        assert.equal(fila.precio_venta, 4);
+        const porUnidad = Math.round(46.9826 / 20 * 10000) / 10000;          // 2,3491
+        cerca(fila.ganancia, 4 - porUnidad);
+        assert.equal(fila.margen, Math.round((4 - porUnidad) * 100 / 4 * 10) / 10);
+
+        const otra = await api('POST', '/costos/recetas', { token: tAdmin, body: { nombre: 'Otra', rendimiento: 1, id_producto,
+            ingredientes: [{ id_insumo: leche, cantidad: 1, id_unidad: U.l }] } });
+        assert.equal(otra.status, 409);
+        assert.equal(otra.body.error, 'Ese producto ya tiene otra receta');
+        const prods = (await api('GET', '/costos/productos', { token: tAdmin })).body;
+        assert.equal(prods.find(p => p.id_producto === id_producto).id_receta, id_receta);
+    });
+
     test('un insumo usado no se elimina; la receta sí', async () => {
         const r = await api('DELETE', `/costos/insumos/${harina}`, { token: tAdmin });
         assert.equal(r.status, 409);

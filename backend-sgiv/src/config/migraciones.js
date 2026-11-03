@@ -240,23 +240,6 @@ const MIGRACIONES = [
         ADD COLUMN IF NOT EXISTS cerrado_por VARCHAR(15) CHECK (cerrado_por IN ('Cajero', 'Administrador', 'Sistema'));
     CREATE INDEX IF NOT EXISTS idx_turno_estado_apertura ON turno_caja (estado_turno, fecha_hora_apertura);`,
 
-    // Foto del stock de cada sucursal al terminar el día (lista de productos que quedaron)
-    `CREATE TABLE IF NOT EXISTS foto_stock (
-        id_foto         SERIAL PRIMARY KEY,
-        id_sucursal     INT NOT NULL REFERENCES sucursal(id_sucursal),
-        fecha           DATE NOT NULL,
-        fecha_toma      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        desbloqueada_por INT REFERENCES usuario(id_usuario),
-        fecha_desbloqueo TIMESTAMPTZ,
-        UNIQUE (id_sucursal, fecha)
-    );
-    CREATE TABLE IF NOT EXISTS detalle_foto_stock (
-        id_foto     INT NOT NULL REFERENCES foto_stock(id_foto),
-        id_producto INT NOT NULL REFERENCES producto(id_producto),
-        cantidad    INT NOT NULL,
-        PRIMARY KEY (id_foto, id_producto)
-    );`,
-
     // Reimpresión de comprobantes: mesa y cliente de una venta
     `CREATE INDEX IF NOT EXISTS idx_detalle_cuenta_venta ON detalle_cuenta (id_venta);`,
 
@@ -341,7 +324,79 @@ CREATE TABLE IF NOT EXISTS historial_inversion_receta (
     id_usuario   INT REFERENCES usuario(id_usuario),
     fecha        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion_receta (id_receta, fecha);`
+CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion_receta (id_receta, fecha);`,
+
+    // Receta ↔ producto del Inventario (para ver precio de venta y ganancia); un producto, una receta
+    `ALTER TABLE receta ADD COLUMN IF NOT EXISTS id_producto INT REFERENCES producto(id_producto) ON DELETE SET NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_receta_producto ON receta (id_producto) WHERE id_producto IS NOT NULL;`,
+    // ─── Normalización (2026-11-02) ───
+    // 1) Fuera lo que no se usa: notificaciones y clientes nunca usados, foto del stock (lista del día retirada),
+    //    nivel de permiso del rol y los enlaces de venta a cliente / pedido QR.
+    `DROP TABLE IF EXISTS notificacion_admin, detalle_foto_stock, foto_stock CASCADE;
+    ALTER TABLE venta_caja DROP COLUMN IF EXISTS id_cliente, DROP COLUMN IF EXISTS id_pedido_mesa;
+    DROP TABLE IF EXISTS cliente CASCADE;
+    ALTER TABLE rol_usuario DROP COLUMN IF EXISTS nivel_permiso;`,
+
+    // 2) Reglas: claves que nunca van vacías y valores permitidos. Si una BD vieja no cumple, se avisa y arranca igual.
+    `DO $$
+    DECLARE r RECORD;
+    BEGIN
+        FOR r IN SELECT * FROM (VALUES
+            ('inventario_sucursal', 'id_sucursal'), ('inventario_sucursal', 'id_producto'),
+            ('historial_inventario', 'id_inventario'), ('detalle_venta', 'id_venta'), ('detalle_venta', 'id_producto'),
+            ('venta_caja', 'id_sucursal'), ('venta_caja', 'id_usuario_cajero'), ('venta_caja', 'id_turno'),
+            ('turno_caja', 'id_sucursal'), ('turno_caja', 'id_usuario_cajero'), ('turno_caja', 'estado_turno'),
+            ('detalle_cuenta', 'id_cuenta'), ('detalle_cuenta', 'id_producto'), ('cuenta_mesa', 'id_mesa'), ('cuenta_mesa', 'estado'),
+            ('detalle_pedido', 'id_pedido'), ('detalle_pedido', 'id_producto'), ('mesa_local', 'id_sucursal'),
+            ('mesa_local', 'estado_mesa'), ('permiso_usuario', 'id_usuario')) AS c(tabla, columna)
+        LOOP
+            BEGIN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET NOT NULL', r.tabla, r.columna);
+            EXCEPTION WHEN not_null_violation THEN
+                RAISE WARNING 'Hay filas sin %.%: queda sin NOT NULL', r.tabla, r.columna;
+            END;
+        END LOOP;
+        FOR r IN SELECT * FROM (VALUES
+            ('venta_caja', 'venta_caja_metodo_pago_check', 'metodo_pago IN (''Efectivo'', ''QR'')'),
+            ('cuenta_mesa', 'cuenta_mesa_estado_check', 'estado IN (''Abierta'', ''Pagada'', ''Cancelada'')'),
+            ('turno_caja', 'turno_caja_estado_check', 'estado_turno IN (''Abierto'', ''Cerrado'')'),
+            ('mesa_local', 'mesa_local_estado_check', 'estado_mesa IN (''Libre'', ''Ocupada'')'),
+            ('historial_inventario', 'historial_inventario_tipo_check', 'tipo_movimiento IN (''INGRESO'', ''SALIDA'')'))
+            AS c(tabla, nombre, regla)
+        LOOP
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = r.nombre) THEN
+                EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I CHECK (%s) NOT VALID', r.tabla, r.nombre, r.regla);
+            END IF;
+            BEGIN
+                EXECUTE format('ALTER TABLE %I VALIDATE CONSTRAINT %I', r.tabla, r.nombre);
+            EXCEPTION WHEN check_violation THEN
+                RAISE WARNING 'Hay filas que no cumplen %: solo se aplica a los cambios nuevos', r.nombre;
+            END;
+        END LOOP;
+    END $$;`,
+
+    // 3) Calculados por la base de datos (nunca quedan mal): subtotales y diferencia del arqueo
+    `DO $$ BEGIN
+        IF (SELECT is_generated FROM information_schema.columns WHERE table_name = 'detalle_cuenta' AND column_name = 'subtotal') = 'NEVER' THEN
+            ALTER TABLE detalle_cuenta DROP COLUMN subtotal;
+            ALTER TABLE detalle_cuenta ADD COLUMN subtotal NUMERIC(10, 2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED;
+        END IF;
+        IF (SELECT is_generated FROM information_schema.columns WHERE table_name = 'detalle_pedido' AND column_name = 'subtotal_detalle') = 'NEVER' THEN
+            ALTER TABLE detalle_pedido DROP COLUMN subtotal_detalle;
+            ALTER TABLE detalle_pedido ADD COLUMN subtotal_detalle NUMERIC(10, 2) GENERATED ALWAYS AS (cantidad_solicitada * precio_aplicado) STORED;
+        END IF;
+        IF (SELECT is_generated FROM information_schema.columns WHERE table_name = 'turno_caja' AND column_name = 'diferencia') = 'NEVER' THEN
+            ALTER TABLE turno_caja DROP COLUMN diferencia;
+            ALTER TABLE turno_caja ADD COLUMN diferencia NUMERIC(10, 2) GENERATED ALWAYS AS (monto_real_declarado - monto_calculado) STORED;
+        END IF;
+    END $$;`,
+
+    // 4) Sin datos duplicados: caja abierta = tiene turno abierto; stock mínimo = el de Ajustes;
+    //    total por cobrar de la cuenta y monto del pedido = suma de su detalle; el método de pago está en cada venta
+    `ALTER TABLE usuario DROP COLUMN IF EXISTS caja_habilitada;
+    ALTER TABLE inventario_sucursal DROP COLUMN IF EXISTS stock_minimo_alerta;
+    ALTER TABLE cuenta_mesa DROP COLUMN IF EXISTS total_acumulado, DROP COLUMN IF EXISTS metodo_pago;
+    ALTER TABLE pedido_mesa DROP COLUMN IF EXISTS monto_total;`
 ];
 
 const aplicarMigraciones = async () => {

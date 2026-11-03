@@ -334,7 +334,7 @@ describe('Menú QR: confirmar, entregar y cobrar', () => {
         // 3. El cliente pide más: se suma a la misma cuenta
         const p2 = await pedir(mesa.codigo_qr, [{ id_producto: cafe, cantidad: 3 }], { cliente_mesa: celular });
         await api('POST', `/pedidos/${p2.body.id_pedido}/confirmar`, { token: tCajero });
-        const [cuenta] = await bd.sql(`SELECT * FROM cuenta_mesa WHERE id_cuenta = $1`, [id_cuenta]);
+        const [cuenta] = await bd.sql(`SELECT SUM(subtotal) AS total_acumulado FROM detalle_cuenta WHERE id_cuenta = $1 AND id_venta IS NULL`, [id_cuenta]);
         assert.equal(Number(cuenta.total_acumulado), 55);
         assert.equal((await bd.sql(`SELECT 1 FROM cuenta_mesa WHERE id_mesa = $1 AND estado = 'Abierta'`, [mesa.id_mesa])).length, 1);
 
@@ -421,9 +421,10 @@ describe('Menú QR: confirmar, entregar y cobrar', () => {
         assert.equal(cobroBeto.body.cuenta_cerrada, true);
         assert.equal((await estadoPedido(pb.body.id_pedido)).estado_pedido, 'Pagado');
 
-        const [cerrada] = await bd.sql(`SELECT estado, total_acumulado FROM cuenta_mesa WHERE id_cuenta = $1`, [id_cuenta]);
+        const [cerrada] = await bd.sql(`SELECT estado, (SELECT SUM(subtotal) FROM detalle_cuenta WHERE id_cuenta = $1) AS consumido
+                                        FROM cuenta_mesa WHERE id_cuenta = $1`, [id_cuenta]);
         assert.equal(cerrada.estado, 'Pagada');
-        assert.equal(Number(cerrada.total_acumulado), 35);
+        assert.equal(Number(cerrada.consumido), 35);
         const [m] = await bd.sql(`SELECT estado_mesa FROM mesa_local WHERE id_mesa = $1`, [mesaGrupo.id_mesa]);
         assert.equal(m.estado_mesa, 'Libre');
         const ventas = await bd.sql(`SELECT SUM(monto_total_venta)::float8 AS t, COUNT(*)::int AS n FROM venta_caja

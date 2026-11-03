@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, Observable } from 'rxjs';
 import { LucideAngularModule, Plus, Search, X, Pencil, Trash2, History } from 'lucide-angular';
-import { CostoService, Insumo, Receta, TipoUnidad, Unidad } from '../../../core/services/costo.service';
+import { CostoService, Insumo, ProductoVenta, Receta, TipoUnidad, Unidad } from '../../../core/services/costo.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
@@ -11,7 +11,7 @@ import { cifra, fechaHora } from '../../../core/utils/informe';
 
 interface FormInsumo { id_insumo: number | null; nombre: string; cantidad_compra: number | null; id_unidad_compra: number | null; precio_compra: number | null }
 interface Fila { id_insumo: number | null; cantidad: number | null; id_unidad: number | null }
-interface FormReceta { id_receta: number | null; nombre: string; rendimiento: number | null; filas: Fila[] }
+interface FormReceta { id_receta: number | null; nombre: string; rendimiento: number | null; id_producto: number | null; filas: Fila[] }
 
 const BASE: Record<TipoUnidad, string> = { PESO: 'g', VOLUMEN: 'ml', CANTIDAD: 'u' };
 
@@ -38,6 +38,7 @@ export class CostosComponent implements OnInit {
   readonly unidades  = signal<Unidad[]>([]);
   readonly insumos   = signal<Insumo[]>([]);
   readonly recetas   = signal<Receta[]>([]);
+  readonly productos = signal<ProductoVenta[]>([]);
 
   private readonly filtrar = <T extends { nombre: string }>(lista: T[]) => {
     const q = this.busqueda().trim().toLowerCase();
@@ -50,15 +51,17 @@ export class CostosComponent implements OnInit {
   private readonly insumoPorId = computed(() => new Map(this.insumos().map(i => [i.id_insumo, i])));
 
   ngOnInit() {
-    forkJoin({ u: this.costos.unidades(), i: this.costos.insumos(), r: this.costos.recetas() }).subscribe({
-      next: ({ u, i, r }) => { this.unidades.set(u); this.insumos.set(i); this.recetas.set(r); this.cargando.set(false); },
+    forkJoin({ u: this.costos.unidades(), i: this.costos.insumos(), r: this.costos.recetas(), p: this.costos.productos() }).subscribe({
+      next: ({ u, i, r, p }) => {
+        this.unidades.set(u); this.insumos.set(i); this.recetas.set(r); this.productos.set(p); this.cargando.set(false);
+      },
       error: () => { this.cargando.set(false); this.dialogo.error('No se pudo cargar Costos.'); }
     });
   }
 
   private recargar() {
-    forkJoin({ i: this.costos.insumos(), r: this.costos.recetas() })
-      .subscribe(({ i, r }) => { this.insumos.set(i); this.recetas.set(r); });
+    forkJoin({ i: this.costos.insumos(), r: this.costos.recetas(), p: this.costos.productos() })
+      .subscribe(({ i, r, p }) => { this.insumos.set(i); this.recetas.set(r); this.productos.set(p); });
   }
 
   cambiarVista(v: 'insumos' | 'recetas') { this.vista.set(v); this.busqueda.set(''); }
@@ -155,7 +158,10 @@ export class CostosComponent implements OnInit {
       return ins && u && Number(x.cantidad) > 0 && u.tipo === ins.tipo ? Number(x.cantidad) * u.factor_base * ins.costo_base : null;
     });
     const total = costos.reduce<number>((s, c) => s + (c ?? 0), 0);
-    return { costos, total, porUnidad: Number(f.rendimiento) > 0 ? total / Number(f.rendimiento) : null };
+    const porUnidad = Number(f.rendimiento) > 0 ? total / Number(f.rendimiento) : null;
+    const precio = f.id_producto ? this.productos().find(p => p.id_producto === f.id_producto)?.precio_venta ?? null : null;
+    const ganancia = precio != null && porUnidad != null ? precio - porUnidad : null;
+    return { costos, total, porUnidad, precio, ganancia, margen: ganancia != null && precio ? ganancia * 100 / precio : null };
   });
 
   tipoDeFila(x: Fila): TipoUnidad | undefined {
@@ -164,14 +170,15 @@ export class CostosComponent implements OnInit {
 
   nuevaReceta() {
     this.errorReceta.set('');
-    this.formReceta.set({ id_receta: null, nombre: '', rendimiento: null, filas: [{ id_insumo: null, cantidad: null, id_unidad: null }] });
+    this.formReceta.set({ id_receta: null, nombre: '', rendimiento: null, id_producto: null,
+                          filas: [{ id_insumo: null, cantidad: null, id_unidad: null }] });
   }
 
   editarReceta(r: Receta) {
     this.costos.receta(r.id_receta).subscribe({
       next: (d) => {
         this.errorReceta.set('');
-        this.formReceta.set({ id_receta: d.id_receta, nombre: d.nombre, rendimiento: d.rendimiento,
+        this.formReceta.set({ id_receta: d.id_receta, nombre: d.nombre, rendimiento: d.rendimiento, id_producto: d.id_producto,
           filas: d.ingredientes.map(x => ({ id_insumo: x.id_insumo, cantidad: x.cantidad, id_unidad: x.id_unidad })) });
       },
       error: () => this.dialogo.error('No se pudo abrir la receta.')
@@ -200,8 +207,13 @@ export class CostosComponent implements OnInit {
     this.formReceta.update(f => f && { ...f, filas: f.filas.map((x, k) => k === i ? { ...x, [campo]: valor === '' || valor == null ? null : Number(valor) } : x) });
   }
 
-  cambiarDato(campo: 'nombre' | 'rendimiento', valor: any) {
+  cambiarDato(campo: 'nombre' | 'rendimiento' | 'id_producto', valor: any) {
     this.formReceta.update(f => f && { ...f, [campo]: campo === 'nombre' ? valor : (valor === '' || valor == null ? null : Number(valor)) });
+  }
+
+  /** Productos libres o el de esta receta (un producto tiene una sola receta) */
+  productosParaReceta(id_receta: number | null) {
+    return this.productos().filter(p => !p.id_receta || p.id_receta === id_receta);
   }
 
   guardarReceta() {
@@ -214,7 +226,7 @@ export class CostosComponent implements OnInit {
     if (filas.some(x => !(Number(x.cantidad) > 0) || !x.id_unidad)) return this.errorReceta.set('Completa la cantidad de cada insumo.');
     this.guardando.set(true);
     this.costos.guardarReceta(f.id_receta, {
-      nombre: f.nombre, rendimiento: Number(f.rendimiento),
+      nombre: f.nombre, rendimiento: Number(f.rendimiento), id_producto: f.id_producto,
       ingredientes: filas.map(x => ({ id_insumo: Number(x.id_insumo), cantidad: Number(x.cantidad), id_unidad: Number(x.id_unidad) }))
     }).subscribe({
       next: () => {

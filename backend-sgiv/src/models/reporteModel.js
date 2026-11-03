@@ -89,7 +89,7 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
         `, p),
         filas(`
             SELECT COUNT(*)::int AS total, COUNT(c.id_cuenta)::int AS ocupadas,
-                   ROUND(COALESCE(SUM(c.total_acumulado), 0), 2)::float8 AS por_cobrar
+                   ROUND(COALESCE(SUM((SELECT SUM(dc.subtotal) FROM detalle_cuenta dc WHERE dc.id_cuenta = c.id_cuenta AND dc.id_venta IS NULL)), 0), 2)::float8 AS por_cobrar
             FROM mesa_local m
             LEFT JOIN cuenta_mesa c ON c.id_mesa = m.id_mesa AND c.estado = 'Abierta'
             WHERE ${deSucursal('m.id_sucursal')}
@@ -105,18 +105,18 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
         filas(`
             SELECT COUNT(*)::int AS productos,
                    COUNT(*) FILTER (WHERE i.cantidad_actual <= 0)::int AS agotados,
-                   COUNT(*) FILTER (WHERE i.cantidad_actual > 0 AND i.cantidad_actual <= i.stock_minimo_alerta)::int AS bajos
+                   COUNT(*) FILTER (WHERE i.cantidad_actual > 0 AND i.cantidad_actual <= (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1))::int AS bajos
             FROM inventario_sucursal i
             JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo
             WHERE ${deSucursal('i.id_sucursal')}
         `, p).then(r => r[0]),
         filas(`
-            SELECT p.nombre_producto, s.nombre_sucursal, i.cantidad_actual, i.stock_minimo_alerta
+            SELECT p.nombre_producto, s.nombre_sucursal, i.cantidad_actual, (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1) AS stock_minimo_alerta
             FROM inventario_sucursal i
             JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo
             JOIN sucursal s ON s.id_sucursal = i.id_sucursal
-            WHERE ${deSucursal('i.id_sucursal')} AND i.cantidad_actual <= i.stock_minimo_alerta
-            ORDER BY (i.cantidad_actual > 0), i.cantidad_actual::numeric / GREATEST(i.stock_minimo_alerta, 1)
+            WHERE ${deSucursal('i.id_sucursal')} AND i.cantidad_actual <= (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1)
+            ORDER BY (i.cantidad_actual > 0), i.cantidad_actual::numeric / GREATEST((SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1), 1)
             LIMIT 8
         `, p),
         filas(`
@@ -321,7 +321,7 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
                    COALESCE(SUM(GREATEST(i.cantidad_actual, 0)), 0)::int AS unidades,
                    ROUND(COALESCE(SUM(GREATEST(i.cantidad_actual, 0) * p.precio_unitario), 0), 2)::float8 AS valor_venta,
                    COUNT(*) FILTER (WHERE i.cantidad_actual <= 0)::int AS agotados,
-                   COUNT(*) FILTER (WHERE i.cantidad_actual > 0 AND i.cantidad_actual <= i.stock_minimo_alerta)::int AS bajos
+                   COUNT(*) FILTER (WHERE i.cantidad_actual > 0 AND i.cantidad_actual <= (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1))::int AS bajos
             FROM inventario_sucursal i
             JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo
             WHERE ${deSucursal('i.id_sucursal')}
@@ -330,7 +330,7 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
             SELECT COUNT(*)::int AS total,
                    COUNT(*) FILTER (WHERE pm.estado_pedido IN ('Confirmado', 'Entregado', 'Pagado'))::int AS atendidos,
                    COUNT(*) FILTER (WHERE pm.estado_pedido = 'Cancelado')::int AS cancelados,
-                   ROUND(COALESCE(SUM(pm.monto_total) FILTER (WHERE pm.estado_pedido <> 'Cancelado'), 0), 2)::float8 AS monto
+                   ROUND(COALESCE(SUM((SELECT SUM(dp.subtotal_detalle) FROM detalle_pedido dp WHERE dp.id_pedido = pm.id_pedido)) FILTER (WHERE pm.estado_pedido <> 'Cancelado'), 0), 2)::float8 AS monto
             FROM pedido_mesa pm
             LEFT JOIN mesa_local m ON m.id_mesa = pm.id_mesa
             WHERE ${deSucursal('COALESCE(pm.id_sucursal, m.id_sucursal)')}

@@ -89,7 +89,7 @@ describe('Cierre automático de caja a las 00:00', () => {
         assert.equal(cerrado.monto_real_declarado, null);
         const [{ medianoche }] = await bd.sql(`SELECT $1::timestamp = CURRENT_DATE::timestamp AS medianoche`, [cerrado.fecha_hora_cierre]);
         assert.ok(medianoche);
-        assert.equal((await bd.sql(`SELECT caja_habilitada FROM usuario WHERE id_usuario = $1`, [ayer.id]))[0].caja_habilitada, false);
+        assert.equal((await bd.sql(`SELECT 1 FROM turno_caja WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto'`, [ayer.id])).length, 0);
         assert.equal((await turno(t2.id_turno)).estado_turno, 'Abierto');
 
         // El cajero ve que su caja la cerró el sistema; sin turno no puede vender
@@ -122,8 +122,8 @@ describe('Cierre automático de caja a las 00:00', () => {
         // Cuenta de mesa abierta de ayer: el cierre del día no la toca
         const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr, estado_mesa)
                                      VALUES (1, 90, md5(random()::text), 'Ocupada') RETURNING id_mesa`);
-        const [cuenta] = await bd.sql(`INSERT INTO cuenta_mesa (id_mesa, estado, total_acumulado, fecha_apertura)
-                                       VALUES ($1, 'Abierta', 0, CURRENT_DATE - INTERVAL '2 hours') RETURNING id_cuenta`, [mesa.id_mesa]);
+        const [cuenta] = await bd.sql(`INSERT INTO cuenta_mesa (id_mesa, estado, fecha_apertura)
+                                       VALUES ($1, 'Abierta', CURRENT_DATE - INTERVAL '2 hours') RETURNING id_cuenta`, [mesa.id_mesa]);
         await cierreDiario.ejecutar();
         assert.equal((await bd.sql(`SELECT estado FROM cuenta_mesa WHERE id_cuenta = $1`, [cuenta.id_cuenta]))[0].estado, 'Abierta');
     });

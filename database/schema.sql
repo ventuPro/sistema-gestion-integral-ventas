@@ -18,17 +18,13 @@ DROP TABLE IF EXISTS detalle_cuenta CASCADE;
 DROP TABLE IF EXISTS cuenta_mesa CASCADE;
 DROP TABLE IF EXISTS detalle_venta CASCADE;
 DROP TABLE IF EXISTS venta_caja CASCADE;
-DROP TABLE IF EXISTS cliente CASCADE;
 DROP TABLE IF EXISTS turno_caja CASCADE;
-DROP TABLE IF EXISTS detalle_foto_stock CASCADE;
-DROP TABLE IF EXISTS foto_stock CASCADE;
 DROP TABLE IF EXISTS detalle_transferencia CASCADE;
 DROP TABLE IF EXISTS transferencia CASCADE;
 DROP TABLE IF EXISTS bloqueo_menu CASCADE;
 DROP TABLE IF EXISTS detalle_pedido CASCADE;
 DROP TABLE IF EXISTS pedido_mesa CASCADE;
 DROP TABLE IF EXISTS mesa_local CASCADE;
-DROP TABLE IF EXISTS notificacion_admin CASCADE;
 DROP TABLE IF EXISTS historial_inventario CASCADE;
 DROP TABLE IF EXISTS inventario_sucursal CASCADE;
 DROP TABLE IF EXISTS promocion_categoria CASCADE;
@@ -55,8 +51,7 @@ CREATE TABLE sucursal (
 
 CREATE TABLE rol_usuario (
     id_rol SERIAL PRIMARY KEY,
-    nombre_rol VARCHAR(50) NOT NULL,
-    nivel_permiso INT NOT NULL 
+    nombre_rol VARCHAR(50) NOT NULL
 );
 
 CREATE TABLE usuario (
@@ -66,11 +61,8 @@ CREATE TABLE usuario (
     nombre_completo VARCHAR(100) NOT NULL,
     correo_electronico VARCHAR(100) UNIQUE NOT NULL,
     contrasena_hash VARCHAR(255) NOT NULL,
-    estado_activo BOOLEAN DEFAULT TRUE,
-    -- Flag sincronizado automáticamente con turno_caja.estado_turno.
-    -- TRUE  → el cajero tiene un turno abierto y puede operar.
-    -- FALSE → no tiene turno abierto (sin apertura del día o cerrado).
-    caja_habilitada BOOLEAN DEFAULT FALSE
+    estado_activo BOOLEAN DEFAULT TRUE
+    -- «Caja habilitada» no se guarda: es tener un turno abierto en turno_caja
 );
 
 -- Permisos granulares por usuario (sobreescriben los defaults del rol).
@@ -153,19 +145,19 @@ CREATE TABLE promocion_categoria (
 
 CREATE TABLE inventario_sucursal (
     id_inventario SERIAL PRIMARY KEY,
-    id_sucursal INT REFERENCES sucursal(id_sucursal),
-    id_producto INT REFERENCES producto(id_producto),
+    id_sucursal INT NOT NULL REFERENCES sucursal(id_sucursal),
+    id_producto INT NOT NULL REFERENCES producto(id_producto),
+    -- El stock mínimo de alerta es uno solo: configuracion.stock_minimo_defecto
     cantidad_actual INT NOT NULL DEFAULT 0,
-    stock_minimo_alerta INT NOT NULL DEFAULT 10,
     UNIQUE(id_sucursal, id_producto),
     CONSTRAINT inventario_sucursal_cantidad_no_negativa CHECK (cantidad_actual >= 0)
 );
 
 CREATE TABLE historial_inventario (
     id_historial SERIAL PRIMARY KEY,
-    id_inventario INT REFERENCES inventario_sucursal(id_inventario),
+    id_inventario INT NOT NULL REFERENCES inventario_sucursal(id_inventario),
     id_usuario INT REFERENCES usuario(id_usuario),
-    tipo_movimiento VARCHAR(20) NOT NULL,
+    tipo_movimiento VARCHAR(20) NOT NULL CONSTRAINT historial_inventario_tipo_check CHECK (tipo_movimiento IN ('INGRESO', 'SALIDA')),
     cantidad_movida INT NOT NULL,
     motivo_movimiento VARCHAR(100),
     detalle VARCHAR(200),
@@ -190,33 +182,6 @@ CREATE TABLE detalle_transferencia (
     PRIMARY KEY (id_transferencia, id_producto)
 );
 
--- Foto del stock al terminar cada día (00:00): «lista de productos que quedaron».
--- El cajero la ve hasta la primera venta del día siguiente, salvo que el administrador la desbloquee.
-CREATE TABLE foto_stock (
-    id_foto         SERIAL PRIMARY KEY,
-    id_sucursal     INT NOT NULL REFERENCES sucursal(id_sucursal),
-    fecha           DATE NOT NULL,
-    fecha_toma      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    desbloqueada_por INT REFERENCES usuario(id_usuario),
-    fecha_desbloqueo TIMESTAMPTZ,
-    UNIQUE (id_sucursal, fecha)
-);
-CREATE TABLE detalle_foto_stock (
-    id_foto     INT NOT NULL REFERENCES foto_stock(id_foto),
-    id_producto INT NOT NULL REFERENCES producto(id_producto),
-    cantidad    INT NOT NULL,
-    PRIMARY KEY (id_foto, id_producto)
-);
-
-CREATE TABLE notificacion_admin (
-    id_notificacion SERIAL PRIMARY KEY,
-    id_sucursal INT REFERENCES sucursal(id_sucursal),
-    tipo_alerta VARCHAR(50) NOT NULL,
-    mensaje_alerta TEXT NOT NULL,
-    estado_leido BOOLEAN DEFAULT FALSE,
-    fecha_notificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- ==========================================
 -- 4. MENÚ DIGITAL INTERACTIVO (CLIENTE)
 -- ==========================================
@@ -224,11 +189,11 @@ CREATE TABLE notificacion_admin (
 -- codigo_qr: token aleatorio que va en la URL del menú (/menu/<codigo_qr>)
 CREATE TABLE mesa_local (
     id_mesa SERIAL PRIMARY KEY,
-    id_sucursal INT REFERENCES sucursal(id_sucursal),
+    id_sucursal INT NOT NULL REFERENCES sucursal(id_sucursal),
     numero_mesa INT NOT NULL,
     codigo_qr TEXT UNIQUE NOT NULL,
     -- Libre / Ocupada (= habilitada: sus celulares piden sin verificación)
-    estado_mesa VARCHAR(20) DEFAULT 'Libre',
+    estado_mesa VARCHAR(20) NOT NULL DEFAULT 'Libre' CONSTRAINT mesa_local_estado_check CHECK (estado_mesa IN ('Libre', 'Ocupada')),
     fecha_habilitacion TIMESTAMPTZ,
     -- Las visitas del menú QR que empezaron antes de esta fecha terminaron
     fecha_liberacion TIMESTAMPTZ,
@@ -239,11 +204,11 @@ CREATE TABLE mesa_local (
 -- Comanda / cuenta abierta de una mesa (atención directa del cajero + pedidos QR)
 CREATE TABLE cuenta_mesa (
     id_cuenta SERIAL PRIMARY KEY,
-    id_mesa INT REFERENCES mesa_local(id_mesa) ON DELETE CASCADE,
+    id_mesa INT NOT NULL REFERENCES mesa_local(id_mesa) ON DELETE CASCADE,
     id_usuario_apertura INT REFERENCES usuario(id_usuario),
-    estado VARCHAR(20) DEFAULT 'Abierta',
-    total_acumulado DECIMAL(10, 2) DEFAULT 0.00,
-    metodo_pago VARCHAR(50),
+    -- Lo que falta cobrar se calcula del detalle (detalle_cuenta.id_venta IS NULL);
+    -- el método de pago está en cada venta (cobro por persona)
+    estado VARCHAR(20) NOT NULL DEFAULT 'Abierta' CONSTRAINT cuenta_mesa_estado_check CHECK (estado IN ('Abierta', 'Pagada', 'Cancelada')),
     fecha_apertura TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_cierre TIMESTAMP
 );
@@ -259,8 +224,8 @@ CREATE TABLE pedido_mesa (
     id_mesa INT REFERENCES mesa_local(id_mesa) ON DELETE CASCADE,
     id_cuenta INT REFERENCES cuenta_mesa(id_cuenta) ON DELETE SET NULL,
     id_usuario_atencion INT REFERENCES usuario(id_usuario),
+    -- El monto del pedido es la suma de detalle_pedido
     estado_pedido VARCHAR(30) NOT NULL DEFAULT 'Pendiente_Cajero',
-    monto_total DECIMAL(10, 2) DEFAULT 0.00,
     fecha_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     observacion_general TEXT,
     fecha_aprobacion TIMESTAMP,
@@ -294,21 +259,21 @@ CREATE TABLE bloqueo_menu (
 
 CREATE TABLE detalle_pedido (
     id_detalle_pedido SERIAL PRIMARY KEY,
-    id_pedido INT REFERENCES pedido_mesa(id_pedido) ON DELETE CASCADE,
-    id_producto INT REFERENCES producto(id_producto),
+    id_pedido INT NOT NULL REFERENCES pedido_mesa(id_pedido) ON DELETE CASCADE,
+    id_producto INT NOT NULL REFERENCES producto(id_producto),
     cantidad_solicitada INT NOT NULL,
     precio_aplicado DECIMAL(10, 2) NOT NULL,
-    subtotal_detalle DECIMAL(10, 2) NOT NULL,
-    nota_cliente TEXT
+    nota_cliente TEXT,
+    subtotal_detalle NUMERIC(10, 2) GENERATED ALWAYS AS (cantidad_solicitada * precio_aplicado) STORED
 );
 
 CREATE TABLE detalle_cuenta (
     id_detalle_cuenta SERIAL PRIMARY KEY,
-    id_cuenta INT REFERENCES cuenta_mesa(id_cuenta) ON DELETE CASCADE,
-    id_producto INT REFERENCES producto(id_producto),
+    id_cuenta INT NOT NULL REFERENCES cuenta_mesa(id_cuenta) ON DELETE CASCADE,
+    id_producto INT NOT NULL REFERENCES producto(id_producto),
     cantidad INT NOT NULL DEFAULT 1,
     precio_unitario DECIMAL(10, 2) NOT NULL,
-    subtotal DECIMAL(10, 2) NOT NULL,
+    subtotal NUMERIC(10, 2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
     nota TEXT,
     origen VARCHAR(20) DEFAULT 'cajero',
     fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -325,15 +290,15 @@ CREATE TABLE detalle_cuenta (
 
 CREATE TABLE turno_caja (
     id_turno SERIAL PRIMARY KEY,
-    id_sucursal INT REFERENCES sucursal(id_sucursal),
-    id_usuario_cajero INT REFERENCES usuario(id_usuario),
+    id_sucursal INT NOT NULL REFERENCES sucursal(id_sucursal),
+    id_usuario_cajero INT NOT NULL REFERENCES usuario(id_usuario),
     fecha_hora_apertura TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_hora_cierre TIMESTAMP,
     monto_inicial DECIMAL(10, 2) NOT NULL,
     monto_calculado DECIMAL(10, 2),
     monto_real_declarado DECIMAL(10, 2),
-    diferencia DECIMAL(10, 2),
-    estado_turno VARCHAR(20) DEFAULT 'Abierto',
+    diferencia NUMERIC(10, 2) GENERATED ALWAYS AS (monto_real_declarado - monto_calculado) STORED,
+    estado_turno VARCHAR(20) NOT NULL DEFAULT 'Abierto' CONSTRAINT turno_caja_estado_check CHECK (estado_turno IN ('Abierto', 'Cerrado')),
     -- Cajero, Administrador o Sistema (cierre automático a las 00:00)
     cerrado_por VARCHAR(15) CHECK (cerrado_por IN ('Cajero', 'Administrador', 'Sistema'))
 );
@@ -342,21 +307,13 @@ CREATE TABLE turno_caja (
 -- 6. SISTEMA DE VENTAS (CAJA / EMPLEADOS)
 -- ==========================================
 
-CREATE TABLE cliente (
-    id_cliente SERIAL PRIMARY KEY,
-    nombre_cliente VARCHAR(100) NOT NULL,
-    numero_documento VARCHAR(20)
-);
-
 CREATE TABLE venta_caja (
     id_venta SERIAL PRIMARY KEY,
-    id_sucursal INT REFERENCES sucursal(id_sucursal),
-    id_usuario_cajero INT REFERENCES usuario(id_usuario),
-    id_cliente INT REFERENCES cliente(id_cliente),
-    id_pedido_mesa INT REFERENCES pedido_mesa(id_pedido) ON DELETE SET NULL,
-    id_turno INT REFERENCES turno_caja(id_turno),
+    id_sucursal INT NOT NULL REFERENCES sucursal(id_sucursal),
+    id_usuario_cajero INT NOT NULL REFERENCES usuario(id_usuario),
+    id_turno INT NOT NULL REFERENCES turno_caja(id_turno),
     monto_total_venta DECIMAL(10, 2) NOT NULL,
-    metodo_pago VARCHAR(50) NOT NULL,
+    metodo_pago VARCHAR(50) NOT NULL CONSTRAINT venta_caja_metodo_pago_check CHECK (metodo_pago IN ('Efectivo', 'QR')),
     fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- Descuentos ya restados de monto_total_venta
     descuento_promociones DECIMAL(10, 2) NOT NULL DEFAULT 0,
@@ -366,8 +323,8 @@ CREATE TABLE venta_caja (
 
 CREATE TABLE detalle_venta (
     id_detalle_venta SERIAL PRIMARY KEY,
-    id_venta INT REFERENCES venta_caja(id_venta),
-    id_producto INT REFERENCES producto(id_producto),
+    id_venta INT NOT NULL REFERENCES venta_caja(id_venta),
+    id_producto INT NOT NULL REFERENCES producto(id_producto),
     cantidad_vendida INT NOT NULL,
     precio_unitario DECIMAL(10, 2) NOT NULL,
     subtotal_venta DECIMAL(10, 2) NOT NULL,
@@ -542,9 +499,11 @@ CREATE TABLE receta (
     nombre        VARCHAR(80) NOT NULL,
     rendimiento   NUMERIC(10, 2) NOT NULL CHECK (rendimiento > 0),
     inversion     NUMERIC(14, 4) NOT NULL DEFAULT 0,
-    fecha_calculo TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    fecha_calculo TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id_producto   INT REFERENCES producto(id_producto) ON DELETE SET NULL
 );
 CREATE UNIQUE INDEX uq_receta_nombre ON receta (lower(nombre));
+CREATE UNIQUE INDEX uq_receta_producto ON receta (id_producto) WHERE id_producto IS NOT NULL;
 CREATE TABLE ingrediente_receta (
     id_receta INT NOT NULL REFERENCES receta(id_receta) ON DELETE CASCADE,
     id_insumo INT NOT NULL REFERENCES insumo(id_insumo),

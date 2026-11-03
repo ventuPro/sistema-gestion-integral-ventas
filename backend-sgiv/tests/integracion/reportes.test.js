@@ -18,11 +18,25 @@ const api = async (ruta, token, metodo = 'GET', body) => {
     return { status: r.status, body: await r.json(), headers: r.headers };
 };
 
+// Toda venta es de un cajero y de un turno: las de prueba van a un turno cerrado del administrador por sucursal
+const turnosPrueba = new Map();
+const turnoDe = async (id_sucursal) => {
+    if (!turnosPrueba.has(id_sucursal)) {
+        const [t] = await bd.sql(`
+            INSERT INTO turno_caja (id_sucursal, id_usuario_cajero, monto_inicial, estado_turno, cerrado_por)
+            VALUES ($1, (SELECT id_usuario FROM usuario WHERE correo_electronico = 'admin@rickys.com'), 0, 'Cerrado', 'Sistema')
+            RETURNING id_turno, id_usuario_cajero`, [id_sucursal]);
+        turnosPrueba.set(id_sucursal, t);
+    }
+    return turnosPrueba.get(id_sucursal);
+};
+
 const venta = async (id_sucursal, fecha, lineas, metodo = 'Efectivo') => {
     const total = lineas.reduce((s, [, cant, precio]) => s + cant * precio, 0);
+    const t = await turnoDe(id_sucursal);
     const [v] = await bd.sql(
-        `INSERT INTO venta_caja (id_sucursal, monto_total_venta, metodo_pago, fecha_venta)
-         VALUES ($1, $2, $3, $4) RETURNING id_venta`, [id_sucursal, total, metodo, fecha]);
+        `INSERT INTO venta_caja (id_sucursal, id_usuario_cajero, id_turno, monto_total_venta, metodo_pago, fecha_venta)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_venta`, [id_sucursal, t.id_usuario_cajero, t.id_turno, total, metodo, fecha]);
     for (const [id_producto, cant, precio] of lineas) {
         await bd.sql(
             `INSERT INTO detalle_venta (id_venta, id_producto, cantidad_vendida, precio_unitario, subtotal_venta)

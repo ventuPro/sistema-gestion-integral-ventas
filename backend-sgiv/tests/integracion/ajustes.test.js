@@ -291,15 +291,15 @@ test('parámetros: sin CAPTCHA y con duración de sesión configurada', async ()
 });
 
 test('el stock mínimo de Ajustes se aplica a todos los productos (también a los que ya existían)', async () => {
-    const [{ id }] = await bd.sql(`SELECT min(id_categoria) AS id FROM categoria_producto`);
+    const [{ id }] = await bd.sql(`INSERT INTO categoria_producto (nombre_categoria) VALUES ('MINIMO') RETURNING id_categoria AS id`);
     const [p] = await bd.sql(`INSERT INTO producto (id_categoria, nombre_producto, precio_unitario)
                               VALUES ($1, 'MINIMO EXISTENTE', 5) RETURNING id_producto`, [id]);
-    await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual, stock_minimo_alerta)
-                  VALUES (1, $1, 3, 5)`, [p.id_producto]);
+    await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES (1, $1, 3)`, [p.id_producto]);
 
     assert.equal((await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body: { stock_minimo_defecto: 1 } })).status, 200);
-    const filas = await bd.sql(`SELECT DISTINCT stock_minimo_alerta FROM inventario_sucursal`);
-    assert.deepEqual(filas.map(f => f.stock_minimo_alerta), [1]);
+    const lista = (await api('GET', '/catalogo/productos?id_sucursal=1', { token: tokenAdmin })).body;
+    assert.ok(lista.length > 0);
+    assert.deepEqual([...new Set(lista.map(x => x.stock_minimo_alerta))], [1]);
 
     await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body: { stock_minimo_defecto: 5 } });
 });

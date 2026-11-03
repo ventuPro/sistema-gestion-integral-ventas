@@ -31,7 +31,8 @@ const obtenerMesasPorSucursal = async (id_sucursal) => {
     const r = await db.query(`
         SELECT
             m.id_mesa, m.numero_mesa, m.estado_mesa, m.codigo_qr, m.id_sucursal, m.fecha_habilitacion,
-            c.id_cuenta, c.total_acumulado, c.fecha_apertura,
+            c.id_cuenta, c.fecha_apertura,
+            (SELECT COALESCE(SUM(dc.subtotal), 0) FROM detalle_cuenta dc WHERE dc.id_cuenta = c.id_cuenta AND dc.id_venta IS NULL) AS total_acumulado,
             (SELECT COUNT(*)::int FROM detalle_cuenta dc WHERE dc.id_cuenta=c.id_cuenta AND dc.id_venta IS NULL) AS num_items
         FROM mesa_local m
         LEFT JOIN cuenta_mesa c ON c.id_mesa=m.id_mesa AND c.estado='Abierta'
@@ -154,12 +155,8 @@ const eliminarMesa = async (id_mesa, id_usuario = null) => {
         // Pedidos QR sin confirmar: se cancelan y su stock vuelve
         cambiosStock = cambiosStock.concat((await pedidoModel.cancelarPendientesMesa(client, id_mesa)).cambios);
 
-        // detalle_pedido y venta_caja referencian pedido_mesa sin ON DELETE CASCADE:
+        // detalle_pedido referencia pedido_mesa sin ON DELETE CASCADE:
         // sin esto, borrar una mesa que alguna vez recibió pedidos QR falla por FK.
-        await client.query(`
-            UPDATE venta_caja SET id_pedido_mesa = NULL
-            WHERE id_pedido_mesa IN (SELECT id_pedido FROM pedido_mesa WHERE id_mesa = $1)
-        `, [id_mesa]);
         await client.query(`
             DELETE FROM detalle_pedido
             WHERE id_pedido IN (SELECT id_pedido FROM pedido_mesa WHERE id_mesa = $1)

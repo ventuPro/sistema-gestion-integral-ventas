@@ -7,6 +7,7 @@ const { verificarToken, soloAdministrador } = require('../middlewares/authMiddle
 router.use(verificarToken, soloAdministrador);
 
 router.get   ('/unidades',               ctrl.unidades);
+router.get   ('/productos',              ctrl.productos);
 
 router.get   ('/insumos',                ctrl.listarInsumos);
 router.post  ('/insumos',                ctrl.crearInsumo);

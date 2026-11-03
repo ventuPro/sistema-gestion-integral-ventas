@@ -40,9 +40,14 @@
   padding: 14px 20px;
 }
 .totales div { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.totales small { font-size: 0.6em; font-weight: 500; }
 .totales b {
   font-size: calc(20px * var(--escala-texto));
   font-weight: 600;
   color: var(--i-tinta);
   font-variant-numeric: tabular-nums;
 }
+
+/* Ganancia: verde si gana, rojo si pierde */
+.inf-tabla .fuerte.inf-sube, .totales b.inf-sube { color: var(--i-sube); }
+.inf-tabla .fuerte.inf-baja, .totales b.inf-baja { color: var(--i-baja); }

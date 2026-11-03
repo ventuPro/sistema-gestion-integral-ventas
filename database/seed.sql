@@ -1,10 +1,9 @@
 -- Roles del sistema
-INSERT INTO rol_usuario (id_rol, nombre_rol, nivel_permiso) VALUES
-(1, 'Administrador', 1),
-(2, 'Cajero',        2)
+INSERT INTO rol_usuario (id_rol, nombre_rol) VALUES
+(1, 'Administrador'),
+(2, 'Cajero')
 ON CONFLICT (id_rol) DO UPDATE
-  SET nombre_rol = EXCLUDED.nombre_rol,
-      nivel_permiso = EXCLUDED.nivel_permiso;
+  SET nombre_rol = EXCLUDED.nombre_rol;
 
 -- Sucursal inicial
 INSERT INTO sucursal (nombre_sucursal, direccion_fisica, telefono_contacto)

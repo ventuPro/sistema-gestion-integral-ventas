@@ -48,7 +48,7 @@ const listarUsuarios = async () => {
             u.id_rol,
             u.id_sucursal,
             u.estado_activo,
-            u.caja_habilitada,
+            EXISTS (SELECT 1 FROM turno_caja t WHERE t.id_usuario_cajero = u.id_usuario AND t.estado_turno = 'Abierto') AS caja_habilitada,
             r.nombre_rol,
             s.nombre_sucursal
         FROM usuario u

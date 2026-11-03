@@ -5,12 +5,8 @@ const promocionModel = require('./promocionModel');
 const visitaModel = require('./visitaModel');
 const { turnoParaVender } = require('./cajaModel');
 
-// total_acumulado = lo que falta cobrar (las partes ya pagadas tienen id_venta)
-const recalcularTotal = (client, id_cuenta) => client.query(`
-    UPDATE cuenta_mesa
-    SET total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta = $1 AND id_venta IS NULL)
-    WHERE id_cuenta = $1
-`, [id_cuenta]);
+// total_acumulado = lo que falta cobrar (las partes ya pagadas tienen id_venta); se calcula, no se guarda
+const PENDIENTE = `(SELECT COALESCE(SUM(dc.subtotal), 0) FROM detalle_cuenta dc WHERE dc.id_cuenta = c.id_cuenta AND dc.id_venta IS NULL)`;
 
 // ─── ABRIR CUENTA / COMANDA ───
 const abrirCuenta = async (id_mesa, id_usuario) => {
@@ -26,8 +22,8 @@ const abrirCuenta = async (id_mesa, id_usuario) => {
     let r;
     try {
         r = await db.query(`
-            INSERT INTO cuenta_mesa (id_mesa, id_usuario_apertura, estado, total_acumulado)
-            VALUES ($1, $2, 'Abierta', 0.00) RETURNING *
+            INSERT INTO cuenta_mesa (id_mesa, id_usuario_apertura, estado)
+            VALUES ($1, $2, 'Abierta') RETURNING *, 0 AS total_acumulado
         `, [id_mesa, id_usuario]);
     } catch (e) {
         if (e.code === '23505') throw new Error('CUENTA_YA_ABIERTA');
@@ -42,7 +38,7 @@ const abrirCuenta = async (id_mesa, id_usuario) => {
 // ─── OBTENER CUENTA ACTIVA DE UNA MESA ───
 const obtenerCuentaActiva = async (id_mesa) => {
     const rCuenta = await db.query(`
-        SELECT c.*, ml.numero_mesa, s.nombre_sucursal
+        SELECT c.*, ${PENDIENTE} AS total_acumulado, ml.numero_mesa, s.nombre_sucursal
         FROM cuenta_mesa c
         JOIN mesa_local  ml ON c.id_mesa   = ml.id_mesa
         JOIN sucursal    s  ON ml.id_sucursal = s.id_sucursal
@@ -120,8 +116,7 @@ const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_un
             motivo: 'Cuenta de mesa', detalle: `Mesa ${numero_mesa}`, stock_resultante: nuevo_stock
         });
 
-        // 4. Insertar o incrementar en detalle_cuenta
-        const subtotal = cantidad * precio_unitario;
+        // 4. Insertar o incrementar en detalle_cuenta (el subtotal lo calcula la BD)
         const existe = await client.query(`
             SELECT id_detalle_cuenta, cantidad
             FROM detalle_cuenta
@@ -131,20 +126,16 @@ const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_un
         let detalle;
         if (existe.rows.length > 0) {
             const nuevaCantidad = Number(existe.rows[0].cantidad) + cantidad;
-            const nuevoSubtotal = nuevaCantidad * precio_unitario;
             detalle = (await client.query(`
-                UPDATE detalle_cuenta SET cantidad=$1, subtotal=$2
-                WHERE id_detalle_cuenta=$3 RETURNING *
-            `, [nuevaCantidad, nuevoSubtotal, existe.rows[0].id_detalle_cuenta])).rows[0];
+                UPDATE detalle_cuenta SET cantidad=$1
+                WHERE id_detalle_cuenta=$2 RETURNING *
+            `, [nuevaCantidad, existe.rows[0].id_detalle_cuenta])).rows[0];
         } else {
             detalle = (await client.query(`
-                INSERT INTO detalle_cuenta (id_cuenta,id_producto,cantidad,precio_unitario,subtotal,nota,origen)
-                VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *
-            `, [id_cuenta, id_producto, cantidad, precio_unitario, subtotal, nota||null, origen||'cajero'])).rows[0];
+                INSERT INTO detalle_cuenta (id_cuenta,id_producto,cantidad,precio_unitario,nota,origen)
+                VALUES ($1,$2,$3,$4,$5,$6) RETURNING *
+            `, [id_cuenta, id_producto, cantidad, precio_unitario, nota||null, origen||'cajero'])).rows[0];
         }
-
-        // 5. Recalcular total_acumulado de la cuenta
-        await recalcularTotal(client, id_cuenta);
 
         await client.query('COMMIT');
         return { detalle, id_producto, nuevo_stock, id_sucursal, id_mesa };
@@ -195,9 +186,6 @@ const quitarProductoCuenta = async (id_detalle_cuenta, id_usuario = null) => {
             `DELETE FROM detalle_cuenta WHERE id_detalle_cuenta=$1`,
             [id_detalle_cuenta]
         );
-
-        // 4. Recalcular total
-        await recalcularTotal(client, id_cuenta);
 
         await client.query('COMMIT');
         return { id_cuenta, id_producto, nuevo_stock, id_sucursal, id_mesa };
@@ -254,11 +242,7 @@ const cambiarCantidadDetalle = async (id_detalle_cuenta, cantidad, id_usuario = 
                 detalle: `Mesa ${det.numero_mesa}`, stock_resultante: nuevo_stock
             });
 
-            await client.query(
-                `UPDATE detalle_cuenta SET cantidad = $1::int, subtotal = $1::int * precio_unitario WHERE id_detalle_cuenta = $2`,
-                [cantidad, id_detalle_cuenta]
-            );
-            await recalcularTotal(client, det.id_cuenta);
+            await client.query(`UPDATE detalle_cuenta SET cantidad = $1 WHERE id_detalle_cuenta = $2`, [cantidad, id_detalle_cuenta]);
         }
 
         await client.query('COMMIT');
@@ -374,16 +358,9 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         let pedidos_pagados = [];
         if (cuenta_cerrada) {
             pedidos_pagados = await finalizarPedidosDeCuenta(client, id_cuenta, 'Pagado');
-            // Cerrada: total_acumulado guarda todo lo consumido
-            await client.query(`
-                UPDATE cuenta_mesa
-                SET estado='Pagada', metodo_pago=$1, fecha_cierre=NOW(),
-                    total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta=$2)
-                WHERE id_cuenta=$2
-            `, [metodo_pago, id_cuenta]);
+            await client.query(`UPDATE cuenta_mesa SET estado='Pagada', fecha_cierre=NOW() WHERE id_cuenta=$1`, [id_cuenta]);
             await visitaModel.liberar(client, cuenta.id_mesa);
         } else {
-            await recalcularTotal(client, id_cuenta);
             if (parte?.cliente_mesa) {
                 pedidos_pagados = (await client.query(`
                     UPDATE pedido_mesa SET estado_pedido = 'Pagado'
@@ -440,7 +417,7 @@ const obtenerMesasConCuenta = async (id_sucursal) => {
             m.codigo_qr,
             m.id_sucursal,
             c.id_cuenta,
-            c.total_acumulado,
+            CASE WHEN c.id_cuenta IS NULL THEN NULL ELSE COALESCE(SUM(dc.subtotal), 0) END AS total_acumulado,
             c.fecha_apertura,
             COUNT(dc.id_detalle_cuenta)::int AS num_items
         FROM mesa_local m
@@ -448,7 +425,7 @@ const obtenerMesasConCuenta = async (id_sucursal) => {
         LEFT JOIN detalle_cuenta dc ON dc.id_cuenta = c.id_cuenta AND dc.id_venta IS NULL
         WHERE m.id_sucursal = $1
         GROUP BY m.id_mesa, m.numero_mesa, m.estado_mesa, m.codigo_qr, m.id_sucursal,
-                 c.id_cuenta, c.total_acumulado, c.fecha_apertura
+                 c.id_cuenta, c.fecha_apertura
         ORDER BY m.numero_mesa ASC
     `, [id_sucursal]);
     return r.rows;

@@ -2,7 +2,6 @@ const db = require('../config/db');
 const { registrarHistorial } = require('./inventarioModel');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const promocionModel = require('./promocionModel');
-const visitaModel = require('./visitaModel');
 
 // Efectivo esperado de un turno t: fondo inicial + ventas en efectivo (igual en todo cierre)
 const EFECTIVO_ESPERADO = `t.monto_inicial + COALESCE((
@@ -20,13 +19,11 @@ const turnoParaVender = async (client, id_usuario) => (await client.query(`
     FOR SHARE
 `, [id_usuario])).rows[0] || null;
 
-// Estado de caja basado en turno_caja.estado_turno.
-// caja_habilitada se sincroniza automáticamente con el estado del turno.
+// Caja habilitada = el usuario tiene un turno abierto (no se guarda aparte)
+const CAJA_ABIERTA = `EXISTS (SELECT 1 FROM turno_caja t WHERE t.id_usuario_cajero = u.id_usuario AND t.estado_turno = 'Abierto')`;
+
 const obtenerEstadoCaja = async (id_usuario) => {
-    const r = await db.query(
-        `SELECT caja_habilitada FROM usuario WHERE id_usuario = $1`,
-        [id_usuario]
-    );
+    const r = await db.query(`SELECT ${CAJA_ABIERTA} AS caja_habilitada FROM usuario u WHERE u.id_usuario = $1`, [id_usuario]);
     return r.rows[0] || { caja_habilitada: false };
 };
 
@@ -40,11 +37,6 @@ const obtenerEstadoCompleto = async (id_usuario) => {
     `, [id_usuario]);
 
     if (rAbierto.rows.length > 0) {
-        // Sincronizar flag por si quedó desincronizado
-        await db.query(
-            `UPDATE usuario SET caja_habilitada = TRUE WHERE id_usuario = $1 AND caja_habilitada = FALSE`,
-            [id_usuario]
-        );
         return {
             estado:          'ABIERTA',
             caja_habilitada: true,
@@ -64,12 +56,6 @@ const obtenerEstadoCompleto = async (id_usuario) => {
         ORDER BY fecha_hora_cierre DESC
         LIMIT 1
     `, [id_usuario]);
-
-    // Sincronizar flag a FALSE — no hay turno abierto
-    await db.query(
-        `UPDATE usuario SET caja_habilitada = FALSE WHERE id_usuario = $1 AND caja_habilitada = TRUE`,
-        [id_usuario]
-    );
 
     if (rCerradoHoy.rows.length > 0) {
         return {
@@ -128,12 +114,6 @@ const abrirTurno = async (id_sucursal, id_usuario_cajero, monto_inicial) => {
             throw e.code === '23505' ? new Error('YA_TIENE_TURNO_ABIERTO') : e;
         });
 
-        // Sincronizar flag → TRUE
-        await client.query(
-            `UPDATE usuario SET caja_habilitada = TRUE WHERE id_usuario = $1`,
-            [id_usuario_cajero]
-        );
-
         await client.query('COMMIT');
         return r.rows[0];
     } catch (e) {
@@ -158,17 +138,10 @@ const cerrarCaja = async (id_sucursal, id_usuario_cajero, efectivo_contado = nul
             UPDATE turno_caja t
             SET fecha_hora_cierre = CURRENT_TIMESTAMP, estado_turno = 'Cerrado', cerrado_por = 'Cajero',
                 monto_calculado = ${EFECTIVO_ESPERADO},
-                monto_real_declarado = $2::numeric,
-                diferencia = $2::numeric - (${EFECTIVO_ESPERADO})
+                monto_real_declarado = $2::numeric
             WHERE t.id_turno = ANY($1::int[]) AND t.estado_turno = 'Abierto'
             RETURNING t.id_turno, t.monto_calculado::float8, t.monto_real_declarado::float8, t.diferencia::float8
         `, [rT.rows.map(t => t.id_turno), efectivo_contado]);
-
-        // Sincronizar flag → FALSE
-        await client.query(
-            `UPDATE usuario SET caja_habilitada = FALSE WHERE id_usuario = $1`,
-            [id_usuario_cajero]
-        );
 
         await client.query('COMMIT');
         const t = r.rows[0];
@@ -226,18 +199,12 @@ const reabrirTurno = async (id_usuario_cajero) => {
             UPDATE turno_caja
             SET estado_turno = 'Abierto',
                 fecha_hora_cierre = NULL, cerrado_por = NULL,
-                monto_calculado = NULL, monto_real_declarado = NULL, diferencia = NULL
+                monto_calculado = NULL, monto_real_declarado = NULL
             WHERE id_turno = $1
             RETURNING *
         `, [id_turno]).catch(e => {
             throw e.code === '23505' ? new Error('YA_TIENE_TURNO_ABIERTO') : e;
         });
-
-        // Sincronizar flag → TRUE
-        await client.query(
-            `UPDATE usuario SET caja_habilitada = TRUE WHERE id_usuario = $1`,
-            [id_usuario_cajero]
-        );
 
         await client.query('COMMIT');
         return r.rows[0];
@@ -255,8 +222,7 @@ const reabrirTurno = async (id_usuario_cajero) => {
 // ════════════════════════════════════════════════════════════════════
 
 // Para el admin: "Reabrir caja" desde Usuarios.
-// Si el cajero tiene un turno cerrado hoy → reabre.
-// Si no tiene turno hoy → solo habilita el flag.
+// Si el cajero tiene un turno cerrado hoy → reabre. Si no tiene turno hoy, el cajero abre su caja normalmente.
 const habilitarCaja = async (id_usuario) => {
     // Si tiene turno cerrado hoy → reabrir
     const rCerradoHoy = await db.query(`
@@ -269,21 +235,14 @@ const habilitarCaja = async (id_usuario) => {
 
     if (rCerradoHoy.rows.length > 0) {
         await reabrirTurno(id_usuario);
-        const r = await db.query(
-            `SELECT id_usuario, nombre_completo, caja_habilitada FROM usuario WHERE id_usuario = $1`,
-            [id_usuario]
-        );
-        return { ...r.rows[0], accion: 'TURNO_REABIERTO' };
+        return { ...(await datosCaja(id_usuario)), accion: 'TURNO_REABIERTO' };
     }
-
-    // Sin turno cerrado hoy → solo flag (el cajero abrirá su turno normalmente)
-    const r = await db.query(
-        `UPDATE usuario SET caja_habilitada = TRUE WHERE id_usuario = $1
-         RETURNING id_usuario, nombre_completo, caja_habilitada`,
-        [id_usuario]
-    );
-    return { ...r.rows[0], accion: 'FLAG_HABILITADO' };
+    return { ...(await datosCaja(id_usuario)), accion: 'FLAG_HABILITADO' };
 };
+
+const datosCaja = async (id_usuario, cliente = db) => (await cliente.query(
+    `SELECT u.id_usuario, u.nombre_completo, ${CAJA_ABIERTA} AS caja_habilitada FROM usuario u WHERE u.id_usuario = $1`,
+    [id_usuario])).rows[0];
 
 // Para el admin: "Cerrar caja" desde Usuarios.
 const deshabilitarCaja = async (id_usuario) => {
@@ -313,14 +272,9 @@ const deshabilitarCaja = async (id_usuario) => {
             RETURNING t.id_turno, t.id_sucursal
         `, [rT.rows.map(t => t.id_turno)])).rows;
 
-        const r = await client.query(
-            `UPDATE usuario SET caja_habilitada = FALSE WHERE id_usuario = $1
-             RETURNING id_usuario, nombre_completo, caja_habilitada`,
-            [id_usuario]
-        );
-
+        const usuario = await datosCaja(id_usuario, client);
         await client.query('COMMIT');
-        return { ...r.rows[0], turnos };
+        return { ...usuario, turnos };
     } catch (e) {
         await client.query('ROLLBACK');
         throw e;
@@ -345,11 +299,6 @@ const cerrarTurnosVencidos = async () => {
             WHERE t.estado_turno = 'Abierto' AND t.fecha_hora_apertura < CURRENT_DATE
             RETURNING t.id_turno, t.id_usuario_cajero, t.id_sucursal
         `);
-        if (r.rows.length) {
-            await client.query(
-                `UPDATE usuario SET caja_habilitada = FALSE WHERE id_usuario = ANY($1::int[])`,
-                [r.rows.map(t => t.id_usuario_cajero)]);
-        }
         await client.query('COMMIT');
         return r.rows;
     } catch (e) {
@@ -586,8 +535,7 @@ const calcularItemsVenta = async (client, detalles) => {
 
 // descuento: { tipo, valor, motivo } opcional
 const registrarVenta = async ({
-    id_sucursal, id_usuario_cajero, id_cliente,
-    id_pedido_mesa, monto_total_venta, metodo_pago, detalles,
+    id_sucursal, id_usuario_cajero, monto_total_venta, metodo_pago, detalles,
     descuento = null
 }) => {
     const client = await db.connect();
@@ -625,16 +573,13 @@ const registrarVenta = async ({
         // 3. Registrar la venta principal
         const rVenta = await client.query(`
             INSERT INTO venta_caja
-                (id_sucursal, id_usuario_cajero, id_cliente, id_pedido_mesa,
-                 id_turno, monto_total_venta, metodo_pago,
+                (id_sucursal, id_usuario_cajero, id_turno, monto_total_venta, metodo_pago,
                  descuento_promociones, descuento_manual, motivo_descuento)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING id_venta
         `, [
             Number(id_sucursal),
             Number(id_usuario_cajero),
-            id_cliente    || null,
-            id_pedido_mesa|| null,
             id_turno,
             totalCentavos / 100,
             metodo_pago,
@@ -693,16 +638,6 @@ const registrarVenta = async ({
                     cantidad, motivo: 'Venta en Caja', stock_resultante: Number(rInv.rows[0].cantidad_actual)
                 });
             }
-        }
-
-        // 5. Si viene de pedido QR → liberar mesa
-        if (id_pedido_mesa) {
-            await client.query(
-                `UPDATE pedido_mesa SET estado_pedido = 'Pagado' WHERE id_pedido = $1`,
-                [id_pedido_mesa]
-            );
-            const rMesa = await client.query(`SELECT id_mesa FROM pedido_mesa WHERE id_pedido = $1`, [id_pedido_mesa]);
-            if (rMesa.rows[0]?.id_mesa) await visitaModel.liberar(client, rMesa.rows[0].id_mesa);
         }
 
         await client.query('COMMIT');

@@ -119,12 +119,9 @@ const devolverStock = async (client, id_sucursal, items, registro = {}) => {
     return cambios;
 };
 
-const recalcularMontoPedido = (client, id_pedido) => client.query(`
-    UPDATE pedido_mesa
-    SET monto_total = (SELECT COALESCE(SUM(subtotal_detalle), 0) FROM detalle_pedido WHERE id_pedido = $1)
-    WHERE id_pedido = $1
-    RETURNING monto_total
-`, [id_pedido]);
+// Monto del pedido = suma de su detalle (se calcula, no se guarda)
+const montoPedido = (client, id_pedido) => client.query(
+    `SELECT COALESCE(SUM(subtotal_detalle), 0) AS monto_total FROM detalle_pedido WHERE id_pedido = $1`, [id_pedido]);
 
 const exigirId = (id) => {
     if (!Number.isInteger(id) || id <= 0) throw errorCodigo('PEDIDO_NO_ENCONTRADO', 'Pedido no encontrado');
@@ -234,21 +231,21 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
 
         const totalCentavos = lista.reduce((s, i) => s + precios.get(i.id_producto) * i.cantidad, 0);
         const rPed = await client.query(`
-            INSERT INTO pedido_mesa (tipo_pedido, id_sucursal, id_mesa, estado_pedido, monto_total, observacion_general,
+            INSERT INTO pedido_mesa (tipo_pedido, id_sucursal, id_mesa, estado_pedido, observacion_general,
                                      cliente_mesa, nombre_cliente, sin_verificar, ip_cliente)
-            VALUES ('Mesa', $1, $2, 'Pendiente_Cajero', $3, $4, $5, $6, $7, $8)
+            VALUES ('Mesa', $1, $2, 'Pendiente_Cajero', $3, $4, $5, $6, $7)
             RETURNING *
-        `, [mesa.id_sucursal, mesa.id_mesa, totalCentavos / 100, texto(observacion_general, MAX_LARGO_NOTA),
+        `, [mesa.id_sucursal, mesa.id_mesa, texto(observacion_general, MAX_LARGO_NOTA),
             cliente_mesa, nombre_cliente, sin_verificar, ip_cliente]);
-        const pedido = rPed.rows[0];
+        const pedido = { ...rPed.rows[0], monto_total: totalCentavos / 100 };
 
         for (const it of lista) {
             const precio = precios.get(it.id_producto);
             await client.query(`
                 INSERT INTO detalle_pedido
-                    (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente)
-                VALUES ($1, $2, $3, $4, $5, $6)
-            `, [pedido.id_pedido, it.id_producto, it.cantidad, precio / 100, (precio * it.cantidad) / 100, it.nota]);
+                    (id_pedido, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente)
+                VALUES ($1, $2, $3, $4, $5)
+            `, [pedido.id_pedido, it.id_producto, it.cantidad, precio / 100, it.nota]);
         }
 
         return { pedido, cambios };
@@ -259,7 +256,7 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
 const obtenerBandeja = async (id_sucursal, minutos_expiracion) => {
     const r = await db.query(`
         SELECT pm.id_pedido, pm.tipo_pedido, pm.id_mesa, pm.id_sucursal, pm.estado_pedido,
-               pm.monto_total, pm.fecha_pedido, pm.fecha_aprobacion, pm.observacion_general,
+               SUM(dp.subtotal_detalle) AS monto_total, pm.fecha_pedido, pm.fecha_aprobacion, pm.observacion_general,
                pm.fecha_pedido + make_interval(mins => $2) AS fecha_expiracion,
                pm.nombre_cliente, pm.telefono_cliente, pm.direccion_entrega, pm.sin_verificar,
                m.numero_mesa,
@@ -322,12 +319,12 @@ const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal, id
                 : await devolverStock(client, pedido.id_sucursal, [mov], registro);
             await client.query(`
                 UPDATE detalle_pedido
-                SET cantidad_solicitada = $1::int, subtotal_detalle = $1::int * precio_aplicado
+                SET cantidad_solicitada = $1
                 WHERE id_detalle_pedido = $2
             `, [nueva, id_detalle]);
         }
 
-        const rMonto = await recalcularMontoPedido(client, id_pedido);
+        const rMonto = await montoPedido(client, id_pedido);
         return { pedido, cambios, monto_total: rMonto.rows[0].monto_total };
     });
 };
@@ -346,8 +343,8 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
         let cuenta_nueva = false;
         if (!rCuenta.rows.length) {
             rCuenta = await client.query(`
-                INSERT INTO cuenta_mesa (id_mesa, id_usuario_apertura, estado, total_acumulado)
-                VALUES ($1, $2, 'Abierta', 0) RETURNING id_cuenta
+                INSERT INTO cuenta_mesa (id_mesa, id_usuario_apertura, estado)
+                VALUES ($1, $2, 'Abierta') RETURNING id_cuenta
             `, [pedido.id_mesa, id_usuario]);
             cuenta_nueva = true;
         }
@@ -355,17 +352,12 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
 
         // Stock ya reservado: no se descuenta de nuevo
         await client.query(`
-            INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, subtotal, nota, origen,
+            INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, nota, origen,
                                         cliente_mesa, nombre_cliente)
-            SELECT $1, id_producto, cantidad_solicitada, precio_aplicado, subtotal_detalle, nota_cliente, 'qr', $3, $4
+            SELECT $1, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente, 'qr', $3, $4
             FROM detalle_pedido WHERE id_pedido = $2
             ORDER BY id_detalle_pedido
         `, [id_cuenta, id_pedido, pedido.cliente_mesa, pedido.nombre_cliente]);
-        await client.query(`
-            UPDATE cuenta_mesa
-            SET total_acumulado = (SELECT COALESCE(SUM(subtotal), 0) FROM detalle_cuenta WHERE id_cuenta = $1 AND id_venta IS NULL)
-            WHERE id_cuenta = $1
-        `, [id_cuenta]);
         await visitaModel.habilitar(client, pedido.id_mesa);
 
         const rPed = await client.query(`
@@ -452,7 +444,7 @@ const obtenerEstadoMesa = async (id_mesa, cliente_mesa) => {
 
     // En curso, más los no atendidos de las últimas 2 horas
     const rPed = await db.query(`
-        SELECT pm.id_pedido, pm.estado_pedido, pm.monto_total, pm.fecha_pedido,
+        SELECT pm.id_pedido, pm.estado_pedido, SUM(dp.subtotal_detalle) AS monto_total, pm.fecha_pedido,
                json_agg(json_build_object(
                    'nombre_producto', p.nombre_producto,
                    'cantidad',        dp.cantidad_solicitada,
@@ -472,7 +464,7 @@ const obtenerEstadoMesa = async (id_mesa, cliente_mesa) => {
 
     // Lo consumido por este celular en la cuenta abierta (pagado o por pagar)
     const rCuenta = await db.query(`
-        SELECT c.id_cuenta, c.total_acumulado AS total_mesa,
+        SELECT c.id_cuenta, (SELECT COALESCE(SUM(dc.subtotal), 0) FROM detalle_cuenta dc WHERE dc.id_cuenta = c.id_cuenta AND dc.id_venta IS NULL) AS total_mesa,
                COALESCE(SUM(dc.subtotal) FILTER (WHERE dc.id_venta IS NULL), 0) AS mi_pendiente,
                COALESCE(SUM(dc.subtotal) FILTER (WHERE dc.id_venta IS NOT NULL), 0) AS mi_pagado,
                COALESCE(json_agg(json_build_object(

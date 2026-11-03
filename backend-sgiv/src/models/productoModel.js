@@ -59,7 +59,7 @@ const obtenerProductos = async (id_sucursal = 1, incluirInactivos = false) => {
             c.id_categoria,
             c.nombre_categoria,
             i.cantidad_actual   AS stock_actual,
-            i.stock_minimo_alerta
+            (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1) AS stock_minimo_alerta
         FROM producto p
         JOIN categoria_producto   c ON p.id_categoria = c.id_categoria
         JOIN inventario_sucursal  i ON i.id_producto  = p.id_producto
@@ -95,8 +95,8 @@ const actualizarProducto = async (id, datos) => {
 // ─── Fila de inventario de un producto nuevo en una sucursal (nunca pisa un stock existente) ───
 const asignarProductoASucursal = async (id_producto, id_sucursal, stock_inicial = 0, cliente = db) => {
     const r = await cliente.query(`
-        INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual, stock_minimo_alerta)
-        VALUES ($1, $2, $3, COALESCE((SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1), 5))
+        INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual)
+        VALUES ($1, $2, $3)
         RETURNING *
     `, [id_sucursal, id_producto, stock_inicial]);
     return r.rows[0];

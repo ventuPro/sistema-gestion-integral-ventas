@@ -46,7 +46,8 @@ const datosReceta = (b) => {
     }));
     if (new Set(lista.map(x => x.id_insumo)).size !== lista.length)
         throw new ErrorValidacion('Un insumo está repetido: suma sus cantidades en una sola fila');
-    return { nombre: nombre(b.nombre), rendimiento: positivo(b.rendimiento, 'Rendimiento', { decimales: 2, max: 1e6 }), ingredientes: lista };
+    return { nombre: nombre(b.nombre), rendimiento: positivo(b.rendimiento, 'Rendimiento', { decimales: 2, max: 1e6 }),
+             id_producto: b.id_producto ? entero(b.id_producto, 'Producto') : null, ingredientes: lista };
 };
 
 const ESTADOS = { INVALIDO: 400, NO_EXISTE: 404, DUPLICADO: 409, EN_USO: 409 };
@@ -66,6 +67,7 @@ const id = (req) => entero(req.params.id, 'Identificador');
 
 module.exports = {
     unidades:         responder(async (req, res) => res.json(await costoModel.unidades())),
+    productos:        responder(async (req, res) => res.json(await costoModel.productos())),
     listarInsumos:    responder(async (req, res) => res.json(await costoModel.listarInsumos())),
     crearInsumo:      responder(async (req, res) =>
         res.status(201).json(await costoModel.crearInsumo(datosInsumo(req.body || {}), req.usuario.id_usuario))),

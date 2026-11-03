@@ -93,7 +93,9 @@
                 <th>Receta</th>
                 <th class="num">Rinde</th>
                 <th class="num">Inversión</th>
-                <th class="num">Por unidad</th>
+                <th class="num">Costo por unidad</th>
+                <th class="num">Precio de venta</th>
+                <th class="num">Ganancia por unidad</th>
                 <th>Actualizada</th>
                 <th></th>
               </tr>
@@ -101,10 +103,20 @@
             <tbody>
               @for (r of recetasFiltradas(); track r.id_receta) {
                 <tr class="fila-receta" (click)="editarReceta(r)">
-                  <td class="fuerte">{{ r.nombre }}</td>
+                  <td>
+                    <span class="fuerte">{{ r.nombre }}</span>
+                    @if (r.nombre_producto && r.nombre_producto !== r.nombre) { <span class="inf-secundario">{{ r.nombre_producto }}</span> }
+                  </td>
                   <td class="num">{{ cantidad(r.rendimiento) }} u</td>
-                  <td class="num fuerte">{{ moneda() }} {{ cifra(r.inversion) }}</td>
+                  <td class="num">{{ moneda() }} {{ cifra(r.inversion) }}</td>
                   <td class="num fuerte">{{ moneda() }} {{ cifra(r.por_unidad) }}</td>
+                  <td class="num">{{ r.precio_venta == null ? '—' : moneda() + ' ' + cifra(r.precio_venta) }}</td>
+                  <td class="num">
+                    @if (r.ganancia != null) {
+                      <span class="fuerte" [class.inf-sube]="r.ganancia > 0" [class.inf-baja]="r.ganancia <= 0">{{ moneda() }} {{ cifra(r.ganancia) }}</span>
+                      <span class="inf-secundario">{{ r.margen }} %</span>
+                    } @else { — }
+                  </td>
                   <td class="inf-tenue">{{ fechaHora(r.fecha_calculo) }}</td>
                   <td (click)="$event.stopPropagation()">
                     <div class="flex justify-end gap-1">
@@ -187,11 +199,20 @@
 
       <div class="p-5 space-y-4 overflow-y-auto">
         @if (errorReceta()) { <p class="error-formulario" role="alert">{{ errorReceta() }}</p> }
-        <div class="grid sm:grid-cols-[1fr_160px] gap-3">
+        <div class="grid sm:grid-cols-[1fr_1fr_140px] gap-3">
           <div class="grupo">
             <label class="inf-etiqueta" for="nombre-receta">Nombre</label>
             <input id="nombre-receta" name="nombre" class="campo" maxlength="80" data-mayusculas
                    [ngModel]="f.nombre" (ngModelChange)="cambiarDato('nombre', $event)" placeholder="CROISSANT">
+          </div>
+          <div class="grupo">
+            <label class="inf-etiqueta" for="producto-receta">Producto</label>
+            <select id="producto-receta" name="producto" class="campo" [ngModel]="f.id_producto" (ngModelChange)="cambiarDato('id_producto', $event)">
+              <option [ngValue]="null">Sin producto</option>
+              @for (p of productosParaReceta(f.id_receta); track p.id_producto) {
+                <option [ngValue]="p.id_producto">{{ p.nombre_producto }} · {{ moneda() }} {{ cifra(p.precio_venta) }}</option>
+              }
+            </select>
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="rinde-receta">Rinde (unidades)</label>
@@ -242,7 +263,18 @@
 
       <div class="totales separador">
         <div><span class="inf-etiqueta">Inversión</span><b>{{ moneda() }} {{ cifra(calculo()?.total || 0) }}</b></div>
-        <div><span class="inf-etiqueta">Por unidad</span><b>{{ calculo()?.porUnidad == null ? '—' : moneda() + ' ' + cifra(calculo()!.porUnidad) }}</b></div>
+        <div><span class="inf-etiqueta">Costo por unidad</span><b>{{ calculo()?.porUnidad == null ? '—' : moneda() + ' ' + cifra(calculo()!.porUnidad) }}</b></div>
+        @if (calculo()?.precio != null) {
+          <div><span class="inf-etiqueta">Precio de venta</span><b>{{ moneda() }} {{ cifra(calculo()!.precio) }}</b></div>
+          <div>
+            <span class="inf-etiqueta">Ganancia por unidad</span>
+            @if (calculo()!.ganancia != null) {
+              <b [class.inf-sube]="calculo()!.ganancia! > 0" [class.inf-baja]="calculo()!.ganancia! <= 0">
+                {{ moneda() }} {{ cifra(calculo()!.ganancia) }} <small>{{ cifra(calculo()!.margen, 1) }} %</small>
+              </b>
+            } @else { <b>—</b> }
+          </div>
+        }
       </div>
       <div class="inf-pie-hoja flex justify-end gap-2">
         <button type="button" class="inf-boton" (click)="cerrarReceta()">Cancelar</button>

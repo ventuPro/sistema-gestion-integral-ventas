@@ -43,7 +43,8 @@ const enTransaccion = async (fn) => {
         return r;
     } catch (e) {
         await client.query('ROLLBACK');
-        if (e.code === '23505') throw error('DUPLICADO', 'Ya existe uno con ese nombre');
+        if (e.code === '23505') throw error('DUPLICADO', e.constraint === 'uq_receta_producto'
+            ? 'Ese producto ya tiene otra receta' : 'Ya existe uno con ese nombre');
         throw e;
     } finally {
         client.release();
@@ -147,17 +148,32 @@ const recalcular = async (client, ids, motivo, id_usuario, siempre = false) => {
     `, [ids, motivo, id_usuario || null, siempre])).rows;
 };
 
+// Ganancia por unidad = precio de venta del producto vinculado − costo por unidad de la receta
 const listarRecetas = async () => (await db.query(`
     SELECT r.id_receta, r.nombre, r.rendimiento::float8 AS rendimiento, r.inversion::float8 AS inversion,
            ROUND(r.inversion / r.rendimiento, 4)::float8 AS por_unidad, r.fecha_calculo,
-           (SELECT COUNT(*)::int FROM ingrediente_receta ir WHERE ir.id_receta = r.id_receta) AS ingredientes
-    FROM receta r ORDER BY r.nombre`)).rows;
+           (SELECT COUNT(*)::int FROM ingrediente_receta ir WHERE ir.id_receta = r.id_receta) AS ingredientes,
+           p.id_producto, p.nombre_producto, p.precio_unitario::float8 AS precio_venta,
+           ROUND(p.precio_unitario - r.inversion / r.rendimiento, 4)::float8 AS ganancia,
+           ROUND((p.precio_unitario - r.inversion / r.rendimiento) * 100 / NULLIF(p.precio_unitario, 0), 1)::float8 AS margen
+    FROM receta r LEFT JOIN producto p ON p.id_producto = r.id_producto
+    ORDER BY r.nombre`)).rows;
+
+/** Productos que se pueden vincular a una receta (los activos; el precio es el del catálogo) */
+const productos = async () => (await db.query(`
+    SELECT p.id_producto, p.nombre_producto, p.precio_unitario::float8 AS precio_venta,
+           (SELECT r.id_receta FROM receta r WHERE r.id_producto = p.id_producto) AS id_receta
+    FROM producto p WHERE p.estado_activo ORDER BY p.nombre_producto`)).rows;
 
 const obtenerReceta = async (id_receta) => {
     const r = await db.query(`
-        SELECT id_receta, nombre, rendimiento::float8 AS rendimiento, inversion::float8 AS inversion,
-               ROUND(inversion / rendimiento, 4)::float8 AS por_unidad, fecha_calculo
-        FROM receta WHERE id_receta = $1`, [id_receta]);
+        SELECT r.id_receta, r.nombre, r.rendimiento::float8 AS rendimiento, r.inversion::float8 AS inversion,
+               ROUND(r.inversion / r.rendimiento, 4)::float8 AS por_unidad, r.fecha_calculo,
+               p.id_producto, p.nombre_producto, p.precio_unitario::float8 AS precio_venta,
+               ROUND(p.precio_unitario - r.inversion / r.rendimiento, 4)::float8 AS ganancia,
+               ROUND((p.precio_unitario - r.inversion / r.rendimiento) * 100 / NULLIF(p.precio_unitario, 0), 1)::float8 AS margen
+        FROM receta r LEFT JOIN producto p ON p.id_producto = r.id_producto
+        WHERE r.id_receta = $1`, [id_receta]);
     if (!r.rows.length) return null;
     const ingredientes = (await db.query(`
         SELECT ir.id_insumo, i.nombre, ir.cantidad::float8 AS cantidad, ir.id_unidad, u.codigo AS unidad,
@@ -171,7 +187,7 @@ const obtenerReceta = async (id_receta) => {
 };
 
 /** Crea (id_receta null) o reemplaza la receta con sus ingredientes y guarda su inversión */
-const guardarReceta = (id_receta, { nombre, rendimiento, ingredientes }, id_usuario) =>
+const guardarReceta = (id_receta, { nombre, rendimiento, id_producto = null, ingredientes }, id_usuario) =>
     enTransaccion(async (client) => {
         // Cada ingrediente en una unidad del mismo tipo que su insumo
         const ids = ingredientes.map(x => x.id_insumo);
@@ -186,15 +202,21 @@ const guardarReceta = (id_receta, { nombre, rendimiento, ingredientes }, id_usua
             if (u.tipo !== ins.tipo) throw error('INVALIDO', `${ins.nombre} no se mide en ${u.codigo}`);
         }
 
+        if (id_producto) {
+            const p = await client.query(`SELECT 1 FROM producto WHERE id_producto = $1`, [id_producto]);
+            if (!p.rows.length) throw error('INVALIDO', 'El producto ya no existe');
+        }
+
         let id = id_receta;
         if (id) {
-            const r = await client.query(`UPDATE receta SET nombre = $2, rendimiento = $3 WHERE id_receta = $1 RETURNING id_receta`,
-                                         [id, nombre, rendimiento]);
+            const r = await client.query(
+                `UPDATE receta SET nombre = $2, rendimiento = $3, id_producto = $4 WHERE id_receta = $1 RETURNING id_receta`,
+                [id, nombre, rendimiento, id_producto]);
             if (!r.rows.length) throw error('NO_EXISTE', 'Receta no encontrada');
             await client.query(`DELETE FROM ingrediente_receta WHERE id_receta = $1`, [id]);
         } else {
-            id = (await client.query(`INSERT INTO receta (nombre, rendimiento) VALUES ($1, $2) RETURNING id_receta`,
-                                     [nombre, rendimiento])).rows[0].id_receta;
+            id = (await client.query(`INSERT INTO receta (nombre, rendimiento, id_producto) VALUES ($1, $2, $3) RETURNING id_receta`,
+                                     [nombre, rendimiento, id_producto])).rows[0].id_receta;
         }
         for (const x of ingredientes) {
             await client.query(`INSERT INTO ingrediente_receta (id_receta, id_insumo, cantidad, id_unidad) VALUES ($1, $2, $3, $4)`,
@@ -217,5 +239,5 @@ const historialReceta = async (id_receta) => (await db.query(`
 
 module.exports = {
     unidades, listarInsumos, crearInsumo, actualizarInsumo, eliminarInsumo, historialInsumo,
-    listarRecetas, obtenerReceta, guardarReceta, eliminarReceta, historialReceta
+    listarRecetas, obtenerReceta, guardarReceta, eliminarReceta, historialReceta, productos
 };

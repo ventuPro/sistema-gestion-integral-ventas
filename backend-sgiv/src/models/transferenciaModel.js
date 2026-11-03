@@ -63,7 +63,7 @@ const crear = async ({ id_origen, id_destino, id_usuario, items, observacion }) 
             const rSale = await client.query(`
                 UPDATE inventario_sucursal SET cantidad_actual = cantidad_actual - $1
                 WHERE id_sucursal = $2 AND id_producto = $3 AND cantidad_actual >= $1
-                RETURNING id_inventario, cantidad_actual, stock_minimo_alerta
+                RETURNING id_inventario, cantidad_actual
             `, [it.cantidad, id_origen, it.id_producto]);
             if (!rSale.rows.length) {
                 const rHay = await client.query(
@@ -74,14 +74,14 @@ const crear = async ({ id_origen, id_destino, id_usuario, items, observacion }) 
             }
             const sale = rSale.rows[0];
 
-            // Si el destino nunca tuvo el producto, se le crea con la alerta del origen
+            // Si el destino nunca tuvo el producto, se le crea
             const rEntra = await client.query(`
-                INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual, stock_minimo_alerta)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual)
+                VALUES ($1, $2, $3)
                 ON CONFLICT (id_sucursal, id_producto)
                 DO UPDATE SET cantidad_actual = inventario_sucursal.cantidad_actual + EXCLUDED.cantidad_actual
                 RETURNING id_inventario, cantidad_actual
-            `, [id_destino, it.id_producto, it.cantidad, sale.stock_minimo_alerta]);
+            `, [id_destino, it.id_producto, it.cantidad]);
             const entra = rEntra.rows[0];
 
             await client.query(

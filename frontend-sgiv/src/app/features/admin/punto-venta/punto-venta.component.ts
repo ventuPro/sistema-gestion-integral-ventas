@@ -612,8 +612,6 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
     const datosVenta = {
       id_sucursal:       this.sucursal(),
-      id_cliente:        null,
-      id_pedido_mesa:    null,
       monto_total_venta: this.total(),
       metodo_pago:       this.metodoPago(),
       descuento:         this.descuento(),

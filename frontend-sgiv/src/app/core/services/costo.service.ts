@@ -29,13 +29,21 @@ export interface Receta {
   por_unidad: number;
   fecha_calculo: string;
   ingredientes?: number;
+  /** Producto vinculado: precio de venta, ganancia por unidad y margen (%) */
+  id_producto: number | null;
+  nombre_producto: string | null;
+  precio_venta: number | null;
+  ganancia: number | null;
+  margen: number | null;
 }
+
+export interface ProductoVenta { id_producto: number; nombre_producto: string; precio_venta: number; id_receta: number | null }
 
 export interface Ingrediente { id_insumo: number; nombre?: string; cantidad: number; id_unidad: number; unidad?: string; costo?: number }
 export interface RecetaDetalle extends Omit<Receta, 'ingredientes'> { ingredientes: Ingrediente[] }
 
 export interface NuevoInsumo { nombre: string; cantidad_compra: number; id_unidad_compra: number; precio_compra: number }
-export interface NuevaReceta { nombre: string; rendimiento: number; ingredientes: { id_insumo: number; cantidad: number; id_unidad: number }[] }
+export interface NuevaReceta { nombre: string; rendimiento: number; id_producto: number | null; ingredientes: { id_insumo: number; cantidad: number; id_unidad: number }[] }
 
 @Injectable({ providedIn: 'root' })
 export class CostoService {
@@ -43,6 +51,7 @@ export class CostoService {
   private api  = `${environment.apiUrl}/costos`;
 
   unidades()                              { return this.http.get<Unidad[]>(`${this.api}/unidades`); }
+  productos()                             { return this.http.get<ProductoVenta[]>(`${this.api}/productos`); }
 
   insumos()                               { return this.http.get<Insumo[]>(`${this.api}/insumos`); }
   crearInsumo(d: NuevoInsumo)             { return this.http.post<{ id_insumo: number; recetas_actualizadas?: number }>(`${this.api}/insumos`, d); }
