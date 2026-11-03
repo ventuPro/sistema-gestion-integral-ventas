@@ -1,10 +1,16 @@
 // ─── Guía de uso del sistema para el asistente del personal ───
 // Una sección por módulo; el asistente solo recibe las que el usuario puede usar.
-// modulo: permiso que se exige (null = solo administrador).
+// modulo: permiso que se exige (null = solo administrador; '*' = todo el personal).
 const GUIAS = {
     panel: { modulo: 'dashboard', titulo: 'Panel principal', resumen: 'resumen del día (ingresos, cobros, turnos abiertos, stock por reponer, lo más vendido).', texto: `
 Menú lateral → «Panel principal». Muestra el día en curso: ingresos de hoy y, justo debajo, lo cobrado en efectivo y por QR; ventas, ticket promedio, ritmo de ventas por hora, cobros por método (efectivo / QR), turnos de caja abiertos con el efectivo que debería haber, consumo por cobrar en mesas, pedidos del menú QR, alertas de stock («Stock por reponer», con enlace «Ver inventario»), lo más vendido hoy y las últimas ventas. Se actualiza solo.
 El administrador elige la sucursal (o «Todas») con el selector de sucursal de arriba. El ticket promedio es el ingreso por venta. Las promociones vigentes se ven en el menú «Promociones».` },
+
+    notificaciones: { modulo: '*', titulo: 'Notificaciones', resumen: 'campana «Notificaciones» del menú lateral con el número de avisos sin leer; tocar un aviso lleva a su pantalla.', texto: `
+Menú lateral → «Notificaciones» (ícono de campana, encima de «Pedidos QR»). El número rojo son los avisos sin leer. Al tocarla se abre la lista con «No leídas» y «Todas»; «Marcar todas como leídas» las deja leídas. Tocar un aviso lo marca como leído y, si tienes acceso a esa pantalla, te lleva a ella (stock a Inventario, arqueo y caja sin cerrar a Cierres de caja, descuentos a Reportes). Esc o tocar fuera cierra la lista. Los avisos se guardan 7 días.
+Qué avisa el sistema: «Stock bajo» cuando un producto baja al stock mínimo de Ajustes (una vez; no en cada venta) y «Agotado» cuando llega a 0; «Faltante en caja» o «Sobrante en caja» cuando un turno se cierra con el efectivo contado distinto del esperado; «Caja sin cerrar» cuando el sistema cerró un turno a las 00:00; «Transferencia» cuando llegan productos de otra sucursal; «Descuento manual» en cada venta o cobro de mesa con descuento manual (monto, cajero y motivo).
+Quién los recibe: el administrador recibe todos, de todas las sucursales. El cajero recibe el stock bajo, los agotados y las transferencias de su sucursal, y el aviso de su propia caja cerrada por el sistema; el arqueo con diferencia y los descuentos manuales solo los ve el administrador. Quien hizo la acción (por ejemplo, quien envió la transferencia) no la recibe como pendiente.
+Al llegar, el faltante o sobrante en caja, la caja sin cerrar y las transferencias se muestran además en un aviso arriba a la derecha; el stock bajo, los agotados y los descuentos solo suman al número de la campana para no interrumpir la venta.` },
 
     punto_venta: { modulo: 'punto_venta', titulo: 'Punto de venta', resumen: '«Abrir la caja del día» con el fondo inicial; vender tocando productos → «Cobrar venta» → método de pago → «Confirmar venta».', texto: `
 Menú lateral → «Punto de venta». Con el menú lateral plegado el catálogo muestra más productos por fila. El botón de arriba del menú, junto al logo, lo pliega (solo íconos) o lo despliega; vale para todas las pantallas y el sistema recuerda la elección en ese equipo. Con el menú plegado, al pasar el puntero sobre un ícono aparece su nombre.
@@ -101,7 +107,7 @@ Menú lateral → «Ajustes». Pestañas:
 /** Secciones que puede consultar el usuario según sus permisos */
 const guiasPermitidas = (esAdmin, permisos) =>
     Object.entries(GUIAS)
-        .filter(([, g]) => esAdmin || (g.modulo && permisos[g.modulo] === true))
+        .filter(([, g]) => esAdmin || g.modulo === '*' || (g.modulo && permisos[g.modulo] === true))
         .map(([clave, g]) => ({ clave, titulo: g.titulo, resumen: g.resumen, texto: g.texto.trim() }));
 
 module.exports = { guiasPermitidas };

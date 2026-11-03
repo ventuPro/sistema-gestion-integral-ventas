@@ -35,6 +35,13 @@
         }
       }
 
+      <button (click)="abrirNotificaciones()" class="enlace pedidos avisos" [class.hay-avisos]="notificaciones.noLeidas()"
+              data-titulo="Notificaciones" aria-label="Notificaciones">
+        <lucide-icon [img]="icons.campana" class="w-[18px] h-[18px] flex-shrink-0" [strokeWidth]="1.75"></lucide-icon>
+        <span class="texto flex-1 text-left">Notificaciones</span>
+        @if (notificaciones.noLeidas(); as n) { <span class="contador-pedidos bg-red-600 text-white">{{ n > 99 ? '99+' : n }}</span> }
+      </button>
+
       @if (bandeja(); as b) {
         <button (click)="abrirBandeja()" class="enlace pedidos" [class.hay]="b.conteo().pendientes"
                 data-titulo="Pedidos QR" aria-label="Pedidos QR">
@@ -70,6 +77,10 @@
       </button>
     </div>
   </aside>
+
+  @if (panelNotificaciones()) {
+    <app-panel-notificaciones [rutas]="rutasPermitidas()" (cerrar)="panelNotificaciones.set(false)" />
+  }
 
   <!-- Pedidos del menú QR: visibles en cualquier pantalla del cajero -->
   @if (esCajero() && tiene('mesas')) { <app-bandeja-pedidos [flotante]="false" /> }

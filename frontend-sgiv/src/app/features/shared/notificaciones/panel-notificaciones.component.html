@@ -1,0 +1,44 @@
+<div class="fixed inset-0 z-50 flex justify-end fondo-modal" (fondoModal)="cerrar.emit()">
+  <aside class="panel" role="dialog" aria-label="Notificaciones">
+
+    <div class="cabecera">
+      <h2>Notificaciones</h2>
+      <button class="icono-cerrar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <lucide-icon [img]="icons.x" class="w-5 h-5"></lucide-icon>
+      </button>
+    </div>
+
+    <div class="barra">
+      <div class="filtros" role="tablist">
+        <button role="tab" [class.activo]="soloNoLeidas()" [attr.aria-selected]="soloNoLeidas()" (click)="soloNoLeidas.set(true)">
+          No leídas @if (servicio.noLeidas()) { <span class="cuenta">{{ servicio.noLeidas() }}</span> }
+        </button>
+        <button role="tab" [class.activo]="!soloNoLeidas()" [attr.aria-selected]="!soloNoLeidas()" (click)="soloNoLeidas.set(false)">Todas</button>
+      </div>
+      @if (servicio.noLeidas()) {
+        <button class="marcar" (click)="servicio.marcarLeidas()">
+          <lucide-icon [img]="icons.todas" class="w-4 h-4"></lucide-icon> Marcar todas como leídas
+        </button>
+      }
+    </div>
+
+    <div class="lista">
+      @for (n of visibles(); track n.id_notificacion) {
+        <button class="aviso" [class.nueva]="!n.leida" [class.enlace]="puedeIr(n)" [attr.data-tipo]="n.tipo" (click)="abrir(n)">
+          <span class="icono"><lucide-icon [img]="icono(n)" class="w-[18px] h-[18px]" [strokeWidth]="1.75"></lucide-icon></span>
+          <span class="textos">
+            <span class="titulo">{{ n.titulo }}</span>
+            <span class="mensaje">{{ n.mensaje }}</span>
+            <span class="hora">{{ hace(n.fecha_creacion) }}</span>
+          </span>
+          @if (!n.leida) { <span class="punto" aria-label="No leída"></span> }
+        </button>
+      } @empty {
+        <div class="vacio">
+          <lucide-icon [img]="icons.vacio" class="w-8 h-8" [strokeWidth]="1.5"></lucide-icon>
+          <p>{{ soloNoLeidas() ? 'Sin notificaciones nuevas' : 'Sin notificaciones' }}</p>
+        </div>
+      }
+    </div>
+  </aside>
+</div>

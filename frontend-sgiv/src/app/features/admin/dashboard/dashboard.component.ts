@@ -5,7 +5,7 @@ import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
          Landmark, LogOut, Building2,
-         Settings, Menu, X, Bell, BadgePercent, ChevronsUpDown, Calculator, PanelLeftClose, PanelLeftOpen, CircleUser } from 'lucide-angular';
+         Settings, Menu, X, Bell, BadgePercent, ChevronsUpDown, Calculator, PanelLeftClose, PanelLeftOpen, CircleUser, QrCode } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
@@ -18,6 +18,8 @@ import { componenteDiferido } from '../../../core/utils/diferido';
 import type { MensajeChat } from '../../shared/asistente/asistente-chat.component';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
+import { NotificacionService } from '../../../core/services/notificacion.service';
+import { PanelNotificacionesComponent } from '../../shared/notificaciones/panel-notificaciones.component';
 
 const CLAVE_PLEGADO = 'menu_plegado';
 const leerPlegado = () => { try { return localStorage.getItem(CLAVE_PLEGADO) === '1'; } catch { return false; } };
@@ -27,7 +29,7 @@ interface Enlace { ruta: string; texto: string; icono: any; modulo?: string }
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterOutlet, RouterModule, CommonModule, LucideAngularModule, BandejaPedidosComponent],
+  imports: [RouterOutlet, RouterModule, CommonModule, LucideAngularModule, BandejaPedidosComponent, PanelNotificacionesComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -40,6 +42,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private socketService  = inject(SocketService);
   readonly ajustes       = inject(AjustesService);
   private http           = inject(HttpClient);
+  readonly notificaciones = inject(NotificacionService);
 
   // ─── Asistente con IA (se descarga solo si está activado) ───
   readonly chatAsistente = componenteDiferido(() => this.ajustes.config().ia_interno_disponible,
@@ -61,8 +64,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private subPermisos?: Subscription;
   private subRuta?: Subscription;
-  private subTransferencias?: Subscription;
-  private subCierre?: Subscription;
+
+  /** Panel de la campana */
+  readonly panelNotificaciones = signal(false);
+  /** Pantallas del menú a las que puede entrar (enlaces de las notificaciones) */
+  readonly rutasPermitidas = computed(() => new Set(this.secciones().flatMap(s => s.enlaces)
+    .filter(e => !e.modulo || this.tiene(e.modulo)).map(e => e.ruta)));
 
   /** Menú lateral abierto (solo en celular y tablet) */
   readonly menuAbierto = signal(false);
@@ -99,7 +106,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     cierres:    Landmark,
     logout:     LogOut,
     menu:       Menu,
-    pedidos:    Bell,
+    pedidos:    QrCode,
+    campana:    Bell,
     cerrar:     X,
     sucursal:   Building2,
     ajustes:    Settings,
@@ -137,31 +145,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
 
     this.permisoService.escucharCambios();
-    this.avisarTransferencias();
+    // Las notificaciones llegan a la sala propia del usuario (se une con 'cajeros')
+    this.socketService.conectar('cajeros');
+    this.notificaciones.iniciar();
   }
 
-  /** Aviso a la sucursal que recibe productos (y al administrador), en cualquier pantalla */
-  private avisarTransferencias() {
-    this.socketService.conectar('cajeros');
-    this.subTransferencias = this.socketService.escuchar<any>('transferencia:nueva').subscribe(d => {
-      const yo = this.usuario();
-      if (!d || !yo || Number(d.id_usuario) === Number(yo.id_usuario)) return;
-      if (this.esAdmin())
-        this.dialogo.avisar(`Transferencia de ${d.nombre_origen} a ${d.nombre_destino}: ${d.resumen}`);
-      else if (Number(d.id_sucursal_destino) === this.sesion.idSucursal())
-        this.dialogo.avisar(`Llegaron productos de ${d.nombre_origen}: ${d.resumen}`);
-    });
-    this.subCierre = this.socketService.escuchar<any>('caja:cerrada').subscribe(d => {
-      if (d?.por === 'Sistema' && Number(d.id_usuario) === this.usuario()?.id_usuario)
-        this.dialogo.avisar('El sistema cerró tu caja a las 00:00.');
-    });
+  abrirNotificaciones() {
+    this.cerrarMenu();
+    this.menuCuenta.set(false);
+    this.panelNotificaciones.set(true);
   }
 
   ngOnDestroy() {
     this.subPermisos?.unsubscribe();
     this.subRuta?.unsubscribe();
-    this.subTransferencias?.unsubscribe();
-    this.subCierre?.unsubscribe();
+    this.notificaciones.detener();
     this.permisoService.dejarDeEscuchar();
   }
 
