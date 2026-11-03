@@ -119,10 +119,7 @@
                   </div>
                 </td>
                 <td class="num">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</td>
-                <td class="num">
-                  <span class="fuerte">{{ prod.stock_actual || 0 }}</span>
-                  <span class="inf-secundario">mín. {{ prod.stock_minimo_alerta }}</span>
-                </td>
+                <td class="num"><span class="fuerte">{{ prod.stock_actual || 0 }}</span></td>
                 <td>
                   @if (!prod.estado_activo) { <span class="inf-estado neutro">Inactivo</span> }
                   @else if (estadoStock(prod) === 'sin') { <span class="inf-estado mal">Sin stock</span> }

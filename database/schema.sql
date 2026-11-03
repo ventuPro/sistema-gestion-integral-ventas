@@ -5,6 +5,12 @@
 -- Consultas de ejemplo: database/consultas_auditoria.sql
 
 -- Limpieza previa para evitar errores de "ya existe" (Opcional pero recomendado en desarrollo)
+DROP TABLE IF EXISTS historial_inversion_receta CASCADE;
+DROP TABLE IF EXISTS ingrediente_receta CASCADE;
+DROP TABLE IF EXISTS receta CASCADE;
+DROP TABLE IF EXISTS historial_precio_insumo CASCADE;
+DROP TABLE IF EXISTS insumo CASCADE;
+DROP TABLE IF EXISTS unidad_medida CASCADE;
 DROP TABLE IF EXISTS configuracion CASCADE;
 DROP TABLE IF EXISTS propietario CASCADE;
 DROP TABLE IF EXISTS horario_sucursal CASCADE;
@@ -490,3 +496,70 @@ CREATE INDEX idx_promocion_sucursal      ON promocion (id_sucursal);
 CREATE INDEX idx_promocion_producto_prod ON promocion_producto (id_producto);
 CREATE INDEX idx_promocion_categoria_cat ON promocion_categoria (id_categoria);
 CREATE INDEX idx_detalle_venta_promocion ON detalle_venta (id_promocion);
+
+-- ==========================================
+-- COSTOS DE PRODUCCIÓN (solo administrador)
+-- Unidades (base: g, ml, unidad), insumos con su precio de compra y recetas.
+-- La inversión de cada receta se guarda con su historial; el costo por g / ml / unidad se calcula.
+-- ==========================================
+
+CREATE TABLE unidad_medida (
+    id_unidad   SMALLSERIAL PRIMARY KEY,
+    codigo      VARCHAR(12) NOT NULL UNIQUE,
+    nombre      VARCHAR(30) NOT NULL,
+    tipo        VARCHAR(10) NOT NULL CHECK (tipo IN ('PESO', 'VOLUMEN', 'CANTIDAD')),
+    factor_base NUMERIC(14, 6) NOT NULL CHECK (factor_base > 0),
+    orden       SMALLINT NOT NULL DEFAULT 0
+);
+INSERT INTO unidad_medida (codigo, nombre, tipo, factor_base, orden) VALUES
+    ('mg', 'Miligramo', 'PESO', 0.001, 1), ('g', 'Gramo', 'PESO', 1, 2), ('kg', 'Kilogramo', 'PESO', 1000, 3),
+    ('lb', 'Libra', 'PESO', 460, 4), ('arroba', 'Arroba', 'PESO', 11500, 5), ('quintal', 'Quintal', 'PESO', 46000, 6),
+    ('ml', 'Mililitro', 'VOLUMEN', 1, 10), ('l', 'Litro', 'VOLUMEN', 1000, 11),
+    ('cdta', 'Cucharadita', 'VOLUMEN', 5, 12), ('cda', 'Cucharada', 'VOLUMEN', 15, 13), ('taza', 'Taza', 'VOLUMEN', 240, 14),
+    ('u', 'Unidad', 'CANTIDAD', 1, 20), ('docena', 'Docena', 'CANTIDAD', 12, 21), ('maple', 'Maple', 'CANTIDAD', 30, 22)
+ON CONFLICT (codigo) DO NOTHING;
+CREATE TABLE insumo (
+    id_insumo        SERIAL PRIMARY KEY,
+    nombre           VARCHAR(80) NOT NULL,
+    cantidad_compra  NUMERIC(14, 4) NOT NULL CHECK (cantidad_compra > 0),
+    id_unidad_compra SMALLINT NOT NULL REFERENCES unidad_medida(id_unidad),
+    precio_compra    NUMERIC(12, 2) NOT NULL CHECK (precio_compra >= 0),
+    fecha_precio     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX uq_insumo_nombre ON insumo (lower(nombre));
+CREATE TABLE historial_precio_insumo (
+    id_historial     SERIAL PRIMARY KEY,
+    id_insumo        INT NOT NULL REFERENCES insumo(id_insumo) ON DELETE CASCADE,
+    cantidad_compra  NUMERIC(14, 4) NOT NULL,
+    id_unidad_compra SMALLINT NOT NULL REFERENCES unidad_medida(id_unidad),
+    precio_compra    NUMERIC(12, 2) NOT NULL,
+    id_usuario       INT REFERENCES usuario(id_usuario),
+    fecha            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_historial_precio_insumo ON historial_precio_insumo (id_insumo, fecha);
+CREATE TABLE receta (
+    id_receta     SERIAL PRIMARY KEY,
+    nombre        VARCHAR(80) NOT NULL,
+    rendimiento   NUMERIC(10, 2) NOT NULL CHECK (rendimiento > 0),
+    inversion     NUMERIC(14, 4) NOT NULL DEFAULT 0,
+    fecha_calculo TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX uq_receta_nombre ON receta (lower(nombre));
+CREATE TABLE ingrediente_receta (
+    id_receta INT NOT NULL REFERENCES receta(id_receta) ON DELETE CASCADE,
+    id_insumo INT NOT NULL REFERENCES insumo(id_insumo),
+    cantidad  NUMERIC(14, 4) NOT NULL CHECK (cantidad > 0),
+    id_unidad SMALLINT NOT NULL REFERENCES unidad_medida(id_unidad),
+    PRIMARY KEY (id_receta, id_insumo)
+);
+CREATE INDEX idx_ingrediente_receta_insumo ON ingrediente_receta (id_insumo);
+CREATE TABLE historial_inversion_receta (
+    id_historial SERIAL PRIMARY KEY,
+    id_receta    INT NOT NULL REFERENCES receta(id_receta) ON DELETE CASCADE,
+    inversion    NUMERIC(14, 4) NOT NULL,
+    rendimiento  NUMERIC(10, 2) NOT NULL,
+    motivo       VARCHAR(200) NOT NULL,
+    id_usuario   INT REFERENCES usuario(id_usuario),
+    fecha        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_historial_inversion_receta ON historial_inversion_receta (id_receta, fecha);

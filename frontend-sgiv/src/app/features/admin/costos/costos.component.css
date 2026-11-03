@@ -1,0 +1,48 @@
+/* ─── Costos de producción ─── */
+
+/* Precio editable en la lista de insumos */
+.precio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--i-linea);
+  border-radius: 7px;
+  background: var(--i-papel);
+}
+.precio:focus-within { border-color: var(--i-acento); box-shadow: 0 0 0 3px var(--i-acento-suave); }
+.precio span { font-size: calc(12.5px * var(--escala-texto)); color: var(--i-tenue); }
+.precio input {
+  width: 92px;
+  padding: 6px 0;
+  text-align: right;
+  font-weight: 600;
+  color: var(--i-tinta);
+  background: transparent;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.fila-receta { cursor: pointer; }
+
+.dato { font-size: calc(13px * var(--escala-texto)); color: var(--i-texto); }
+.dato b { color: var(--i-tinta); }
+
+/* Ingredientes de la receta */
+.ingredientes td { padding-top: 6px; padding-bottom: 6px; }
+.ingredientes .campo { padding: 6px 9px; height: 36px; }
+.ingredientes .cantidad { width: 110px; text-align: right; }
+
+.totales {
+  display: flex;
+  justify-content: flex-end;
+  gap: 32px;
+  padding: 14px 20px;
+}
+.totales div { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.totales b {
+  font-size: calc(20px * var(--escala-texto));
+  font-weight: 600;
+  color: var(--i-tinta);
+  font-variant-numeric: tabular-nums;
+}

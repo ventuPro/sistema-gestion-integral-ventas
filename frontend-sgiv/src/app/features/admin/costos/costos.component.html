@@ -1,0 +1,296 @@
+<div class="space-y-5">
+
+  <header class="flex flex-wrap items-end justify-between gap-4">
+    <h1 class="inf-titulo">Costos de producción</h1>
+    @if (vista() === 'insumos') {
+      <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!" (click)="nuevoInsumo()">
+        <lucide-icon [img]="icons.nuevo" class="w-3.5 h-3.5"></lucide-icon> Nuevo insumo
+      </button>
+    } @else {
+      <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!" (click)="nuevaReceta()">
+        <lucide-icon [img]="icons.nuevo" class="w-3.5 h-3.5"></lucide-icon> Nueva receta
+      </button>
+    }
+  </header>
+
+  <nav class="inf-pestanas separador-inferior">
+    <button [class.activa]="vista() === 'insumos'" (click)="cambiarVista('insumos')">Insumos</button>
+    <button [class.activa]="vista() === 'recetas'" (click)="cambiarVista('recetas')">Recetas</button>
+  </nav>
+
+  <section class="inf-hoja overflow-clip">
+    <div class="p-4 pb-3 separador-inferior">
+      <div class="buscador max-w-md">
+        <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
+        <input type="text" [(ngModel)]="busqueda" [placeholder]="vista() === 'insumos' ? 'Buscar insumo' : 'Buscar receta'">
+        @if (busqueda()) {
+          <button class="quitar" (click)="busqueda.set('')" aria-label="Limpiar búsqueda">
+            <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon>
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (cargando()) {
+      <div class="p-4 space-y-2">@for (n of [1,2,3,4]; track n) { <div class="inf-esqueleto h-11"></div> }</div>
+    } @else if (vista() === 'insumos') {
+      @if (!insumosFiltrados().length) {
+        <p class="inf-vacio">{{ insumos().length ? 'Ningún insumo coincide.' : 'Todavía no hay insumos.' }}</p>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="inf-tabla">
+            <thead>
+              <tr>
+                <th>Insumo</th>
+                <th>Compra</th>
+                <th class="num">Precio de compra</th>
+                <th class="num">Costo</th>
+                <th class="num">Recetas</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (i of insumosFiltrados(); track i.id_insumo) {
+                <tr>
+                  <td class="fuerte">{{ i.nombre }}</td>
+                  <td>{{ cantidad(i.cantidad_compra) }} {{ i.unidad_compra }}</td>
+                  <td class="num">
+                    <label class="precio">
+                      <span>{{ moneda() }}</span>
+                      <input type="number" min="0" step="0.01" [value]="i.precio_compra" [attr.aria-label]="'Precio de ' + i.nombre"
+                             (change)="cambiarPrecio(i, $event)" (keydown.enter)="$any($event.target).blur()">
+                    </label>
+                  </td>
+                  <td class="num">{{ moneda() }} {{ precisa(i.costo_base) }} <span class="inf-tenue">/ {{ base(i.tipo) }}</span></td>
+                  <td class="num">{{ i.recetas }}</td>
+                  <td>
+                    <div class="flex justify-end gap-1">
+                      <button class="accion" (click)="verHistorialInsumo(i)" title="Historial de precios" aria-label="Historial de precios">
+                        <lucide-icon [img]="icons.historial" class="w-4 h-4"></lucide-icon>
+                      </button>
+                      <button class="accion" (click)="editarInsumo(i)" title="Editar" aria-label="Editar insumo">
+                        <lucide-icon [img]="icons.editar" class="w-4 h-4"></lucide-icon>
+                      </button>
+                      <button class="accion peligro" (click)="eliminarInsumo(i)" title="Eliminar" aria-label="Eliminar insumo">
+                        <lucide-icon [img]="icons.eliminar" class="w-4 h-4"></lucide-icon>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    } @else {
+      @if (!recetasFiltradas().length) {
+        <p class="inf-vacio">{{ recetas().length ? 'Ninguna receta coincide.' : 'Todavía no hay recetas.' }}</p>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="inf-tabla">
+            <thead>
+              <tr>
+                <th>Receta</th>
+                <th class="num">Rinde</th>
+                <th class="num">Inversión</th>
+                <th class="num">Por unidad</th>
+                <th>Actualizada</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of recetasFiltradas(); track r.id_receta) {
+                <tr class="fila-receta" (click)="editarReceta(r)">
+                  <td class="fuerte">{{ r.nombre }}</td>
+                  <td class="num">{{ cantidad(r.rendimiento) }} u</td>
+                  <td class="num fuerte">{{ moneda() }} {{ cifra(r.inversion) }}</td>
+                  <td class="num fuerte">{{ moneda() }} {{ cifra(r.por_unidad) }}</td>
+                  <td class="inf-tenue">{{ fechaHora(r.fecha_calculo) }}</td>
+                  <td (click)="$event.stopPropagation()">
+                    <div class="flex justify-end gap-1">
+                      <button class="accion" (click)="verHistorialReceta(r)" title="Historial de inversión" aria-label="Historial de inversión">
+                        <lucide-icon [img]="icons.historial" class="w-4 h-4"></lucide-icon>
+                      </button>
+                      <button class="accion" (click)="editarReceta(r)" title="Editar" aria-label="Editar receta">
+                        <lucide-icon [img]="icons.editar" class="w-4 h-4"></lucide-icon>
+                      </button>
+                      <button class="accion peligro" (click)="eliminarReceta(r)" title="Eliminar" aria-label="Eliminar receta">
+                        <lucide-icon [img]="icons.eliminar" class="w-4 h-4"></lucide-icon>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  </section>
+</div>
+
+<!-- ═══ INSUMO ═══ -->
+@if (formInsumo(); as f) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarInsumo()">
+    <form class="inf-hoja ventana w-full max-w-md" (ngSubmit)="guardarInsumo()" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">{{ f.id_insumo ? 'Editar insumo' : 'Nuevo insumo' }}</h3>
+        <button type="button" class="quitar" (click)="cerrarInsumo()" aria-label="Cancelar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        @if (errorInsumo()) { <p class="error-formulario" role="alert">{{ errorInsumo() }}</p> }
+        <div class="grupo">
+          <label class="inf-etiqueta" for="nombre-insumo">Nombre</label>
+          <input id="nombre-insumo" name="nombre" class="campo" maxlength="80" data-mayusculas [(ngModel)]="f.nombre" placeholder="HARINA">
+        </div>
+        <div class="grupo">
+          <span class="inf-etiqueta">Compra</span>
+          <div class="flex gap-2">
+            <input name="cantidad" type="number" min="0" class="campo w-28" [(ngModel)]="f.cantidad_compra" placeholder="1" aria-label="Cantidad que trae">
+            <select name="unidad" class="campo" [(ngModel)]="f.id_unidad_compra" aria-label="Unidad">
+              <option [ngValue]="null" disabled>Unidad</option>
+              @for (u of unidades(); track u.id_unidad) { <option [ngValue]="u.id_unidad">{{ u.nombre }} ({{ u.codigo }})</option> }
+            </select>
+          </div>
+        </div>
+        <div class="grupo">
+          <label class="inf-etiqueta" for="precio-insumo">Precio de compra</label>
+          <div class="campo-monto">
+            <span>{{ moneda() }}</span>
+            <input id="precio-insumo" name="precio" type="number" min="0" step="0.01" [(ngModel)]="f.precio_compra" placeholder="0.00">
+          </div>
+        </div>
+        @if (costoForm(); as c) {
+          <p class="dato">Costo: <b>{{ moneda() }} {{ precisa(c.valor) }}</b> por {{ c.base }}</p>
+        }
+      </div>
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button type="button" class="inf-boton" (click)="cerrarInsumo()">Cancelar</button>
+        <button type="submit" class="boton-primario" data-enter [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar' }}</button>
+      </div>
+    </form>
+  </div>
+}
+
+<!-- ═══ RECETA ═══ -->
+@if (formReceta(); as f) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarReceta()">
+    <form class="inf-hoja ventana w-full max-w-3xl max-h-[92vh] flex flex-col" (ngSubmit)="guardarReceta()" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">{{ f.id_receta ? 'Editar receta' : 'Nueva receta' }}</h3>
+        <button type="button" class="quitar" (click)="cerrarReceta()" aria-label="Cancelar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 overflow-y-auto">
+        @if (errorReceta()) { <p class="error-formulario" role="alert">{{ errorReceta() }}</p> }
+        <div class="grid sm:grid-cols-[1fr_160px] gap-3">
+          <div class="grupo">
+            <label class="inf-etiqueta" for="nombre-receta">Nombre</label>
+            <input id="nombre-receta" name="nombre" class="campo" maxlength="80" data-mayusculas
+                   [ngModel]="f.nombre" (ngModelChange)="cambiarDato('nombre', $event)" placeholder="CROISSANT">
+          </div>
+          <div class="grupo">
+            <label class="inf-etiqueta" for="rinde-receta">Rinde (unidades)</label>
+            <input id="rinde-receta" name="rinde" type="number" min="0" class="campo"
+                   [ngModel]="f.rendimiento" (ngModelChange)="cambiarDato('rendimiento', $event)" placeholder="30">
+          </div>
+        </div>
+
+        <table class="inf-tabla ingredientes">
+          <thead>
+            <tr><th>Insumo</th><th class="num">Cantidad</th><th>Unidad</th><th class="num">Costo</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (x of f.filas; track $index; let k = $index) {
+              <tr>
+                <td>
+                  <select class="campo" [name]="'insumo' + k" [ngModel]="x.id_insumo" (ngModelChange)="elegirInsumo(k, $event)" aria-label="Insumo">
+                    <option [ngValue]="null" disabled>Elegir insumo</option>
+                    @for (i of insumos(); track i.id_insumo) { <option [ngValue]="i.id_insumo">{{ i.nombre }}</option> }
+                  </select>
+                </td>
+                <td class="num">
+                  <input class="campo cantidad" type="number" min="0" [name]="'cantidad' + k" [ngModel]="x.cantidad"
+                         (ngModelChange)="cambiarFila(k, 'cantidad', $event)" placeholder="0" aria-label="Cantidad">
+                </td>
+                <td>
+                  <select class="campo" [name]="'unidad' + k" [ngModel]="x.id_unidad" (ngModelChange)="cambiarFila(k, 'id_unidad', $event)"
+                          [disabled]="!x.id_insumo" aria-label="Unidad">
+                    @for (u of unidadesDeTipo(tipoDeFila(x)); track u.id_unidad) { <option [ngValue]="u.id_unidad">{{ u.codigo }}</option> }
+                  </select>
+                </td>
+                <td class="num fuerte">
+                  @if (calculo()?.costos?.[k]; as c) { {{ moneda() }} {{ cifra(c) }} } @else { — }
+                </td>
+                <td>
+                  <button type="button" class="accion peligro" (click)="quitarFila(k)" aria-label="Quitar insumo">
+                    <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        <button type="button" class="inf-boton" (click)="agregarFila()">
+          <lucide-icon [img]="icons.nuevo" class="w-3.5 h-3.5"></lucide-icon> Agregar insumo
+        </button>
+      </div>
+
+      <div class="totales separador">
+        <div><span class="inf-etiqueta">Inversión</span><b>{{ moneda() }} {{ cifra(calculo()?.total || 0) }}</b></div>
+        <div><span class="inf-etiqueta">Por unidad</span><b>{{ calculo()?.porUnidad == null ? '—' : moneda() + ' ' + cifra(calculo()!.porUnidad) }}</b></div>
+      </div>
+      <div class="inf-pie-hoja flex justify-end gap-2">
+        <button type="button" class="inf-boton" (click)="cerrarReceta()">Cancelar</button>
+        <button type="submit" class="boton-primario" data-enter [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar' }}</button>
+      </div>
+    </form>
+  </div>
+}
+
+<!-- ═══ HISTORIAL ═══ -->
+@if (historial(); as h) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="historial.set(null)">
+    <div class="inf-hoja ventana w-full max-w-2xl max-h-[85vh] flex flex-col" (click)="$event.stopPropagation()">
+      <div class="flex items-center justify-between px-5 py-4 separador-inferior">
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">{{ h.titulo }}</h3>
+        <button class="quitar" (click)="historial.set(null)" aria-label="Cerrar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+      <div class="overflow-y-auto">
+        <table class="inf-tabla">
+          @if (h.tipo === 'insumo') {
+            <thead><tr><th>Fecha</th><th>Compra</th><th class="num">Precio</th><th>Usuario</th></tr></thead>
+            <tbody>
+              @for (x of h.filas; track $index) {
+                <tr>
+                  <td>{{ fechaHora(x.fecha) }}</td>
+                  <td>{{ cantidad(x.cantidad_compra) }} {{ x.unidad }}</td>
+                  <td class="num fuerte">{{ moneda() }} {{ cifra(x.precio_compra) }}</td>
+                  <td class="inf-tenue">{{ x.usuario || '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          } @else {
+            <thead><tr><th>Fecha</th><th>Cambio</th><th class="num">Inversión</th><th class="num">Por unidad</th></tr></thead>
+            <tbody>
+              @for (x of h.filas; track $index) {
+                <tr>
+                  <td class="whitespace-nowrap">{{ fechaHora(x.fecha) }}</td>
+                  <td>{{ x.motivo }}</td>
+                  <td class="num fuerte">{{ moneda() }} {{ cifra(x.inversion) }}</td>
+                  <td class="num">{{ moneda() }} {{ cifra(x.por_unidad) }}</td>
+                </tr>
+              }
+            </tbody>
+          }
+        </table>
+      </div>
+    </div>
+  </div>
+}

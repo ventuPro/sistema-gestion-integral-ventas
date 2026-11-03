@@ -5,7 +5,7 @@ import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
          Landmark, LogOut, Building2,
-         Settings, Menu, X, Bell, BadgePercent, ChevronsUpDown } from 'lucide-angular';
+         Settings, Menu, X, Bell, BadgePercent, ChevronsUpDown, Calculator } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
@@ -87,7 +87,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     sucursal:   Building2,
     ajustes:    Settings,
     promociones: BadgePercent,
-    cuenta:     ChevronsUpDown
+    cuenta:     ChevronsUpDown,
+    costos:     Calculator
   };
 
   ngOnInit() {
@@ -153,6 +154,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         { ruta: 'inventario',   texto: 'Inventario',      icono: i.inventario },
         { ruta: 'reportes',     texto: 'Reportes',        icono: i.reportes },
         { ruta: 'promociones',  texto: 'Promociones',     icono: i.promociones },
+        { ruta: 'costos',       texto: 'Costos',          icono: i.costos },
         { ruta: 'cierres-caja', texto: 'Cierres de caja', icono: i.cierres }
       ]},
       { titulo: 'Sistema', enlaces: [

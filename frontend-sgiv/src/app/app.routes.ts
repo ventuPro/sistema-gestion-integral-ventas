@@ -67,6 +67,11 @@ export const routes: Routes = [
         canActivate: [permisoGuard('reportes')]
       },
       {
+        path: 'costos',
+        loadComponent: () => import('./features/admin/costos/costos.component').then(m => m.CostosComponent),
+        canActivate: [permisoGuard('ajustes')]   // solo administrador
+      },
+      {
         // Solo administrador: 'ajustes' no es un permiso asignable a cajeros
         path: 'ajustes',
         loadComponent: () => import('./features/admin/ajustes/ajustes.component').then(m => m.AjustesComponent),
