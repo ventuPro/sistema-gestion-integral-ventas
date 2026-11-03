@@ -1,0 +1,91 @@
+@if (cargando()) {
+  <div class="space-y-5">
+    <div class="inf-esqueleto h-40"></div>
+    <div class="inf-esqueleto h-72"></div>
+  </div>
+} @else if (estado(); as e) {
+  <div class="space-y-5">
+
+    <!-- ═══ BOT ═══ -->
+    <section class="inf-hoja">
+      <div class="bloque-cabeza"><h2>Bot de Telegram</h2></div>
+      <div class="bloque-cuerpo">
+        @if (!e.activo) {
+          <span class="inf-estado mal">Sin bot de Telegram</span>
+          <p class="aviso-suave mt-3">
+            En Telegram, abre &#64;BotFather → /newbot, elige un nombre y copia la clave que te entrega.
+            Agrégala en el archivo <code>backend-sgiv/.env</code> como <code>TELEGRAM_BOT_TOKEN=…</code> y reinicia el servidor.
+          </p>
+        } @else if (e.error) {
+          <span class="inf-estado mal">{{ e.error }}</span>
+        } @else {
+          <div class="bot">
+            @if (e.qr) { <img [src]="e.qr" alt="QR del bot de Telegram" class="qr"> }
+            <div class="space-y-2">
+              <span class="inf-estado ok">Activo</span>
+              <p class="inf-tinta font-semibold text-[length:calc(16px*var(--escala-texto))]">&#64;{{ e.bot }}</p>
+              <a class="inf-boton" [href]="e.enlace" target="_blank" rel="noopener">
+                <lucide-icon [img]="icons.abrir" class="w-3.5 h-3.5"></lucide-icon> Abrir el bot
+              </a>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- ═══ PERSONAS ═══ -->
+    <section class="inf-hoja">
+      <div class="bloque-cabeza"><h2>Personal</h2></div>
+      <div class="bloque-cuerpo">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          @for (u of e.usuarios; track u.id_usuario) {
+            <article class="persona">
+              <div class="flex justify-between items-start gap-3">
+                <div class="min-w-0">
+                  <h3 class="truncate">{{ u.nombre_completo }}</h3>
+                  <p class="inf-sutil text-[length:calc(12.5px*var(--escala-texto))]">{{ u.nombre_rol }}{{ u.nombre_sucursal ? ' · ' + u.nombre_sucursal : '' }}</p>
+                </div>
+                @if (u.vinculado) { <span class="inf-estado ok">Vinculado</span> }
+                @else if (u.telefono) { <span class="inf-estado neutro">Falta compartir el número</span> }
+                @else { <span class="inf-estado neutro">Sin teléfono</span> }
+              </div>
+
+              <form class="campos" (submit)="$event.preventDefault(); hayCambios(u) && guardar(u)">
+                <div class="grupo">
+                  <label class="inf-etiqueta" [for]="'tel' + u.id_usuario">Teléfono</label>
+                  <input class="campo" type="tel" [id]="'tel' + u.id_usuario" [value]="borrador(u).telefono" maxlength="20"
+                         (input)="cambiar(u, 'telefono', $any($event.target).value)" placeholder="71234567">
+                </div>
+                <div class="grupo">
+                  <label class="inf-etiqueta" [for]="'av' + u.id_usuario">Avisos de</label>
+                  <select class="campo" [id]="'av' + u.id_usuario" [value]="borrador(u).avisos"
+                          (change)="cambiar(u, 'avisos', $any($event.target).value)">
+                    <option value="todas" [selected]="borrador(u).avisos === 'todas'">Todas las sucursales</option>
+                    @for (s of e.sucursales; track s.id_sucursal) {
+                      <option [value]="s.id_sucursal" [selected]="borrador(u).avisos === '' + s.id_sucursal">{{ s.nombre_sucursal }}</option>
+                    }
+                    <option value="ninguna" [selected]="borrador(u).avisos === 'ninguna'">Ninguna (solo el código de ingreso)</option>
+                  </select>
+                </div>
+                <div class="acciones">
+                  @if (u.vinculado) {
+                    <button type="button" class="inf-boton" (click)="probar(u)" [disabled]="ocupado() === u.id_usuario">
+                      <lucide-icon [img]="icons.probar" class="w-3.5 h-3.5"></lucide-icon> Probar
+                    </button>
+                    <button type="button" class="inf-boton inf-baja" (click)="desvincular(u)" [disabled]="ocupado() === u.id_usuario">
+                      <lucide-icon [img]="icons.desvincular" class="w-3.5 h-3.5"></lucide-icon> Desvincular
+                    </button>
+                  }
+                  <button type="submit" class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!"
+                          [disabled]="!hayCambios(u) || ocupado() === u.id_usuario">
+                    <lucide-icon [img]="icons.guardar" class="w-3.5 h-3.5"></lucide-icon> Guardar
+                  </button>
+                </div>
+              </form>
+            </article>
+          }
+        </div>
+      </div>
+    </section>
+  </div>
+}

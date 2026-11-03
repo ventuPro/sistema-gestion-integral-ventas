@@ -1,6 +1,10 @@
 const ajusteModel = require('../models/ajusteModel');
 const { guardarImagen, borrarImagen } = require('../utils/imagenes');
 const groq = require('../ia/groq');
+const telegramApi = require('../utils/telegram');
+const QRCode = require('qrcode');
+const db = require('../config/db');
+const telegramModel = require('../models/telegramModel');
 
 // ─── Reglas de validación ───
 const TELEFONO = /^[0-9+()\s-]{6,20}$/;
@@ -224,5 +228,62 @@ const probarIa = async (req, res) => {
     }
 };
 
+// ─── Telegram: teléfono, vínculo y sucursal de avisos de cada usuario ───
+const ERRORES_TELEGRAM = { INVALIDO: 400, OCUPADO: 409, NO_EXISTE: 404 };
+
+const telegram = async (req, res) => {
+    try {
+        let bot = null, enlace = null, qr = null, error = null;
+        if (telegramApi.activo()) {
+            try {
+                bot = (await telegramApi.datosBot()).username;
+                enlace = `https://t.me/${bot}`;
+                qr = await QRCode.toDataURL(enlace, { margin: 1, width: 240 });
+            } catch (e) { error = `Telegram no respondió: ${e.message}`; }
+        }
+        const sucursales = (await db.query(
+            `SELECT id_sucursal, nombre_sucursal FROM sucursal WHERE estado_activo = TRUE ORDER BY id_sucursal`)).rows;
+        res.json({ activo: telegramApi.activo(), bot, enlace, qr, error, sucursales, usuarios: await telegramModel.listar() });
+    } catch (e) {
+        console.error('telegram:', e);
+        res.status(500).json({ error: 'No se pudo cargar Telegram' });
+    }
+};
+
+const guardarTelegramUsuario = async (req, res) => {
+    try {
+        const { telefono, avisos_telegram, avisos_sucursal } = req.body || {};
+        await telegramModel.actualizar(Number(req.params.id), { telefono, avisos_telegram, avisos_sucursal: Number(avisos_sucursal) || null });
+        res.json({ mensaje: 'Guardado', usuarios: await telegramModel.listar() });
+    } catch (e) {
+        if (ERRORES_TELEGRAM[e.codigo]) return res.status(ERRORES_TELEGRAM[e.codigo]).json({ error: e.message });
+        console.error('guardarTelegramUsuario:', e);
+        res.status(500).json({ error: 'No se pudo guardar' });
+    }
+};
+
+const probarTelegramUsuario = async (req, res) => {
+    const u = await telegramModel.chatDe(Number(req.params.id)).catch(() => null);
+    if (!u?.telegram_chat_id) return res.status(400).json({ error: 'Ese usuario todavía no vinculó su Telegram' });
+    try {
+        const nombre = (await ajusteModel.obtener())?.nombre_comercial || 'el sistema';
+        await telegramApi.enviar(u.telegram_chat_id, `Mensaje de prueba de ${nombre}: los avisos llegarán a este chat.`);
+        res.json({ mensaje: 'Mensaje de prueba enviado' });
+    } catch (e) {
+        res.status(502).json({ error: `Telegram no respondió: ${e.message}` });
+    }
+};
+
+const desvincularTelegramUsuario = async (req, res) => {
+    try {
+        await telegramModel.desvincular(Number(req.params.id));
+        res.json({ mensaje: 'Telegram desvinculado', usuarios: await telegramModel.listar() });
+    } catch (e) {
+        console.error('desvincularTelegramUsuario:', e);
+        res.status(500).json({ error: 'No se pudo desvincular' });
+    }
+};
+
 module.exports = { obtenerPublico, obtener, guardarEmpresa, guardarApariencia, guardarParametros,
-                   guardarIa, probarIa };
+                   guardarIa, probarIa,
+                   telegram, guardarTelegramUsuario, probarTelegramUsuario, desvincularTelegramUsuario };

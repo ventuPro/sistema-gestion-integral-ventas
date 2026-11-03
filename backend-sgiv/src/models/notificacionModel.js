@@ -33,7 +33,7 @@ const despachar = async (n, leida_por) => {
     };
     for (const { id_usuario } of r.rows)
         emitirUsuario(id_usuario, 'notificacion:nueva', { ...datos, leida: id_usuario === leida_por });
-    for (const fn of oyentes) await fn(datos);
+    for (const fn of oyentes) await fn({ ...datos, destino: n.destino, id_usuario: n.id_usuario, leida_por });
 };
 
 /**

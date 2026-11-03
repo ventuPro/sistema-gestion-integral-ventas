@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule,
          Building2, Palette, Upload, RotateCcw, Save, Sun, Moon, MonitorSmartphone,
-         ImageIcon, Undo2, Crown, Store, SlidersHorizontal, Sparkles } from 'lucide-angular';
+         ImageIcon, Undo2, Crown, Store, SlidersHorizontal, Sparkles, Send } from 'lucide-angular';
 import { AjustesService, Configuracion, Tema,
          COLOR_PRIMARIO_ORIGINAL, COLOR_SECUNDARIO_ORIGINAL } from '../../../core/services/ajustes.service';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
@@ -11,9 +11,10 @@ import { AjustesPropietariosComponent } from './propietarios/ajustes-propietario
 import { AjustesSucursalesComponent } from './sucursales/ajustes-sucursales.component';
 import { AjustesParametrosComponent } from './parametros/ajustes-parametros.component';
 import { AjustesIaComponent } from './ia/ajustes-ia.component';
+import { AjustesTelegramComponent } from './telegram/ajustes-telegram.component';
 import { DialogoService } from '../../../core/services/dialogo.service';
 
-type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'parametros' | 'ia';
+type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'parametros' | 'ia' | 'telegram';
 
 interface CampoEmpresa { clave: string; etiqueta: string; ejemplo: string; max: number; tipo?: string; ancho?: boolean }
 
@@ -30,7 +31,7 @@ const IMAGENES = {
   selector: 'app-ajustes',
   standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe,
-            AjustesPropietariosComponent, AjustesSucursalesComponent, AjustesParametrosComponent, AjustesIaComponent],
+            AjustesPropietariosComponent, AjustesSucursalesComponent, AjustesParametrosComponent, AjustesIaComponent, AjustesTelegramComponent],
   templateUrl: './ajustes.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './ajustes.css']
@@ -105,7 +106,8 @@ export class AjustesComponent implements OnInit, OnDestroy {
     { id: 'propietarios', nombre: 'Propietarios', icono: Crown },
     { id: 'sucursales',   nombre: 'Sucursales',   icono: Store },
     { id: 'parametros',   nombre: 'Parámetros',   icono: SlidersHorizontal },
-    { id: 'ia',           nombre: 'Chatbot',      icono: Sparkles }
+    { id: 'ia',           nombre: 'Chatbot',      icono: Sparkles },
+    { id: 'telegram',     nombre: 'Telegram',     icono: Send }
   ];
 
   readonly pestana            = signal<Pestana>('empresa');

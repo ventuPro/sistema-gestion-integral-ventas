@@ -41,6 +41,8 @@ const obtenerPublico = async () => {
     for (const k of PRIVADOS) delete publico[k];
     // Los chatbots están siempre activos; sin clave de Groq no se muestran
     publico.ia_cliente_disponible = publico.ia_interno_disponible = !!process.env.GROQ_API_KEY;
+    // Con Telegram el login pide el CAPTCHA solo si el servidor lo exige
+    publico.telegram_activo = !!process.env.TELEGRAM_BOT_TOKEN;
     return publico;
 };
 

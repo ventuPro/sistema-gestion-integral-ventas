@@ -112,7 +112,7 @@ describe('Login', () => {
     test('sin CAPTCHA o con CAPTCHA incorrecto no se evalúa la contraseña', async () => {
         const sin = await intentar('admin@rickys.com', 'password', {});
         assert.equal(sin.status, 400);
-        assert.equal(sin.body.codigo, 'CAPTCHA_INVALIDO');
+        assert.equal(sin.body.codigo, 'CAPTCHA_REQUERIDO');
 
         const { id_captcha } = resolverCaptcha();
         const malo = await intentar('admin@rickys.com', 'password', { id_captcha, captcha: 'zzzzz' });

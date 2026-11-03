@@ -15,11 +15,12 @@
         <p class="inf-tinta font-semibold text-lg">{{ titulo() }}</p>
       </div>
 
-      <h1 class="inf-titulo">Iniciar sesión</h1>
+      <h1 class="inf-titulo">{{ paso() === 'codigo' ? 'Código de Telegram' : 'Iniciar sesión' }}</h1>
 
 
       @if (mensajeError()) { <p class="error-formulario mb-4" role="alert">{{ mensajeError() }}</p> }
 
+      @if (paso() === 'datos') {
       <form #formulario (ngSubmit)="iniciarSesion()" (keydown)="marcarEscritura()" (keydown.enter)="siguienteCampo($event, formulario)" autocomplete="on" class="space-y-4">
         <div class="grupo">
           <label class="inf-etiqueta" for="correo">Correo</label>
@@ -39,31 +40,72 @@
           </div>
         </div>
 
-        @if (usaCaptcha()) {
-          <div class="grupo">
-            <label class="inf-etiqueta" for="captcha">Escribe los caracteres de la imagen</label>
-            <div class="flex items-center gap-2">
-              <div class="captcha">
-                @if (captchaImagen() && !cargandoCaptcha()) {
-                  <img [src]="captchaImagen()" alt="Caracteres de verificación" draggable="false">
-                } @else {
-                  <span class="inf-esqueleto w-full h-full"></span>
-                }
-              </div>
-              <button type="button" class="inf-boton h-16" (click)="cargarCaptcha()" [disabled]="cargandoCaptcha()"
-                      title="Mostrar otra imagen" aria-label="Mostrar otra imagen">
-                <lucide-icon [img]="icons.refrescar" class="w-4 h-4"></lucide-icon>
-              </button>
-            </div>
-            <input class="campo tracking-[0.25em]" type="text" id="captcha" name="captcha" [(ngModel)]="captchaTexto" maxlength="5"
-                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
-          </div>
-        }
+        @if (usaCaptcha()) { <ng-container [ngTemplateOutlet]="bloqueCaptcha" /> }
 
         <button type="submit" class="boton-primario w-full mt-2" [disabled]="cargando() || (usaCaptcha() && cargandoCaptcha())">
           {{ cargando() ? 'Verificando…' : 'Ingresar' }}
         </button>
       </form>
+      }
+
+      <!-- Paso 2: código enviado por Telegram -->
+      @if (paso() === 'codigo') {
+        <form (ngSubmit)="enviarCodigo()" class="space-y-4">
+          <div class="grupo">
+            <label class="inf-etiqueta flex items-center gap-1.5" for="codigo">
+              <lucide-icon [img]="icons.telegram" class="w-4 h-4"></lucide-icon>
+              Código enviado a tu Telegram{{ telefono() ? ' (…' + telefono() + ')' : '' }}
+            </label>
+            <input class="campo codigo" type="text" id="codigo" name="codigo" inputmode="numeric" autocomplete="one-time-code"
+                   maxlength="6" [ngModel]="codigo()" (ngModelChange)="escribirCodigo($event)" placeholder="000000">
+          </div>
+          <button type="submit" class="boton-primario w-full" [disabled]="cargando() || codigo().length !== 6">
+            {{ cargando() ? 'Verificando…' : 'Ingresar' }}
+          </button>
+          <div class="flex items-center justify-between">
+            <button type="button" class="inf-boton" (click)="volver()">
+              <lucide-icon [img]="icons.volver" class="w-4 h-4"></lucide-icon> Volver
+            </button>
+            <button type="button" class="inf-boton" (click)="reenviar()" [disabled]="esperaReenvio() > 0">
+              {{ esperaReenvio() > 0 ? 'Reenviar en ' + esperaReenvio() + ' s' : 'Reenviar código' }}
+            </button>
+          </div>
+        </form>
+      }
+
+      <!-- Paso 2 cuando Telegram no respondió -->
+      @if (paso() === 'alterno') {
+        <form (ngSubmit)="enviarAlterno()" class="space-y-4">
+          <ng-container [ngTemplateOutlet]="bloqueCaptcha" />
+          <button type="submit" class="boton-primario w-full" [disabled]="cargando() || cargandoCaptcha()">
+            {{ cargando() ? 'Verificando…' : 'Ingresar' }}
+          </button>
+          <button type="button" class="inf-boton" (click)="volver()">
+            <lucide-icon [img]="icons.volver" class="w-4 h-4"></lucide-icon> Volver
+          </button>
+        </form>
+      }
     </div>
   </main>
 </div>
+
+<ng-template #bloqueCaptcha>
+  <div class="grupo">
+    <label class="inf-etiqueta" for="captcha">Escribe los caracteres de la imagen</label>
+    <div class="flex items-center gap-2">
+      <div class="captcha">
+        @if (captchaImagen() && !cargandoCaptcha()) {
+          <img [src]="captchaImagen()" alt="Caracteres de verificación" draggable="false">
+        } @else {
+          <span class="inf-esqueleto w-full h-full"></span>
+        }
+      </div>
+      <button type="button" class="inf-boton h-16" (click)="cargarCaptcha()" [disabled]="cargandoCaptcha()"
+              title="Mostrar otra imagen" aria-label="Mostrar otra imagen">
+        <lucide-icon [img]="icons.refrescar" class="w-4 h-4"></lucide-icon>
+      </button>
+    </div>
+    <input class="campo tracking-[0.25em]" type="text" id="captcha" name="captcha" [(ngModel)]="captchaTexto" maxlength="5"
+           autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+  </div>
+</ng-template>

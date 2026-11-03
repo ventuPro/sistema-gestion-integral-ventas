@@ -22,6 +22,20 @@ export class AuthService {
     return this.http.post(`${this.apiUrl}/usuarios/login`, { correo_electronico, contrasena, id_captcha, captcha });
   }
 
+  /** Paso 2: código enviado por Telegram */
+  verificarCodigo(id_desafio: string, codigo: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/usuarios/login/codigo`, { id_desafio, codigo });
+  }
+
+  /** Paso 2 cuando Telegram no respondió: CAPTCHA */
+  verificarAlterno(id_desafio: string, id_captcha: string, captcha: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/usuarios/login/alterno`, { id_desafio, id_captcha, captcha });
+  }
+
+  reenviarCodigo(id_desafio: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/usuarios/login/reenviar`, { id_desafio });
+  }
+
   estaLogueado(): boolean {
     return !!this.sesion.usuario();
   }

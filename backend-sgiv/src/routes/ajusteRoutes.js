@@ -18,6 +18,12 @@ router.put('/parametros', admin, ctrl.guardarParametros);
 router.put ('/ia',        admin, ctrl.guardarIa);
 router.post('/ia/probar', admin, ctrl.probarIa);
 
+// Telegram: teléfono, vínculo y sucursal de avisos de cada usuario
+router.get ('/telegram',                         admin, ctrl.telegram);
+router.put ('/telegram/usuarios/:id',            admin, ctrl.guardarTelegramUsuario);
+router.post('/telegram/usuarios/:id/prueba',     admin, ctrl.probarTelegramUsuario);
+router.post('/telegram/usuarios/:id/desvincular', admin, ctrl.desvincularTelegramUsuario);
+
 // Propietarios: datos privados, solo el administrador
 router.get   ('/propietarios',     admin, propietarios.listar);
 router.post  ('/propietarios',     admin, propietarios.crear);

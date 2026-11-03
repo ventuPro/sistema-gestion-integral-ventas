@@ -420,7 +420,15 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
         PRIMARY KEY (id_notificacion, id_usuario)
     );
     CREATE INDEX IF NOT EXISTS idx_notificacion_fecha ON notificacion (fecha_creacion DESC);
-    CREATE INDEX IF NOT EXISTS idx_notificacion_producto ON notificacion (id_producto, id_sucursal, tipo, fecha_creacion);`
+    CREATE INDEX IF NOT EXISTS idx_notificacion_producto ON notificacion (id_producto, id_sucursal, tipo, fecha_creacion);`,
+
+    // Telegram: teléfono del usuario (llave para vincular), chat vinculado y de qué sucursal recibe avisos (NULL = todas)
+    `ALTER TABLE usuario ADD COLUMN IF NOT EXISTS telefono VARCHAR(20),
+                        ADD COLUMN IF NOT EXISTS telegram_chat_id BIGINT,
+                        ADD COLUMN IF NOT EXISTS avisos_telegram BOOLEAN NOT NULL DEFAULT TRUE,
+                        ADD COLUMN IF NOT EXISTS avisos_sucursal INT REFERENCES sucursal(id_sucursal) ON DELETE SET NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_telefono ON usuario (telefono) WHERE telefono IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_telegram ON usuario (telegram_chat_id) WHERE telegram_chat_id IS NOT NULL;`
 ];
 
 const aplicarMigraciones = async () => {

@@ -86,6 +86,9 @@ app.use('/api/promociones', promocionRoutes);
 app.use('/api/costos',     require('./routes/costoRoutes'));
 app.use('/api/notificaciones', require('./routes/notificacionRoutes'));
 
+// Telegram: cada notificación también va a los celulares vinculados
+require('./procesos/telegramBot').registrarAvisos();
+
 // Socket.IO eventos
 io.on('connection', (socket) => {
     console.log(`[socket] Cliente conectado: ${socket.id}`);
@@ -139,6 +142,7 @@ if (require.main === module) {
             });
             require('./controllers/pedidoController').iniciarExpiracion();
             require('./procesos/cierreDiario').iniciar();
+            require('./procesos/telegramBot').iniciar();
             imagenes.limpiarHuerfanas(require('./config/db'))
                 .then(n => n && console.log(`${n} imágenes sin uso borradas`))
                 .catch(e => console.error('Limpieza de imágenes:', e.message));

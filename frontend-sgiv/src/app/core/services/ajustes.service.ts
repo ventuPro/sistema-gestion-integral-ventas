@@ -17,6 +17,29 @@ export interface Propietario {
   porcentaje_participacion: number | string;
 }
 
+export interface UsuarioTelegram {
+  id_usuario: number;
+  nombre_completo: string;
+  id_rol: number;
+  nombre_rol: string;
+  nombre_sucursal: string | null;
+  telefono: string | null;
+  vinculado: boolean;
+  avisos_telegram: boolean;
+  /** null = todas las sucursales */
+  avisos_sucursal: number | null;
+}
+
+export interface EstadoTelegram {
+  activo: boolean;
+  bot: string | null;
+  enlace: string | null;
+  qr: string | null;
+  error: string | null;
+  sucursales: { id_sucursal: number; nombre_sucursal: string }[];
+  usuarios: UsuarioTelegram[];
+}
+
 export interface Configuracion {
   nombre_comercial: string;
   razon_social: string | null;
@@ -54,6 +77,8 @@ export interface Configuracion {
   /** Chatbots siempre activos: true si el servidor tiene la clave de Groq */
   ia_cliente_disponible: boolean;
   ia_interno_disponible: boolean;
+  /** Con Telegram, el login pide el código y el CAPTCHA solo si el servidor lo exige */
+  telegram_activo?: boolean;
   // Solo con sesión de administrador
   menu_minutos_expiracion?: number;
   menu_max_pendientes_mesa?: number;
@@ -166,6 +191,23 @@ export class AjustesService {
     return this.http.post<{ cliente: PruebaChatbot; interno: PruebaChatbot }>(`${this.api}/ia/probar`, {});
   }
 
+  // ─── Telegram (solo administrador) ───
+  telegram(): Observable<EstadoTelegram> {
+    return this.http.get<EstadoTelegram>(`${this.api}/telegram`);
+  }
+
+  guardarTelegramUsuario(id: number, datos: { telefono: string | null; avisos_telegram: boolean; avisos_sucursal: number | null }) {
+    return this.http.put<{ usuarios: UsuarioTelegram[] }>(`${this.api}/telegram/usuarios/${id}`, datos);
+  }
+
+  probarTelegramUsuario(id: number) {
+    return this.http.post<{ mensaje: string }>(`${this.api}/telegram/usuarios/${id}/prueba`, {});
+  }
+
+  desvincularTelegramUsuario(id: number) {
+    return this.http.post<{ usuarios: UsuarioTelegram[] }>(`${this.api}/telegram/usuarios/${id}/desvincular`, {});
+  }
+
   // ─── Propietarios (solo administrador) ───
   listarPropietarios(): Observable<Propietario[]> {
     return this.http.get<Propietario[]>(`${this.api}/propietarios`);
@@ -219,6 +261,7 @@ export class AjustesService {
     if (!('ia_cliente_disponible' in c)) {
       publico.ia_cliente_disponible = this.config().ia_cliente_disponible;
       publico.ia_interno_disponible = this.config().ia_interno_disponible;
+      publico.telegram_activo = this.config().telegram_activo;
     }
     this.config.set(publico);
     try { localStorage.setItem(CLAVE_CACHE, JSON.stringify(this.config())); } catch { }

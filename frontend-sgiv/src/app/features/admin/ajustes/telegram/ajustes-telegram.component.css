@@ -1,0 +1,26 @@
+/* ─── Ajustes → Telegram ─── */
+.bot { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
+.qr {
+  width: 132px;
+  height: 132px;
+  border-radius: 8px;
+  border: 1px solid var(--i-linea);
+  background: #fff;
+  padding: 4px;
+  image-rendering: pixelated;
+}
+
+.persona {
+  border: 1px solid var(--i-linea);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.persona h3 { font-size: calc(14px * var(--escala-texto)); font-weight: 600; color: var(--i-tinta); }
+
+.campos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+.acciones { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+@media (max-width: 520px) { .campos { grid-template-columns: 1fr; } }

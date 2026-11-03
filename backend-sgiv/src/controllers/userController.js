@@ -5,6 +5,8 @@ const userModel   = require('../models/userModel');
 const ajusteModel = require('../models/ajusteModel');
 const db          = require('../config/db');
 const captcha     = require('../utils/captcha');
+const telegram    = require('../utils/telegram');
+const codigosLogin = require('../utils/codigosLogin');
 const contexto    = require('../auditoria/contexto');
 const { marcarEvento, huellaSesion } = require('../auditoria/registroAcceso');
 const { JWT_SECRET, JWT_OPCIONES, COOKIE_SESION, opcionesCookie, leerToken, verificarJWT } = require('../config/seguridad');
@@ -52,7 +54,7 @@ const registrarUsuario = async (req, res) => {
     }
 };
 
-// ─── Login (CAPTCHA + contraseña) ───
+// ─── Login (contraseña + código de Telegram, o CAPTCHA) ───
 // Mismo mensaje y mismo tiempo de respuesta si el correo no existe o la
 // contraseña es incorrecta, para no revelar qué correos están registrados.
 // Además se limita la cantidad de intentos fallidos por IP + correo
@@ -83,6 +85,12 @@ const registrarFallo = (clave, { ventanaMs }) => {
     else r.cantidad++;
 };
 
+// Paso 1: correo y contraseña. Quien tiene Telegram vinculado recibe un código (paso 2) y no usa CAPTCHA;
+// los demás, CAPTCHA (si está activo en Ajustes). Si Telegram no responde, el paso 2 es el CAPTCHA.
+const conTelegram = (u) => telegram.activo() && !!u?.telegram_chat_id;
+const limiteDe = (p) => ({ maxIntentos: p.login_max_intentos, ventanaMs: p.login_minutos_bloqueo * 60 * 1000 });
+const VENCIDO = 'El ingreso venció. Vuelva a ingresar su contraseña.';
+
 const loginUsuario = async (req, res) => {
     try {
         const { correo_electronico, contrasena, id_captcha, captcha: respuestaCaptcha } = req.body || {};
@@ -91,11 +99,7 @@ const loginUsuario = async (req, res) => {
 
         const correo = normalizarCorreo(correo_electronico);
         const p = await ajusteModel.parametros();
-        const limite = { maxIntentos: p.login_max_intentos, ventanaMs: p.login_minutos_bloqueo * 60 * 1000 };
-        if (p.captcha_activo && !captcha.verificar(id_captcha, respuestaCaptcha)) {
-            marcarEvento(res, 'CAPTCHA_INCORRECTO', { correo });
-            return res.status(400).json({ error: 'El código de la imagen es incorrecto o venció', codigo: 'CAPTCHA_INVALIDO' });
-        }
+        const limite = limiteDe(p);
 
         const clave = claveIntento(req, correo_electronico);
         if (estaBloqueado(clave, limite)) {
@@ -104,6 +108,12 @@ const loginUsuario = async (req, res) => {
         }
 
         const u = await userModel.obtenerUsuarioPorCorreo(correo);
+        if (!conTelegram(u) && p.captcha_activo && !captcha.verificar(id_captcha, respuestaCaptcha)) {
+            if (!id_captcha) return res.status(400).json({ error: 'Escriba el código de la imagen', codigo: 'CAPTCHA_REQUERIDO' });
+            marcarEvento(res, 'CAPTCHA_INCORRECTO', { correo });
+            return res.status(400).json({ error: 'El código de la imagen es incorrecto o venció', codigo: 'CAPTCHA_INVALIDO' });
+        }
+
         const valida = await bcrypt.compare(String(contrasena), u ? u.contrasena_hash : HASH_FICTICIO);
         if (!u || !valida) {
             registrarFallo(clave, limite);
@@ -111,39 +121,128 @@ const loginUsuario = async (req, res) => {
                 { correo, motivo: u ? 'Contraseña incorrecta' : 'Correo no registrado o usuario inactivo' });
             return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
         }
-        intentosFallidos.delete(clave);
-        contexto.asignarUsuario(u.id_usuario, `${u.nombre_completo} <${u.correo_electronico}>`);
 
-        // Obtener nombre de sucursal
-        const rSuc = await require('../config/db').query(
-            `SELECT nombre_sucursal FROM sucursal WHERE id_sucursal = $1`,
-            [u.id_sucursal]
-        );
-        const nombre_sucursal = rSuc.rows[0]?.nombre_sucursal || '';
-
-        const token = jwt.sign(
-            { id_usuario: u.id_usuario, id_rol: u.id_rol, id_sucursal: u.id_sucursal },
-            JWT_SECRET,
-            { ...JWT_OPCIONES, expiresIn: `${p.sesion_horas}h` }
-        );
-
-        marcarEvento(res, 'INICIO_SESION', { sesion: huellaSesion(token) });
-        res.cookie(COOKIE_SESION, token, opcionesCookie(req, p.sesion_horas));
-        res.json({
-            mensaje: 'Login exitoso',
-            usuario: {
-                id_usuario:      u.id_usuario,
-                nombre_completo: u.nombre_completo,
-                correo_electronico: u.correo_electronico,
-                id_rol:          u.id_rol,
-                id_sucursal:     u.id_sucursal,
-                nombre_sucursal              // ← incluir aquí
-            }
-        });
+        if (conTelegram(u)) {
+            const { id, codigo } = codigosLogin.crear(u.id_usuario, u.correo_electronico);
+            return await enviarCodigo(res, u, id, codigo);
+        }
+        await completarLogin(req, res, u, p);
     } catch(e) {
         console.error('Error loginUsuario:', e);
         res.status(500).json({ error: 'Error al iniciar sesión' });
     }
+};
+
+const enviarCodigo = async (res, u, id_desafio, codigo) => {
+    const correo = u.correo_electronico;
+    try {
+        const nombre = (await ajusteModel.obtener())?.nombre_comercial || 'el sistema';
+        await telegram.enviar(u.telegram_chat_id,
+            `Código para ingresar a ${nombre}: ${codigo}\nVence en 5 minutos. Si no intentaste ingresar, avisa al administrador y cambia tu contraseña.`);
+        marcarEvento(res, 'CODIGO_TELEGRAM_ENVIADO', { correo });
+        res.json({ requiere_codigo: true, id_desafio, telefono: String(u.telefono || '').slice(-3) });
+    } catch (e) {
+        console.error('Telegram (código de ingreso):', e.message);
+        codigosLogin.pasarAAlterno(id_desafio);
+        marcarEvento(res, 'TELEGRAM_SIN_RESPUESTA', { correo });
+        res.json({ requiere_captcha: true, id_desafio });
+    }
+};
+
+const usuarioActivo = async (id_usuario) => id_usuario
+    ? (await db.query(`SELECT * FROM usuario WHERE id_usuario = $1 AND estado_activo = TRUE`, [id_usuario])).rows[0]
+    : null;
+
+// Paso 2: código de Telegram
+const verificarCodigoLogin = async (req, res) => {
+    try {
+        const { id_desafio, codigo } = req.body || {};
+        const d = codigosLogin.obtener(id_desafio);
+        const p = await ajusteModel.parametros();
+        const clave = d && claveIntento(req, d.correo);
+        if (clave && estaBloqueado(clave, limiteDe(p))) {
+            marcarEvento(res, 'BLOQUEO_POR_INTENTOS', { correo: d.correo });
+            return res.status(429).json({ error: `Demasiados intentos fallidos. Intente de nuevo en ${p.login_minutos_bloqueo} minutos.` });
+        }
+        const r = codigosLogin.verificarCodigo(id_desafio, codigo);
+        if (!r.ok) {
+            if (clave) registrarFallo(clave, limiteDe(p));
+            marcarEvento(res, 'CODIGO_TELEGRAM_INCORRECTO', { correo: d?.correo, motivo: r.motivo });
+            const mensaje = r.motivo === 'INCORRECTO' ? `Código incorrecto. Quedan ${r.quedan} intentos.`
+                          : r.motivo === 'AGOTADO'    ? 'Demasiados intentos. Vuelva a ingresar su contraseña.'
+                          : VENCIDO;
+            return res.status(r.motivo === 'INCORRECTO' ? 400 : 410).json({ error: mensaje, codigo: r.motivo });
+        }
+        const u = await usuarioActivo(r.id_usuario);
+        if (!u) return res.status(410).json({ error: VENCIDO, codigo: 'VENCIDO' });
+        await completarLogin(req, res, u, p);
+    } catch (e) {
+        console.error('Error verificarCodigoLogin:', e);
+        res.status(500).json({ error: 'Error al iniciar sesión' });
+    }
+};
+
+// Paso 2 alterno: Telegram no respondió, se pide el CAPTCHA
+const verificarAlternoLogin = async (req, res) => {
+    try {
+        const { id_desafio, id_captcha, captcha: respuestaCaptcha } = req.body || {};
+        const d = codigosLogin.obtener(id_desafio);
+        if (!d?.alterno) return res.status(410).json({ error: VENCIDO, codigo: 'VENCIDO' });
+        if (!captcha.verificar(id_captcha, respuestaCaptcha)) {
+            marcarEvento(res, 'CAPTCHA_INCORRECTO', {});
+            return res.status(400).json({ error: 'El código de la imagen es incorrecto o venció', codigo: 'CAPTCHA_INVALIDO' });
+        }
+        const u = await usuarioActivo(codigosLogin.usarAlterno(id_desafio));
+        if (!u) return res.status(410).json({ error: VENCIDO, codigo: 'VENCIDO' });
+        await completarLogin(req, res, u, await ajusteModel.parametros());
+    } catch (e) {
+        console.error('Error verificarAlternoLogin:', e);
+        res.status(500).json({ error: 'Error al iniciar sesión' });
+    }
+};
+
+// Reenviar el código (cada 30 s como mínimo)
+const reenviarCodigoLogin = async (req, res) => {
+    try {
+        const id_desafio = req.body?.id_desafio;
+        if (!codigosLogin.obtener(id_desafio)) return res.status(410).json({ error: VENCIDO, codigo: 'VENCIDO' });
+        const r = codigosLogin.renovar(id_desafio);
+        if (!r) return res.status(429).json({ error: 'Espere unos segundos para pedir otro código' });
+        const u = await usuarioActivo(r.id_usuario);
+        if (!conTelegram(u)) return res.status(410).json({ error: VENCIDO, codigo: 'VENCIDO' });
+        await enviarCodigo(res, u, id_desafio, r.codigo);
+    } catch (e) {
+        console.error('Error reenviarCodigoLogin:', e);
+        res.status(500).json({ error: 'No se pudo reenviar el código' });
+    }
+};
+
+const completarLogin = async (req, res, u, p) => {
+    intentosFallidos.delete(claveIntento(req, u.correo_electronico));
+    contexto.asignarUsuario(u.id_usuario, `${u.nombre_completo} <${u.correo_electronico}>`);
+
+    const rSuc = await db.query(`SELECT nombre_sucursal FROM sucursal WHERE id_sucursal = $1`, [u.id_sucursal]);
+    const nombre_sucursal = rSuc.rows[0]?.nombre_sucursal || '';
+
+    const token = jwt.sign(
+        { id_usuario: u.id_usuario, id_rol: u.id_rol, id_sucursal: u.id_sucursal },
+        JWT_SECRET,
+        { ...JWT_OPCIONES, expiresIn: `${p.sesion_horas}h` }
+    );
+
+    marcarEvento(res, 'INICIO_SESION', { sesion: huellaSesion(token) });
+    res.cookie(COOKIE_SESION, token, opcionesCookie(req, p.sesion_horas));
+    res.json({
+        mensaje: 'Login exitoso',
+        usuario: {
+            id_usuario:         u.id_usuario,
+            nombre_completo:    u.nombre_completo,
+            correo_electronico: u.correo_electronico,
+            id_rol:             u.id_rol,
+            id_sucursal:        u.id_sucursal,
+            nombre_sucursal
+        }
+    });
 };
 
 // Borra la cookie siempre; el cierre queda en la auditoría si la sesión seguía vigente
@@ -252,7 +351,8 @@ const obtenerDatosFormulario = async (req, res) => {
 };
 
 module.exports = {
-    registrarUsuario, loginUsuario, cerrarSesion, obtenerCaptcha, listarUsuarios,
+    registrarUsuario, loginUsuario, verificarCodigoLogin, verificarAlternoLogin, reenviarCodigoLogin,
+    cerrarSesion, obtenerCaptcha, listarUsuarios,
     actualizarUsuario, desactivarUsuario, reactivarUsuario,
     cambiarContrasena, obtenerDatosFormulario
 };

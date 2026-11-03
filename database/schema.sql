@@ -61,9 +61,17 @@ CREATE TABLE usuario (
     nombre_completo VARCHAR(100) NOT NULL,
     correo_electronico VARCHAR(100) UNIQUE NOT NULL,
     contrasena_hash VARCHAR(255) NOT NULL,
-    estado_activo BOOLEAN DEFAULT TRUE
+    estado_activo BOOLEAN DEFAULT TRUE,
     -- «Caja habilitada» no se guarda: es tener un turno abierto en turno_caja
+    -- Telegram: el teléfono es la llave para vincular (la persona comparte su número con el bot);
+    -- recibe avisos de avisos_sucursal (NULL = todas) y el código de cada inicio de sesión
+    telefono VARCHAR(20),
+    telegram_chat_id BIGINT,
+    avisos_telegram BOOLEAN NOT NULL DEFAULT TRUE,
+    avisos_sucursal INT REFERENCES sucursal(id_sucursal) ON DELETE SET NULL
 );
+CREATE UNIQUE INDEX uq_usuario_telefono ON usuario (telefono) WHERE telefono IS NOT NULL;
+CREATE UNIQUE INDEX uq_usuario_telegram ON usuario (telegram_chat_id) WHERE telegram_chat_id IS NOT NULL;
 
 -- Permisos granulares por usuario (sobreescriben los defaults del rol).
 -- El admin asigna/quita acceso a módulos específicos para cada cajero.

@@ -44,6 +44,7 @@ services:
       JWT_SECRET:   ${JWT_SECRET:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       PORT:         3000
     ports:
       - "3000:3000"
