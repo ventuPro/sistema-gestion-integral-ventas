@@ -4,14 +4,18 @@
   @if (menuAbierto()) { <div class="fondo-menu lg:hidden" (click)="cerrarMenu()"></div> }
 
   <!-- ═══ BARRA LATERAL ═══ -->
-  <aside class="lateral bg-gray-900 text-white" [class.abierta]="menuAbierto()" aria-label="Menú principal">
+  <aside class="lateral bg-gray-900 text-white" [class.abierta]="menuAbierto()" [class.plegada]="plegado()" aria-label="Menú principal">
 
     <div class="marca">
       @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="Logo"> }
-      <div class="min-w-0 flex-1">
+      <div class="textos min-w-0 flex-1">
         <p class="nombre">{{ ajustes.nombre() }}</p>
         @if (ajustes.config().eslogan) { <p class="eslogan">{{ ajustes.config().eslogan }}</p> }
       </div>
+      <button class="plegar" (click)="alternarMenu()" [attr.aria-label]="plegado() ? 'Mostrar menú' : 'Ocultar menú'"
+              [attr.aria-expanded]="!plegado()" [attr.data-titulo]="plegado() ? 'Mostrar menú' : null">
+        <lucide-icon [img]="plegado() ? icons.desplegar : icons.plegar" class="w-5 h-5"></lucide-icon>
+      </button>
       <button class="cerrar lg:hidden" (click)="cerrarMenu()" aria-label="Cerrar menú">
         <lucide-icon [img]="icons.cerrar" class="w-5 h-5"></lucide-icon>
       </button>
@@ -22,18 +26,20 @@
         <p class="grupo">{{ seccion.titulo }}</p>
         @for (item of seccion.enlaces; track item.ruta) {
           @if (!item.modulo || tiene(item.modulo)) {
-            <a [routerLink]="'/dashboard/' + item.ruta" routerLinkActive="activo" class="enlace">
+            <a [routerLink]="'/dashboard/' + item.ruta" routerLinkActive="activo" class="enlace"
+               [attr.data-titulo]="item.texto" [attr.aria-label]="item.texto">
               <lucide-icon [img]="item.icono" class="w-[18px] h-[18px] flex-shrink-0" [strokeWidth]="1.75"></lucide-icon>
-              {{ item.texto }}
+              <span class="texto">{{ item.texto }}</span>
             </a>
           }
         }
       }
 
       @if (bandeja(); as b) {
-        <button (click)="abrirBandeja()" class="enlace pedidos" [class.hay]="b.conteo().pendientes">
+        <button (click)="abrirBandeja()" class="enlace pedidos" [class.hay]="b.conteo().pendientes"
+                data-titulo="Pedidos QR" aria-label="Pedidos QR">
           <lucide-icon [img]="icons.pedidos" class="w-[18px] h-[18px] flex-shrink-0" [strokeWidth]="1.75"></lucide-icon>
-          <span class="flex-1 text-left">Pedidos QR</span>
+          <span class="texto flex-1 text-left">Pedidos QR</span>
           @if (b.conteo().pendientes) { <span class="contador-pedidos bg-amber-500 text-gray-900">{{ b.conteo().pendientes }}</span> }
           @if (b.conteo().porEntregar) { <span class="contador-pedidos bg-blue-600 text-white" title="Por entregar">{{ b.conteo().porEntregar }}</span> }
         </button>
@@ -52,14 +58,15 @@
         </div>
       }
       <button class="cuenta" [class.abierto]="menuCuenta()" (click)="menuCuenta.set(!menuCuenta())"
-              aria-haspopup="menu" [attr.aria-expanded]="menuCuenta()">
-        <span class="min-w-0 flex-1 text-left">
+              aria-haspopup="menu" [attr.aria-expanded]="menuCuenta()" [attr.data-titulo]="plegado() && !menuCuenta() ? usuario()?.nombre_completo : null">
+        <lucide-icon [img]="icons.usuario" class="solo-plegada w-6 h-6" [strokeWidth]="1.5"></lucide-icon>
+        <span class="texto min-w-0 flex-1 text-left">
           <span class="usuario">{{ usuario()?.nombre_completo }}</span>
           <span class="sucursal">
             <lucide-icon [img]="icons.sucursal" class="w-3.5 h-3.5 flex-shrink-0" [strokeWidth]="1.75"></lucide-icon> {{ nombreSucursal() }}
           </span>
         </span>
-        <lucide-icon [img]="icons.cuenta" class="w-4 h-4 flex-shrink-0 opacity-60"></lucide-icon>
+        <lucide-icon [img]="icons.cuenta" class="texto w-4 h-4 flex-shrink-0 opacity-60"></lucide-icon>
       </button>
     </div>
   </aside>

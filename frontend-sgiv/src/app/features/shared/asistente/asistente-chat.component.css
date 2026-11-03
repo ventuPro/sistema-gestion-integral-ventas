@@ -25,8 +25,8 @@
 .chat-boton:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .chat-boton.elevado { bottom: calc(88px + env(safe-area-inset-bottom)); }
 .chat-boton.izquierda { right: auto; left: 16px; }
-/* En escritorio, después de la barra lateral (260 px) */
-@media (min-width: 1024px) { .chat-boton.izquierda { left: 276px; } }
+/* En escritorio, después de la barra lateral (--ancho-lateral: 260 px o 72 px plegada) */
+@media (min-width: 1024px) { .chat-boton.izquierda { left: calc(var(--ancho-lateral, 260px) + 16px); } }
 
 .chat-panel {
   position: fixed;

@@ -1,11 +1,11 @@
-import { Component, computed, inject, OnInit, OnDestroy, HostListener, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, OnInit, OnDestroy, HostListener, signal, viewChild } from '@angular/core';
 import { Router, RouterOutlet, RouterModule, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
          Landmark, LogOut, Building2,
-         Settings, Menu, X, Bell, BadgePercent, ChevronsUpDown, Calculator } from 'lucide-angular';
+         Settings, Menu, X, Bell, BadgePercent, ChevronsUpDown, Calculator, PanelLeftClose, PanelLeftOpen, CircleUser } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
@@ -18,6 +18,9 @@ import { componenteDiferido } from '../../../core/utils/diferido';
 import type { MensajeChat } from '../../shared/asistente/asistente-chat.component';
 import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
+
+const CLAVE_PLEGADO = 'menu_plegado';
+const leerPlegado = () => { try { return localStorage.getItem(CLAVE_PLEGADO) === '1'; } catch { return false; } };
 
 interface Enlace { ruta: string; texto: string; icono: any; modulo?: string }
 
@@ -67,6 +70,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly menuCuenta = signal(false);
   /** En Punto de venta el Asistente va abajo a la izquierda para no tapar «Cobrar» */
   readonly enPuntoVenta = signal(false);
+
+  // ─── Menú lateral plegado (solo íconos, en escritorio): igual en todas las pantallas, se recuerda en este equipo ───
+  readonly plegado = signal(leerPlegado());
+
+  // El botón del Asistente en Punto de venta se ubica después del menú
+  private readonly anchoMenu = effect(() =>
+    document.documentElement.style.setProperty('--ancho-lateral', this.plegado() ? '72px' : '260px'));
+
+  alternarMenu() {
+    this.menuCuenta.set(false);
+    const plegado = !this.plegado();
+    this.plegado.set(plegado);
+    try { localStorage.setItem(CLAVE_PLEGADO, plegado ? '1' : '0'); } catch { }
+  }
   readonly bandeja = viewChild(BandejaPedidosComponent);
   readonly secciones = computed(() => this.armarMenu());
 
@@ -88,7 +105,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     ajustes:    Settings,
     promociones: BadgePercent,
     cuenta:     ChevronsUpDown,
-    costos:     Calculator
+    costos:     Calculator,
+    plegar:     PanelLeftClose,
+    desplegar:  PanelLeftOpen,
+    usuario:    CircleUser
   };
 
   ngOnInit() {
