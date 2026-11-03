@@ -19,6 +19,10 @@
   --text-3xl:  calc(1.875rem * var(--escala-texto));
 }
 
+/* ─── Ventanas modales: fondo oscurecido y sombra (todas, para que nunca se mezclen con la pantalla) ─── */
+.fondo-modal { background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(3px); }
+.ventana { box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.45); }
+
 /* ─── Modo oscuro (Ajustes → Apariencia) ───
    AjustesService pone la clase .tema-oscuro en <html>. Las reglas usan :where()
    para tener la misma prioridad que las clases de Tailwind y van después de ellas,

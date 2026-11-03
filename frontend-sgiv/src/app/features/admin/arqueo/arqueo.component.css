@@ -94,8 +94,6 @@
 .resultado { background: var(--i-linea); border: 1px solid var(--i-linea); border-radius: 6px; overflow: hidden; }
 .resultado > div { background: var(--i-papel); padding: 14px 16px; }
 
-.fondo-modal { background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(3px); }
-.ventana { box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.45); }
 
 @media print {
   .no-print { display: none !important; }
