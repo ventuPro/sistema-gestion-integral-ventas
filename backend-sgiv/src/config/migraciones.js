@@ -396,7 +396,31 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
     `ALTER TABLE usuario DROP COLUMN IF EXISTS caja_habilitada;
     ALTER TABLE inventario_sucursal DROP COLUMN IF EXISTS stock_minimo_alerta;
     ALTER TABLE cuenta_mesa DROP COLUMN IF EXISTS total_acumulado, DROP COLUMN IF EXISTS metodo_pago;
-    ALTER TABLE pedido_mesa DROP COLUMN IF EXISTS monto_total;`
+    ALTER TABLE pedido_mesa DROP COLUMN IF EXISTS monto_total;`,
+
+    // Notificaciones (campana y Telegram): fuera de la auditoría, se borran a los 7 días
+    `CREATE TABLE IF NOT EXISTS notificacion (
+        id_notificacion SERIAL PRIMARY KEY,
+        tipo           VARCHAR(20) NOT NULL CONSTRAINT notificacion_tipo_check
+                       CHECK (tipo IN ('STOCK_BAJO', 'AGOTADO', 'ARQUEO', 'CAJA_SIN_CERRAR', 'TRANSFERENCIA', 'DESCUENTO')),
+        titulo         VARCHAR(80)  NOT NULL,
+        mensaje        VARCHAR(300) NOT NULL,
+        ruta           VARCHAR(40),
+        destino        VARCHAR(10) NOT NULL DEFAULT 'ADMIN' CONSTRAINT notificacion_destino_check
+                       CHECK (destino IN ('ADMIN', 'SUCURSAL', 'USUARIO')),
+        id_sucursal    INT REFERENCES sucursal(id_sucursal) ON DELETE CASCADE,
+        id_usuario     INT REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+        id_producto    INT REFERENCES producto(id_producto) ON DELETE CASCADE,
+        fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS notificacion_leida (
+        id_notificacion INT NOT NULL REFERENCES notificacion(id_notificacion) ON DELETE CASCADE,
+        id_usuario      INT NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+        fecha_lectura   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id_notificacion, id_usuario)
+    );
+    CREATE INDEX IF NOT EXISTS idx_notificacion_fecha ON notificacion (fecha_creacion DESC);
+    CREATE INDEX IF NOT EXISTS idx_notificacion_producto ON notificacion (id_producto, id_sucursal, tipo, fecha_creacion);`
 ];
 
 const aplicarMigraciones = async () => {

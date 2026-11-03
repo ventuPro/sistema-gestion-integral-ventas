@@ -1,4 +1,5 @@
 const cajaModel = require('../models/cajaModel');
+const notificacionModel = require('../models/notificacionModel');
 const contexto  = require('../auditoria/contexto');
 const { emitirUsuario, emitirCajeros } = require('../utils/tiempoReal');
 
@@ -15,6 +16,7 @@ const ejecutar = () => contexto.ejecutar({ ...CONTEXTO }, async () => {
             emitirCajeros('caja:cerrada', datos);
         }
         if (turnos.length) console.log(`Cierre del día: ${turnos.length} turno(s) cerrados por el sistema`);
+        await notificacionModel.limpiarAntiguas();
     } catch (e) {
         console.error('cierreDiario:', e.message);
     }

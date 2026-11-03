@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const notificacionModel = require('./notificacionModel');
 
 // ─── Movimientos de inventario (entradas y mermas con motivo) ───
 // Todo cambio de stock debería dejar una fila en historial_inventario con el
@@ -10,13 +11,20 @@ const MOTIVOS = {
 };
 
 /** cliente: db o un cliente dentro de una transacción */
-const registrarHistorial = (cliente, { id_inventario, id_usuario, tipo, cantidad, motivo, detalle = null, stock_resultante }) =>
-    cliente.query(
+const registrarHistorial = async (cliente, { id_inventario, id_usuario, tipo, cantidad, motivo, detalle = null, stock_resultante }) => {
+    const r = await cliente.query(
         `INSERT INTO historial_inventario
             (id_inventario, id_usuario, tipo_movimiento, cantidad_movida, motivo_movimiento, detalle, stock_resultante)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [id_inventario, id_usuario || null, tipo, Math.abs(cantidad), motivo, detalle, stock_resultante]
     );
+    // Toda salida pasa por aquí: aviso de stock bajo o agotado
+    if (tipo === 'SALIDA' && stock_resultante != null) {
+        const despues = Number(stock_resultante);
+        await notificacionModel.revisarStock(cliente, { id_inventario, antes: despues + Math.abs(cantidad), despues });
+    }
+    return r;
+};
 
 /** Entrada o merma manual. Lanza { codigo: 'SIN_STOCK' } si la salida deja el stock negativo. */
 const registrarMovimiento = async ({ id_sucursal, id_producto, id_usuario, tipo, cantidad, motivo, detalle }) => {

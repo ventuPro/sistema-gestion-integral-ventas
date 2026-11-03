@@ -84,6 +84,7 @@ app.use('/api/ajustes',    ajusteRoutes);
 app.use('/api/asistente',  asistenteRoutes);
 app.use('/api/promociones', promocionRoutes);
 app.use('/api/costos',     require('./routes/costoRoutes'));
+app.use('/api/notificaciones', require('./routes/notificacionRoutes'));
 
 // Socket.IO eventos
 io.on('connection', (socket) => {

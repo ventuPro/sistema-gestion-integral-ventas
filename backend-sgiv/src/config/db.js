@@ -43,7 +43,28 @@ const connect = async () => {
         client.release(e);
         throw e;
     }
+    prepararConfirmacion(client);
     return client;
+};
+
+// ─── Acciones después del COMMIT (avisos en tiempo real) ───
+// client.alConfirmar: funciones que corren solo si la transacción se confirma; un ROLLBACK las descarta.
+const FIN_TRANSACCION = /^\s*(COMMIT|ROLLBACK)\s*;?\s*$/i;
+
+const prepararConfirmacion = (client) => {
+    client.alConfirmar = [];
+    if (client.conConfirmacion) return;
+    client.conConfirmacion = true;
+    const original = client.query.bind(client);
+    client.query = (texto, ...resto) => {
+        const fin = typeof texto === 'string' && texto.match(FIN_TRANSACCION);
+        const p = original(texto, ...resto);
+        if (!fin) return p;
+        const pendientes = client.alConfirmar;
+        client.alConfirmar = [];
+        if (fin[1].toUpperCase() !== 'COMMIT' || !pendientes.length || !p?.then) return p;
+        return p.then(r => { for (const fn of pendientes) setImmediate(fn); return r; });
+    };
 };
 
 const query = async (texto, params) => {

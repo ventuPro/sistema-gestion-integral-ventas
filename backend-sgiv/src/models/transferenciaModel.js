@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { registrarHistorial } = require('./inventarioModel');
+const notificacionModel = require('./notificacionModel');
 
 // ─── Transferencias directas entre sucursales ───
 // El stock sale del origen y entra al destino en la misma transacción.
@@ -100,6 +101,10 @@ const crear = async ({ id_origen, id_destino, id_usuario, items, observacion }) 
             cambios.push({ id_producto: it.id_producto, id_sucursal: id_origen,  nuevo_stock: Number(sale.cantidad_actual) },
                          { id_producto: it.id_producto, id_sucursal: id_destino, nuevo_stock: Number(entra.cantidad_actual) });
         }
+        await notificacionModel.transferencia(client, {
+            id_transferencia: tr.id_transferencia, origen: origen.nombre_sucursal, destino: destino.nombre_sucursal,
+            id_destino, id_usuario, items: lista.map(i => ({ ...i, nombre_producto: nombres.get(i.id_producto) }))
+        });
 
         await client.query('COMMIT');
         return {

@@ -125,6 +125,7 @@ END $$;
 
 -- ─── Activa los triggers en todas las tablas de 'public' ───
 -- Se ejecuta en cada arranque: las tablas nuevas quedan auditadas solas.
+-- Excepto las notificaciones: son avisos (se borran a los 7 días), no datos del negocio.
 CREATE OR REPLACE FUNCTION auditoria.activar_en_todas() RETURNS INT
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -136,6 +137,7 @@ BEGIN
         SELECT c.oid, c.relname
         FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
         WHERE ns.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition
+          AND c.relname NOT IN ('notificacion', 'notificacion_leida')
     LOOP
         SELECT string_agg(quote_literal(a.attname), ', ' ORDER BY array_position(i.indkey::INT2[], a.attnum))
         INTO v_pk
@@ -152,6 +154,12 @@ BEGIN
                         FOR EACH STATEMENT EXECUTE FUNCTION auditoria.fn_registrar_truncate()',
                        t.relname);
         n := n + 1;
+    END LOOP;
+    FOR t IN SELECT relname FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
+             WHERE ns.nspname = 'public' AND c.relname IN ('notificacion', 'notificacion_leida') AND c.relkind = 'r'
+    LOOP
+        EXECUTE format('DROP TRIGGER IF EXISTS trg_auditoria ON public.%I', t.relname);
+        EXECUTE format('DROP TRIGGER IF EXISTS trg_auditoria_truncate ON public.%I', t.relname);
     END LOOP;
     RETURN n;
 END $$;

@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { finalizarPedidosDeCuenta } = require('./pedidoModel');
 const { registrarHistorial } = require('./inventarioModel');
 const promocionModel = require('./promocionModel');
+const notificacionModel = require('./notificacionModel');
 const visitaModel = require('./visitaModel');
 const { turnoParaVender } = require('./cajaModel');
 
@@ -338,6 +339,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         `, [cuenta.id_sucursal, id_usuario_cajero, id_turno, total, metodo_pago,
             cot.promoCentavos / 100, cot.manualCentavos / 100, cot.motivo]);
         const id_venta = rVenta.rows[0].id_venta;
+        if (cot.manualCentavos > 0) await notificacionModel.descuentoManual(client, id_venta);
 
         // El stock ya se descontó al agregar cada producto: aquí no se toca
         for (const l of cot.lineas) {

@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { registrarHistorial } = require('./inventarioModel');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const promocionModel = require('./promocionModel');
+const notificacionModel = require('./notificacionModel');
 
 // Efectivo esperado de un turno t: fondo inicial + ventas en efectivo (igual en todo cierre)
 const EFECTIVO_ESPERADO = `t.monto_inicial + COALESCE((
@@ -142,6 +143,7 @@ const cerrarCaja = async (id_sucursal, id_usuario_cajero, efectivo_contado = nul
             WHERE t.id_turno = ANY($1::int[]) AND t.estado_turno = 'Abierto'
             RETURNING t.id_turno, t.monto_calculado::float8, t.monto_real_declarado::float8, t.diferencia::float8
         `, [rT.rows.map(t => t.id_turno), efectivo_contado]);
+        if (r.rows[0]) await notificacionModel.arqueoConDiferencia(client, r.rows[0].id_turno);
 
         await client.query('COMMIT');
         const t = r.rows[0];
@@ -299,6 +301,7 @@ const cerrarTurnosVencidos = async () => {
             WHERE t.estado_turno = 'Abierto' AND t.fecha_hora_apertura < CURRENT_DATE
             RETURNING t.id_turno, t.id_usuario_cajero, t.id_sucursal
         `);
+        for (const t of r.rows) await notificacionModel.cajaSinCerrar(client, t.id_turno);
         await client.query('COMMIT');
         return r.rows;
     } catch (e) {
@@ -588,6 +591,7 @@ const registrarVenta = async ({
             cot.motivo
         ]);
         const id_venta = rVenta.rows[0].id_venta;
+        if (cot.manualCentavos > 0) await notificacionModel.descuentoManual(client, id_venta);
 
         // 4. Procesar cada ítem del carrito
         const cambiosStock = [];
