@@ -58,6 +58,9 @@ CREATE INDEX IF NOT EXISTS idx_cambio_fecha        ON registro_cambio (fecha_hor
 CREATE INDEX IF NOT EXISTS idx_cambio_usuario      ON registro_cambio (id_usuario, fecha_hora);
 CREATE INDEX IF NOT EXISTS idx_cambio_tabla        ON registro_cambio (tabla, id_registro);
 CREATE INDEX IF NOT EXISTS idx_cambio_acceso       ON registro_cambio (id_acceso);
+-- Pantalla Ajustes → Auditoría: una operación = una petición (o una transacción sin petición)
+CREATE INDEX IF NOT EXISTS idx_cambio_operacion    ON registro_cambio ((COALESCE(id_acceso, -id_transaccion)), id_cambio);
+CREATE INDEX IF NOT EXISTS idx_acceso_eventos      ON registro_acceso (id_acceso) WHERE evento <> 'PETICION';
 
 -- ─── Inmutabilidad ───
 -- Los registros no se modifican ni se borran. Excepciones: completar el

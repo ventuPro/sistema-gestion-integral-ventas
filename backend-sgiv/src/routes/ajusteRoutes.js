@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/ajusteController');
 const propietarios = require('../controllers/propietarioController');
+const auditoria    = require('../controllers/auditoriaController');
 const { verificarToken, soloAdministrador } = require('../middlewares/authMiddleware');
 
 const admin = [verificarToken, soloAdministrador];
@@ -23,6 +24,12 @@ router.get ('/telegram',                         admin, ctrl.telegram);
 router.put ('/telegram/usuarios/:id',            admin, ctrl.guardarTelegramUsuario);
 router.post('/telegram/usuarios/:id/prueba',     admin, ctrl.probarTelegramUsuario);
 router.post('/telegram/usuarios/:id/desvincular', admin, ctrl.desvincularTelegramUsuario);
+
+// Auditoría: movimientos y accesos (solo lectura)
+router.get('/auditoria/opciones',        admin, auditoria.opciones);
+router.get('/auditoria/movimientos',     admin, auditoria.movimientos);
+router.get('/auditoria/movimientos/:id', admin, auditoria.movimiento);
+router.get('/auditoria/accesos',         admin, auditoria.accesos);
 
 // Propietarios: datos privados, solo el administrador
 router.get   ('/propietarios',     admin, propietarios.listar);

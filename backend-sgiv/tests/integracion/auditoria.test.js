@@ -284,3 +284,99 @@ describe('Integridad de la auditoría', () => {
         assert.equal((await api('GET', '/usuarios/captcha')).status, 200);
     });
 });
+
+// ─── Pantalla Ajustes → Auditoría ───
+describe('Ajustes → Auditoría', () => {
+    const esperarMovimiento = async (token, filtro, prueba) => {
+        for (let i = 0; i < 40; i++) {
+            const r = await api('GET', `/ajustes/auditoria/movimientos?${filtro}`, { token });
+            const m = r.body.movimientos?.find(prueba);
+            if (m) return m;
+            await new Promise(res => setTimeout(res, 50));
+        }
+        throw new Error(`Sin movimiento para ${filtro}`);
+    };
+
+    test('solo el administrador la ve', async () => {
+        await crearUsuario('mirar@prueba.com', 2);
+        const tCajero = await login('mirar@prueba.com');
+        for (const ruta of ['opciones', 'movimientos', 'accesos', 'movimientos/1'])
+            assert.equal((await api('GET', `/ajustes/auditoria/${ruta}`, { token: tCajero })).status, 403);
+        assert.equal((await api('GET', '/ajustes/auditoria/movimientos')).status, 401);
+    });
+
+    test('cada operación es una fila con su frase y su detalle antes / después', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        const [{ id_categoria }] = await bd.sql(`SELECT min(id_categoria) AS id_categoria FROM categoria_producto`);
+        const base = { nombre_producto: 'PASTEL AUDITADO', precio_unitario: 10, id_categoria, id_sucursal: 1, stock_inicial: 3 };
+        const creado = await api('POST', '/catalogo/productos', { token: tAdmin, body: base });
+        assert.equal(creado.status, 201);
+        const id = creado.body.producto.id_producto;
+        assert.equal((await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: { ...base, precio_unitario: 12.5 } })).status, 200);
+
+        const cambio = await esperarMovimiento(tAdmin, 'modulo=productos&accion=modificar', m => m.accion === 'Modificó un producto');
+        assert.match(cambio.detalle, /PASTEL AUDITADO · Precio: Bs\. 10\.00 → Bs\. 12\.50/);
+        assert.match(cambio.correo, /admin@rickys.com/);
+        assert.equal(cambio.modulo, 'Productos');
+
+        // Crear el producto cambió varias tablas, pero es una sola operación
+        const alta = await esperarMovimiento(tAdmin, 'accion=crear&q=PASTEL%20AUDITADO', m => m.accion === 'Creó un producto');
+        assert.ok(alta.filas >= 3);
+        const detalle = await api('GET', `/ajustes/auditoria/movimientos/${alta.id}`, { token: tAdmin });
+        assert.equal(detalle.status, 200);
+        assert.equal(detalle.body.origen, 'POST /api/catalogo/productos');
+        assert.equal(detalle.body.cambios.length, alta.filas);
+        const fila = detalle.body.cambios.find(c => c.tabla === 'producto');
+        assert.equal(fila.operacion, 'Creó');
+        assert.deepEqual(fila.campos.find(c => c.campo === 'Precio'), { campo: 'Precio', antes: null, despues: '10.00' });
+
+        // Los filtros excluyen lo que no corresponde
+        const otros = await api('GET', '/ajustes/auditoria/movimientos?modulo=costos', { token: tAdmin });
+        assert.ok(!otros.body.movimientos.some(m => /PASTEL AUDITADO/.test(m.detalle)));
+        const [{ id_usuario }] = await bd.sql(`SELECT id_usuario FROM usuario WHERE correo_electronico = 'admin@rickys.com'`);
+        const delAdmin = await api('GET', `/ajustes/auditoria/movimientos?usuario=u:${id_usuario}`, { token: tAdmin });
+        assert.ok(delAdmin.body.movimientos.length && delAdmin.body.movimientos.every(m => m.id_usuario === id_usuario));
+    });
+
+    test('las páginas no repiten ni saltan operaciones; incluye lo automático', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        await bd.sql(`SELECT set_config('sgiv.usuario', 'Sistema', false), set_config('sgiv.origen', 'Proceso de prueba', false)`);
+        for (let i = 0; i < 5; i++) await bd.sql(`INSERT INTO categoria_producto (nombre_categoria) VALUES ($1)`, [`PAGINA ${i}`]);
+
+        const todas = (await api('GET', '/ajustes/auditoria/movimientos?por_pagina=500', { token: tAdmin })).body.movimientos;
+        const vistas = [];
+        let antes = null;
+        do {
+            const r = await api('GET', `/ajustes/auditoria/movimientos?por_pagina=3${antes ? `&antes=${antes}` : ''}`, { token: tAdmin });
+            vistas.push(...r.body.movimientos.map(m => m.id));
+            antes = r.body.siguiente;
+        } while (antes);
+        assert.deepEqual(vistas, todas.map(m => m.id));
+
+        const sistema = await api('GET', '/ajustes/auditoria/movimientos?usuario=sistema', { token: tAdmin });
+        assert.equal(sistema.body.movimientos.filter(m => m.accion === 'Proceso de prueba').length, 5);
+    });
+
+    test('accesos: sesiones y rechazos con su texto', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        await api('POST', '/usuarios/login', { body: { correo_electronico: 'admin@rickys.com', contrasena: 'mala', ...resolverCaptcha() } });
+        await ultimoAcceso('POST', '/usuarios/login');
+        const r = await api('GET', '/ajustes/auditoria/accesos?tipo=rechazos', { token: tAdmin });
+        assert.equal(r.status, 200);
+        const fallido = r.body.accesos.find(a => a.evento === 'INICIO_SESION_FALLIDO');
+        assert.equal(fallido.texto, 'Intento de ingreso fallido');
+        assert.equal(fallido.usuario, 'admin@rickys.com');
+        assert.ok(r.body.accesos.every(a => a.evento !== 'INICIO_SESION'));
+        const sesiones = await api('GET', '/ajustes/auditoria/accesos?tipo=sesiones', { token: tAdmin });
+        assert.ok(sesiones.body.accesos.some(a => a.texto === 'Inició sesión'));
+    });
+
+    test('valida los filtros', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        for (const q of ['desde=05/11/2026', 'desde=2026-11-05&hasta=2026-11-01', 'usuario=x', 'antes=-1', 'por_pagina=9999', 'id_sucursal=abc'])
+            assert.equal((await api('GET', `/ajustes/auditoria/movimientos?${q}`, { token: tAdmin })).status, 400, q);
+        assert.equal((await api('GET', '/ajustes/auditoria/movimientos/999999999', { token: tAdmin })).status, 404);
+        const o = await api('GET', '/ajustes/auditoria/opciones', { token: tAdmin });
+        assert.ok(o.body.usuarios.length && o.body.modulos.length && o.body.sucursales.length);
+    });
+});

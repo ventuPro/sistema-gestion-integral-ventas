@@ -1,9 +1,9 @@
 import { Component, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, NgComponentOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule,
          Building2, Palette, Upload, RotateCcw, Save, Sun, Moon, MonitorSmartphone,
-         ImageIcon, Undo2, Crown, Store, SlidersHorizontal, Sparkles, Send } from 'lucide-angular';
+         ImageIcon, Undo2, Crown, Store, SlidersHorizontal, Sparkles, Send, ShieldCheck } from 'lucide-angular';
 import { AjustesService, Configuracion, Tema,
          COLOR_PRIMARIO_ORIGINAL, COLOR_SECUNDARIO_ORIGINAL } from '../../../core/services/ajustes.service';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
@@ -13,8 +13,9 @@ import { AjustesParametrosComponent } from './parametros/ajustes-parametros.comp
 import { AjustesIaComponent } from './ia/ajustes-ia.component';
 import { AjustesTelegramComponent } from './telegram/ajustes-telegram.component';
 import { DialogoService } from '../../../core/services/dialogo.service';
+import { componenteDiferido } from '../../../core/utils/diferido';
 
-type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'parametros' | 'ia' | 'telegram';
+type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'parametros' | 'ia' | 'telegram' | 'auditoria';
 
 interface CampoEmpresa { clave: string; etiqueta: string; ejemplo: string; max: number; tipo?: string; ancho?: boolean }
 
@@ -30,7 +31,7 @@ const IMAGENES = {
 @Component({
   selector: 'app-ajustes',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe,
+  imports: [CommonModule, NgComponentOutlet, FormsModule, LucideAngularModule, ImagenUrlPipe,
             AjustesPropietariosComponent, AjustesSucursalesComponent, AjustesParametrosComponent, AjustesIaComponent, AjustesTelegramComponent],
   templateUrl: './ajustes.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
@@ -107,11 +108,16 @@ export class AjustesComponent implements OnInit, OnDestroy {
     { id: 'sucursales',   nombre: 'Sucursales',   icono: Store },
     { id: 'parametros',   nombre: 'Parámetros',   icono: SlidersHorizontal },
     { id: 'ia',           nombre: 'Chatbot',      icono: Sparkles },
-    { id: 'telegram',     nombre: 'Telegram',     icono: Send }
+    { id: 'telegram',     nombre: 'Telegram',     icono: Send },
+    { id: 'auditoria',    nombre: 'Auditoría',    icono: ShieldCheck }
   ];
 
   readonly pestana            = signal<Pestana>('empresa');
   readonly cargando           = signal(true);
+
+  // Se descarga solo al abrir la pestaña
+  readonly auditoria = componenteDiferido(() => this.pestana() === 'auditoria',
+    () => import('./auditoria/ajustes-auditoria.component').then(m => m.AjustesAuditoriaComponent));
   readonly guardando          = signal(false);
 
   readonly empresa    = signal<Record<string, string>>({});

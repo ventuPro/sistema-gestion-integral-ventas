@@ -1,0 +1,254 @@
+<div class="space-y-4">
+
+  <!-- ═══ VISTA Y DESCARGAS ═══ -->
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <nav class="inf-segmentos">
+      <button [class.activa]="vista() === 'movimientos'" (click)="cambiarVista('movimientos')">Movimientos</button>
+      <button [class.activa]="vista() === 'accesos'" (click)="cambiarVista('accesos')">Accesos</button>
+    </nav>
+    <div class="flex flex-wrap gap-2">
+      <button class="inf-boton" (click)="cargar()" [disabled]="cargando()">
+        <lucide-icon [img]="icons.actualizar" class="w-3.5 h-3.5" [class.animate-spin]="cargando()"></lucide-icon> Actualizar
+      </button>
+      <button class="inf-boton" (click)="descargarPDF()" [disabled]="exportando() || cargando() || vacio()">
+        <lucide-icon [img]="icons.pdf" class="w-3.5 h-3.5"></lucide-icon> PDF
+      </button>
+      <button class="inf-boton" (click)="descargarExcel()" [disabled]="exportando() || cargando() || vacio()">
+        <lucide-icon [img]="icons.excel" class="w-3.5 h-3.5"></lucide-icon> Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ FILTROS ═══ -->
+  <section class="inf-hoja filtros">
+    <div class="periodo">
+      <nav class="inf-segmentos max-w-full">
+        @for (p of periodos; track p.id) {
+          <button [class.activa]="periodo() === p.id" (click)="elegirPeriodo(p.id)">{{ p.nombre }}</button>
+        }
+      </nav>
+      @if (periodo() === 'rango') {
+        <div class="flex items-center gap-2">
+          <input type="date" class="inf-campo" [value]="filtros().desde" [max]="filtros().hasta" aria-label="Desde"
+                 (change)="cambiarFecha('desde', $any($event.target).value)">
+          <span class="inf-sutil">–</span>
+          <input type="date" class="inf-campo" [value]="filtros().hasta" [min]="filtros().desde" aria-label="Hasta"
+                 (change)="cambiarFecha('hasta', $any($event.target).value)">
+        </div>
+      }
+    </div>
+
+    <div class="rejilla">
+      <div class="grupo">
+        <label class="inf-etiqueta" for="aud-usuario">Usuario</label>
+        <select id="aud-usuario" class="campo" (change)="cambiar('usuario', $any($event.target).value)">
+          <option value="" [selected]="!filtros().usuario">Todos</option>
+          @for (u of opciones()?.usuarios ?? []; track u.id_usuario) {
+            <option [value]="'u:' + u.id_usuario" [selected]="filtros().usuario === 'u:' + u.id_usuario">
+              {{ u.nombre_completo }} · {{ u.nombre_rol }}{{ u.estado_activo ? '' : ' (inactivo)' }}
+            </option>
+          }
+          <option value="sistema" [selected]="filtros().usuario === 'sistema'">Sistema (automático)</option>
+          <option value="cliente" [selected]="filtros().usuario === 'cliente'">Clientes del menú QR</option>
+          @if (vista() === 'movimientos') {
+            <option value="directo" [selected]="filtros().usuario === 'directo'">Directo en la base de datos</option>
+          }
+        </select>
+      </div>
+
+      @if (vista() === 'movimientos') {
+        <div class="grupo">
+          <label class="inf-etiqueta" for="aud-sucursal">Sucursal</label>
+          <select id="aud-sucursal" class="campo" (change)="cambiar('id_sucursal', $any($event.target).value)">
+            <option value="" [selected]="!filtros().id_sucursal">Todas</option>
+            @for (s of opciones()?.sucursales ?? []; track s.id_sucursal) {
+              <option [value]="s.id_sucursal" [selected]="filtros().id_sucursal === '' + s.id_sucursal">{{ s.nombre_sucursal }}</option>
+            }
+          </select>
+        </div>
+        <div class="grupo">
+          <label class="inf-etiqueta" for="aud-modulo">Módulo</label>
+          <select id="aud-modulo" class="campo" (change)="cambiar('modulo', $any($event.target).value)">
+            <option value="" [selected]="!filtros().modulo">Todos</option>
+            @for (m of opciones()?.modulos ?? []; track m.id) {
+              <option [value]="m.id" [selected]="filtros().modulo === m.id">{{ m.nombre }}</option>
+            }
+          </select>
+        </div>
+        <div class="grupo">
+          <label class="inf-etiqueta" for="aud-accion">Acción</label>
+          <select id="aud-accion" class="campo" (change)="cambiar('accion', $any($event.target).value)">
+            <option value="" [selected]="!filtros().accion">Todas</option>
+            @for (a of acciones; track a.id) {
+              <option [value]="a.id" [selected]="filtros().accion === a.id">{{ a.nombre }}</option>
+            }
+          </select>
+        </div>
+      } @else {
+        <div class="grupo">
+          <label class="inf-etiqueta" for="aud-tipo">Mostrar</label>
+          <select id="aud-tipo" class="campo" (change)="cambiar('tipo', $any($event.target).value)">
+            @for (t of opciones()?.tipos_acceso ?? []; track t.id) {
+              <option [value]="t.id" [selected]="filtros().tipo === t.id">{{ t.nombre }}</option>
+            }
+          </select>
+        </div>
+      }
+
+      <div class="grupo buscar">
+        <label class="inf-etiqueta" for="aud-buscar">Buscar</label>
+        <div class="campo-buscar">
+          <lucide-icon [img]="icons.buscar" class="w-4 h-4"></lucide-icon>
+          <input id="aud-buscar" class="campo" type="search" maxlength="100" autocomplete="off"
+                 [placeholder]="vista() === 'movimientos' ? 'Producto, número, IP…' : 'Correo, IP…'"
+                 [value]="filtros().q" (input)="buscar($any($event.target).value)">
+        </div>
+      </div>
+    </div>
+
+    @if (hayFiltros()) {
+      <div class="flex justify-end">
+        <button class="inf-enlace inline-flex items-center gap-1" (click)="limpiar()">
+          <lucide-icon [img]="icons.cerrar" class="w-3.5 h-3.5"></lucide-icon> Quitar filtros
+        </button>
+      </div>
+    }
+  </section>
+
+  <!-- ═══ LISTA ═══ -->
+  <section class="inf-hoja" [class.inf-refrescando]="cargando() && !vacio()">
+    @if (cargando() && vacio()) {
+      <div class="p-4 space-y-3">
+        @for (i of [1, 2, 3, 4, 5, 6]; track i) { <div class="inf-esqueleto h-11"></div> }
+      </div>
+    } @else if (vacio()) {
+      <p class="inf-vacio">{{ vista() === 'movimientos' ? 'Sin movimientos con estos filtros' : 'Sin accesos con estos filtros' }}</p>
+    } @else if (vista() === 'movimientos') {
+      @for (d of diasMovimientos(); track d.clave) {
+        <h3 class="dia">{{ d.titulo }}</h3>
+        <ul>
+          @for (m of d.filas; track m.id) {
+            <li>
+              <button class="fila" (click)="abrir(m)" [class.abriendo]="abriendoDetalle() === m.id">
+                <span class="hora">{{ hora(m.fecha) }}</span>
+                <span class="cuerpo">
+                  <span class="accion"><i [class]="'punto ' + m.tipo"></i>{{ m.accion }}</span>
+                  @if (m.detalle) { <span class="detalle">{{ m.detalle }}</span> }
+                </span>
+                <span class="quien">
+                  <span class="nombre">{{ m.usuario }}</span>
+                  <span class="lugar">{{ m.modulo }}{{ m.sucursal ? ' · ' + m.sucursal : '' }}</span>
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    } @else {
+      @for (d of diasAccesos(); track d.clave) {
+        <h3 class="dia">{{ d.titulo }}</h3>
+        <ul>
+          @for (a of d.filas; track a.id) {
+            <li class="fila acceso">
+              <span class="hora">{{ hora(a.fecha) }}</span>
+              <span class="cuerpo">
+                <span class="accion">
+                  <span class="inf-estado" [class]="a.nivel">{{ a.texto }}</span>
+                  @if (a.veces > 1) { <span class="veces">×{{ a.veces }} hasta {{ hora(a.hasta!) }}</span> }
+                </span>
+                @if (a.evento === 'PETICION') { <span class="detalle ruta">{{ a.ruta }}</span> }
+                @if (a.detalle) { <span class="detalle">{{ a.detalle }}</span> }
+              </span>
+              <span class="quien">
+                <span class="nombre">{{ a.usuario }}</span>
+                <span class="lugar">{{ a.ip || '—' }}{{ a.navegador ? ' · ' + a.navegador : '' }}</span>
+              </span>
+            </li>
+          }
+        </ul>
+      }
+    }
+
+    @if (siguiente() && !vacio()) {
+      <div class="pie">
+        <button class="inf-boton" (click)="cargar(true)" [disabled]="cargandoMas()">
+          <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon> {{ cargandoMas() ? 'Cargando…' : 'Cargar más' }}
+        </button>
+      </div>
+    }
+  </section>
+</div>
+
+<!-- ═══ DETALLE DE UN MOVIMIENTO ═══ -->
+@if (detalle(); as d) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarDetalle()">
+    <div class="inf-hoja ventana w-full max-w-3xl max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+      <div class="flex items-start justify-between gap-3 px-5 py-4 separador-inferior">
+        <div class="min-w-0">
+          <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))] flex items-center">
+            <i [class]="'punto ' + d.tipo"></i>{{ d.accion }}
+          </h3>
+          @if (d.detalle) { <p class="detalle-cabeza">{{ d.detalle }}</p> }
+        </div>
+        <button type="button" class="quitar" (click)="cerrarDetalle()" aria-label="Cerrar">
+          <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-5 space-y-5">
+        <dl class="datos">
+          <div><dt>Fecha</dt><dd>{{ fechaHora(d.fecha) }}</dd></div>
+          <div><dt>Usuario</dt><dd>{{ d.usuario }}@if (d.correo) {<span class="inf-secundario">{{ d.correo }}</span>}</dd></div>
+          <div><dt>Módulo</dt><dd>{{ d.modulo }}</dd></div>
+          <div><dt>Sucursal</dt><dd>{{ d.sucursal || '—' }}</dd></div>
+          <div><dt>IP</dt><dd>{{ d.ip || '—' }}</dd></div>
+          <div><dt>Navegador</dt><dd>{{ d.navegador || '—' }}</dd></div>
+          <div class="ancho"><dt>Origen</dt><dd class="ruta">{{ d.origen }}</dd></div>
+          @if (d.estado_http !== null) {
+            <div><dt>Respuesta</dt><dd>{{ d.estado_http }}{{ d.duracion_ms !== null ? ' · ' + d.duracion_ms + ' ms' : '' }}</dd></div>
+          }
+        </dl>
+
+        <div class="space-y-3">
+          <h4 class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))]">Cambios ({{ d.filas }})</h4>
+          @if (d.truncado) { <p class="inf-aviso">Se muestran los primeros {{ d.cambios.length }} de {{ d.filas }}.</p> }
+          @for (c of d.cambios; track c.id) {
+            <article class="cambio">
+              <header>
+                <i [class]="'punto ' + (c.tipo === 'INSERT' ? 'crear' : c.tipo === 'UPDATE' ? 'modificar' : 'eliminar')"></i>
+                {{ c.operacion }} {{ c.tabla }}
+                @if (c.registro) { <span class="inf-sutil">#{{ c.registro }}</span> }
+              </header>
+              @if (c.campos.length) {
+                <div class="overflow-x-auto">
+                  <table class="inf-tabla compacta">
+                    <thead>
+                      <tr>
+                        <th>Campo</th>
+                        @if (c.tipo !== 'INSERT') { <th>Antes</th> }
+                        @if (c.tipo !== 'DELETE') { <th>Después</th> }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (f of c.campos; track $index) {
+                        <tr>
+                          <td class="campo-nombre">{{ f.campo }}</td>
+                          @if (c.tipo !== 'INSERT') { <td [class.antes]="c.tipo === 'UPDATE'">{{ f.antes }}</td> }
+                          @if (c.tipo !== 'DELETE') { <td [class.despues]="c.tipo === 'UPDATE'">{{ f.despues }}</td> }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </article>
+          }
+        </div>
+      </div>
+
+      <div class="flex justify-end px-5 py-3 border-t border-[var(--i-linea)]">
+        <button type="button" class="inf-boton" data-enter (click)="cerrarDetalle()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+}
