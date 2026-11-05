@@ -3,3 +3,10 @@
 # Respaldos de la base de datos (contienen datos reales y hashes de contraseñas)
 *.backup
 *.dump
+
+# Documentación del informe (no es parte del sistema)
+Doc ref/
+Figuras informe/
+*.docx
+*.pdf
+~$*
