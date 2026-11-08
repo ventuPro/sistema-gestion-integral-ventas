@@ -48,7 +48,7 @@ const ingresar = (id_producto, cantidad, extra = {}) => api('POST', '/inventario
 
 /** Lotes del producto en la sucursal, del más antiguo al más nuevo */
 const lotes = async (id_producto, id_sucursal = 1) => (await bd.sql(`
-    SELECT l.id_lote, l.cantidad_actual, l.cantidad_inicial, l.fecha_ingreso, l.fecha_vencimiento
+    SELECT l.id_lote, l.cantidad_actual, l.cantidad_inicial, l.fecha_ingreso, l.fecha_vencimiento, l.costo_unitario
     FROM lote_inventario l JOIN inventario_sucursal i ON i.id_inventario = l.id_inventario
     WHERE i.id_producto = $1 AND i.id_sucursal = $2 ORDER BY l.fecha_ingreso, l.id_lote`, [id_producto, id_sucursal]));
 
@@ -368,5 +368,108 @@ describe('Vencidos', () => {
         assert.deepEqual(r.body, { lotes: 1, unidades: 1 });
         assert.deepEqual(await enLotes(id), [0, 4, 6]);
         await cuadraTodo();
+    });
+});
+
+describe('Costos por lote y costo de lo vendido', () => {
+    /** Receta simple: inversión ÷ rendimiento = costo por unidad */
+    const receta = (id_producto, inversion, rendimiento = 10) => bd.sql(`
+        INSERT INTO receta (nombre, rendimiento, inversion, id_producto) VALUES ($1, $2, $3, $4)
+        ON CONFLICT (id_producto) WHERE id_producto IS NOT NULL DO UPDATE SET inversion = EXCLUDED.inversion, rendimiento = EXCLUDED.rendimiento`,
+        [`RECETA ${id_producto}`, rendimiento, inversion, id_producto]);
+    const costos = async (id) => (await lotes(id)).map(l => l.costo_unitario == null ? null : Number(l.costo_unitario));
+    const costoVendido = async (id_venta, id_producto) => {
+        const [d] = await bd.sql(`SELECT costo_unitario FROM detalle_venta WHERE id_venta = $1 AND id_producto = $2`, [id_venta, id_producto]);
+        return d.costo_unitario == null ? null : Number(d.costo_unitario);
+    };
+
+    test('lo elaborado entra con el costo de su receta de ese día; si la receta cambia, los lotes viejos no', async () => {
+        const id = await crearProducto('Costo receta');
+        await receta(id, 25);                                    // 2,50 por unidad
+        await ingresar(id, 10);
+        await receta(id, 40);                                    // ahora 4,00
+        await ingresar(id, 5);
+        assert.deepEqual(await costos(id), [2.5, 4]);
+
+        // PEPS: 10 a 2,50 y 2 a 4,00 → 2,75 por unidad
+        const r = await cobrar([{ id_producto: id, cantidad: 12 }]);
+        assert.equal(r.status, 201);
+        assert.equal(await costoVendido(r.body.id_venta, id), 2.75);
+    });
+
+    test('sin receta el lote queda sin costo y la venta también', async () => {
+        const id = await crearProducto('Sin receta');
+        await ingresar(id, 3);
+        assert.deepEqual(await costos(id), [null]);
+        const r = await cobrar([{ id_producto: id, cantidad: 1 }]);
+        assert.equal(await costoVendido(r.body.id_venta, id), null);
+    });
+
+    test('lo comprado: el administrador pone el costo y la compra siguiente lo sugiere', async () => {
+        const id = await crearProducto('Costo compra', 'COMPRADO');
+        assert.equal((await ingresar(id, 6, { motivo: 'Compra a proveedor', costo_unitario: 3.2 })).status, 201);
+        assert.equal((await api('GET', `/inventario/costo?id_producto=${id}`, { token: tAdmin })).body.costo, 3.2);
+        await ingresar(id, 4, { motivo: 'Compra a proveedor' });
+        assert.deepEqual(await costos(id), [3.2, 3.2]);
+        assert.equal((await ingresar(id, 1, { costo_unitario: -1 })).status, 400);
+    });
+
+    test('lo preparado cuesta lo de su receta al venderlo', async () => {
+        const id = await crearProducto('Te con receta', 'PREPARADO');
+        await receta(id, 3.1, 10);                               // 0,31 la taza
+        const r = await cobrar([{ id_producto: id, cantidad: 2 }]);
+        assert.equal(await costoVendido(r.body.id_venta, id), 0.31);
+    });
+
+    test('al cobrar una mesa, el costo es el de los lotes que reservó (también lo del menú QR)', async () => {
+        const id = await crearProducto('Costo mesa');
+        await receta(id, 20);                                    // 2,00
+        await ingresar(id, 3);
+        await bd.sql(`UPDATE lote_inventario l SET fecha_ingreso = fecha_ingreso - interval '1 day'
+                      FROM inventario_sucursal i WHERE i.id_inventario = l.id_inventario AND i.id_producto = $1`, [id]);
+        await receta(id, 50);                                    // 5,00
+        await ingresar(id, 5);
+
+        const mesa = await nuevaMesa();
+        const cuenta = (await api('POST', '/cuentas/abrir', { token: tAdmin, body: { id_mesa: mesa.id_mesa } })).body.cuenta;
+        await api('POST', `/cuentas/${cuenta.id_cuenta}/producto`, { token: tAdmin, body: { id_producto: id, cantidad: 2 } });   // 2 a 2,00
+        const ped = await pedir()(mesa.codigo_qr, [{ id_producto: id, cantidad: 2 }]);                                          // 1 a 2,00 y 1 a 5,00
+        assert.equal(ped.status, 201, JSON.stringify(ped.body));
+        assert.equal((await api('POST', `/pedidos/${ped.body.id_pedido}/confirmar`, { token: tAdmin })).status, 200);
+
+        const r = await api('POST', `/cuentas/${cuenta.id_cuenta}/cerrar`, { token: tAdmin, body: { metodo_pago: 'Efectivo' } });
+        assert.equal(r.status, 200, JSON.stringify(r.body));
+        // Cada línea con su costo: la del cajero 2 × 2,00 y la del pedido QR 1 × 2,00 + 1 × 5,00
+        const lineas = await bd.sql(`
+            SELECT dv.costo_unitario::float8 AS costo, dv.cantidad_vendida AS cantidad FROM detalle_venta dv
+            WHERE dv.id_venta = (SELECT DISTINCT id_venta FROM detalle_cuenta WHERE id_cuenta = $1) AND dv.id_producto = $2
+            ORDER BY dv.id_detalle_venta`, [cuenta.id_cuenta, id]);
+        assert.deepEqual(lineas.map(l => [l.cantidad, l.costo]), [[2, 2], [2, 3.5]]);
+    });
+
+    test('la transferencia lleva el costo de cada lote', async () => {
+        const id = await crearProducto('Costo transferido');
+        await receta(id, 30);
+        await ingresar(id, 4);
+        await receta(id, 60);                                    // la receta cambia en el destino: no importa
+        const r = await api('POST', '/inventario/transferencias', {
+            token: tAdmin, body: { id_sucursal_origen: 1, id_sucursal_destino: idOtra, items: [{ id_producto: id, cantidad: 2 }] }
+        });
+        assert.equal(r.status, 201);
+        const destino = await lotes(id, idOtra);
+        assert.equal(Number(destino[0].costo_unitario), 3);
+    });
+
+    test('el informe del administrador trae el costo de lo vendido y la ganancia', async () => {
+        const id = await crearProducto('Costo informe');
+        await receta(id, 40);                                    // 4,00; se vende a 10
+        await ingresar(id, 5);
+        await cobrar([{ id_producto: id, cantidad: 3 }]);
+        const [{ hoy }] = await bd.sql(`SELECT to_char(now() AT TIME ZONE 'America/La_Paz', 'YYYY-MM-DD') AS hoy`);
+        const inf = await api('GET', `/reportes/periodo/1?fecha_inicio=${hoy}&fecha_fin=${hoy}`, { token: tAdmin });
+        assert.equal(inf.status, 200, JSON.stringify(inf.body));
+        const p = inf.body.costos.productos.find(x => x.id_producto === id);
+        assert.deepEqual([p.unidades, p.ingresos, p.costo, p.ganancia, p.margen], [3, 30, 12, 18, 60]);
+        assert.ok(inf.body.costos.resumen.ganancia > 0);
     });
 });

@@ -9,6 +9,7 @@ router.get ('/motivos',     inventario, ctrl.listarMotivos);
 router.get ('/movimientos', inventario, ctrl.listarMovimientos);
 router.post('/movimientos', inventario, ctrl.registrarMovimiento);
 router.get ('/ingresos',    inventario, ctrl.ingresosDelDia);
+router.get ('/costo',         inventario, ctrl.costoActual);
 router.get ('/vencimientos',  inventario, ctrl.listarVencimientos);
 router.post('/vencidos/baja', inventario, ctrl.darDeBajaVencidos);
 router.get ('/transferencias',     inventario, ctrl.listarTransferencias);

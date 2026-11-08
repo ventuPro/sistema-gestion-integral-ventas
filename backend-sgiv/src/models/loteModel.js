@@ -14,12 +14,41 @@ const VENCE = `
     CROSS JOIN configuracion c
     WHERE i.id_inventario = $1 AND c.id_configuracion = 1`;
 
-const insertar = (client, { id_inventario, id_historial, cantidad, fecha_ingreso = null, vence = null }) =>
+// ─── Costo por unidad (solo insumos; el sistema nunca pone precios) ───
+// Elaborado y preparado: inversión de su receta ÷ rendimiento (NULL sin receta).
+// Comprado: el costo del último lote comprado de ese producto en cualquier sucursal.
+const COSTO_DE_PRODUCTO = (p = 'p') => `(CASE WHEN ${p}.tipo_producto = 'COMPRADO'
+    THEN (SELECT l2.costo_unitario FROM lote_inventario l2 JOIN inventario_sucursal i2 ON i2.id_inventario = l2.id_inventario
+          WHERE i2.id_producto = ${p}.id_producto AND l2.costo_unitario IS NOT NULL
+          ORDER BY l2.fecha_ingreso DESC, l2.id_lote DESC LIMIT 1)
+    ELSE (SELECT ROUND(r.inversion / r.rendimiento, 4) FROM receta r WHERE r.id_producto = ${p}.id_producto) END)`;
+
+/** Costo por unidad que tendría hoy un ingreso del producto (null = sin costo) */
+const costoActual = async (client, id_producto) => {
+    const r = await client.query(`SELECT ${COSTO_DE_PRODUCTO()} AS costo FROM producto p WHERE p.id_producto = $1`, [id_producto]);
+    return r.rows[0]?.costo == null ? null : Number(r.rows[0].costo);
+};
+
+/** Costo medio de lo que salió de unos lotes; null si alguno no tiene costo */
+const costoDeLotes = (tomados) => {
+    const unidades = tomados.reduce((s, t) => s + t.cantidad, 0);
+    if (!unidades || tomados.some(t => t.costo_unitario == null)) return null;
+    return Math.round(tomados.reduce((s, t) => s + t.cantidad * Number(t.costo_unitario), 0) / unidades * 10000) / 10000;
+};
+
+/** costo: undefined = el de ahora (receta o última compra); null o número = ese (copias de una transferencia) */
+const insertar = (client, { id_inventario, id_historial, cantidad, fecha_ingreso = null, vence = null, costo = undefined }) =>
     client.query(`
-        INSERT INTO lote_inventario (id_inventario, id_historial, fecha_ingreso, fecha_vencimiento, cantidad_inicial, cantidad_actual)
-        VALUES ($1, $2, COALESCE($3::timestamp, LOCALTIMESTAMP), COALESCE($4::timestamp, (${VENCE})), $5, $5)
+        INSERT INTO lote_inventario (id_inventario, id_historial, fecha_ingreso, fecha_vencimiento, cantidad_inicial, cantidad_actual,
+                                     costo_unitario)
+        VALUES ($1, $2, COALESCE($3::timestamp, LOCALTIMESTAMP), COALESCE($4::timestamp, (${VENCE})), $5, $5,
+                ${costo === undefined
+                    ? `(SELECT ${COSTO_DE_PRODUCTO()} FROM inventario_sucursal i JOIN producto p ON p.id_producto = i.id_producto
+                        WHERE i.id_inventario = $1)`
+                    : '$6::numeric'})
         RETURNING id_lote`,
-        [id_inventario, id_historial, fecha_ingreso, vence, cantidad]);
+        costo === undefined ? [id_inventario, id_historial, fecha_ingreso, vence, cantidad]
+                            : [id_inventario, id_historial, fecha_ingreso, vence, cantidad, costo]);
 
 const anotar = (client, id_historial, movimientos) => {
     if (!id_historial || !movimientos.length) return null;
@@ -32,7 +61,7 @@ const anotar = (client, id_historial, movimientos) => {
 /** Salida PEPS. lotes: ids a los que se limita (dar de baja vencidos). Devuelve lo que sacó de cada lote. */
 const consumir = async (client, { id_inventario, id_historial, cantidad, lotes = null }) => {
     const r = await client.query(`
-        SELECT id_lote, cantidad_actual, fecha_ingreso, fecha_vencimiento
+        SELECT id_lote, cantidad_actual, fecha_ingreso, fecha_vencimiento, costo_unitario
         FROM lote_inventario
         WHERE id_inventario = $1 AND cantidad_actual > 0 AND ($2::int[] IS NULL OR id_lote = ANY($2))
         ORDER BY fecha_ingreso, id_lote`, [id_inventario, lotes]);
@@ -41,7 +70,8 @@ const consumir = async (client, { id_inventario, id_historial, cantidad, lotes =
     for (const l of r.rows) {
         if (resta <= 0) break;
         const t = Math.min(resta, l.cantidad_actual);
-        tomados.push({ id_lote: l.id_lote, cantidad: t, fecha_ingreso: l.fecha_ingreso, fecha_vencimiento: l.fecha_vencimiento });
+        tomados.push({ id_lote: l.id_lote, cantidad: t, fecha_ingreso: l.fecha_ingreso, fecha_vencimiento: l.fecha_vencimiento,
+                       costo_unitario: l.costo_unitario });
         resta -= t;
     }
     if (tomados.length) {
@@ -54,12 +84,16 @@ const consumir = async (client, { id_inventario, id_historial, cantidad, lotes =
     return { tomados, faltan: resta };
 };
 
-/** Ingreso: un lote nuevo, o copias de los lotes que salieron de otra sucursal (transferencia) */
-const ingresar = async (client, { id_inventario, id_historial, cantidad, vence = null, desde = null }) => {
-    const partes = desde?.length ? desde : [{ cantidad, fecha_ingreso: null, fecha_vencimiento: vence }];
+/**
+ * Ingreso: un lote nuevo, o copias de los lotes que salieron de otra sucursal (transferencia: misma fecha,
+ * vencimiento y costo). costo: el que se pagó (compra); sin él, el de ahora.
+ */
+const ingresar = async (client, { id_inventario, id_historial, cantidad, vence = null, desde = null, costo = undefined }) => {
+    const partes = desde?.length ? desde
+                 : [{ cantidad, fecha_ingreso: null, fecha_vencimiento: vence, costo_unitario: costo ?? undefined }];
     const movimientos = [];
     for (const p of partes) {
-        const r = await insertar(client, { id_inventario, id_historial, cantidad: p.cantidad,
+        const r = await insertar(client, { id_inventario, id_historial, cantidad: p.cantidad, costo: p.costo_unitario,
                                            fecha_ingreso: p.fecha_ingreso, vence: p.fecha_vencimiento });
         movimientos.push({ id_lote: r.rows[0].id_lote, cantidad: p.cantidad });
     }
@@ -163,6 +197,23 @@ const cuadrarTodos = async (db) => {
     return corregidos;
 };
 
+/**
+ * Costo por unidad de lo que tiene reservado una línea de mesa: lo que salió de los lotes con su
+ * referencia (la línea o el pedido QR del que vino), menos lo devuelto. null si no se puede saber.
+ */
+const costoReservado = async (client, { id_producto, id_detalle_cuenta, id_pedido = null }) => {
+    const r = await client.query(`
+        SELECT ml.id_lote, -SUM(ml.cantidad)::int AS cantidad, l.costo_unitario
+        FROM movimiento_lote ml
+        JOIN historial_inventario h ON h.id_historial  = ml.id_historial
+        JOIN inventario_sucursal i  ON i.id_inventario = h.id_inventario
+        JOIN lote_inventario l      ON l.id_lote       = ml.id_lote
+        WHERE i.id_producto = $1 AND (h.id_detalle_cuenta = $2 OR h.id_pedido = $3)
+        GROUP BY ml.id_lote, l.costo_unitario
+        HAVING SUM(ml.cantidad) < 0`, [id_producto, id_detalle_cuenta, id_pedido]);
+    return { unidades: r.rows.reduce((s, l) => s + l.cantidad, 0), costo: costoDeLotes(r.rows) };
+};
+
 // ─── Vencimientos ───
 // «Por vencer» = vence dentro del aviso de Ajustes (horas para lo elaborado, días para lo comprado).
 // p = producto, c = configuracion, l = lote
@@ -222,4 +273,5 @@ const nuevosVencimientos = async (db) => {
     }));
 };
 
-module.exports = { consumir, ingresar, devolver, cuadrar, cuadrarTodos, AVISO, ESTADO, listarVencimientos, nuevosVencimientos };
+module.exports = { consumir, ingresar, devolver, cuadrar, cuadrarTodos, AVISO, ESTADO, listarVencimientos, nuevosVencimientos,
+                   COSTO_DE_PRODUCTO, costoActual, costoDeLotes, costoReservado };

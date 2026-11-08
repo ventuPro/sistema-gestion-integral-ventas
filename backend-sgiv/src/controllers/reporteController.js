@@ -44,7 +44,8 @@ const obtenerInforme = async (req, res) => {
         const cats = String(categorias || '').split(',')
             .map(v => parseInt(v.trim(), 10)).filter(n => Number.isInteger(n) && n > 0);
 
-        res.json(await reporteModel.obtenerInforme(id_sucursal, fecha_inicio, fecha_fin, cats.length ? cats : null));
+        res.json(await reporteModel.obtenerInforme(id_sucursal, fecha_inicio, fecha_fin, cats.length ? cats : null,
+                                                   { conCostos: Number(req.usuario.id_rol) === 1 }));
     } catch (error) {
         console.error('Error en obtenerInforme:', error);
         res.status(500).json({ error: 'Error al generar el informe' });

@@ -403,9 +403,17 @@
         </div>
 
         @if (mov().tipo === 'INGRESO' && productoMov()?.tipo_producto === 'COMPRADO') {
-          <div class="grupo">
-            <label class="inf-etiqueta" for="mov-vence">Vence</label>
-            <input id="mov-vence" type="date" class="campo" [min]="hoy()" [(ngModel)]="mov().vence">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="grupo">
+              <label class="inf-etiqueta" for="mov-vence">Vence</label>
+              <input id="mov-vence" type="date" class="campo" [min]="hoy()" [(ngModel)]="mov().vence">
+            </div>
+            @if (esAdmin()) {
+              <div class="grupo">
+                <label class="inf-etiqueta" for="mov-costo">Costo por unidad ({{ moneda() }})</label>
+                <input id="mov-costo" type="number" min="0" max="99999" step="0.01" class="campo" [(ngModel)]="mov().costo" placeholder="0.00">
+              </div>
+            }
           </div>
         }
 

@@ -419,6 +419,69 @@
       }
     </section>
 
+    <!-- 12 Costo de lo vendido y ganancia (solo administrador) -->
+    @if (costos(); as cos) {
+      <section class="inf-hoja overflow-hidden">
+        <div class="px-5 pt-5">
+          <div class="inf-seccion mb-1!"><span class="inf-indice">12</span><h2>Costo y ganancia</h2></div>
+        </div>
+        @if (cos.productos.length) {
+          <div class="inf-tira separador-inferior">
+            <div>
+              <p class="inf-etiqueta">Ventas con costo</p>
+              <p class="inf-valor">{{ moneda() }} {{ cifra(cos.resumen.ventas) }}</p>
+            </div>
+            <div>
+              <p class="inf-etiqueta">Costo de lo vendido</p>
+              <p class="inf-valor">{{ moneda() }} {{ cifra(cos.resumen.costo) }}</p>
+            </div>
+            <div>
+              <p class="inf-etiqueta">Ganancia bruta</p>
+              <p class="inf-valor inf-sube">{{ moneda() }} {{ cifra(cos.resumen.ganancia) }}</p>
+              @if (cos.resumen.margen != null) { <p class="inf-sub">{{ cos.resumen.margen }} % de margen</p> }
+            </div>
+            @if (cos.resumen.unidades_sin_costo) {
+              <div>
+                <p class="inf-etiqueta">Sin costo conocido</p>
+                <p class="inf-valor">{{ entero(cos.resumen.unidades_sin_costo) }} u</p>
+                <p class="inf-sub">{{ moneda() }} {{ cifra(cos.resumen.ventas_sin_costo) }} vendidos</p>
+              </div>
+            }
+          </div>
+          <div class="overflow-x-auto">
+            <table class="inf-tabla">
+              <thead><tr><th>Producto</th><th class="num">Unidades</th><th class="num">Ingresos</th><th class="num">Costo</th><th class="num">Ganancia</th><th class="num">Margen</th></tr></thead>
+              <tbody>
+                @for (x of productosCosto(); track x.id_producto) {
+                  <tr>
+                    <td class="fuerte">{{ x.nombre_producto }}</td>
+                    <td class="num">{{ entero(x.unidades) }}</td>
+                    <td class="num">{{ moneda() }} {{ cifra(x.ingresos) }}</td>
+                    @if (x.costo == null) {
+                      <td class="num"><span class="inf-estado neutro">Sin costo</span></td><td></td><td></td>
+                    } @else {
+                      <td class="num">{{ moneda() }} {{ cifra(x.costo) }}</td>
+                      <td class="num fuerte" [class.inf-sube]="x.ganancia >= 0" [class.inf-baja]="x.ganancia < 0">{{ moneda() }} {{ cifra(x.ganancia) }}</td>
+                      <td class="num">{{ x.margen }} %</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (cos.productos.length > 10) {
+            <div class="px-5 py-3 separador">
+              <button class="inf-enlace" (click)="verTodosCostos.set(!verTodosCostos())">
+                {{ verTodosCostos() ? 'Mostrar menos' : 'Ver los ' + cos.productos.length + ' productos' }}
+              </button>
+            </div>
+          }
+        } @else {
+          <p class="inf-vacio">Sin ventas en el período.</p>
+        }
+      </section>
+    }
+
   </div>
   }
 </div>

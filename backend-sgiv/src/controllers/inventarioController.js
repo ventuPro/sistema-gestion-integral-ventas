@@ -1,6 +1,8 @@
 const inventarioModel = require('../models/inventarioModel');
 const { mayusculas } = require('../utils/texto');
-const { ErrorValidacion, revisar } = require('../utils/validacion');
+const { ErrorValidacion, revisar, numero } = require('../utils/validacion');
+const loteModel = require('../models/loteModel');
+const db = require('../config/db');
 const transferenciaModel = require('../models/transferenciaModel');
 const { emitirStock, emitirCajeros } = require('../utils/tiempoReal');
 
@@ -43,9 +45,14 @@ const registrarMovimiento = async (req, res) => {
             if (fecha_vencimiento < hoyLaPaz()) return res.status(400).json({ error: 'La fecha de vencimiento ya pasó' });
         }
 
+        // Costo por unidad de una compra: solo lo escribe el administrador; vacío = el de la última compra o la receta
+        const costo = tipo === 'INGRESO' && esAdmin(req)
+            ? numero(req.body?.costo_unitario, { etiqueta: 'El costo por unidad', min: 0, max: 99999 }) ?? undefined
+            : undefined;
+
         const r = await inventarioModel.registrarMovimiento({
             id_sucursal, id_producto: Number(id_producto), id_usuario: req.usuario.id_usuario,
-            tipo, cantidad, motivo, detalle, vence: fecha_vencimiento ? `${fecha_vencimiento} 23:59:59` : null
+            tipo, cantidad, motivo, detalle, vence: fecha_vencimiento ? `${fecha_vencimiento} 23:59:59` : null, costo
         });
         emitirStock([{ id_producto: Number(id_producto), id_sucursal, nuevo_stock: r.cantidad_actual }]);
         res.status(201).json({ mensaje: 'Movimiento registrado', stock_actual: r.cantidad_actual });
@@ -91,6 +98,19 @@ const ingresosDelDia = async (req, res) => {
     } catch (error) {
         console.error('ingresosDelDia:', error);
         res.status(500).json({ error: 'No se pudieron consultar los ingresos del día' });
+    }
+};
+
+// GET /api/inventario/costo?id_producto — costo por unidad de hoy (para sugerir el de una compra; solo administrador)
+const costoActual = async (req, res) => {
+    try {
+        if (!esAdmin(req)) return res.status(403).json({ error: 'Solo el administrador ve los costos' });
+        const id_producto = Number(req.query.id_producto);
+        if (!Number.isInteger(id_producto) || id_producto <= 0) return res.status(400).json({ error: 'Producto inválido' });
+        res.json({ costo: await loteModel.costoActual(db, id_producto) });
+    } catch (error) {
+        console.error('costoActual:', error);
+        res.status(500).json({ error: 'No se pudo consultar el costo' });
     }
 };
 
@@ -183,5 +203,5 @@ const obtenerTransferencia = async (req, res) => {
     }
 };
 
-module.exports = { listarMotivos, registrarMovimiento, listarMovimientos, ingresosDelDia, listarVencimientos, darDeBajaVencidos,
+module.exports = { listarMotivos, registrarMovimiento, listarMovimientos, ingresosDelDia, listarVencimientos, darDeBajaVencidos, costoActual,
                    crearTransferencia, listarTransferencias, obtenerTransferencia };

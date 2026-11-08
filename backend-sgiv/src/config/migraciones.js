@@ -552,6 +552,23 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
             ALTER TABLE notificacion ADD CONSTRAINT notificacion_tipo_check
                 CHECK (tipo IN ('STOCK_BAJO', 'AGOTADO', 'ARQUEO', 'CAJA_SIN_CERRAR', 'TRANSFERENCIA', 'DESCUENTO', 'POR_VENCER', 'VENCIDO'));
         END IF;
+    END $$;`,
+
+    // ─── Costo por lote y costo de lo vendido (2026-11-08) ───
+    // Solo insumos: receta ÷ rendimiento (elaborado, preparado) o precio de compra (comprado). NULL = sin costo conocido.
+    // La primera vez, los lotes que ya había de lo elaborado toman el costo de su receta de hoy
+    `ALTER TABLE detalle_venta ADD COLUMN IF NOT EXISTS costo_unitario NUMERIC(12, 4)
+        CONSTRAINT detalle_venta_costo_check CHECK (costo_unitario >= 0);
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lote_inventario' AND column_name = 'costo_unitario') THEN
+            ALTER TABLE lote_inventario ADD COLUMN costo_unitario NUMERIC(12, 4)
+                CONSTRAINT lote_inventario_costo_check CHECK (costo_unitario >= 0);
+            UPDATE lote_inventario l SET costo_unitario = ROUND(r.inversion / r.rendimiento, 4)
+            FROM inventario_sucursal i
+            JOIN producto p ON p.id_producto = i.id_producto
+            JOIN receta r   ON r.id_producto = p.id_producto
+            WHERE i.id_inventario = l.id_inventario AND p.tipo_producto <> 'COMPRADO';
+        END IF;
     END $$;`
 ];
 

@@ -86,7 +86,7 @@ export class InventarioService {
     this.http.get<Record<TipoMovimiento, string[]>>(`${this.api}/motivos`).pipe(shareReplay(1));
 
   registrar(datos: { id_producto: number; id_sucursal: number; tipo: TipoMovimiento; cantidad: number; motivo: string;
-                     detalle?: string; fecha_vencimiento?: string }) {
+                     detalle?: string; fecha_vencimiento?: string; costo_unitario?: number }) {
     return this.http.post<{ mensaje: string; stock_actual: number }>(`${this.api}/movimientos`, datos);
   }
 
@@ -104,6 +104,11 @@ export class InventarioService {
     let params = new HttpParams().set('id_sucursal', id_sucursal);
     if (fecha) params = params.set('fecha', fecha);
     return this.http.get<IngresoDia[]>(`${this.api}/ingresos`, { params });
+  }
+
+  /** Costo por unidad de hoy (última compra o receta); solo administrador */
+  costoActual(id_producto: number) {
+    return this.http.get<{ costo: number | null }>(`${this.api}/costo`, { params: new HttpParams().set('id_producto', id_producto) });
   }
 
   // ─── Vencidos ───

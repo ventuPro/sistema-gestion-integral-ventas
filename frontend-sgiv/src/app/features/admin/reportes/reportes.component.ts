@@ -247,6 +247,14 @@ export class ReportesComponent implements OnInit, OnDestroy {
   });
   etiquetaPromo(p: any): string { return etiquetaPromocion(p, this.moneda()); }
 
+  /** Costo de lo vendido (solo insumos) y ganancia: solo llega al administrador */
+  readonly costos = computed(() => this.datos()?.costos ?? null);
+  readonly verTodosCostos = signal(false);
+  readonly productosCosto = computed(() => {
+    const p = this.costos()?.productos || [];
+    return this.verTodosCostos() ? p : p.slice(0, 10);
+  });
+
   readonly totalTurnos     = computed(() => (this.datos()?.cierres || []).reduce((s: number, t: any) => s + t.total, 0));
   readonly maxCategoria    = computed(() => Math.max(1, ...(this.datos()?.por_categoria || []).map((c: any) => c.ingresos)));
   readonly tasaCancelacion = computed(() => porcentaje(this.datos()?.pedidos_qr?.cancelados, this.datos()?.pedidos_qr?.total));
@@ -453,6 +461,21 @@ export class ReportesComponent implements OnInit, OnDestroy {
       }
     }
 
+    const cos = d.costos;
+    if (cos && cos.productos.length) {
+      seccion('Costo de lo vendido y ganancia (solo insumos)');
+      tabla(['Concepto', 'Monto'], [
+        ['Ventas con costo conocido', m(cos.resumen.ventas)],
+        ['Costo de lo vendido', m(cos.resumen.costo)],
+        ['Ganancia bruta', m(cos.resumen.ganancia) + (cos.resumen.margen == null ? '' : ` (${cos.resumen.margen} %)`)],
+        ...(cos.resumen.unidades_sin_costo ? [['Vendido sin costo conocido', `${cos.resumen.unidades_sin_costo} u · ${m(cos.resumen.ventas_sin_costo)}`]] : [])
+      ], [1]);
+      tabla(['Producto', 'Unidades', 'Ingresos', 'Costo', 'Ganancia', 'Margen'],
+        cos.productos.map((x: any) => [x.nombre_producto, x.unidades, m(x.ingresos),
+          x.costo == null ? 'sin costo' : m(x.costo), x.ganancia == null ? '' : m(x.ganancia), x.margen == null ? '' : `${x.margen} %`]),
+        [1, 2, 3, 4, 5]);
+    }
+
     const total = doc.getNumberOfPages();
     for (let i = 1; i <= total; i++) {
       doc.setPage(i);
@@ -519,6 +542,12 @@ export class ReportesComponent implements OnInit, OnDestroy {
       hoja('Descuentos manuales', [['Fecha', 'Cajero', 'Sucursal', 'Motivo', `Descuento (${mon})`, `Cobrado (${mon})`],
         ...d.descuentos.manuales.map((x: any) => [fechaHora(x.fecha_venta), x.cajero, x.nombre_sucursal, x.motivo || '', x.descuento, x.cobrado])],
         [18, 24, 18, 36, 16, 14]);
+    }
+
+    if (d.costos) {
+      hoja('Costo y ganancia', [['Producto', 'Unidades', `Ingresos (${mon})`, `Costo (${mon})`, `Ganancia (${mon})`, 'Margen %'],
+        ...d.costos.productos.map((x: any) => [x.nombre_producto, x.unidades, x.ingresos, x.costo ?? 'sin costo', x.ganancia ?? '', x.margen ?? ''])],
+        [30, 10, 14, 14, 14, 10]);
     }
 
     XLSX.writeFile(wb, `Informe_${this.nombreArchivo}_${this.fechaInicio()}_${this.fechaFin()}.xlsx`);

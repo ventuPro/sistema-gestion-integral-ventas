@@ -151,7 +151,8 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
   // ─── Modal movimiento (entrada o merma) ───
   readonly productoMov = signal<any>(null);
-  readonly mov         = signal({ tipo: 'INGRESO' as TipoMovimiento, cantidad: null as number | null, motivo: '', detalle: '', vence: '' });
+  readonly mov         = signal({ tipo: 'INGRESO' as TipoMovimiento, cantidad: null as number | null, motivo: '', detalle: '', vence: '',
+                                  costo: null as number | null });
   readonly hoy         = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
   readonly motivos     = signal<Record<TipoMovimiento, string[]>>({ INGRESO: [], SALIDA: [] });
   readonly errorMov    = signal('');
@@ -412,7 +413,12 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.productoMov.set(prod);
     this.errorMov.set('');
     this.guardando.set(false);
-    this.mov.set({ tipo: 'INGRESO', cantidad: null, motivo: '', detalle: '', vence: this.venceSugerido(prod) });
+    this.mov.set({ tipo: 'INGRESO', cantidad: null, motivo: '', detalle: '', vence: this.venceSugerido(prod), costo: null });
+    // Lo comprado: el administrador ve el costo de la última compra ya escrito (los costos son solo suyos)
+    if (this.esAdmin() && prod?.tipo_producto === 'COMPRADO')
+      this.inventarioService.costoActual(prod.id_producto).subscribe({
+        next: (r) => { if (this.productoMov() === prod) this.mov.update(m => ({ ...m, costo: r.costo })); }
+      });
     this.inventarioService.motivos$.subscribe({
       next:  (m) => { this.motivos.set(m); this.cambiarTipoMov(this.mov().tipo); },
       error: () => this.errorMov.set('No se pudieron cargar los motivos.')
@@ -452,7 +458,9 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.inventarioService.registrar({
       id_producto: prod.id_producto, id_sucursal: this.idSucursal(),
       tipo: this.mov().tipo, cantidad, motivo: this.mov().motivo, detalle: detalle || undefined,
-      fecha_vencimiento: this.mov().tipo === 'INGRESO' && this.mov().vence ? this.mov().vence : undefined
+      fecha_vencimiento: this.mov().tipo === 'INGRESO' && this.mov().vence ? this.mov().vence : undefined,
+      costo_unitario: this.mov().tipo === 'INGRESO' && this.mov().costo != null && String(this.mov().costo) !== ''
+                      ? Number(this.mov().costo) : undefined
     }).subscribe({
       next: (r) => {
         this.fijarStock(Number(prod.id_producto), r.stock_actual);

@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { moverStock } = require('./inventarioModel');
+const { costoActual, costoDeLotes } = require('./loteModel');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const promocionModel = require('./promocionModel');
 const notificacionModel = require('./notificacionModel');
@@ -600,14 +601,6 @@ const registrarVenta = async ({
             const { cantidad } = item;
             const id_prod  = item.id_producto;
 
-            await client.query(`
-                INSERT INTO detalle_venta
-                    (id_venta, id_producto, cantidad_vendida, precio_unitario, subtotal_venta,
-                     descuento_promocion, descuento_manual, id_promocion)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            `, [id_venta, id_prod, cantidad, item.precioCentavos / 100, item.netoCentavos / 100,
-                item.descuentoPromoCentavos / 100, item.descuentoManualCentavos / 100, item.id_promocion]);
-
             // Fila bloqueada: dos cajas no pueden vender el mismo stock a la vez (sale del lote más antiguo)
             const mov = await moverStock(client, {
                 id_sucursal: Number(id_sucursal), id_producto: id_prod, cantidad: -cantidad,
@@ -623,6 +616,16 @@ const registrarVenta = async ({
             }
             if (!mov.preparado)
                 cambiosStock.push({ id_producto: id_prod, id_sucursal: Number(id_sucursal), nuevo_stock: mov.stock });
+
+            // Costo de lo vendido: el de los lotes de los que salió (lo preparado, el de su receta)
+            const costo = mov.preparado ? await costoActual(client, id_prod) : costoDeLotes(mov.lotes);
+            await client.query(`
+                INSERT INTO detalle_venta
+                    (id_venta, id_producto, cantidad_vendida, precio_unitario, subtotal_venta,
+                     descuento_promocion, descuento_manual, id_promocion, costo_unitario)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `, [id_venta, id_prod, cantidad, item.precioCentavos / 100, item.netoCentavos / 100,
+                item.descuentoPromoCentavos / 100, item.descuentoManualCentavos / 100, item.id_promocion, costo]);
         }
 
         await client.query('COMMIT');

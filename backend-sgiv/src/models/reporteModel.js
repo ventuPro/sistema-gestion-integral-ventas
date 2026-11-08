@@ -197,7 +197,7 @@ const periodoAnterior = (inicio, fin) => {
     return [iso(a - n * dia), iso(a - dia)];
 };
 
-const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
+const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null, { conCostos = false } = {}) => {
     const filtra = Array.isArray(categorias) && categorias.length > 0;
     const cte    = `WITH ${ventasDelPeriodo(filtra)}`;
     const conCat = (params) => filtra ? [...params, categorias] : params;
@@ -360,7 +360,46 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
         pedidos_qr: pedidos,
         por_sucursal: sucursales,
         filtro_categorias: filtra ? categorias : [],
-        descuentos: await descuentosDelPeriodo(id_sucursal, inicio, fin)
+        descuentos: await descuentosDelPeriodo(id_sucursal, inicio, fin),
+        ...(conCostos ? { costos: await costosDelPeriodo(cte, params, soloCat) } : {})
+    };
+};
+
+// ─── Costo de lo vendido (solo administrador) ───
+// Costo = solo insumos, el de los lotes de los que salió cada venta (lo preparado, su receta).
+// Lo vendido sin costo conocido (antes de los lotes o sin receta) no entra en la ganancia y se muestra aparte.
+const costosDelPeriodo = async (cte, params, soloCat) => {
+    const LINEAS = `FROM v
+        JOIN detalle_venta dv ON dv.id_venta = v.id_venta
+        JOIN producto p       ON p.id_producto = dv.id_producto
+        WHERE TRUE ${soloCat}`;
+    const [resumen, productos] = await Promise.all([
+        filas(`
+            ${cte}
+            SELECT ROUND(COALESCE(SUM(dv.subtotal_venta) FILTER (WHERE dv.costo_unitario IS NOT NULL), 0), 2)::float8 AS ventas,
+                   ROUND(COALESCE(SUM(dv.costo_unitario * dv.cantidad_vendida), 0), 2)::float8 AS costo,
+                   COALESCE(SUM(dv.cantidad_vendida) FILTER (WHERE dv.costo_unitario IS NULL), 0)::int AS unidades_sin_costo,
+                   ROUND(COALESCE(SUM(dv.subtotal_venta) FILTER (WHERE dv.costo_unitario IS NULL), 0), 2)::float8 AS ventas_sin_costo
+            ${LINEAS}`, params).then(r => r[0]),
+        filas(`
+            ${cte}
+            SELECT p.id_producto, p.nombre_producto,
+                   SUM(dv.cantidad_vendida)::int AS unidades,
+                   ROUND(SUM(dv.subtotal_venta), 2)::float8 AS ingresos,
+                   ROUND(SUM(dv.costo_unitario * dv.cantidad_vendida), 2)::float8 AS costo,
+                   bool_or(dv.costo_unitario IS NULL) AS sin_costo
+            ${LINEAS}
+            GROUP BY p.id_producto, p.nombre_producto
+            ORDER BY ingresos DESC`, params)
+    ]);
+    const ganancia = Math.round((resumen.ventas - resumen.costo) * 100) / 100;
+    return {
+        resumen: { ...resumen, ganancia, margen: resumen.ventas ? Math.round(ganancia * 1000 / resumen.ventas) / 10 : null },
+        productos: productos.map(p => {
+            const g = p.sin_costo ? null : Math.round((p.ingresos - p.costo) * 100) / 100;
+            return { ...p, costo: p.sin_costo ? null : p.costo, ganancia: g,
+                     margen: g == null || !p.ingresos ? null : Math.round(g * 1000 / p.ingresos) / 10 };
+        })
     };
 };
 

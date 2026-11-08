@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { finalizarPedidosDeCuenta } = require('./pedidoModel');
 const { moverStock } = require('./inventarioModel');
+const { costoActual, costoReservado } = require('./loteModel');
 const promocionModel = require('./promocionModel');
 const notificacionModel = require('./notificacionModel');
 const visitaModel = require('./visitaModel');
@@ -259,6 +260,20 @@ const devolverStockCuenta = async (client, id_cuenta, id_usuario = null) => {
 // (cliente_mesa null = lo que cargó el cajero). Si ya no queda nada pendiente se
 // cierra la cuenta y se libera la mesa.
 // Las promociones vigentes se aplican al cobrar, sobre lo que se paga en este momento.
+/**
+ * Costo por unidad de cada línea que se cobra, en el mismo orden (null = sin costo conocido).
+ * Lo preparado: el de su receta. Una línea sin rastro en los lotes (de antes de los lotes): el costo de hoy.
+ */
+const costosDeLineas = async (client, lineas) => {
+    const costos = [];
+    for (const d of lineas) {
+        if (d.tipo_producto === 'PREPARADO') { costos.push(await costoActual(client, d.id_producto)); continue; }
+        const r = await costoReservado(client, d);
+        costos.push(r.unidades >= Number(d.cantidad) ? r.costo : await costoActual(client, d.id_producto));
+    }
+    return costos;
+};
+
 // descuento: { tipo, valor, motivo } opcional
 const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = null, { descuento = null } = {}) => {
     const client = await db.connect();
@@ -279,7 +294,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         const id_turno = turno.id_turno;
 
         const rItems = await client.query(`
-            SELECT dc.*, p.id_categoria FROM detalle_cuenta dc
+            SELECT dc.*, p.id_categoria, p.tipo_producto FROM detalle_cuenta dc
             JOIN producto p ON p.id_producto = dc.id_producto
             ${DE_PEDIDO}
             WHERE dc.id_cuenta=$1 AND dc.id_venta IS NULL AND ${DE_LA_PARTE}
@@ -304,14 +319,17 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         const id_venta = rVenta.rows[0].id_venta;
         if (cot.manualCentavos > 0) await notificacionModel.descuentoManual(client, id_venta);
 
-        // El stock ya se descontó al agregar cada producto: aquí no se toca
-        for (const l of cot.lineas) {
+        // El stock ya se descontó al agregar cada producto: aquí no se toca.
+        // Costo de lo vendido: el de los lotes que reservó cada línea (la cotización conserva el orden de las líneas)
+        const costos = await costosDeLineas(client, rItems.rows);
+        for (const [n, l] of cot.lineas.entries()) {
             await client.query(`
                 INSERT INTO detalle_venta (id_venta,id_producto,cantidad_vendida,precio_unitario,subtotal_venta,
-                                           descuento_promocion,descuento_manual,id_promocion)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+                                           descuento_promocion,descuento_manual,id_promocion,costo_unitario)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
             `, [id_venta, l.id_producto, l.cantidad, l.precioCentavos / 100, l.netoCentavos / 100,
-                l.descuentoPromoCentavos / 100, l.descuentoManualCentavos / 100, l.id_promocion]);
+                l.descuentoPromoCentavos / 100, l.descuentoManualCentavos / 100, l.id_promocion,
+                rItems.rows[n]?.id_producto === l.id_producto ? costos[n] : null]);
         }
         await client.query(`UPDATE detalle_cuenta SET id_venta=$1 WHERE id_detalle_cuenta = ANY($2::int[])`,
                            [id_venta, rItems.rows.map(i => i.id_detalle_cuenta)]);

@@ -39,6 +39,7 @@ const registrarHistorial = async (cliente, { id_inventario, id_usuario, tipo, ca
  *   devolucion: el ingreso vuelve a sus lotes en vez de crear uno nuevo
  *   desde: lotes que salieron de otra sucursal (transferencia: conservan fecha y vencimiento)
  *   vence: vencimiento del lote nuevo (por defecto, la vida útil del producto)
+ *   costo: costo por unidad del lote nuevo (compra); por defecto, el de su receta o la última compra
  *   lotes: ids de lotes de los que debe salir (dar de baja vencidos)
  *   crear: crea la fila de inventario si la sucursal no tenía el producto
  * Devuelve { id_inventario, stock, lotes } o, sin cambiar nada:
@@ -47,7 +48,7 @@ const registrarHistorial = async (cliente, { id_inventario, id_usuario, tipo, ca
  */
 const moverStock = async (client, { id_sucursal, id_producto, id_inventario = null, cantidad, id_usuario = null,
                                     motivo, detalle = null, referencia = {}, devolucion = false, desde = null,
-                                    vence = null, lotes = null, crear = false }) => {
+                                    vence = null, costo = undefined, lotes = null, crear = false }) => {
     cantidad = Number(cantidad);
     if (!Number.isInteger(cantidad) || cantidad === 0) throw new Error(`Cantidad de stock inválida: ${cantidad}`);
     const buscar = () => client.query(`
@@ -87,19 +88,20 @@ const moverStock = async (client, { id_sucursal, id_producto, id_inventario = nu
     } else if (devolucion) {
         await loteModel.devolver(client, { ...base, referencia });
     } else {
-        await loteModel.ingresar(client, { ...base, vence, desde });
+        await loteModel.ingresar(client, { ...base, vence, desde, costo });
     }
     return { id_inventario: inv.id_inventario, stock, lotes: tomados };
 };
 
 /** Entrada o merma manual. Lanza { codigo: 'SIN_STOCK' | 'NO_EXISTE' | 'PREPARADO' }. */
-const registrarMovimiento = async ({ id_sucursal, id_producto, id_usuario, tipo, cantidad, motivo, detalle, vence = null }) => {
+const registrarMovimiento = async ({ id_sucursal, id_producto, id_usuario, tipo, cantidad, motivo, detalle, vence = null,
+                                     costo = undefined }) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
         const r = await moverStock(client, {
             id_sucursal, id_producto, id_usuario, cantidad: tipo === 'SALIDA' ? -cantidad : cantidad,
-            motivo, detalle, vence: tipo === 'INGRESO' ? vence : null,
+            motivo, detalle, vence: tipo === 'INGRESO' ? vence : null, costo: tipo === 'INGRESO' ? costo : undefined,
             devolucion: false
         });
         if (r.existe === false) throw Object.assign(new Error('El producto no está en esta sucursal'), { codigo: 'NO_EXISTE' });

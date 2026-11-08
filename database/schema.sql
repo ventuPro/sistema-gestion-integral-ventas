@@ -350,7 +350,9 @@ CREATE TABLE detalle_venta (
     -- precio_unitario = precio de lista; subtotal_venta = lo cobrado tras los descuentos
     descuento_promocion DECIMAL(10, 2) NOT NULL DEFAULT 0,
     descuento_manual    DECIMAL(10, 2) NOT NULL DEFAULT 0,
-    id_promocion        INT REFERENCES promocion(id_promocion)
+    id_promocion        INT REFERENCES promocion(id_promocion),
+    -- Costo por unidad de lo vendido (solo insumos, de los lotes de los que salió); NULL = sin costo conocido
+    costo_unitario      NUMERIC(12, 4) CONSTRAINT detalle_venta_costo_check CHECK (costo_unitario >= 0)
 );
 
 ALTER TABLE detalle_cuenta
@@ -466,6 +468,8 @@ CREATE TABLE lote_inventario (
     cantidad_actual   INT NOT NULL,
     -- Último aviso enviado: 0 ninguno, 1 por vencer, 2 vencido (cada estado avisa una sola vez)
     aviso             SMALLINT NOT NULL DEFAULT 0 CONSTRAINT lote_inventario_aviso_check CHECK (aviso BETWEEN 0 AND 2),
+    -- Costo por unidad al entrar (receta del día o precio de compra); NULL = sin costo conocido
+    costo_unitario    NUMERIC(12, 4) CONSTRAINT lote_inventario_costo_check CHECK (costo_unitario >= 0),
     CONSTRAINT lote_inventario_cantidad_check CHECK (cantidad_actual BETWEEN 0 AND cantidad_inicial)
 );
 
