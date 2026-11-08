@@ -5,6 +5,7 @@ const io = () => global.io;
 // cambios: [{ id_producto, id_sucursal, nuevo_stock }]
 const emitirStock = (cambios = []) => {
     for (const c of cambios) {
+        if (c.nuevo_stock == null) continue;   // preparado al momento: no lleva stock
         io()?.emit('actualizacion_stock_global', {
             id_producto:               Number(c.id_producto),
             id_sucursal:               Number(c.id_sucursal),

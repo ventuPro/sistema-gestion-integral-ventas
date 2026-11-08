@@ -107,13 +107,13 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
                    COUNT(*) FILTER (WHERE i.cantidad_actual <= 0)::int AS agotados,
                    COUNT(*) FILTER (WHERE i.cantidad_actual > 0 AND i.cantidad_actual <= (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1))::int AS bajos
             FROM inventario_sucursal i
-            JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo
+            JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo AND p.tipo_producto <> 'PREPARADO'
             WHERE ${deSucursal('i.id_sucursal')}
         `, p).then(r => r[0]),
         filas(`
             SELECT p.nombre_producto, s.nombre_sucursal, i.cantidad_actual, (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1) AS stock_minimo_alerta
             FROM inventario_sucursal i
-            JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo
+            JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo AND p.tipo_producto <> 'PREPARADO'
             JOIN sucursal s ON s.id_sucursal = i.id_sucursal
             WHERE ${deSucursal('i.id_sucursal')} AND i.cantidad_actual <= (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1)
             ORDER BY (i.cantidad_actual > 0), i.cantidad_actual::numeric / GREATEST((SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1), 1)
@@ -323,7 +323,7 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null) => {
                    COUNT(*) FILTER (WHERE i.cantidad_actual <= 0)::int AS agotados,
                    COUNT(*) FILTER (WHERE i.cantidad_actual > 0 AND i.cantidad_actual <= (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1))::int AS bajos
             FROM inventario_sucursal i
-            JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo
+            JOIN producto p ON p.id_producto = i.id_producto AND p.estado_activo AND p.tipo_producto <> 'PREPARADO'
             WHERE ${deSucursal('i.id_sucursal')}
         `, [id_sucursal]).then(r => r[0]),
         filas(`

@@ -41,6 +41,19 @@ export interface IngresoDia {
   orden_categoria:   number;
 }
 
+/** Lote con stock vencido o por vencer */
+export interface LoteVencimiento {
+  id_lote:           number;
+  cantidad:          number;
+  fecha_ingreso:     string;
+  fecha_vencimiento: string;
+  estado:            'VENCIDO' | 'POR_VENCER';
+  id_producto:       number;
+  nombre_producto:   string;
+  tipo_producto:     string;
+  nombre_categoria:  string | null;
+}
+
 export interface NuevaTransferencia {
   id_sucursal_origen: number;
   id_sucursal_destino: number;
@@ -72,7 +85,8 @@ export class InventarioService {
   readonly motivos$: Observable<Record<TipoMovimiento, string[]>> =
     this.http.get<Record<TipoMovimiento, string[]>>(`${this.api}/motivos`).pipe(shareReplay(1));
 
-  registrar(datos: { id_producto: number; id_sucursal: number; tipo: TipoMovimiento; cantidad: number; motivo: string; detalle?: string }) {
+  registrar(datos: { id_producto: number; id_sucursal: number; tipo: TipoMovimiento; cantidad: number; motivo: string;
+                     detalle?: string; fecha_vencimiento?: string }) {
     return this.http.post<{ mensaje: string; stock_actual: number }>(`${this.api}/movimientos`, datos);
   }
 
@@ -90,6 +104,15 @@ export class InventarioService {
     let params = new HttpParams().set('id_sucursal', id_sucursal);
     if (fecha) params = params.set('fecha', fecha);
     return this.http.get<IngresoDia[]>(`${this.api}/ingresos`, { params });
+  }
+
+  // ─── Vencidos ───
+  vencimientos(id_sucursal: number): Observable<LoteVencimiento[]> {
+    return this.http.get<LoteVencimiento[]>(`${this.api}/vencimientos`, { params: new HttpParams().set('id_sucursal', id_sucursal) });
+  }
+
+  darDeBajaVencidos(id_sucursal: number, lotes: number[]) {
+    return this.http.post<{ lotes: number; unidades: number }>(`${this.api}/vencidos/baja`, { id_sucursal, lotes });
   }
 
   // ─── Transferencias entre sucursales ───

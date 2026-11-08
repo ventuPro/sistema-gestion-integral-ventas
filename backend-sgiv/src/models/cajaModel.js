@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { registrarHistorial } = require('./inventarioModel');
+const { moverStock } = require('./inventarioModel');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const promocionModel = require('./promocionModel');
 const notificacionModel = require('./notificacionModel');
@@ -608,41 +608,21 @@ const registrarVenta = async ({
             `, [id_venta, id_prod, cantidad, item.precioCentavos / 100, item.netoCentavos / 100,
                 item.descuentoPromoCentavos / 100, item.descuentoManualCentavos / 100, item.id_promocion]);
 
-            // Descuento atómico: solo si hay stock suficiente (evita sobreventa
-            // cuando dos cajas venden el mismo producto a la vez).
-            const rInv = await client.query(`
-                UPDATE inventario_sucursal
-                SET cantidad_actual = cantidad_actual - $1
-                WHERE id_sucursal = $2 AND id_producto = $3 AND cantidad_actual >= $1
-                RETURNING id_inventario, cantidad_actual
-            `, [cantidad, Number(id_sucursal), id_prod]);
-
-            if (rInv.rows.length === 0) {
-                const rInfo = await client.query(`
-                    SELECT p.nombre_producto, i.cantidad_actual
-                    FROM producto p
-                    LEFT JOIN inventario_sucursal i ON i.id_producto = p.id_producto AND i.id_sucursal = $2
-                    WHERE p.id_producto = $1
-                `, [id_prod, Number(id_sucursal)]);
-                const info = rInfo.rows[0];
+            // Fila bloqueada: dos cajas no pueden vender el mismo stock a la vez (sale del lote más antiguo)
+            const mov = await moverStock(client, {
+                id_sucursal: Number(id_sucursal), id_producto: id_prod, cantidad: -cantidad,
+                id_usuario: Number(id_usuario_cajero), motivo: 'Venta en Caja'
+            });
+            if (mov.falta || mov.existe === false) {
+                const rInfo = await client.query(`SELECT nombre_producto FROM producto WHERE id_producto = $1`, [id_prod]);
                 const err  = new Error(
-                    `Stock insuficiente de "${info?.nombre_producto || id_prod}" (disponible: ${info?.cantidad_actual ?? 0})`
+                    `Stock insuficiente de "${rInfo.rows[0]?.nombre_producto || id_prod}" (disponible: ${mov.disponible ?? 0})`
                 );
                 err.code = 'STOCK_INSUFICIENTE';
                 throw err;
             }
-
-            if (rInv.rows.length > 0) {
-                cambiosStock.push({
-                    id_producto: id_prod,
-                    id_sucursal: Number(id_sucursal),
-                    nuevo_stock: Number(rInv.rows[0].cantidad_actual)
-                });
-                await registrarHistorial(client, {
-                    id_inventario: rInv.rows[0].id_inventario, id_usuario: Number(id_usuario_cajero), tipo: 'SALIDA',
-                    cantidad, motivo: 'Venta en Caja', stock_resultante: Number(rInv.rows[0].cantidad_actual)
-                });
-            }
+            if (!mov.preparado)
+                cambiosStock.push({ id_producto: id_prod, id_sucursal: Number(id_sucursal), nuevo_stock: mov.stock });
         }
 
         await client.query('COMMIT');

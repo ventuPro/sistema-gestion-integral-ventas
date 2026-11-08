@@ -77,6 +77,10 @@ const ENTEROS = {
     menu_visita_inactividad:  { min: 10, max: 240,  nombre: 'Fin de la visita por inactividad (minutos)' },
     menu_bloqueo_horas:       { min: 1, max: 72,    nombre: 'Bloqueo por pedido falso (horas)' },
     stock_minimo_defecto:     { min: 0, max: 10000, nombre: 'Stock mínimo' },
+    vida_util_elaborado_horas: { min: 1, max: 8760, nombre: 'Vida útil de lo elaborado (horas)' },
+    vida_util_comprado_dias:   { min: 1, max: 3650, nombre: 'Vida útil de lo comprado (días)' },
+    aviso_vence_elaborado_horas: { min: 1, max: 720, nombre: 'Aviso de por vencer de lo elaborado (horas antes)' },
+    aviso_vence_comprado_dias:   { min: 1, max: 365, nombre: 'Aviso de por vencer de lo comprado (días antes)' },
     login_max_intentos:       { min: 3, max: 20,    nombre: 'Intentos de inicio de sesión' },
     login_minutos_bloqueo:    { min: 1, max: 1440,  nombre: 'Minutos de bloqueo' },
     sesion_horas:             { min: 1, max: 24,    nombre: 'Duración de la sesión (horas)' }

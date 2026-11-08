@@ -25,6 +25,8 @@ DROP TABLE IF EXISTS bloqueo_menu CASCADE;
 DROP TABLE IF EXISTS detalle_pedido CASCADE;
 DROP TABLE IF EXISTS pedido_mesa CASCADE;
 DROP TABLE IF EXISTS mesa_local CASCADE;
+DROP TABLE IF EXISTS movimiento_lote CASCADE;
+DROP TABLE IF EXISTS lote_inventario CASCADE;
 DROP TABLE IF EXISTS historial_inventario CASCADE;
 DROP TABLE IF EXISTS inventario_sucursal CASCADE;
 DROP TABLE IF EXISTS promocion_dia CASCADE;
@@ -108,7 +110,11 @@ CREATE TABLE producto (
     estado_activo BOOLEAN DEFAULT TRUE,
     ingredientes TEXT,                         -- reverso de la tarjeta en el menú QR
     preparacion TEXT,
-    destacado BOOLEAN NOT NULL DEFAULT FALSE   -- «Recomendados de la casa»
+    destacado BOOLEAN NOT NULL DEFAULT FALSE,  -- «Recomendados de la casa»
+    -- ELABORADO (vence en horas), PREPARADO al momento (sin stock ni lotes), COMPRADO (vence en días)
+    tipo_producto VARCHAR(10) NOT NULL DEFAULT 'ELABORADO'
+        CONSTRAINT producto_tipo_check CHECK (tipo_producto IN ('ELABORADO', 'PREPARADO', 'COMPRADO')),
+    vida_util_horas INT CONSTRAINT producto_vida_util_check CHECK (vida_util_horas BETWEEN 1 AND 87600)  -- NULL = la de Ajustes
 );
 
 -- Promociones: se aplican solas al cobrar y siempre gana la que más ahorra al cliente
@@ -398,6 +404,15 @@ CREATE TABLE configuracion (
     menu_qr_visita           BOOLEAN NOT NULL DEFAULT FALSE,
     -- Parámetros: inventario
     stock_minimo_defecto     INT NOT NULL DEFAULT 5  CHECK (stock_minimo_defecto BETWEEN 0 AND 10000),
+    vida_util_elaborado_horas INT NOT NULL DEFAULT 48
+        CONSTRAINT configuracion_vida_elaborado_check CHECK (vida_util_elaborado_horas BETWEEN 1 AND 8760),
+    vida_util_comprado_dias  INT NOT NULL DEFAULT 180
+        CONSTRAINT configuracion_vida_comprado_check CHECK (vida_util_comprado_dias BETWEEN 1 AND 3650),
+    -- Aviso «por vencer»: horas antes (elaborado) y días antes (comprado)
+    aviso_vence_elaborado_horas INT NOT NULL DEFAULT 12
+        CONSTRAINT configuracion_aviso_elaborado_check CHECK (aviso_vence_elaborado_horas BETWEEN 1 AND 720),
+    aviso_vence_comprado_dias   INT NOT NULL DEFAULT 7
+        CONSTRAINT configuracion_aviso_comprado_check CHECK (aviso_vence_comprado_dias BETWEEN 1 AND 365),
     -- Parámetros: seguridad
     captcha_activo           BOOLEAN NOT NULL DEFAULT TRUE,
     login_max_intentos       INT NOT NULL DEFAULT 5  CHECK (login_max_intentos BETWEEN 3 AND 20),
@@ -434,6 +449,35 @@ CREATE TABLE propietario (
 );
 
 -- ==========================================
+-- Lotes de inventario (PEPS): cada ingreso es un lote; las salidas sacan del más antiguo
+-- ==========================================
+-- Referencia de cada movimiento: las devoluciones vuelven a los lotes de los que salieron
+ALTER TABLE historial_inventario
+    ADD COLUMN id_pedido INT REFERENCES pedido_mesa(id_pedido) ON DELETE SET NULL,
+    ADD COLUMN id_detalle_cuenta INT REFERENCES detalle_cuenta(id_detalle_cuenta) ON DELETE SET NULL;
+
+CREATE TABLE lote_inventario (
+    id_lote           SERIAL PRIMARY KEY,
+    id_inventario     INT NOT NULL REFERENCES inventario_sucursal(id_inventario),
+    id_historial      INT REFERENCES historial_inventario(id_historial),   -- ingreso que lo creó
+    fecha_ingreso     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_vencimiento TIMESTAMP,
+    cantidad_inicial  INT NOT NULL CONSTRAINT lote_inventario_inicial_check CHECK (cantidad_inicial > 0),
+    cantidad_actual   INT NOT NULL,
+    -- Último aviso enviado: 0 ninguno, 1 por vencer, 2 vencido (cada estado avisa una sola vez)
+    aviso             SMALLINT NOT NULL DEFAULT 0 CONSTRAINT lote_inventario_aviso_check CHECK (aviso BETWEEN 0 AND 2),
+    CONSTRAINT lote_inventario_cantidad_check CHECK (cantidad_actual BETWEEN 0 AND cantidad_inicial)
+);
+
+-- Qué lote tocó cada movimiento (negativo = salió, positivo = entró)
+CREATE TABLE movimiento_lote (
+    id_historial INT NOT NULL REFERENCES historial_inventario(id_historial) ON DELETE CASCADE,
+    id_lote      INT NOT NULL REFERENCES lote_inventario(id_lote) ON DELETE CASCADE,
+    cantidad     INT NOT NULL CONSTRAINT movimiento_lote_cantidad_check CHECK (cantidad <> 0),
+    PRIMARY KEY (id_historial, id_lote)
+);
+
+-- ==========================================
 -- 7. ÍNDICES
 -- ==========================================
 
@@ -462,6 +506,12 @@ CREATE INDEX idx_detalle_cuenta_pedido    ON detalle_cuenta (id_pedido);
 CREATE INDEX idx_detalle_pedido_pedido    ON detalle_pedido (id_pedido);
 CREATE INDEX idx_turno_sucursal_estado    ON turno_caja (id_sucursal, estado_turno);
 CREATE INDEX idx_historial_inv_fecha      ON historial_inventario (id_inventario, fecha_registro);
+CREATE INDEX idx_historial_pedido         ON historial_inventario (id_pedido) WHERE id_pedido IS NOT NULL;
+CREATE INDEX idx_historial_detalle_cuenta ON historial_inventario (id_detalle_cuenta) WHERE id_detalle_cuenta IS NOT NULL;
+CREATE INDEX idx_lote_peps                ON lote_inventario (id_inventario, fecha_ingreso, id_lote) WHERE cantidad_actual > 0;
+CREATE INDEX idx_lote_inventario          ON lote_inventario (id_inventario);
+CREATE INDEX idx_lote_vence               ON lote_inventario (fecha_vencimiento) WHERE cantidad_actual > 0;
+CREATE INDEX idx_movimiento_lote_lote     ON movimiento_lote (id_lote);
 CREATE INDEX idx_promocion_vigencia      ON promocion (estado_activo, fecha_inicio, fecha_fin);
 CREATE INDEX idx_promocion_sucursal      ON promocion (id_sucursal);
 CREATE INDEX idx_promocion_producto_prod ON promocion_producto (id_producto);
@@ -545,7 +595,8 @@ CREATE INDEX idx_historial_inversion_receta ON historial_inversion_receta (id_re
 CREATE TABLE notificacion (
     id_notificacion SERIAL PRIMARY KEY,
     tipo           VARCHAR(20) NOT NULL CONSTRAINT notificacion_tipo_check
-                   CHECK (tipo IN ('STOCK_BAJO', 'AGOTADO', 'ARQUEO', 'CAJA_SIN_CERRAR', 'TRANSFERENCIA', 'DESCUENTO')),
+                   CHECK (tipo IN ('STOCK_BAJO', 'AGOTADO', 'ARQUEO', 'CAJA_SIN_CERRAR', 'TRANSFERENCIA', 'DESCUENTO',
+                                   'POR_VENCER', 'VENCIDO')),
     titulo         VARCHAR(80)  NOT NULL,
     mensaje        VARCHAR(300) NOT NULL,
     ruta           VARCHAR(40),

@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const ajusteModel = require('./ajusteModel');
+const loteModel = require('./loteModel');
 const { emitirUsuario } = require('../utils/tiempoReal');
 
 // ─── Notificaciones ───
@@ -175,11 +176,38 @@ const marcarLeidas = async (id_usuario, ids = null) => {
     return r.rowCount;
 };
 
+/** Lotes que pasaron a «por vencer» o «vencido»: un aviso por sucursal con los productos y cuántos (cada lote avisa una vez por estado) */
+const vencimientos = async () => {
+    let avisos = 0;
+    for (const g of await loteModel.nuevosVencimientos(db)) {
+        const client = await db.connect();
+        try {
+            await client.query('BEGIN');
+            const vencido = g.nivel === 2;
+            await crear(client, {
+                tipo: vencido ? 'VENCIDO' : 'POR_VENCER', destino: 'SUCURSAL', id_sucursal: g.id_sucursal, ruta: 'inventario',
+                titulo:  `${vencido ? 'Vencidos' : 'Por vencer'} en ${g.nombre_sucursal}`,
+                mensaje: g.productos.map(p => `${p.nombre} (${p.cantidad})`).join(', ')
+            });
+            await client.query(`UPDATE lote_inventario SET aviso = GREATEST(aviso, $2) WHERE id_lote = ANY($1::int[])`,
+                               [g.lotes, g.nivel]);
+            await client.query('COMMIT');
+            avisos++;
+        } catch (e) {
+            await client.query('ROLLBACK');
+            console.error('vencimientos:', e.message);
+        } finally {
+            client.release();
+        }
+    }
+    return avisos;
+};
+
 const limpiarAntiguas = async () =>
     (await db.query(`DELETE FROM notificacion WHERE fecha_creacion < CURRENT_TIMESTAMP - make_interval(days => $1)`,
                     [DIAS_GUARDADAS])).rowCount;
 
 module.exports = {
     crear, alCrear, revisarStock, arqueoConDiferencia, cajaSinCerrar, transferencia, descuentoManual,
-    listar, marcarLeidas, limpiarAntiguas, DIAS_GUARDADAS
+    listar, marcarLeidas, limpiarAntiguas, vencimientos, DIAS_GUARDADAS
 };

@@ -9,7 +9,7 @@ import { InventarioService, Movimiento, TipoMovimiento } from '../../../core/ser
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
          Pencil, ArrowUpDown, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban, History,
-         ChevronUp, ChevronDown, ListOrdered, Star, Download, Trash2, PackagePlus } from 'lucide-angular';
+         ChevronUp, ChevronDown, ListOrdered, Star, Download, Trash2, PackagePlus, CalendarX } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
@@ -20,17 +20,18 @@ import { comprimirImagen } from '../../../core/utils/imagen';
 import { TransferenciasComponent } from './transferencias/transferencias.component';
 import { DescargaInventarioComponent } from './descarga-inventario/descarga-inventario.component';
 import { IngresosDiaComponent } from './ingresos-dia/ingresos-dia.component';
+import { VencidosComponent } from './vencidos/vencidos.component';
 import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria } from '../../../core/utils/categorias';
 import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 
-type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'inactivos' | 'todos';
+type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'vence' | 'inactivos' | 'todos';
 
 @Component({
   selector: 'app-inventario',
   standalone: true,
   imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe, TransferenciasComponent,
-            DescargaInventarioComponent, IngresosDiaComponent, BarraCategoriasComponent],
+            DescargaInventarioComponent, IngresosDiaComponent, VencidosComponent, BarraCategoriasComponent],
   templateUrl: './inventario.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './inventario.component.css']
@@ -41,7 +42,21 @@ export class InventarioComponent implements OnInit, OnDestroy {
   private dialogo         = inject(DialogoService);
   private socketService   = inject(SocketService);
   private inventarioService = inject(InventarioService);
-  readonly moneda          = inject(AjustesService).moneda;
+  private ajustes         = inject(AjustesService);
+  readonly moneda          = this.ajustes.moneda;
+
+  // Tipo de producto: elaborado (vence en horas), preparado al momento (sin stock) o comprado (vence en días)
+  readonly tipos = [
+    { valor: 'ELABORADO', texto: 'Elaborado' },
+    { valor: 'PREPARADO', texto: 'Preparado al momento' },
+    { valor: 'COMPRADO',  texto: 'Comprado' }
+  ];
+  readonly esPreparado = (p: any) => p?.tipo_producto === 'PREPARADO';
+  /** Vida útil por defecto en la unidad del tipo (horas o días) */
+  vidaPorDefecto(tipo: string): number {
+    const c = this.ajustes.config();
+    return tipo === 'COMPRADO' ? c.vida_util_comprado_dias ?? 180 : c.vida_util_elaborado_horas ?? 48;
+  }
   private http            = inject(HttpClient);
   private apiUrl          = environment.apiUrl;
   private stockSub?:      Subscription;
@@ -66,16 +81,21 @@ export class InventarioComponent implements OnInit, OnDestroy {
     destacado:  Star,
     descargar:  Download,
     ingresos:   PackagePlus,
+    vencidos:   CalendarX,
     quitarCategoria: Trash2
   };
 
   readonly mostrarDescarga = signal(false);
   readonly mostrarIngresos = signal(false);
+  readonly mostrarVencidos = signal(false);
+  /** Unidades vencidas en la sucursal (número del botón «Vencidos») */
+  readonly totalVencidos = computed(() => this.productos().reduce((s, p) => s + (Number(p.vencidos) || 0), 0));
 
   readonly filtrosEstado: { valor: FiltroEstado; texto: string }[] = [
     { valor: 'activos',   texto: 'Activos' },
     { valor: 'bajo',      texto: 'Stock bajo' },
     { valor: 'sin',       texto: 'Sin stock' },
+    { valor: 'vence',     texto: 'Por vencer o vencidos' },
     { valor: 'inactivos', texto: 'Inactivos' },
     { valor: 'todos',     texto: 'Todos' }
   ];
@@ -102,6 +122,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
       const porNomb   = !texto || p.nombre_producto.toLowerCase().includes(texto);
       const porEstado = f === 'todos'
                         || (f === 'inactivos' && !p.estado_activo)
+                        || (f === 'vence' && (p.vencidos > 0 || p.por_vencer > 0))
                         || (p.estado_activo && (f === 'activos' || this.estadoStock(p) === f));
       return porNomb && porEstado;
     });
@@ -124,12 +145,14 @@ export class InventarioComponent implements OnInit, OnDestroy {
     nombre_producto: '', descripcion_producto: '',
     precio_unitario: '', id_categoria: '',
     ingredientes: '', preparacion: '', destacado: false, mostrar_en_menu: true,
-    stock_inicial: null
+    tipo_producto: 'ELABORADO', vida_util: null, stock_inicial: null
   });
+  private tipoAntes = 'ELABORADO';
 
   // ─── Modal movimiento (entrada o merma) ───
   readonly productoMov = signal<any>(null);
-  readonly mov         = signal({ tipo: 'INGRESO' as TipoMovimiento, cantidad: null as number | null, motivo: '', detalle: '' });
+  readonly mov         = signal({ tipo: 'INGRESO' as TipoMovimiento, cantidad: null as number | null, motivo: '', detalle: '', vence: '' });
+  readonly hoy         = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
   readonly motivos     = signal<Record<TipoMovimiento, string[]>>({ INGRESO: [], SALIDA: [] });
   readonly errorMov    = signal('');
 
@@ -250,6 +273,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   // ─── FILTROS ───
   // Mismo criterio que el Panel: bajo = hasta el mínimo de alerta de la sucursal
   estadoStock(p: any): 'sin' | 'bajo' | 'ok' {
+    if (this.esPreparado(p)) return 'ok';
     const stock = Number(p.stock_actual) || 0;
     if (stock <= 0) return 'sin';
     return stock <= Number(p.stock_minimo_alerta ?? 0) ? 'bajo' : 'ok';
@@ -266,8 +290,9 @@ export class InventarioComponent implements OnInit, OnDestroy {
       nombre_producto: '', descripcion_producto: '',
       precio_unitario: '', id_categoria: '',
       ingredientes: '', preparacion: '', destacado: false, mostrar_en_menu: true,
-      stock_inicial: null
+      tipo_producto: 'ELABORADO', vida_util: null, stock_inicial: null
     });
+    this.tipoAntes = 'ELABORADO';
     this.mostrarModal.set(true);
   }
 
@@ -285,8 +310,11 @@ export class InventarioComponent implements OnInit, OnDestroy {
       preparacion:          prod.preparacion || '',
       destacado:            !!prod.destacado,
       mostrar_en_menu:      prod.mostrar_en_menu !== false,
+      tipo_producto:        prod.tipo_producto || 'ELABORADO',
+      vida_util:            prod.vida_util_horas ? (prod.tipo_producto === 'COMPRADO' ? prod.vida_util_horas / 24 : prod.vida_util_horas) : null,
       stock_inicial:        null
     });
+    this.tipoAntes = prod.tipo_producto || 'ELABORADO';
     this.mostrarModal.set(true);
   }
 
@@ -309,10 +337,23 @@ export class InventarioComponent implements OnInit, OnDestroy {
     }
   }
 
-  guardarProducto() {
+  /** Al cambiar el tipo, la vida útil vuelve a la de Ajustes (cambia la unidad) */
+  cambiarTipo(tipo: string) {
+    this.formulario.update(f => ({ ...f, tipo_producto: tipo, vida_util: null }));
+  }
+
+  async guardarProducto() {
     const f = this.formulario(), id = this.editandoId();
     if (!f.nombre_producto || !f.precio_unitario || !f.id_categoria)
       return this.errorModal.set('Completa nombre, precio y categoría.');
+    if (id && f.tipo_producto === 'PREPARADO' && this.tipoAntes !== 'PREPARADO' && !(await this.dialogo.confirmar({
+      titulo: '¿Pasar a «Preparado al momento»?', textoConfirmar: 'Cambiar', peligro: true,
+      advertencias: ['Su stock de todas las sucursales sale como «Ajuste de conteo».',
+                     'Desde ahora se vende siempre, sin stock ni lotes.']
+    }))) return;
+    const vida = Number(f.vida_util) || null;
+    const vida_util_horas = f.tipo_producto === 'PREPARADO' || !vida ? null
+                          : Math.round(f.tipo_producto === 'COMPRADO' ? vida * 24 : vida);
 
     this.guardando.set(true);
     this.errorModal.set('');
@@ -324,7 +365,9 @@ export class InventarioComponent implements OnInit, OnDestroy {
       ingredientes:         f.ingredientes || '',
       preparacion:          f.preparacion || '',
       destacado:            !!f.destacado,
-      mostrar_en_menu:      f.mostrar_en_menu !== false
+      mostrar_en_menu:      f.mostrar_en_menu !== false,
+      tipo_producto:        f.tipo_producto,
+      vida_util_horas
     };
     const fallo = (e: any, msg: string) => {
       this.errorModal.set(e?.error?.error || msg);
@@ -339,7 +382,8 @@ export class InventarioComponent implements OnInit, OnDestroy {
       });
     } else {
       // Crear: queda asignado a la sucursal elegida con su stock inicial
-      const nuevo = { ...datos, id_sucursal: this.idSucursal(), stock_inicial: f.stock_inicial || 0 };
+      const nuevo = { ...datos, id_sucursal: this.idSucursal(),
+                      stock_inicial: f.tipo_producto === 'PREPARADO' ? 0 : f.stock_inicial || 0 };
       this.productoService.crearProducto(nuevo, this.fotoNueva).subscribe({
         next:  () => { this.cerrarModal(); this.dialogo.avisar('Producto creado'); this.cargarProductos(); },
         error: (e: any) => fallo(e, 'No se pudo crear el producto.')
@@ -368,7 +412,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.productoMov.set(prod);
     this.errorMov.set('');
     this.guardando.set(false);
-    this.mov.set({ tipo: 'INGRESO', cantidad: null, motivo: '', detalle: '' });
+    this.mov.set({ tipo: 'INGRESO', cantidad: null, motivo: '', detalle: '', vence: this.venceSugerido(prod) });
     this.inventarioService.motivos$.subscribe({
       next:  (m) => { this.motivos.set(m); this.cambiarTipoMov(this.mov().tipo); },
       error: () => this.errorMov.set('No se pudieron cargar los motivos.')
@@ -381,6 +425,15 @@ export class InventarioComponent implements OnInit, OnDestroy {
   }
 
   cerrarMovimiento() { this.productoMov.set(null); this.guardando.set(false); }
+
+  /** Lo comprado trae la fecha del envase: se sugiere hoy + su vida útil (en días) */
+  private venceSugerido(prod: any): string {
+    if (prod?.tipo_producto !== 'COMPRADO') return '';
+    const dias = prod.vida_util_horas ? Math.round(prod.vida_util_horas / 24) : this.vidaPorDefecto('COMPRADO');
+    const d = new Date(`${this.hoy()}T12:00:00`);
+    d.setDate(d.getDate() + dias);
+    return d.toLocaleDateString('en-CA');
+  }
 
   get stockTrasMovimiento(): number {
     const mov = this.mov(), n = Math.trunc(Number(mov.cantidad)) || 0;
@@ -398,7 +451,8 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.guardando.set(true);
     this.inventarioService.registrar({
       id_producto: prod.id_producto, id_sucursal: this.idSucursal(),
-      tipo: this.mov().tipo, cantidad, motivo: this.mov().motivo, detalle: detalle || undefined
+      tipo: this.mov().tipo, cantidad, motivo: this.mov().motivo, detalle: detalle || undefined,
+      fecha_vencimiento: this.mov().tipo === 'INGRESO' && this.mov().vence ? this.mov().vence : undefined
     }).subscribe({
       next: (r) => {
         this.fijarStock(Number(prod.id_producto), r.stock_actual);

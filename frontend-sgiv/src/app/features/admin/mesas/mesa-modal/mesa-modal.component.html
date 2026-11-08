@@ -115,7 +115,7 @@
                     <div class="datos">
                       <span class="nombre">{{ prod.nombre_producto }}</span>
                       <span class="precio">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</span>
-                      <span class="stock" [class.bajo]="prod.stock_actual <= 3">{{ prod.stock_actual > 0 ? prod.stock_actual + ' disponibles' : 'Sin stock' }}</span>
+                      @if (prod.tipo_producto !== 'PREPARADO') { <span class="stock" [class.bajo]="prod.stock_actual <= 3">{{ prod.stock_actual > 0 ? prod.stock_actual + ' disponibles' : 'Sin stock' }}</span> }
                     </div>
                   </button>
                 }

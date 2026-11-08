@@ -1,5 +1,6 @@
 const db = require('../config/db');
-const { registrarHistorial } = require('./inventarioModel');
+const { moverStock } = require('./inventarioModel');
+const { STOCK_VISIBLE } = require('./productoModel');
 const visitaModel = require('./visitaModel');
 
 // ─── Pedidos del cliente: Pendiente_Cajero → Confirmado → Entregado → Pagado / Cancelado ───
@@ -66,36 +67,23 @@ const normalizarItems = (items) => {
     return lista.sort((a, b) => a.id_producto - b.id_producto);
 };
 
-// ─── Stock (descuento atómico) ───
-// registro: { id_usuario, detalle } para el historial de inventario
+// ─── Stock (fila bloqueada; sale del lote más antiguo y vuelve al mismo lote) ───
+// registro: { id_usuario, detalle, id_pedido } para el historial de inventario
 const reservarStock = async (client, id_sucursal, items, registro = {}) => {
     const cambios = [];
     for (const it of items) {
-        const r = await client.query(`
-            UPDATE inventario_sucursal
-            SET cantidad_actual = cantidad_actual - $1
-            WHERE id_sucursal = $2 AND id_producto = $3 AND cantidad_actual >= $1
-            RETURNING id_inventario, cantidad_actual
-        `, [it.cantidad, id_sucursal, it.id_producto]);
-
-        if (r.rows.length === 0) {
-            const rInfo = await client.query(`
-                SELECT p.nombre_producto, COALESCE(i.cantidad_actual, 0)::int AS disponible
-                FROM producto p
-                LEFT JOIN inventario_sucursal i ON i.id_producto = p.id_producto AND i.id_sucursal = $2
-                WHERE p.id_producto = $1
-            `, [it.id_producto, id_sucursal]);
-            const info = rInfo.rows[0] || {};
-            throw errorCodigo('STOCK_INSUFICIENTE',
-                `Ya no hay suficiente "${info.nombre_producto || it.id_producto}" (disponible: ${info.disponible ?? 0})`,
-                { id_producto: it.id_producto, disponible: info.disponible ?? 0 });
-        }
-        const nuevo_stock = Number(r.rows[0].cantidad_actual);
-        await registrarHistorial(client, {
-            id_inventario: r.rows[0].id_inventario, id_usuario: registro.id_usuario, tipo: 'SALIDA',
-            cantidad: it.cantidad, motivo: 'Pedido QR', detalle: registro.detalle, stock_resultante: nuevo_stock
+        const mov = await moverStock(client, {
+            id_sucursal, id_producto: it.id_producto, cantidad: -it.cantidad, id_usuario: registro.id_usuario,
+            motivo: 'Pedido QR', detalle: registro.detalle, referencia: { id_pedido: registro.id_pedido }
         });
-        cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock });
+        if (mov.falta || mov.existe === false) {
+            const rInfo = await client.query(`SELECT nombre_producto FROM producto WHERE id_producto = $1`, [it.id_producto]);
+            const disponible = mov.disponible ?? 0;
+            throw errorCodigo('STOCK_INSUFICIENTE',
+                `Ya no hay suficiente "${rInfo.rows[0]?.nombre_producto || it.id_producto}" (disponible: ${disponible})`,
+                { id_producto: it.id_producto, disponible });
+        }
+        if (mov.stock != null) cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock: mov.stock });
     }
     return cambios;
 };
@@ -103,19 +91,12 @@ const reservarStock = async (client, id_sucursal, items, registro = {}) => {
 const devolverStock = async (client, id_sucursal, items, registro = {}) => {
     const cambios = [];
     for (const it of items) {
-        const r = await client.query(`
-            UPDATE inventario_sucursal
-            SET cantidad_actual = cantidad_actual + $1
-            WHERE id_sucursal = $2 AND id_producto = $3
-            RETURNING id_inventario, cantidad_actual
-        `, [it.cantidad, id_sucursal, it.id_producto]);
-        if (!r.rows.length) continue;
-        const nuevo_stock = Number(r.rows[0].cantidad_actual);
-        await registrarHistorial(client, {
-            id_inventario: r.rows[0].id_inventario, id_usuario: registro.id_usuario, tipo: 'INGRESO',
-            cantidad: it.cantidad, motivo: 'Pedido QR devuelto', detalle: registro.detalle, stock_resultante: nuevo_stock
+        const mov = await moverStock(client, {
+            id_sucursal, id_producto: it.id_producto, cantidad: Number(it.cantidad), id_usuario: registro.id_usuario,
+            motivo: 'Pedido QR devuelto', detalle: registro.detalle, devolucion: true,
+            referencia: { id_pedido: registro.id_pedido }
         });
-        cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock });
+        if (mov.stock != null) cambios.push({ id_producto: it.id_producto, id_sucursal, nuevo_stock: mov.stock });
     }
     return cambios;
 };
@@ -170,7 +151,7 @@ const obtenerCatalogoMenu = async (id_sucursal) => {
         SELECT p.id_producto, p.nombre_producto, p.descripcion_producto,
                p.precio_unitario, p.url_imagen, p.ingredientes, p.preparacion, p.destacado,
                c.id_categoria, c.nombre_categoria,
-               GREATEST(i.cantidad_actual, 0)::int AS stock_actual
+               (${STOCK_VISIBLE()})::int AS stock_actual
         FROM producto p
         JOIN categoria_producto  c ON c.id_categoria = p.id_categoria
         JOIN inventario_sucursal i ON i.id_producto  = p.id_producto AND i.id_sucursal = $1
@@ -228,8 +209,6 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
             throw errorCodigo('PRODUCTO_NO_DISPONIBLE', 'Un producto de tu pedido ya no está disponible. Revisa tu carrito.',
                               { id_producto: noDisponible.id_producto });
 
-        const cambios = await reservarStock(client, mesa.id_sucursal, lista, { detalle: `Mesa ${mesa.numero_mesa}` });
-
         const totalCentavos = lista.reduce((s, i) => s + precios.get(i.id_producto) * i.cantidad, 0);
         const rPed = await client.query(`
             INSERT INTO pedido_mesa (tipo_pedido, id_sucursal, id_mesa, estado_pedido, observacion_general,
@@ -248,6 +227,10 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
                 VALUES ($1, $2, $3, $4, $5)
             `, [pedido.id_pedido, it.id_producto, it.cantidad, precio / 100, it.nota]);
         }
+
+        // Reserva del stock: si no alcanza, se deshace el pedido completo
+        const cambios = await reservarStock(client, mesa.id_sucursal, lista,
+                                            { detalle: `Mesa ${mesa.numero_mesa}`, id_pedido: pedido.id_pedido });
 
         return { pedido, cambios };
     });
@@ -269,7 +252,7 @@ const obtenerBandeja = async (id_sucursal, minutos_expiracion) => {
                    'precio',          dp.precio_aplicado,
                    'subtotal',        dp.subtotal_detalle,
                    'nota_cliente',    dp.nota_cliente,
-                   'stock_disponible', COALESCE(i.cantidad_actual, 0)
+                   'stock_disponible', COALESCE(${STOCK_VISIBLE()}, 0)
                ) ORDER BY dp.id_detalle_pedido) AS items
         FROM pedido_mesa pm
         LEFT JOIN mesa_local m ON m.id_mesa = pm.id_mesa
@@ -303,7 +286,7 @@ const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal, id
         const delta = nueva - Number(det.cantidad_solicitada);
 
         let cambios = [];
-        const registro = { id_usuario, detalle: `Pedido #${id_pedido} ajustado` };
+        const registro = { id_usuario, id_pedido, detalle: `Pedido #${id_pedido} ajustado` };
         if (nueva === 0) {
             const rOtros = await client.query(
                 `SELECT COUNT(*)::int AS n FROM detalle_pedido WHERE id_pedido = $1 AND id_detalle_pedido <> $2`,
@@ -374,7 +357,7 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
 // Pedido ya bloqueado
 const cancelarPendiente = async (client, pedido, id_usuario = null) => {
     const cambios = await devolverStock(client, pedido.id_sucursal, await itemsDelPedido(client, pedido.id_pedido),
-                                        { id_usuario, detalle: `Pedido #${pedido.id_pedido} cancelado` });
+                                        { id_usuario, id_pedido: pedido.id_pedido, detalle: `Pedido #${pedido.id_pedido} cancelado` });
     const r = await client.query(`
         UPDATE pedido_mesa SET estado_pedido = 'Cancelado', id_usuario_atencion = COALESCE($2, id_usuario_atencion)
         WHERE id_pedido = $1 RETURNING *

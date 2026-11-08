@@ -114,7 +114,7 @@ export class DescargaInventarioComponent implements OnInit {
     this.estado.set('cargando');
     this.productosApi.obtenerInventario(this.idSucursal()).subscribe({
       next: (lista) => {
-        this.productos.set(lista || []);
+        this.productos.set((lista || []).filter(p => p.tipo_producto !== 'PREPARADO'));   // lo preparado no lleva stock
         this.generado.set(new Date());
         this.elegidas.set(new Set(this.categorias().map(c => c.id)));
         this.estado.set('listo');

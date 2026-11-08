@@ -6,6 +6,7 @@ const { emitirStock, emitirCajeros } = require('../utils/tiempoReal');
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const esAdmin = (req) => Number(req.usuario.id_rol) === 1;
+const hoyLaPaz = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
 
 /** El administrador elige la sucursal; el resto trabaja solo con la suya (null = pidió otra). */
 const sucursalPermitida = (req, pedida) => {
@@ -34,9 +35,17 @@ const registrarMovimiento = async (req, res) => {
         if (motivo === 'Otro' && !detalle) return res.status(400).json({ error: 'Describe el motivo en la observación' });
         if (detalle && detalle.length > 200) return res.status(400).json({ error: 'La observación admite hasta 200 caracteres' });
 
+        // Vencimiento del envase (compras): opcional, de hoy en adelante; vacío = vida útil del producto
+        const fecha_vencimiento = req.body?.fecha_vencimiento || null;
+        if (fecha_vencimiento) {
+            if (tipo !== 'INGRESO' || !FECHA.test(fecha_vencimiento) || Number.isNaN(Date.parse(fecha_vencimiento)))
+                return res.status(400).json({ error: 'Fecha de vencimiento inválida' });
+            if (fecha_vencimiento < hoyLaPaz()) return res.status(400).json({ error: 'La fecha de vencimiento ya pasó' });
+        }
+
         const r = await inventarioModel.registrarMovimiento({
             id_sucursal, id_producto: Number(id_producto), id_usuario: req.usuario.id_usuario,
-            tipo, cantidad, motivo, detalle
+            tipo, cantidad, motivo, detalle, vence: fecha_vencimiento ? `${fecha_vencimiento} 23:59:59` : null
         });
         emitirStock([{ id_producto: Number(id_producto), id_sucursal, nuevo_stock: r.cantidad_actual }]);
         res.status(201).json({ mensaje: 'Movimiento registrado', stock_actual: r.cantidad_actual });
@@ -44,6 +53,7 @@ const registrarMovimiento = async (req, res) => {
         if (error instanceof ErrorValidacion) return res.status(400).json({ error: error.message });
         if (error.codigo === 'SIN_STOCK') return res.status(409).json({ error: error.message, codigo: error.codigo });
         if (error.codigo === 'NO_EXISTE') return res.status(404).json({ error: error.message });
+        if (error.codigo === 'PREPARADO') return res.status(409).json({ error: error.message, codigo: error.codigo });
         console.error('registrarMovimiento:', error);
         res.status(500).json({ error: 'No se pudo registrar el movimiento' });
     }
@@ -81,6 +91,36 @@ const ingresosDelDia = async (req, res) => {
     } catch (error) {
         console.error('ingresosDelDia:', error);
         res.status(500).json({ error: 'No se pudieron consultar los ingresos del día' });
+    }
+};
+
+// ─── Vencidos ───
+// GET /api/inventario/vencimientos?id_sucursal — lotes vencidos o por vencer
+const listarVencimientos = async (req, res) => {
+    try {
+        const id_sucursal = sucursalPermitida(req, req.query.id_sucursal);
+        if (!id_sucursal) return res.status(403).json({ error: 'Solo puedes ver el inventario de tu sucursal' });
+        res.json(await inventarioModel.listarVencimientos(id_sucursal));
+    } catch (error) {
+        console.error('listarVencimientos:', error);
+        res.status(500).json({ error: 'No se pudieron consultar los vencimientos' });
+    }
+};
+
+// POST /api/inventario/vencidos/baja { id_sucursal?, lotes: [id_lote] }
+const darDeBajaVencidos = async (req, res) => {
+    try {
+        const id_sucursal = sucursalPermitida(req, req.body?.id_sucursal);
+        if (!id_sucursal) return res.status(403).json({ error: 'Solo puedes mover el inventario de tu sucursal' });
+        const lotes = Array.isArray(req.body?.lotes) ? [...new Set(req.body.lotes.map(Number))] : [];
+        if (!lotes.length || lotes.length > 500 || lotes.some(id => !Number.isInteger(id) || id <= 0))
+            return res.status(400).json({ error: 'Elige los lotes vencidos a dar de baja' });
+        const r = await inventarioModel.darDeBajaVencidos({ id_sucursal, lotes, id_usuario: req.usuario.id_usuario });
+        emitirStock(r.cambios);
+        res.json({ lotes: r.lotes, unidades: r.unidades });
+    } catch (error) {
+        console.error('darDeBajaVencidos:', error);
+        res.status(500).json({ error: 'No se pudieron dar de baja los vencidos' });
     }
 };
 
@@ -143,5 +183,5 @@ const obtenerTransferencia = async (req, res) => {
     }
 };
 
-module.exports = { listarMotivos, registrarMovimiento, listarMovimientos, ingresosDelDia,
+module.exports = { listarMotivos, registrarMovimiento, listarMovimientos, ingresosDelDia, listarVencimientos, darDeBajaVencidos,
                    crearTransferencia, listarTransferencias, obtenerTransferencia };

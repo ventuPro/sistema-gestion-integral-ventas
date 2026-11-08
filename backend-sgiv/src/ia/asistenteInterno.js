@@ -119,6 +119,7 @@ const crearHerramientas = ({ usuario, esAdmin, permisos, guias }) => {
             const filas = [];
             for (const s of lista) {
                 for (const p of await productoModel.obtenerProductos(s.id_sucursal)) {
+                    if (p.tipo_producto === 'PREPARADO') continue;   // se prepara al momento: sin stock
                     const stock = Number(p.stock_actual), minimo = Number(p.stock_minimo_alerta);
                     if (solo_bajo && stock > minimo) continue;
                     if (texto && !`${p.nombre_producto} ${p.nombre_categoria}`.toLowerCase().includes(texto)) continue;

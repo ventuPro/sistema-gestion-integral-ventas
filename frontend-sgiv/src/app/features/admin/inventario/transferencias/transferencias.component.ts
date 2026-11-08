@@ -63,7 +63,7 @@ export class TransferenciasComponent implements OnInit, OnDestroy {
     if (!texto) return [];
     const elegidos = new Set(this.lineas().map(l => l.id_producto));
     return this.productos()
-      .filter(p => p.estado_activo && Number(p.stock_actual) > 0 && !elegidos.has(Number(p.id_producto))
+      .filter(p => p.estado_activo && p.tipo_producto !== 'PREPARADO' && Number(p.stock_actual) > 0 && !elegidos.has(Number(p.id_producto))
                    && p.nombre_producto.toLowerCase().includes(texto))
       .slice(0, 8);
   });

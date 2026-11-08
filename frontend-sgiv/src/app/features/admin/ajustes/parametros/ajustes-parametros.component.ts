@@ -22,6 +22,10 @@ interface Parametros {
   menu_bloqueo_horas: number;
   menu_qr_visita: boolean;
   stock_minimo_defecto: number;
+  vida_util_elaborado_horas: number;
+  vida_util_comprado_dias: number;
+  aviso_vence_elaborado_horas: number;
+  aviso_vence_comprado_dias: number;
   captcha_activo: boolean;
   login_max_intentos: number;
   login_minutos_bloqueo: number;
@@ -33,7 +37,8 @@ const ORIGINALES: Parametros = {
   moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80',
   menu_activo: true, menu_mensaje_bienvenida: '', menu_minutos_expiracion: 15, menu_max_pendientes_mesa: 3,
   menu_max_pedidos_ip: 10, menu_visita_horas: 3, menu_visita_inactividad: 30, menu_bloqueo_horas: 6,
-  menu_qr_visita: false, stock_minimo_defecto: 5, captcha_activo: true, login_max_intentos: 5,
+  menu_qr_visita: false, stock_minimo_defecto: 5, vida_util_elaborado_horas: 48, vida_util_comprado_dias: 180,
+  aviso_vence_elaborado_horas: 12, aviso_vence_comprado_dias: 7, captcha_activo: true, login_max_intentos: 5,
   login_minutos_bloqueo: 15, sesion_horas: 8
 };
 
@@ -69,6 +74,14 @@ export class AjustesParametrosComponent implements OnInit {
     { clave: 'menu_visita_horas', etiqueta: 'Duración máxima de la visita', unidad: 'horas', min: 1, max: 12 },
     { clave: 'menu_visita_inactividad', etiqueta: 'Fin de la visita por inactividad', unidad: 'min', min: 10, max: 240 },
     { clave: 'menu_bloqueo_horas', etiqueta: 'Bloqueo por pedido falso', unidad: 'horas', min: 1, max: 72 }
+  ];
+
+  readonly camposInventario: CampoNumero[] = [
+    { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo por defecto', unidad: 'unidades', min: 0, max: 10000 },
+    { clave: 'vida_util_elaborado_horas', etiqueta: 'Vida útil de lo elaborado', unidad: 'horas', min: 1, max: 8760 },
+    { clave: 'vida_util_comprado_dias', etiqueta: 'Vida útil de lo comprado', unidad: 'días', min: 1, max: 3650 },
+    { clave: 'aviso_vence_elaborado_horas', etiqueta: 'Aviso «por vencer» de lo elaborado', unidad: 'horas antes', min: 1, max: 720 },
+    { clave: 'aviso_vence_comprado_dias', etiqueta: 'Aviso «por vencer» de lo comprado', unidad: 'días antes', min: 1, max: 365 }
   ];
 
   readonly camposSeguridad: CampoNumero[] = [
@@ -168,6 +181,8 @@ export class AjustesParametrosComponent implements OnInit {
     if (a.moneda_simbolo !== n.moneda_simbolo) lista.push(`Precios, tickets y reportes mostrarán «${n.moneda_simbolo}» en lugar de «${a.moneda_simbolo}».`);
     if (Number(a.stock_minimo_defecto) !== Number(n.stock_minimo_defecto))
       lista.push(`El stock mínimo pasará de ${a.stock_minimo_defecto} a ${n.stock_minimo_defecto} en todos los productos de todas las sucursales.`);
+    if (Number(a.vida_util_elaborado_horas) !== Number(n.vida_util_elaborado_horas) || Number(a.vida_util_comprado_dias) !== Number(n.vida_util_comprado_dias))
+      lista.push('Los ingresos nuevos vencerán con la vida útil nueva (los productos que tienen la suya no cambian; los lotes ya ingresados conservan su fecha).');
     if (a.ticket_ancho !== n.ticket_ancho) lista.push('Los tickets se imprimirán con el nuevo ancho: revisa que coincida con la impresora.');
     if (Number(a.sesion_horas) !== Number(n.sesion_horas))
       lista.push(`La sesión durará ${sesion(Number(n.sesion_horas))} desde el próximo inicio de sesión.`);
@@ -179,7 +194,7 @@ export class AjustesParametrosComponent implements OnInit {
 
   async guardar() {
     const fuera = [...this.camposMenu, ...this.camposSeguridad,
-                   { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo', min: 0, max: 10000 } as CampoNumero]
+                   ...this.camposInventario]
       .find(c => { const n = Number(this.p()[c.clave]); return !Number.isInteger(n) || n < c.min || n > c.max; });
     if (fuera) return this.dialogo.error(`${fuera.etiqueta}: debe ser un número entero entre ${fuera.min} y ${fuera.max}.`);
     if (!this.p().moneda_simbolo.trim()) return this.dialogo.error('El símbolo de moneda es obligatorio.');

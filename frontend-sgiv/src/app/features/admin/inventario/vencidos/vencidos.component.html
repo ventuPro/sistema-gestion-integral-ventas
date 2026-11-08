@@ -1,0 +1,80 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrar.emit()">
+  <div class="inf-hoja ventana w-full max-w-2xl max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+    <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
+      <div>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Vencidos</h3>
+        <p class="inf-sub mt-0!">{{ nombreSucursal() }}</p>
+      </div>
+      <button class="quitar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+      </button>
+    </div>
+
+    <div class="overflow-y-auto flex-1">
+      @switch (estado()) {
+        @case ('cargando') { <div class="p-5"><div class="inf-esqueleto h-40"></div></div> }
+        @case ('error') { <p class="inf-vacio">No se pudieron cargar los vencimientos.</p> }
+        @default {
+          @if (!lotes().length) {
+            <p class="inf-vacio">Sin productos vencidos ni por vencer.</p>
+          } @else {
+            <table class="inf-tabla">
+              <thead>
+                <tr>
+                  <th class="w-10">
+                    @if (vencidos().length) {
+                      <input type="checkbox" [checked]="todos()" (change)="alternarTodos()" aria-label="Elegir todos los vencidos">
+                    }
+                  </th>
+                  <th>Producto</th>
+                  <th class="num">Ingresó</th>
+                  <th class="num">Vence</th>
+                  <th class="num">Cantidad</th>
+                </tr>
+              </thead>
+              @if (vencidos().length) {
+                <tbody>
+                  <tr class="fila-seccion"><td colspan="5">Vencidos</td></tr>
+                  @for (l of vencidos(); track l.id_lote) {
+                    <tr class="cursor-pointer" (click)="alternar(l.id_lote)">
+                      <td><input type="checkbox" [checked]="!quitados().has(l.id_lote)" (click)="$event.stopPropagation()"
+                                 (change)="alternar(l.id_lote)" [attr.aria-label]="'Dar de baja ' + l.nombre_producto"></td>
+                      <td class="fuerte">{{ l.nombre_producto }}</td>
+                      <td class="num">{{ l.fecha_ingreso | date:'dd/MM HH:mm' }}</td>
+                      <td class="num"><span class="inf-estado mal">{{ l.fecha_vencimiento | date:'dd/MM HH:mm' }}</span></td>
+                      <td class="num font-semibold">{{ l.cantidad }}</td>
+                    </tr>
+                  }
+                </tbody>
+              }
+              @if (porVencer().length) {
+                <tbody>
+                  <tr class="fila-seccion"><td colspan="5">Por vencer</td></tr>
+                  @for (l of porVencer(); track l.id_lote) {
+                    <tr>
+                      <td></td>
+                      <td class="fuerte">{{ l.nombre_producto }}</td>
+                      <td class="num">{{ l.fecha_ingreso | date:'dd/MM HH:mm' }}</td>
+                      <td class="num"><span class="inf-estado aviso">{{ l.fecha_vencimiento | date:'dd/MM HH:mm' }}</span></td>
+                      <td class="num font-semibold">{{ l.cantidad }}</td>
+                    </tr>
+                  }
+                </tbody>
+              }
+            </table>
+          }
+        }
+      }
+    </div>
+
+    <div class="inf-pie-hoja flex justify-end gap-2">
+      <button class="inf-boton" (click)="cerrar.emit()">Cerrar</button>
+      @if (vencidos().length) {
+        <button class="boton-peligro" data-enter (click)="darDeBaja()" [disabled]="guardando() || !elegidos().length">
+          <lucide-icon [img]="icons.baja" class="w-4 h-4"></lucide-icon>
+          {{ guardando() ? 'Guardando…' : 'Dar de baja (' + unidades() + ')' }}
+        </button>
+      }
+    </div>
+  </div>
+</div>

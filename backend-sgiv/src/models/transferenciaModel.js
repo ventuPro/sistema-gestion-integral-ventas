@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { registrarHistorial } = require('./inventarioModel');
+const { moverStock } = require('./inventarioModel');
 const notificacionModel = require('./notificacionModel');
 const { revisar } = require('../utils/validacion');
 
@@ -64,45 +64,30 @@ const crear = async ({ id_origen, id_destino, id_usuario, items, observacion }) 
         const cambios = [];
         for (const it of lista) {
             const nombre = nombres.get(it.id_producto);
-            const rSale = await client.query(`
-                UPDATE inventario_sucursal SET cantidad_actual = cantidad_actual - $1
-                WHERE id_sucursal = $2 AND id_producto = $3 AND cantidad_actual >= $1
-                RETURNING id_inventario, cantidad_actual
-            `, [it.cantidad, id_origen, it.id_producto]);
-            if (!rSale.rows.length) {
-                const rHay = await client.query(
-                    `SELECT cantidad_actual FROM inventario_sucursal WHERE id_sucursal = $1 AND id_producto = $2`,
-                    [id_origen, it.id_producto]);
-                const hay = Math.max(0, Number(rHay.rows[0]?.cantidad_actual) || 0);
-                throw error('SIN_STOCK', `Solo quedan ${hay} de "${nombre}" en ${origen.nombre_sucursal}`);
-            }
-            const sale = rSale.rows[0];
+            // Las dos filas en orden fijo: dos transferencias opuestas a la vez no se traban
+            await client.query(`
+                SELECT 1 FROM inventario_sucursal WHERE id_producto = $1 AND id_sucursal = ANY($2::int[])
+                ORDER BY id_inventario FOR UPDATE`, [it.id_producto, [id_origen, id_destino]]);
+            const sale = await moverStock(client, {
+                id_sucursal: id_origen, id_producto: it.id_producto, cantidad: -it.cantidad, id_usuario,
+                motivo: 'Transferencia', detalle: `A ${destino.nombre_sucursal} · #${tr.id_transferencia}`
+            });
+            if (sale.preparado) throw error('INVALIDA', `"${nombre}" se prepara al momento: no se transfiere`);
+            if (sale.falta || sale.existe === false)
+                throw error('SIN_STOCK', `Solo quedan ${sale.disponible ?? 0} de "${nombre}" en ${origen.nombre_sucursal}`);
 
-            // Si el destino nunca tuvo el producto, se le crea
-            const rEntra = await client.query(`
-                INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (id_sucursal, id_producto)
-                DO UPDATE SET cantidad_actual = inventario_sucursal.cantidad_actual + EXCLUDED.cantidad_actual
-                RETURNING id_inventario, cantidad_actual
-            `, [id_destino, it.id_producto, it.cantidad]);
-            const entra = rEntra.rows[0];
+            // Entra con los mismos lotes (fecha y vencimiento); si el destino nunca tuvo el producto, se le crea
+            const entra = await moverStock(client, {
+                id_sucursal: id_destino, id_producto: it.id_producto, cantidad: it.cantidad, id_usuario, crear: true,
+                motivo: 'Transferencia', detalle: `Desde ${origen.nombre_sucursal} · #${tr.id_transferencia}`,
+                desde: sale.lotes
+            });
 
             await client.query(
                 `INSERT INTO detalle_transferencia (id_transferencia, id_producto, cantidad) VALUES ($1, $2, $3)`,
                 [tr.id_transferencia, it.id_producto, it.cantidad]);
-            await registrarHistorial(client, {
-                id_inventario: sale.id_inventario, id_usuario, tipo: 'SALIDA', cantidad: it.cantidad,
-                motivo: 'Transferencia', detalle: `A ${destino.nombre_sucursal} · #${tr.id_transferencia}`,
-                stock_resultante: Number(sale.cantidad_actual)
-            });
-            await registrarHistorial(client, {
-                id_inventario: entra.id_inventario, id_usuario, tipo: 'INGRESO', cantidad: it.cantidad,
-                motivo: 'Transferencia', detalle: `Desde ${origen.nombre_sucursal} · #${tr.id_transferencia}`,
-                stock_resultante: Number(entra.cantidad_actual)
-            });
-            cambios.push({ id_producto: it.id_producto, id_sucursal: id_origen,  nuevo_stock: Number(sale.cantidad_actual) },
-                         { id_producto: it.id_producto, id_sucursal: id_destino, nuevo_stock: Number(entra.cantidad_actual) });
+            cambios.push({ id_producto: it.id_producto, id_sucursal: id_origen,  nuevo_stock: sale.stock },
+                         { id_producto: it.id_producto, id_sucursal: id_destino, nuevo_stock: entra.stock });
         }
         await notificacionModel.transferencia(client, {
             id_transferencia: tr.id_transferencia, origen: origen.nombre_sucursal, destino: destino.nombre_sucursal,

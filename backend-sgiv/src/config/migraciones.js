@@ -462,6 +462,96 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
             END IF;
             ALTER TABLE detalle_cuenta DROP COLUMN origen, DROP COLUMN cliente_mesa, DROP COLUMN nombre_cliente;
         END IF;
+    END $$;`,
+
+    // ─── Lotes y PEPS (2026-11-08) ───
+    // Tipo de producto: ELABORADO (vence en horas), PREPARADO al momento (sin stock) y COMPRADO (vence en días).
+    // vida_util_horas NULL = la de Ajustes según el tipo
+    `ALTER TABLE configuracion
+        ADD COLUMN IF NOT EXISTS vida_util_elaborado_horas INT NOT NULL DEFAULT 48
+            CONSTRAINT configuracion_vida_elaborado_check CHECK (vida_util_elaborado_horas BETWEEN 1 AND 8760),
+        ADD COLUMN IF NOT EXISTS vida_util_comprado_dias INT NOT NULL DEFAULT 180
+            CONSTRAINT configuracion_vida_comprado_check CHECK (vida_util_comprado_dias BETWEEN 1 AND 3650);
+    ALTER TABLE historial_inventario
+        ADD COLUMN IF NOT EXISTS id_pedido INT REFERENCES pedido_mesa(id_pedido) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS id_detalle_cuenta INT REFERENCES detalle_cuenta(id_detalle_cuenta) ON DELETE SET NULL;
+    CREATE INDEX IF NOT EXISTS idx_historial_pedido ON historial_inventario (id_pedido) WHERE id_pedido IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_historial_detalle_cuenta ON historial_inventario (id_detalle_cuenta) WHERE id_detalle_cuenta IS NOT NULL;
+
+    -- Cada ingreso es un lote; las salidas sacan del más antiguo (PEPS)
+    CREATE TABLE IF NOT EXISTS lote_inventario (
+        id_lote           SERIAL PRIMARY KEY,
+        id_inventario     INT NOT NULL REFERENCES inventario_sucursal(id_inventario),
+        id_historial      INT REFERENCES historial_inventario(id_historial),
+        fecha_ingreso     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        fecha_vencimiento TIMESTAMP,
+        cantidad_inicial  INT NOT NULL CONSTRAINT lote_inventario_inicial_check CHECK (cantidad_inicial > 0),
+        cantidad_actual   INT NOT NULL,
+        CONSTRAINT lote_inventario_cantidad_check CHECK (cantidad_actual BETWEEN 0 AND cantidad_inicial)
+    );
+    CREATE INDEX IF NOT EXISTS idx_lote_peps ON lote_inventario (id_inventario, fecha_ingreso, id_lote) WHERE cantidad_actual > 0;
+    CREATE INDEX IF NOT EXISTS idx_lote_inventario ON lote_inventario (id_inventario);
+    -- Qué lote tocó cada movimiento (negativo = salió, positivo = entró)
+    CREATE TABLE IF NOT EXISTS movimiento_lote (
+        id_historial INT NOT NULL REFERENCES historial_inventario(id_historial) ON DELETE CASCADE,
+        id_lote      INT NOT NULL REFERENCES lote_inventario(id_lote) ON DELETE CASCADE,
+        cantidad     INT NOT NULL CONSTRAINT movimiento_lote_cantidad_check CHECK (cantidad <> 0),
+        PRIMARY KEY (id_historial, id_lote)
+    );
+    CREATE INDEX IF NOT EXISTS idx_movimiento_lote_lote ON movimiento_lote (id_lote);
+
+    -- Solo la primera vez: clasifica por categoría, saca el stock de lo preparado y crea el lote inicial con el stock de hoy
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'producto' AND column_name = 'tipo_producto') THEN
+            ALTER TABLE producto
+                ADD COLUMN tipo_producto VARCHAR(10) NOT NULL DEFAULT 'ELABORADO'
+                    CONSTRAINT producto_tipo_check CHECK (tipo_producto IN ('ELABORADO', 'PREPARADO', 'COMPRADO')),
+                ADD COLUMN vida_util_horas INT
+                    CONSTRAINT producto_vida_util_check CHECK (vida_util_horas BETWEEN 1 AND 87600);
+
+            UPDATE producto p SET tipo_producto = CASE
+                    WHEN c.nombre_categoria ~* '(JUGO|REFRESCO|AGUA|ALMAC|BEBIDA|GASEOSA)' THEN 'COMPRADO'
+                    WHEN c.nombre_categoria ~* '^\\s*SERVICIO DE T' AND p.nombre_producto ~* '(SOBRE|CAJA|PAQUETE)' THEN 'COMPRADO'
+                    WHEN c.nombre_categoria ~* '^\\s*SERVICIO DE T' THEN 'PREPARADO'
+                    ELSE 'ELABORADO' END
+            FROM categoria_producto c WHERE c.id_categoria = p.id_categoria;
+
+            INSERT INTO historial_inventario (id_inventario, tipo_movimiento, cantidad_movida, motivo_movimiento, detalle, stock_resultante)
+            SELECT i.id_inventario, 'SALIDA', i.cantidad_actual, 'Ajuste de conteo', 'PREPARADO AL MOMENTO: SIN STOCK', 0
+            FROM inventario_sucursal i JOIN producto p ON p.id_producto = i.id_producto
+            WHERE p.tipo_producto = 'PREPARADO' AND i.cantidad_actual > 0;
+            UPDATE inventario_sucursal i SET cantidad_actual = 0
+            FROM producto p WHERE p.id_producto = i.id_producto AND p.tipo_producto = 'PREPARADO' AND i.cantidad_actual > 0;
+
+            INSERT INTO lote_inventario (id_inventario, fecha_ingreso, fecha_vencimiento, cantidad_inicial, cantidad_actual)
+            SELECT i.id_inventario, LOCALTIMESTAMP,
+                   LOCALTIMESTAMP + make_interval(hours => CASE p.tipo_producto WHEN 'COMPRADO' THEN c.vida_util_comprado_dias * 24
+                                                                                ELSE c.vida_util_elaborado_horas END),
+                   i.cantidad_actual, i.cantidad_actual
+            FROM inventario_sucursal i
+            JOIN producto p ON p.id_producto = i.id_producto
+            CROSS JOIN configuracion c
+            WHERE c.id_configuracion = 1 AND p.tipo_producto <> 'PREPARADO' AND i.cantidad_actual > 0;
+        END IF;
+    END $$;`,
+
+    // ─── Vencidos (2026-11-08) ───
+    // Aviso «por vencer» configurable y último aviso de cada lote (0 ninguno, 1 por vencer, 2 vencido)
+    `ALTER TABLE configuracion
+        ADD COLUMN IF NOT EXISTS aviso_vence_elaborado_horas INT NOT NULL DEFAULT 12
+            CONSTRAINT configuracion_aviso_elaborado_check CHECK (aviso_vence_elaborado_horas BETWEEN 1 AND 720),
+        ADD COLUMN IF NOT EXISTS aviso_vence_comprado_dias INT NOT NULL DEFAULT 7
+            CONSTRAINT configuracion_aviso_comprado_check CHECK (aviso_vence_comprado_dias BETWEEN 1 AND 365);
+    ALTER TABLE lote_inventario ADD COLUMN IF NOT EXISTS aviso SMALLINT NOT NULL DEFAULT 0
+        CONSTRAINT lote_inventario_aviso_check CHECK (aviso BETWEEN 0 AND 2);
+    CREATE INDEX IF NOT EXISTS idx_lote_vence ON lote_inventario (fecha_vencimiento) WHERE cantidad_actual > 0;
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'notificacion_tipo_check'
+                       AND pg_get_constraintdef(oid) LIKE '%VENCIDO%') THEN
+            ALTER TABLE notificacion DROP CONSTRAINT IF EXISTS notificacion_tipo_check;
+            ALTER TABLE notificacion ADD CONSTRAINT notificacion_tipo_check
+                CHECK (tipo IN ('STOCK_BAJO', 'AGOTADO', 'ARQUEO', 'CAJA_SIN_CERRAR', 'TRANSFERENCIA', 'DESCUENTO', 'POR_VENCER', 'VENCIDO'));
+        END IF;
     END $$;`
 ];
 

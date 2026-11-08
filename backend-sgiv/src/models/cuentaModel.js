@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const { finalizarPedidosDeCuenta } = require('./pedidoModel');
-const { registrarHistorial } = require('./inventarioModel');
+const { moverStock } = require('./inventarioModel');
 const promocionModel = require('./promocionModel');
 const notificacionModel = require('./notificacionModel');
 const visitaModel = require('./visitaModel');
@@ -99,31 +99,7 @@ const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_un
         if (rSuc.rows.length === 0) throw new Error('CUENTA_NO_ACTIVA');
         const { id_sucursal, id_mesa, numero_mesa } = rSuc.rows[0];
 
-        // 2. Verificar stock disponible en la sucursal (lock de la fila)
-        const rStock = await client.query(`
-            SELECT id_inventario, cantidad_actual
-            FROM inventario_sucursal
-            WHERE id_sucursal = $1 AND id_producto = $2
-            FOR UPDATE
-        `, [id_sucursal, id_producto]);
-        if (rStock.rows.length === 0) throw new Error('PRODUCTO_SIN_INVENTARIO');
-        const stockActual = Number(rStock.rows[0].cantidad_actual);
-        if (stockActual < cantidad) throw new Error('STOCK_INSUFICIENTE');
-
-        // 3. Descontar stock inmediatamente (reserva)
-        const rNuevo = await client.query(`
-            UPDATE inventario_sucursal
-            SET cantidad_actual = cantidad_actual - $1
-            WHERE id_inventario = $2
-            RETURNING cantidad_actual
-        `, [cantidad, rStock.rows[0].id_inventario]);
-        const nuevo_stock = Number(rNuevo.rows[0].cantidad_actual);
-        await registrarHistorial(client, {
-            id_inventario: rStock.rows[0].id_inventario, id_usuario, tipo: 'SALIDA', cantidad,
-            motivo: 'Cuenta de mesa', detalle: `Mesa ${numero_mesa}`, stock_resultante: nuevo_stock
-        });
-
-        // 4. Insertar o incrementar en detalle_cuenta (el subtotal lo calcula la BD)
+        // 2. Insertar o incrementar en detalle_cuenta (el subtotal lo calcula la BD)
         const existe = await client.query(`
             SELECT id_detalle_cuenta, cantidad
             FROM detalle_cuenta
@@ -144,6 +120,15 @@ const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_un
             `, [id_cuenta, id_producto, cantidad, precio_unitario, nota||null])).rows[0];
         }
 
+        // 3. Reservar el stock (fila bloqueada; si no alcanza, se deshace todo)
+        const mov = await moverStock(client, {
+            id_sucursal, id_producto, cantidad: -cantidad, id_usuario, motivo: 'Cuenta de mesa',
+            detalle: `Mesa ${numero_mesa}`, referencia: { id_detalle_cuenta: detalle.id_detalle_cuenta }
+        });
+        if (mov.existe === false) throw new Error('PRODUCTO_SIN_INVENTARIO');
+        if (mov.falta) throw new Error('STOCK_INSUFICIENTE');
+        const nuevo_stock = mov.stock;
+
         await client.query('COMMIT');
         return { detalle: { ...detalle, origen: 'cajero', cliente_mesa: null, nombre_cliente: null }, id_producto, nuevo_stock, id_sucursal, id_mesa };
     } catch (e) {
@@ -162,7 +147,7 @@ const quitarProductoCuenta = async (id_detalle_cuenta, id_usuario = null) => {
 
         // 1. Obtener el detalle + id_sucursal
         const rDet = await client.query(`
-            SELECT dc.id_cuenta, dc.id_producto, dc.cantidad, dc.id_venta, ml.id_sucursal, cm.id_mesa, ml.numero_mesa
+            SELECT dc.id_cuenta, dc.id_producto, dc.cantidad, dc.id_venta, dc.id_pedido, ml.id_sucursal, cm.id_mesa, ml.numero_mesa
             FROM detalle_cuenta dc
             JOIN cuenta_mesa cm ON dc.id_cuenta = cm.id_cuenta
             JOIN mesa_local  ml ON cm.id_mesa   = ml.id_mesa
@@ -171,22 +156,14 @@ const quitarProductoCuenta = async (id_detalle_cuenta, id_usuario = null) => {
         `, [id_detalle_cuenta]);
         if (rDet.rows.length === 0) throw new Error('DETALLE_NO_ENCONTRADO');
         if (rDet.rows[0].id_venta) throw new Error('DETALLE_PAGADO');
-        const { id_cuenta, id_producto, cantidad, id_sucursal, id_mesa, numero_mesa } = rDet.rows[0];
+        const { id_cuenta, id_producto, cantidad, id_pedido, id_sucursal, id_mesa, numero_mesa } = rDet.rows[0];
 
-        // 2. Devolver stock al inventario
-        const rNuevo = await client.query(`
-            UPDATE inventario_sucursal
-            SET cantidad_actual = cantidad_actual + $1
-            WHERE id_sucursal=$2 AND id_producto=$3
-            RETURNING id_inventario, cantidad_actual
-        `, [cantidad, id_sucursal, id_producto]);
-        const nuevo_stock = rNuevo.rows.length > 0 ? Number(rNuevo.rows[0].cantidad_actual) : null;
-        if (rNuevo.rows.length) {
-            await registrarHistorial(client, {
-                id_inventario: rNuevo.rows[0].id_inventario, id_usuario, tipo: 'INGRESO', cantidad,
-                motivo: 'Devuelto de cuenta de mesa', detalle: `Mesa ${numero_mesa}`, stock_resultante: nuevo_stock
-            });
-        }
+        // 2. Devolver el stock a los lotes de los que salió
+        const mov = await moverStock(client, {
+            id_sucursal, id_producto, cantidad: Number(cantidad), id_usuario, motivo: 'Devuelto de cuenta de mesa',
+            detalle: `Mesa ${numero_mesa}`, devolucion: true, referencia: { id_detalle_cuenta, id_pedido }
+        });
+        const nuevo_stock = mov.stock ?? null;
 
         // 3. Eliminar el detalle
         await client.query(
@@ -213,7 +190,7 @@ const cambiarCantidadDetalle = async (id_detalle_cuenta, cantidad, id_usuario = 
     try {
         await client.query('BEGIN');
         const rDet = await client.query(`
-            SELECT dc.id_cuenta, dc.id_producto, dc.cantidad, dc.precio_unitario, dc.id_venta,
+            SELECT dc.id_cuenta, dc.id_producto, dc.cantidad, dc.precio_unitario, dc.id_venta, dc.id_pedido,
                    ml.id_sucursal, cm.id_mesa, ml.numero_mesa
             FROM detalle_cuenta dc
             JOIN cuenta_mesa cm ON dc.id_cuenta = cm.id_cuenta
@@ -228,26 +205,16 @@ const cambiarCantidadDetalle = async (id_detalle_cuenta, cantidad, id_usuario = 
         const diferencia = cantidad - Number(det.cantidad);
         let nuevo_stock = null;
         if (diferencia !== 0) {
-            const rInv = await client.query(`
-                SELECT id_inventario, cantidad_actual FROM inventario_sucursal
-                WHERE id_sucursal = $1 AND id_producto = $2 FOR UPDATE
-            `, [det.id_sucursal, det.id_producto]);
-            if (rInv.rows.length === 0) throw new Error('PRODUCTO_SIN_INVENTARIO');
-            const disponible = Number(rInv.rows[0].cantidad_actual);
-            if (diferencia > disponible)
-                throw Object.assign(new Error('STOCK_INSUFICIENTE'), { disponible: disponible + Number(det.cantidad) });
-
-            nuevo_stock = Number((await client.query(
-                `UPDATE inventario_sucursal SET cantidad_actual = cantidad_actual - $1
-                 WHERE id_inventario = $2 RETURNING cantidad_actual`,
-                [diferencia, rInv.rows[0].id_inventario]
-            )).rows[0].cantidad_actual);
-            await registrarHistorial(client, {
-                id_inventario: rInv.rows[0].id_inventario, id_usuario,
-                tipo: diferencia > 0 ? 'SALIDA' : 'INGRESO', cantidad: Math.abs(diferencia),
+            const mov = await moverStock(client, {
+                id_sucursal: det.id_sucursal, id_producto: det.id_producto, cantidad: -diferencia, id_usuario,
                 motivo: diferencia > 0 ? 'Cuenta de mesa' : 'Devuelto de cuenta de mesa',
-                detalle: `Mesa ${det.numero_mesa}`, stock_resultante: nuevo_stock
+                detalle: `Mesa ${det.numero_mesa}`, devolucion: diferencia < 0,
+                referencia: { id_detalle_cuenta, id_pedido: det.id_pedido }
             });
+            if (mov.existe === false) throw new Error('PRODUCTO_SIN_INVENTARIO');
+            if (mov.falta)
+                throw Object.assign(new Error('STOCK_INSUFICIENTE'), { disponible: mov.disponible + Number(det.cantidad) });
+            nuevo_stock = mov.stock ?? null;
 
             await client.query(`UPDATE detalle_cuenta SET cantidad = $1 WHERE id_detalle_cuenta = $2`, [cantidad, id_detalle_cuenta]);
         }
@@ -266,33 +233,23 @@ const cambiarCantidadDetalle = async (id_detalle_cuenta, cantidad, id_usuario = 
 // ─── DEVOLVER STOCK DE TODOS LOS ITEMS DE UNA CUENTA (cancelaciones) ───
 const devolverStockCuenta = async (client, id_cuenta, id_usuario = null) => {
     const rItems = await client.query(`
-        SELECT dc.id_producto, dc.cantidad, ml.id_sucursal, ml.numero_mesa
+        SELECT dc.id_detalle_cuenta, dc.id_pedido, dc.id_producto, dc.cantidad, ml.id_sucursal, ml.numero_mesa
         FROM detalle_cuenta dc
         JOIN cuenta_mesa cm ON dc.id_cuenta = cm.id_cuenta
         JOIN mesa_local  ml ON cm.id_mesa   = ml.id_mesa
         WHERE dc.id_cuenta = $1 AND dc.id_venta IS NULL
+        ORDER BY dc.id_producto, dc.id_detalle_cuenta
     `, [id_cuenta]);
 
     const cambios = [];
     for (const item of rItems.rows) {
-        const r = await client.query(`
-            UPDATE inventario_sucursal
-            SET cantidad_actual = cantidad_actual + $1
-            WHERE id_sucursal=$2 AND id_producto=$3
-            RETURNING id_inventario, cantidad_actual
-        `, [item.cantidad, item.id_sucursal, item.id_producto]);
-        if (r.rows.length > 0) {
-            await registrarHistorial(client, {
-                id_inventario: r.rows[0].id_inventario, id_usuario, tipo: 'INGRESO', cantidad: item.cantidad,
-                motivo: 'Devuelto de cuenta de mesa', detalle: `Mesa ${item.numero_mesa} (cuenta cancelada)`,
-                stock_resultante: Number(r.rows[0].cantidad_actual)
-            });
-            cambios.push({
-                id_producto:  item.id_producto,
-                id_sucursal:  item.id_sucursal,
-                nuevo_stock:  Number(r.rows[0].cantidad_actual)
-            });
-        }
+        const mov = await moverStock(client, {
+            id_sucursal: item.id_sucursal, id_producto: item.id_producto, cantidad: Number(item.cantidad), id_usuario,
+            motivo: 'Devuelto de cuenta de mesa', detalle: `Mesa ${item.numero_mesa} (cuenta cancelada)`, devolucion: true,
+            referencia: { id_detalle_cuenta: item.id_detalle_cuenta, id_pedido: item.id_pedido }
+        });
+        if (mov.stock != null)
+            cambios.push({ id_producto: item.id_producto, id_sucursal: item.id_sucursal, nuevo_stock: mov.stock });
     }
     return cambios;
 };

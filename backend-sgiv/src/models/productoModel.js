@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { AVISO } = require('./loteModel');
 
 // Las nuevas van al final del orden del menú
 const crearCategoria    = async (nombre, desc) =>
@@ -31,7 +32,12 @@ const eliminarCategoria = async (id) =>
 
 // Campos que el admin edita (undefined = no cambia)
 const CAMPOS = ['id_categoria', 'nombre_producto', 'descripcion_producto', 'precio_unitario', 'url_imagen',
-                'ingredientes', 'preparacion', 'destacado', 'mostrar_en_menu'];
+                'ingredientes', 'preparacion', 'destacado', 'mostrar_en_menu', 'tipo_producto', 'vida_util_horas'];
+
+// Lo que se hace al momento (té, café) no lleva stock: siempre disponible para vender
+const SIN_LIMITE = 9999;
+const STOCK_VISIBLE = (p = 'p', i = 'i') =>
+    `CASE WHEN ${p}.tipo_producto = 'PREPARADO' THEN ${SIN_LIMITE} ELSE GREATEST(${i}.cantidad_actual, 0) END`;
 
 const crearProducto = async (datos, cliente = db) => {
     const campos = CAMPOS.filter(c => datos[c] !== undefined && datos[c] !== null);
@@ -43,7 +49,6 @@ const crearProducto = async (datos, cliente = db) => {
 };
 
 const obtenerProductos = async (id_sucursal = 1, incluirInactivos = false) => {
-    const filtroEstado = incluirInactivos ? '' : 'WHERE p.estado_activo = TRUE';
     const r = await db.query(`
         SELECT
             p.id_producto,
@@ -56,15 +61,28 @@ const obtenerProductos = async (id_sucursal = 1, incluirInactivos = false) => {
             p.preparacion,
             p.destacado,
             p.mostrar_en_menu,
+            p.tipo_producto,
+            p.vida_util_horas,
             c.id_categoria,
             c.nombre_categoria,
-            i.cantidad_actual   AS stock_actual,
-            (SELECT stock_minimo_defecto FROM configuracion WHERE id_configuracion = 1) AS stock_minimo_alerta
+            ${STOCK_VISIBLE()} AS stock_actual,
+            cfg.stock_minimo_defecto AS stock_minimo_alerta,
+            COALESCE(v.vencidos, 0)   AS vencidos,
+            COALESCE(v.por_vencer, 0) AS por_vencer
         FROM producto p
         JOIN categoria_producto   c ON p.id_categoria = c.id_categoria
         JOIN inventario_sucursal  i ON i.id_producto  = p.id_producto
                                    AND i.id_sucursal  = $1
-        ${filtroEstado}
+        CROSS JOIN configuracion cfg
+        -- Unidades vencidas o por vencer (lotes con stock; lo preparado no tiene)
+        LEFT JOIN LATERAL (
+            SELECT SUM(l.cantidad_actual) FILTER (WHERE l.fecha_vencimiento <= LOCALTIMESTAMP)::int AS vencidos,
+                   SUM(l.cantidad_actual) FILTER (WHERE l.fecha_vencimiento > LOCALTIMESTAMP
+                                                    AND l.fecha_vencimiento <= LOCALTIMESTAMP + ${AVISO('p', 'cfg')})::int AS por_vencer
+            FROM lote_inventario l
+            WHERE l.id_inventario = i.id_inventario AND l.cantidad_actual > 0
+        ) v ON TRUE
+        WHERE cfg.id_configuracion = 1 ${incluirInactivos ? '' : 'AND p.estado_activo = TRUE'}
         ORDER BY c.orden, c.nombre_categoria, p.nombre_producto
     `, [id_sucursal]);
     return r.rows;
@@ -82,23 +100,23 @@ const eliminarProducto = desactivarProducto;
 const urlImagen = async (id) =>
     (await db.query('SELECT url_imagen FROM producto WHERE id_producto = $1', [id])).rows[0]?.url_imagen;
 
-const actualizarProducto = async (id, datos) => {
+const actualizarProducto = async (id, datos, cliente = db) => {
     const campos = CAMPOS.filter(c => datos[c] !== undefined);
-    if (!campos.length) return (await db.query('SELECT * FROM producto WHERE id_producto = $1', [id])).rows[0];
-    const r = await db.query(
+    if (!campos.length) return (await cliente.query('SELECT * FROM producto WHERE id_producto = $1', [id])).rows[0];
+    const r = await cliente.query(
         `UPDATE producto SET ${campos.map((c, i) => `${c} = $${i + 1}`).join(', ')}
           WHERE id_producto = $${campos.length + 1} RETURNING *`,
         [...campos.map(c => datos[c]), id]);
     return r.rows[0];
 };
 
-// ─── Fila de inventario de un producto nuevo en una sucursal (nunca pisa un stock existente) ───
-const asignarProductoASucursal = async (id_producto, id_sucursal, stock_inicial = 0, cliente = db) => {
+// ─── Fila de inventario de un producto nuevo en una sucursal (en 0: el stock inicial entra con moverStock) ───
+const asignarProductoASucursal = async (id_producto, id_sucursal, cliente = db) => {
     const r = await cliente.query(`
         INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual)
-        VALUES ($1, $2, $3)
+        VALUES ($1, $2, 0)
         RETURNING *
-    `, [id_sucursal, id_producto, stock_inicial]);
+    `, [id_sucursal, id_producto]);
     return r.rows[0];
 };
 
@@ -116,5 +134,7 @@ module.exports = {
     reactivarProducto,
     actualizarProducto,
     urlImagen,
-    asignarProductoASucursal
+    asignarProductoASucursal,
+    SIN_LIMITE,
+    STOCK_VISIBLE
 };

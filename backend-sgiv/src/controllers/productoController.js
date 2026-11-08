@@ -1,8 +1,8 @@
 const m = require('../models/productoModel');
 const { guardarImagen, borrarImagen } = require('../utils/imagenes');
-const { emitirCatalogo } = require('../utils/tiempoReal');
+const { emitirCatalogo, emitirStock } = require('../utils/tiempoReal');
 const db = require('../config/db');
-const { registrarHistorial } = require('../models/inventarioModel');
+const { moverStock, TIPOS_PRODUCTO } = require('../models/inventarioModel');
 const { mayusculas } = require('../utils/texto');
 const { ErrorValidacion, revisar, numero } = require('../utils/validacion');
 
@@ -30,7 +30,13 @@ const datosProducto = (b, nuevo = false) => {
         ingredientes:         siViene(b.ingredientes, v => mayusculas(revisar(v, 'texto', { etiqueta: 'Los ingredientes', max: 400 }))),
         preparacion:          siViene(b.preparacion, v => mayusculas(revisar(v, 'texto', { etiqueta: 'La preparación', max: 500, multilinea: true }))),
         destacado:            booleano(b.destacado),
-        mostrar_en_menu:      booleano(b.mostrar_en_menu)
+        mostrar_en_menu:      booleano(b.mostrar_en_menu),
+        tipo_producto:        siViene(b.tipo_producto, v => {
+                                  if (!TIPOS_PRODUCTO.includes(v)) throw new ErrorValidacion('Tipo de producto inválido');
+                                  return v;
+                              }),
+        // Vacío = la de Ajustes según el tipo; hasta 10 años
+        vida_util_horas:      siViene(b.vida_util_horas, v => numero(v, { etiqueta: 'La vida útil', min: 1, max: 87600, entero: true }))
     };
 };
 
@@ -126,11 +132,11 @@ const agregarProducto   = async (req, res) => {
         try {
             await client.query('BEGIN');
             prod = await m.crearProducto(datos, client);
-            const inv = await m.asignarProductoASucursal(prod.id_producto, id_suc, stock_ini, client);
-            if (stock_ini > 0) {
-                await registrarHistorial(client, {
-                    id_inventario: inv.id_inventario, id_usuario: req.usuario?.id_usuario, tipo: 'INGRESO',
-                    cantidad: stock_ini, motivo: 'Stock inicial', stock_resultante: stock_ini
+            const inv = await m.asignarProductoASucursal(prod.id_producto, id_suc, client);
+            if (stock_ini > 0 && prod.tipo_producto !== 'PREPARADO') {
+                await moverStock(client, {
+                    id_inventario: inv.id_inventario, id_usuario: req.usuario?.id_usuario,
+                    cantidad: stock_ini, motivo: 'Stock inicial'
                 });
             }
             await client.query('COMMIT');
@@ -151,6 +157,39 @@ const agregarProducto   = async (req, res) => {
     }
 };
 
+/**
+ * Guarda los cambios del producto. Si pasa a «preparado al momento», su stock sale primero
+ * (Ajuste de conteo) en todas las sucursales: lo preparado no lleva stock ni lotes.
+ */
+const guardarProducto = async (id, datos, id_usuario) => {
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const rAntes = await client.query(`SELECT tipo_producto FROM producto WHERE id_producto = $1 FOR UPDATE`, [id]);
+        const cambios = [];
+        if (datos.tipo_producto === 'PREPARADO' && rAntes.rows[0]?.tipo_producto !== 'PREPARADO') {
+            const rInv = await client.query(`
+                SELECT id_inventario, id_sucursal, cantidad_actual FROM inventario_sucursal
+                WHERE id_producto = $1 AND cantidad_actual > 0 ORDER BY id_inventario`, [id]);
+            for (const inv of rInv.rows) {
+                await moverStock(client, {
+                    id_inventario: inv.id_inventario, id_usuario, cantidad: -Number(inv.cantidad_actual),
+                    motivo: 'Ajuste de conteo', detalle: 'PASA A PREPARADO AL MOMENTO'
+                });
+                cambios.push({ id_producto: id, id_sucursal: inv.id_sucursal, nuevo_stock: m.SIN_LIMITE });
+            }
+        }
+        const prod = await m.actualizarProducto(id, datos, client);
+        await client.query('COMMIT');
+        return { prod, cambios };
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+};
+
 // Actualizar producto
 const actualizarProducto = async (req, res) => {
     let url_imagen;
@@ -160,8 +199,9 @@ const actualizarProducto = async (req, res) => {
 
         const datos = datosProducto(req.body);
         url_imagen = fotoNueva(req.body.url_imagen);
-        const prod = await m.actualizarProducto(req.params.id, { ...datos, url_imagen });
+        const { prod, cambios } = await guardarProducto(Number(req.params.id), { ...datos, url_imagen }, req.usuario?.id_usuario);
         if (url_imagen) borrarImagen(anterior);
+        if (cambios.length) emitirStock(cambios);
         emitirCatalogo();
         res.json({ producto: prod });
     } catch(e) {

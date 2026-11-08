@@ -8,6 +8,10 @@
       <button class="inf-boton" (click)="mostrarIngresos.set(true)">
         <lucide-icon [img]="icons.ingresos" class="w-3.5 h-3.5"></lucide-icon> Ingresos del día
       </button>
+      <button class="inf-boton" (click)="mostrarVencidos.set(true)">
+        <lucide-icon [img]="icons.vencidos" class="w-3.5 h-3.5"></lucide-icon> Vencidos
+        @if (totalVencidos()) { <span class="inf-estado mal py-0!">{{ totalVencidos() }}</span> }
+      </button>
       <button class="inf-boton" (click)="abrirOrdenCategorias()">
         <lucide-icon [img]="icons.ordenar" class="w-3.5 h-3.5"></lucide-icon> Ordenar categorías
       </button>
@@ -34,6 +38,11 @@
 
   @if (vista() === 'transferencias') {
     <app-transferencias [idSucursal]="idSucursal()" [productos]="productos()" />
+  }
+
+  @if (mostrarVencidos()) {
+    <app-vencidos [idSucursal]="idSucursal()" [nombreSucursal]="sucursalSeleccionada()?.nombre_sucursal || ''"
+                  (cerrar)="mostrarVencidos.set(false); cargarProductos()" />
   }
 
   @if (mostrarIngresos()) {
@@ -119,18 +128,25 @@
                   </div>
                 </td>
                 <td class="num">{{ moneda() }} {{ cifra(prod.precio_unitario) }}</td>
-                <td class="num"><span class="fuerte">{{ prod.stock_actual || 0 }}</span></td>
+                <td class="num">
+                  @if (esPreparado(prod)) { <span class="inf-secundario">Al momento</span> }
+                  @else { <span class="fuerte">{{ prod.stock_actual || 0 }}</span> }
+                </td>
                 <td>
                   @if (!prod.estado_activo) { <span class="inf-estado neutro">Inactivo</span> }
                   @else if (estadoStock(prod) === 'sin') { <span class="inf-estado mal">Sin stock</span> }
+                  @else if (prod.vencidos > 0) { <span class="inf-estado mal">Vencidos: {{ prod.vencidos }}</span> }
+                  @else if (prod.por_vencer > 0) { <span class="inf-estado aviso">Por vencer: {{ prod.por_vencer }}</span> }
                   @else if (estadoStock(prod) === 'bajo') { <span class="inf-estado aviso">Stock bajo</span> }
                   @else { <span class="inf-estado ok">Disponible</span> }
                 </td>
                 <td>
                   <div class="flex items-center justify-end gap-1">
-                    <button class="inf-boton" (click)="abrirMovimiento(prod)" title="Registrar una entrada o una merma">
-                      <lucide-icon [img]="icons.movimiento" class="w-3.5 h-3.5"></lucide-icon> Movimiento
-                    </button>
+                    @if (!esPreparado(prod)) {
+                      <button class="inf-boton" (click)="abrirMovimiento(prod)" title="Registrar una entrada o una merma">
+                        <lucide-icon [img]="icons.movimiento" class="w-3.5 h-3.5"></lucide-icon> Movimiento
+                      </button>
+                    }
                     <button class="accion" (click)="verMovimientos(prod)" title="Ver sus movimientos" aria-label="Ver movimientos">
                       <lucide-icon [img]="icons.historial" class="w-4 h-4"></lucide-icon>
                     </button>
@@ -287,6 +303,23 @@
           </div>
         </div>
 
+        <div class="grid grid-cols-2 gap-4">
+          <div class="grupo">
+            <label class="inf-etiqueta" for="tipo-producto">Tipo</label>
+            <select id="tipo-producto" class="campo" [ngModel]="formulario().tipo_producto" (ngModelChange)="cambiarTipo($event)">
+              @for (t of tipos; track t.valor) { <option [value]="t.valor">{{ t.texto }}</option> }
+            </select>
+          </div>
+          @if (formulario().tipo_producto !== 'PREPARADO') {
+            <div class="grupo">
+              <label class="inf-etiqueta" for="vida-util">Vida útil ({{ formulario().tipo_producto === 'COMPRADO' ? 'días' : 'horas' }})</label>
+              <input id="vida-util" type="number" min="1" step="1" inputmode="numeric" class="campo"
+                     [max]="formulario().tipo_producto === 'COMPRADO' ? 3650 : 87600"
+                     [(ngModel)]="formulario().vida_util" [placeholder]="vidaPorDefecto(formulario().tipo_producto)">
+            </div>
+          }
+        </div>
+
         <section class="menu-qr space-y-3" aria-labelledby="titulo-menu-qr">
           <h4 id="titulo-menu-qr" class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))]">Menú QR</h4>
           <div class="flex flex-wrap gap-x-6 gap-y-3">
@@ -311,7 +344,7 @@
           </div>
         </section>
 
-        @if (!editandoId()) {
+        @if (!editandoId() && formulario().tipo_producto !== 'PREPARADO') {
           <div class="grupo">
             <label class="inf-etiqueta" for="stock-inicial">Stock inicial</label>
             <input id="stock-inicial" type="number" min="0" max="100000" step="1" inputmode="numeric" class="campo" [(ngModel)]="formulario().stock_inicial" placeholder="0">
@@ -368,6 +401,13 @@
             </select>
           </div>
         </div>
+
+        @if (mov().tipo === 'INGRESO' && productoMov()?.tipo_producto === 'COMPRADO') {
+          <div class="grupo">
+            <label class="inf-etiqueta" for="mov-vence">Vence</label>
+            <input id="mov-vence" type="date" class="campo" [min]="hoy()" [(ngModel)]="mov().vence">
+          </div>
+        }
 
         <div class="grupo">
           <label class="inf-etiqueta" for="mov-detalle">

@@ -126,9 +126,10 @@
       <div class="bloque-cabeza">
         <h2>Inventario</h2>
       </div>
-      <div class="bloque-cuerpo">
-        <ng-container *ngTemplateOutlet="numero; context: { $implicit: { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo por defecto',
-                       unidad: 'unidades', min: 0, max: 10000 } }"></ng-container>
+      <div class="bloque-cuerpo grid grid-cols-1 md:grid-cols-3 gap-6">
+        @for (c of camposInventario; track c.clave) {
+          <ng-container *ngTemplateOutlet="numero; context: { $implicit: c }"></ng-container>
+        }
       </div>
     </section>
 

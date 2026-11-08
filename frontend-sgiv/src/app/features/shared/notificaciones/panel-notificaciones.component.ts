@@ -1,12 +1,14 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { LucideAngularModule, X, PackageMinus, PackageX, Scale, Clock, ArrowLeftRight, BadgePercent, CheckCheck, Bell } from 'lucide-angular';
+import { LucideAngularModule, X, PackageMinus, PackageX, Scale, Clock, ArrowLeftRight, BadgePercent, CheckCheck, Bell,
+         CalendarClock, CalendarX } from 'lucide-angular';
 import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
 import { Notificacion, NotificacionService, TipoNotificacion } from '../../../core/services/notificacion.service';
 
 const ICONOS: Record<TipoNotificacion, any> = {
   STOCK_BAJO: PackageMinus, AGOTADO: PackageX, ARQUEO: Scale,
-  CAJA_SIN_CERRAR: Clock, TRANSFERENCIA: ArrowLeftRight, DESCUENTO: BadgePercent
+  CAJA_SIN_CERRAR: Clock, TRANSFERENCIA: ArrowLeftRight, DESCUENTO: BadgePercent,
+  POR_VENCER: CalendarClock, VENCIDO: CalendarX
 };
 
 // ─── Panel de la campana: últimas notificaciones; cada una lleva a su pantalla ───

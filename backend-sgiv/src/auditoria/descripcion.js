@@ -8,7 +8,7 @@ const MODULOS = [
     { id: 'ventas',      nombre: 'Ventas y caja', rutas: ['/caja'],                  tablas: ['venta_caja', 'detalle_venta', 'turno_caja'] },
     { id: 'mesas',       nombre: 'Mesas',         rutas: ['/cuentas', '/mesas'],     tablas: ['cuenta_mesa', 'detalle_cuenta', 'mesa_local'] },
     { id: 'pedidos',     nombre: 'Pedidos QR',    rutas: ['/pedidos', '/menu'],      tablas: ['pedido_mesa', 'detalle_pedido', 'bloqueo_menu'] },
-    { id: 'inventario',  nombre: 'Inventario',    rutas: ['/inventario'],            tablas: ['inventario_sucursal', 'historial_inventario', 'transferencia', 'detalle_transferencia'] },
+    { id: 'inventario',  nombre: 'Inventario',    rutas: ['/inventario'],            tablas: ['inventario_sucursal', 'historial_inventario', 'lote_inventario', 'movimiento_lote', 'transferencia', 'detalle_transferencia'] },
     { id: 'productos',   nombre: 'Productos',     rutas: ['/catalogo'],              tablas: ['producto', 'categoria_producto'] },
     { id: 'promociones', nombre: 'Promociones',   rutas: ['/promociones'],           tablas: ['promocion', 'promocion_producto', 'promocion_categoria', 'promocion_dia'] },
     { id: 'usuarios',    nombre: 'Usuarios',      rutas: ['/usuarios', '/permisos'], tablas: ['usuario', 'permiso_usuario', 'rol_usuario'] },
@@ -25,6 +25,7 @@ const TABLAS = {
     pedido_mesa: ['pedido QR', 'pedidos QR'], detalle_pedido: ['producto de pedido', 'productos de pedido'],
     bloqueo_menu: ['bloqueo del menú', 'bloqueos del menú'],
     inventario_sucursal: ['existencia', 'existencias'], historial_inventario: ['movimiento de stock', 'movimientos de stock'],
+    lote_inventario: ['lote', 'lotes'], movimiento_lote: ['movimiento de lote', 'movimientos de lote'],
     transferencia: ['transferencia', 'transferencias'], detalle_transferencia: ['producto transferido', 'productos transferidos'],
     producto: ['producto', 'productos'], categoria_producto: ['categoría', 'categorías'],
     promocion: ['promoción', 'promociones'], promocion_producto: ['producto en promoción', 'productos en promoción'],
@@ -47,6 +48,9 @@ const CAMPOS = {
     nombre_categoria: 'Categoría', descripcion_categoria: 'Descripción', orden: 'Orden',
     cantidad_actual: 'Stock', cantidad_movida: 'Cantidad', tipo_movimiento: 'Tipo', motivo_movimiento: 'Motivo',
     stock_resultante: 'Stock resultante', id_inventario: 'Producto',
+    tipo_producto: 'Tipo de producto', vida_util_horas: 'Vida útil (h)', fecha_ingreso: 'Ingreso', fecha_vencimiento: 'Vence',
+    cantidad_inicial: 'Cantidad que entró', vida_util_elaborado_horas: 'Vida útil de lo elaborado (h)',
+    vida_util_comprado_dias: 'Vida útil de lo comprado (días)',
     monto_total_venta: 'Total', metodo_pago: 'Método de pago', descuento_promociones: 'Descuento por promoción',
     descuento_manual: 'Descuento manual', motivo_descuento: 'Motivo del descuento', cantidad_vendida: 'Cantidad',
     subtotal_venta: 'Subtotal', descuento_promocion: 'Descuento por promoción', id_promocion: 'Promoción',
@@ -265,6 +269,12 @@ op('POST /inventario/movimientos', 'crear', (c) => {
     return [h.tipo_movimiento === 'INGRESO' ? 'Registró un ingreso de stock' : 'Registró una salida de stock',
         conDetalle(`${c.nombre('inventario', h.id_inventario)} × ${h.cantidad_movida}`, h.motivo_movimiento,
             c.sucursalDeInventario(h.id_inventario), `stock ${h.stock_resultante}`)];
+});
+op('POST /inventario/vencidos/baja', 'eliminar', (c) => {
+    const h = c.fila('historial_inventario', 'INSERT')?.nuevo;
+    const n = c.cuenta('historial_inventario', 'INSERT');
+    return ['Dio de baja productos vencidos', h && conDetalle(`${n} ${n === 1 ? 'lote' : 'lotes'}`,
+        c.sucursalDeInventario(h.id_inventario))];
 });
 op('POST /inventario/transferencias', 'crear', (c) => {
     const t = c.fila('transferencia', 'INSERT')?.nuevo;

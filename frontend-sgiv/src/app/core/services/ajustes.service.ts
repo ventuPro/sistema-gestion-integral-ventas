@@ -74,6 +74,9 @@ export interface Configuracion {
   /** Pedidos solo con el QR temporal impreso de la visita */
   menu_qr_visita: boolean;
   captcha_activo: boolean;
+  /** Vida útil por defecto de los lotes: elaborados en horas, comprados en días */
+  vida_util_elaborado_horas?: number;
+  vida_util_comprado_dias?: number;
   /** Chatbots siempre activos: true si el servidor tiene la clave de Groq */
   ia_cliente_disponible: boolean;
   ia_interno_disponible: boolean;
@@ -104,7 +107,8 @@ export const CONFIG_ORIGINAL: Configuracion = {
   url_logo: null, url_favicon: null, color_primario: null, color_secundario: null, tema: 'claro',
   moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, url_qr_cobro: null,
   ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80', menu_activo: true, menu_mensaje_bienvenida: null,
-  menu_qr_visita: false, captcha_activo: true, ia_cliente_disponible: false, ia_interno_disponible: false
+  menu_qr_visita: false, captcha_activo: true, ia_cliente_disponible: false, ia_interno_disponible: false,
+  vida_util_elaborado_horas: 48, vida_util_comprado_dias: 180
 };
 
 // Tonos originales de Tailwind (blue-600 e indigo-600), para mostrar en el selector
