@@ -113,6 +113,33 @@ const listarProductos   = async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 };
 
+// ─── Receta del producto (de Costos): de ahí sale su costo por unidad ───
+/** undefined = no se toca; null = sin receta; número = esa receta. Solo el administrador (los costos son suyos). */
+const recetaElegida = (req) => {
+    if (Number(req.usuario?.id_rol) !== 1 || !('id_receta' in (req.body || {}))) return undefined;
+    const v = req.body.id_receta;
+    if (v === null || v === '') return null;
+    const n = Number(v);
+    if (!Number.isInteger(n) || n <= 0) throw new ErrorValidacion('Receta inválida');
+    return n;
+};
+
+/** Una receta es de un solo producto y un producto tiene una sola receta */
+const enlazarReceta = async (client, id_producto, id_receta) => {
+    if (id_receta === undefined) return;
+    if (id_receta) {
+        const r = await client.query(`
+            SELECT r.id_producto, p.nombre_producto FROM receta r LEFT JOIN producto p ON p.id_producto = r.id_producto
+            WHERE r.id_receta = $1 FOR UPDATE OF r`, [id_receta]);
+        if (!r.rows.length) throw new ErrorValidacion('La receta ya no existe');
+        if (r.rows[0].id_producto && r.rows[0].id_producto !== id_producto)
+            throw new ErrorValidacion(`Esa receta ya es de ${r.rows[0].nombre_producto}`);
+    }
+    await client.query(`UPDATE receta SET id_producto = NULL WHERE id_producto = $1 AND id_receta IS DISTINCT FROM $2::int`,
+                       [id_producto, id_receta]);
+    if (id_receta) await client.query(`UPDATE receta SET id_producto = $1 WHERE id_receta = $2`, [id_producto, id_receta]);
+};
+
 // Crear producto Y asignarlo a la sucursal seleccionada
 const agregarProducto   = async (req, res) => {
     let url_imagen = null;
@@ -120,6 +147,7 @@ const agregarProducto   = async (req, res) => {
         const { id_sucursal, stock_inicial } = req.body;
         const producto  = datosProducto(req.body, true);
         const stock_ini = numero(stock_inicial, { etiqueta: 'El stock inicial', min: 0, max: 100000, entero: true }) ?? 0;
+        const id_receta = recetaElegida(req);
 
         url_imagen = fotoNueva(req.body.url_imagen) ?? null;
 
@@ -132,6 +160,8 @@ const agregarProducto   = async (req, res) => {
         try {
             await client.query('BEGIN');
             prod = await m.crearProducto(datos, client);
+            // La receta antes del stock inicial: el primer lote ya entra con su costo
+            await enlazarReceta(client, prod.id_producto, id_receta);
             const inv = await m.asignarProductoASucursal(prod.id_producto, id_suc, client);
             if (stock_ini > 0 && prod.tipo_producto !== 'PREPARADO') {
                 await moverStock(client, {
@@ -161,7 +191,7 @@ const agregarProducto   = async (req, res) => {
  * Guarda los cambios del producto. Si pasa a «preparado al momento», su stock sale primero
  * (Ajuste de conteo) en todas las sucursales: lo preparado no lleva stock ni lotes.
  */
-const guardarProducto = async (id, datos, id_usuario) => {
+const guardarProducto = async (id, datos, id_usuario, id_receta = undefined) => {
     const client = await db.connect();
     try {
         await client.query('BEGIN');
@@ -180,6 +210,7 @@ const guardarProducto = async (id, datos, id_usuario) => {
             }
         }
         const prod = await m.actualizarProducto(id, datos, client);
+        await enlazarReceta(client, id, id_receta);
         await client.query('COMMIT');
         return { prod, cambios };
     } catch (e) {
@@ -199,7 +230,8 @@ const actualizarProducto = async (req, res) => {
 
         const datos = datosProducto(req.body);
         url_imagen = fotoNueva(req.body.url_imagen);
-        const { prod, cambios } = await guardarProducto(Number(req.params.id), { ...datos, url_imagen }, req.usuario?.id_usuario);
+        const { prod, cambios } = await guardarProducto(Number(req.params.id), { ...datos, url_imagen }, req.usuario?.id_usuario,
+                                                        recetaElegida(req));
         if (url_imagen) borrarImagen(anterior);
         if (cambios.length) emitirStock(cambios);
         emitirCatalogo();

@@ -11,6 +11,7 @@ import { LucideAngularModule,
          Pencil, ArrowUpDown, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban, History,
          ChevronUp, ChevronDown, ListOrdered, Star, Download, Trash2, PackagePlus, CalendarX } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
+import { CostoService, Receta } from '../../../core/services/costo.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { cifra } from '../../../core/utils/informe';
@@ -43,6 +44,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   private socketService   = inject(SocketService);
   private inventarioService = inject(InventarioService);
   private ajustes         = inject(AjustesService);
+  private costos          = inject(CostoService);
   readonly moneda          = this.ajustes.moneda;
 
   // Tipo de producto: elaborado (vence en horas), preparado al momento (sin stock) o comprado (vence en días)
@@ -145,7 +147,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     nombre_producto: '', descripcion_producto: '',
     precio_unitario: '', id_categoria: '',
     ingredientes: '', preparacion: '', destacado: false, mostrar_en_menu: true,
-    tipo_producto: 'ELABORADO', vida_util: null, stock_inicial: null
+    tipo_producto: 'ELABORADO', vida_util: null, stock_inicial: null, id_receta: null
   });
   private tipoAntes = 'ELABORADO';
 
@@ -291,9 +293,10 @@ export class InventarioComponent implements OnInit, OnDestroy {
       nombre_producto: '', descripcion_producto: '',
       precio_unitario: '', id_categoria: '',
       ingredientes: '', preparacion: '', destacado: false, mostrar_en_menu: true,
-      tipo_producto: 'ELABORADO', vida_util: null, stock_inicial: null
+      tipo_producto: 'ELABORADO', vida_util: null, stock_inicial: null, id_receta: null
     });
     this.tipoAntes = 'ELABORADO';
+    this.cargarRecetas(null);
     this.mostrarModal.set(true);
   }
 
@@ -313,9 +316,11 @@ export class InventarioComponent implements OnInit, OnDestroy {
       mostrar_en_menu:      prod.mostrar_en_menu !== false,
       tipo_producto:        prod.tipo_producto || 'ELABORADO',
       vida_util:            prod.vida_util_horas ? (prod.tipo_producto === 'COMPRADO' ? prod.vida_util_horas / 24 : prod.vida_util_horas) : null,
-      stock_inicial:        null
+      stock_inicial:        null,
+      id_receta:            null
     });
     this.tipoAntes = prod.tipo_producto || 'ELABORADO';
+    this.cargarRecetas(Number(prod.id_producto));
     this.mostrarModal.set(true);
   }
 
@@ -337,6 +342,34 @@ export class InventarioComponent implements OnInit, OnDestroy {
       this.procesandoFoto.set(false);
     }
   }
+
+  // ─── Receta del producto (de Costos): de ahí sale su costo ───
+  readonly recetas = signal<Receta[]>([]);
+
+  /** Solo el administrador; al editar, marca la receta que ya tiene el producto */
+  private cargarRecetas(id_producto: number | null) {
+    if (!this.esAdmin()) return;
+    this.costos.recetas().subscribe({
+      next: (r) => {
+        this.recetas.set(r);
+        const suya = id_producto ? r.find(x => x.id_producto === id_producto)?.id_receta ?? null : null;
+        if (this.mostrarModal() && this.editandoId() === id_producto) this.formulario.update(f => ({ ...f, id_receta: suya }));
+      }
+    });
+  }
+
+  /** Receta elegida y lo que deja con el precio escrito (el precio lo decide el propietario) */
+  recetaActual(): { receta: Receta; costo: number; ganancia: number | null; margen: number | null } | null {
+    const f = this.formulario();
+    const receta = this.recetas().find(r => r.id_receta === f.id_receta);
+    if (!receta) return null;
+    const precio = Number(f.precio_unitario) || 0;
+    const ganancia = precio ? precio - receta.por_unidad : null;
+    return { receta, costo: receta.por_unidad, ganancia, margen: ganancia == null ? null : ganancia * 100 / precio };
+  }
+
+  /** Una receta que ya es de otro producto no se puede elegir */
+  recetaDeOtro(r: Receta): boolean { return !!r.id_producto && r.id_producto !== this.editandoId(); }
 
   /** Al cambiar el tipo, la vida útil vuelve a la de Ajustes (cambia la unidad) */
   cambiarTipo(tipo: string) {
@@ -368,7 +401,9 @@ export class InventarioComponent implements OnInit, OnDestroy {
       destacado:            !!f.destacado,
       mostrar_en_menu:      f.mostrar_en_menu !== false,
       tipo_producto:        f.tipo_producto,
-      vida_util_horas
+      vida_util_horas,
+      // La receta la elige solo el administrador (lo comprado toma el costo de la compra)
+      ...(this.esAdmin() ? { id_receta: f.tipo_producto === 'COMPRADO' ? null : f.id_receta ?? null } : {})
     };
     const fallo = (e: any, msg: string) => {
       this.errorModal.set(e?.error?.error || msg);

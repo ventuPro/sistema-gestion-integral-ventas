@@ -320,6 +320,30 @@
           }
         </div>
 
+        <!-- Receta (de Costos): el producto toma de ahí su costo por unidad; solo el administrador -->
+        @if (esAdmin() && formulario().tipo_producto !== 'COMPRADO') {
+          <div class="grupo">
+            <label class="inf-etiqueta" for="receta-producto">Receta</label>
+            <select id="receta-producto" class="campo" [(ngModel)]="formulario().id_receta">
+              <option [ngValue]="null">Sin receta</option>
+              @for (r of recetas(); track r.id_receta) {
+                <option [ngValue]="r.id_receta" [disabled]="recetaDeOtro(r)">
+                  {{ r.nombre }} · {{ moneda() }} {{ cifra(r.por_unidad) }}{{ recetaDeOtro(r) ? ' · ya es de ' + r.nombre_producto : '' }}
+                </option>
+              }
+            </select>
+          </div>
+          @if (recetaActual(); as c) {
+            <dl class="inf-pares">
+              <div><dt>Costo por unidad</dt><dd>{{ moneda() }} {{ cifra(c.costo) }}</dd></div>
+              @if (c.ganancia != null) {
+                <div><dt>Ganancia por unidad</dt><dd [class.inf-sube]="c.ganancia >= 0" [class.inf-baja]="c.ganancia < 0">{{ moneda() }} {{ cifra(c.ganancia) }}</dd></div>
+                <div><dt>Margen</dt><dd>{{ cifra(c.margen) }} %</dd></div>
+              }
+            </dl>
+          }
+        }
+
         <section class="menu-qr space-y-3" aria-labelledby="titulo-menu-qr">
           <h4 id="titulo-menu-qr" class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))]">Menú QR</h4>
           <div class="flex flex-wrap gap-x-6 gap-y-3">

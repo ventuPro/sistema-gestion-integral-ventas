@@ -566,3 +566,36 @@ describe('Inventario valorado y kardex: solo el administrador', () => {
         assert.equal((await api('GET', '/reportes/inventario-valorado/1', { token: tAdmin })).status, 200);
     });
 });
+
+describe('Receta elegida al crear o editar el producto', () => {
+    const nuevaReceta = async (nombre, inversion, rendimiento = 10) => (await bd.sql(
+        `INSERT INTO receta (nombre, rendimiento, inversion) VALUES ($1, $2, $3) RETURNING id_receta`,
+        [nombre, rendimiento, inversion]))[0].id_receta;
+    const recetaDe = async (id_producto) =>
+        (await bd.sql(`SELECT id_receta FROM receta WHERE id_producto = $1`, [id_producto]))[0]?.id_receta ?? null;
+
+    test('al crear con receta, el stock inicial ya entra con su costo; se puede cambiar o quitar', async () => {
+        const [{ id_categoria: cat }] = await bd.sql(`SELECT min(id_categoria) AS id_categoria FROM categoria_producto`);
+        const r1 = await nuevaReceta('RECETA FORMULARIO 1', 18);       // 1,80
+        const r2 = await nuevaReceta('RECETA FORMULARIO 2', 30);       // 3,00
+        const creado = await api('POST', '/catalogo/productos', { token: tAdmin, body: {
+            nombre_producto: 'Con receta al crear', precio_unitario: 5, id_categoria: cat, id_sucursal: 1, stock_inicial: 4, id_receta: r1 } });
+        assert.equal(creado.status, 201, JSON.stringify(creado.body));
+        const id = creado.body.producto.id_producto;
+        assert.equal(await recetaDe(id), r1);
+        assert.equal(Number((await lotes(id))[0].costo_unitario), 1.8);
+
+        assert.equal((await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: { id_receta: r2 } })).status, 200);
+        assert.equal(await recetaDe(id), r2);
+        assert.equal((await bd.sql(`SELECT id_producto FROM receta WHERE id_receta = $1`, [r1]))[0].id_producto, null, 'la anterior queda libre');
+
+        // Una receta es de un solo producto
+        const otro = await api('POST', '/catalogo/productos', { token: tAdmin, body: {
+            nombre_producto: 'Quiere la misma receta', precio_unitario: 5, id_categoria: cat, id_sucursal: 1, id_receta: r2 } });
+        assert.equal(otro.status, 400);
+        assert.match(otro.body.error, /ya es de/i);
+
+        assert.equal((await api('PUT', `/catalogo/productos/${id}`, { token: tAdmin, body: { id_receta: null } })).status, 200);
+        assert.equal(await recetaDe(id), null);
+    });
+});
