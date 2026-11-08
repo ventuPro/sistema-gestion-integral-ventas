@@ -1,0 +1,124 @@
+@if (!idSucursal()) {
+  <p class="inf-hoja inf-vacio">Elige una sucursal arriba: el kardex es de un producto en una sucursal.</p>
+} @else {
+  <section class="inf-hoja p-3 flex flex-wrap items-center gap-3">
+    <select class="inf-campo min-w-[240px]" [value]="idProducto() ?? ''" (change)="elegirProducto($any($event.target).value)" aria-label="Producto">
+      <option value="">Elegir producto…</option>
+      @for (s of secciones(); track s.id) {
+        <optgroup [label]="s.nombre">
+          @for (p of s.productos; track p.id_producto) {
+            <option [value]="p.id_producto" [selected]="+p.id_producto === idProducto()">{{ p.nombre_producto }}</option>
+          }
+        </optgroup>
+      }
+    </select>
+    <label class="flex items-center gap-2">
+      <span class="inf-etiqueta mb-0!">Desde</span>
+      <input type="date" class="inf-campo" [value]="desde()" [max]="hoy" (change)="cambiarFecha('desde', $any($event.target).value)">
+    </label>
+    <label class="flex items-center gap-2">
+      <span class="inf-etiqueta mb-0!">Hasta</span>
+      <input type="date" class="inf-campo" [value]="hasta()" [max]="hoy" (change)="cambiarFecha('hasta', $any($event.target).value)">
+    </label>
+    <div class="flex items-center gap-2 ml-auto">
+      <button class="inf-boton" [disabled]="!datos()" (click)="exportarExcel()">
+        <lucide-icon [img]="icons.excel" class="w-3.5 h-3.5"></lucide-icon> Excel
+      </button>
+      <button class="inf-boton" [disabled]="!datos()" (click)="exportarPDF()">
+        <lucide-icon [img]="icons.pdf" class="w-3.5 h-3.5"></lucide-icon> PDF
+      </button>
+    </div>
+  </section>
+
+  @switch (carga()) {
+    @case ('esperando') { <p class="inf-hoja inf-vacio">Elige un producto.</p> }
+    @case ('cargando') { <div class="inf-hoja p-5"><div class="inf-esqueleto h-48"></div></div> }
+    @case ('error') { <p class="inf-hoja inf-vacio">No se pudo armar el kardex.</p> }
+    @default {
+      @let d = datos();
+      <section class="inf-hoja overflow-hidden">
+        <div class="inf-tira separador-inferior">
+          <div>
+            <p class="inf-etiqueta">Saldo inicial</p>
+            <p class="inf-valor">{{ entero(d.inicial.cantidad) }}</p>
+            <p class="inf-sub">@if (d.inicial.valor != null) { {{ moneda() }} {{ cifra(d.inicial.valor) }} } @else { Sin costo conocido }</p>
+          </div>
+          <div>
+            <p class="inf-etiqueta">Entradas</p>
+            <p class="inf-valor inf-sube">+{{ entero(d.totales.entradas) }}</p>
+            <p class="inf-sub">{{ moneda() }} {{ cifra(d.totales.valor_entradas) }}</p>
+          </div>
+          <div>
+            <p class="inf-etiqueta">Salidas</p>
+            <p class="inf-valor inf-baja">−{{ entero(d.totales.salidas) }}</p>
+            <p class="inf-sub">{{ moneda() }} {{ cifra(d.totales.valor_salidas) }}</p>
+          </div>
+          <div>
+            <p class="inf-etiqueta">Saldo final</p>
+            <p class="inf-valor">{{ entero(d.final.cantidad) }}</p>
+            <p class="inf-sub">@if (d.final.valor != null) { {{ moneda() }} {{ cifra(d.final.valor) }} } @else { Sin costo conocido }</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="inf-tabla">
+            <thead>
+              <tr>
+                <th rowspan="2">Fecha</th>
+                <th rowspan="2">Detalle</th>
+                <th class="text-center!" colspan="3">Entrada</th>
+                <th class="text-center!" colspan="3">Salida</th>
+                <th class="text-center!" colspan="3">Saldo</th>
+              </tr>
+              <tr>
+                <th class="num">Cant.</th><th class="num">C. unit.</th><th class="num">Total</th>
+                <th class="num">Cant.</th><th class="num">C. unit.</th><th class="num">Total</th>
+                <th class="num">Cant.</th><th class="num">C. unit.</th><th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="fila-seccion">
+                <td colspan="8">Saldo inicial</td>
+                <td class="num">{{ entero(d.inicial.cantidad) }}</td>
+                <td class="num">@if (d.inicial.valor != null && d.inicial.cantidad) { {{ cifra(d.inicial.valor / d.inicial.cantidad) }} }</td>
+                <td class="num">@if (d.inicial.valor != null) { {{ cifra(d.inicial.valor) }} } @else { — }</td>
+              </tr>
+              @for (m of d.movimientos; track m.id_historial) {
+                <tr>
+                  <td class="inf-tenue whitespace-nowrap">{{ fechaHora(m.fecha) }}</td>
+                  <td class="max-w-[280px]">
+                    <span class="fuerte">{{ m.motivo }}</span>
+                    @if (m.detalle) { <span class="inf-secundario"> · {{ m.detalle }}</span> }
+                  </td>
+                  @if (m.tipo === 'INGRESO') {
+                    <td class="num inf-sube">{{ entero(m.cantidad) }}</td>
+                    <td class="num">@if (m.costo_unitario != null) { {{ cifra(m.costo_unitario) }} } @else { — }</td>
+                    <td class="num">@if (m.total != null) { {{ cifra(m.total) }} } @else { — }</td>
+                    <td></td><td></td><td></td>
+                  } @else {
+                    <td></td><td></td><td></td>
+                    <td class="num inf-baja">{{ entero(m.cantidad) }}</td>
+                    <td class="num">@if (m.costo_unitario != null) { {{ cifra(m.costo_unitario) }} } @else { — }</td>
+                    <td class="num">@if (m.total != null) { {{ cifra(m.total) }} } @else { — }</td>
+                  }
+                  <td class="num fuerte">{{ entero(m.saldo.cantidad) }}</td>
+                  <td class="num">@if (m.saldo.valor != null && m.saldo.cantidad) { {{ cifra(m.saldo.valor / m.saldo.cantidad) }} }</td>
+                  <td class="num fuerte">@if (m.saldo.valor != null) { {{ cifra(m.saldo.valor) }} } @else { — }</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="11" class="inf-vacio">Sin movimientos en el período.</td></tr>
+              }
+              <tr class="fuerte">
+                <td colspan="2">Totales</td>
+                <td class="num">{{ entero(d.totales.entradas) }}</td><td></td><td class="num">{{ cifra(d.totales.valor_entradas) }}</td>
+                <td class="num">{{ entero(d.totales.salidas) }}</td><td></td><td class="num">{{ cifra(d.totales.valor_salidas) }}</td>
+                <td class="num">{{ entero(d.final.cantidad) }}</td><td></td>
+                <td class="num">@if (d.final.valor != null) { {{ cifra(d.final.valor) }} } @else { — }</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+}

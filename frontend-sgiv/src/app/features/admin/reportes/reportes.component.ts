@@ -12,13 +12,15 @@ import { SelectorSucursalComponent } from '../../shared/selector-sucursal/select
 import { etiquetaPromocion } from '../../../core/services/promocion.service';
 import { cifra, entero, porcentaje, fechaCorta, fechaLarga, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
 import { SesionService } from '../../../core/services/sesion.service';
+import { InventarioValoradoComponent } from './inventario-valorado/inventario-valorado.component';
+import { KardexComponent } from './kardex/kardex.component';
 
 type Periodo = 'hoy' | 'ayer' | 'semana' | 'mes' | 'mes_anterior' | 'personalizado';
 
 @Component({
   selector: 'app-reportes',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, InventarioValoradoComponent, KardexComponent],
   templateUrl: './reportes.component.html',
   styleUrls: ['../../shared/informe/informe.css', './reportes.component.css']
 })
@@ -51,6 +53,9 @@ export class ReportesComponent implements OnInit, OnDestroy {
     { id: 'hoy', nombre: 'Hoy' }, { id: 'ayer', nombre: 'Ayer' }, { id: 'semana', nombre: 'Esta semana' },
     { id: 'mes', nombre: 'Este mes' }, { id: 'mes_anterior', nombre: 'Mes anterior' }, { id: 'personalizado', nombre: 'Personalizado' }
   ];
+
+  /** Pestaña: informe de ventas, inventario valorado o kardex */
+  readonly vista = signal<'ventas' | 'valorado' | 'kardex'>('ventas');
 
   readonly cargando    = signal(false);
   readonly refrescando = signal(false);
@@ -470,6 +475,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
         ['Ganancia bruta', m(cos.resumen.ganancia) + (cos.resumen.margen == null ? '' : ` (${cos.resumen.margen} %)`)],
         ...(cos.resumen.unidades_sin_costo ? [['Vendido sin costo conocido', `${cos.resumen.unidades_sin_costo} u · ${m(cos.resumen.ventas_sin_costo)}`]] : [])
       ], [1]);
+      seccion('Costo y ganancia por producto');
       tabla(['Producto', 'Unidades', 'Ingresos', 'Costo', 'Ganancia', 'Margen'],
         cos.productos.map((x: any) => [x.nombre_producto, x.unidades, m(x.ingresos),
           x.costo == null ? 'sin costo' : m(x.costo), x.ganancia == null ? '' : m(x.ganancia), x.margen == null ? '' : `${x.margen} %`]),

@@ -28,4 +28,17 @@ export class ReporteService {
     return this.http.get(`${this.apiUrl}/reportes/periodo/${id_sucursal}`, { params });
   }
 
+  /** Inventario valorado a una fecha de corte (id_sucursal 0 = todas) */
+  inventarioValorado(id_sucursal: number, fecha: string, categorias?: number[]): Observable<any> {
+    let params = new HttpParams().set('fecha', fecha);
+    if (categorias?.length) params = params.set('categorias', categorias.join(','));
+    return this.http.get(`${this.apiUrl}/reportes/inventario-valorado/${id_sucursal}`, { params });
+  }
+
+  /** Kardex de un producto en una sucursal */
+  kardex(id_sucursal: number, id_producto: number, fechaInicio: string, fechaFin: string): Observable<any> {
+    const params = new HttpParams().set('id_producto', id_producto).set('fecha_inicio', fechaInicio).set('fecha_fin', fechaFin);
+    return this.http.get(`${this.apiUrl}/reportes/kardex/${id_sucursal}`, { params });
+  }
+
 }

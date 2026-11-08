@@ -473,3 +473,96 @@ describe('Costos por lote y costo de lo vendido', () => {
         assert.ok(inf.body.costos.resumen.ganancia > 0);
     });
 });
+
+describe('Inventario valorado y kardex', () => {
+    const receta = (id_producto, inversion, rendimiento = 10) => bd.sql(`
+        INSERT INTO receta (nombre, rendimiento, inversion, id_producto) VALUES ($1, $2, $3, $4)
+        ON CONFLICT (id_producto) WHERE id_producto IS NOT NULL DO UPDATE SET inversion = EXCLUDED.inversion`,
+        [`RECETA VALOR ${id_producto}`, rendimiento, inversion, id_producto]);
+    const dia = async (desplazamiento = 0) => (await bd.sql(
+        `SELECT to_char((now() AT TIME ZONE 'America/La_Paz')::date + $1::int, 'YYYY-MM-DD') AS d`, [desplazamiento]))[0].d;
+    const valorado = async (fecha) => (await api('GET', `/reportes/inventario-valorado/1${fecha ? `?fecha=${fecha}` : ''}`, { token: tAdmin })).body;
+    const fila = (v, id) => v.categorias.flatMap(c => c.productos).find(p => p.id_producto === id);
+    const kardex = async (id, desde, hasta) =>
+        (await api('GET', `/reportes/kardex/1?id_producto=${id}&fecha_inicio=${desde}&fecha_fin=${hasta}`, { token: tAdmin })).body;
+
+    /** Pasa todo lo registrado del producto n días atrás (lotes e historial) */
+    const atrasar = (id, dias) => bd.sql(`
+        WITH i AS (SELECT id_inventario FROM inventario_sucursal WHERE id_producto = $1),
+             l AS (UPDATE lote_inventario SET fecha_ingreso = fecha_ingreso - make_interval(days => $2)
+                   WHERE id_inventario IN (SELECT id_inventario FROM i))
+        UPDATE historial_inventario SET fecha_registro = fecha_registro - make_interval(days => $2)
+        WHERE id_inventario IN (SELECT id_inventario FROM i)`, [id, dias]);
+
+    test('valor al costo (PEPS) y a precio de venta, con la ganancia esperada', async () => {
+        const id = await crearProducto('Valorado hoy');           // precio 10
+        await receta(id, 25);                                       // 2,50
+        await ingresar(id, 10);
+        await receta(id, 40);                                       // 4,00
+        await ingresar(id, 5);
+        const p = fila(await valorado(), id);
+        assert.deepEqual([p.cantidad, p.valor_costo, p.valor_venta, p.ganancia, p.costo_promedio], [15, 45, 150, 105, 3]);
+        assert.deepEqual(p.lotes.map(l => [l.cantidad, l.costo_unitario]), [[10, 2.5], [5, 4]]);
+    });
+
+    test('lo sin costo se cuenta aparte y no infla el valor', async () => {
+        const id = await crearProducto('Valorado sin costo');
+        await ingresar(id, 4);
+        const p = fila(await valorado(), id);
+        assert.deepEqual([p.cantidad, p.sin_costo, p.valor_costo, p.ganancia], [4, 4, 0, 0]);
+    });
+
+    test('con fecha de corte pasada se ve lo que había ese día; el kardex cuadra con el stock y los lotes', async () => {
+        const id = await crearProducto('Kardex completo');
+        await receta(id, 20);                                       // 2,00
+        await ingresar(id, 10);
+        await atrasar(id, 3);                                       // entró hace 3 días
+        assert.equal((await cobrar([{ id_producto: id, cantidad: 4 }])).status, 201);
+        await api('POST', '/inventario/movimientos', {
+            token: tAdmin, body: { id_producto: id, id_sucursal: 1, tipo: 'SALIDA', cantidad: 1, motivo: 'Dañado' } });
+
+        assert.equal(fila(await valorado(await dia(-2)), id).cantidad, 10, 'antes de la venta');
+        assert.equal(fila(await valorado(), id).cantidad, 5);
+        assert.equal((await api('GET', `/reportes/inventario-valorado/1?fecha=${await dia(1)}`, { token: tAdmin })).status, 400);
+
+        const k = await kardex(id, await dia(-5), await dia(0));
+        assert.deepEqual(k.inicial, { cantidad: 0, valor: 0 });
+        assert.deepEqual(k.movimientos.map(m => [m.tipo, m.cantidad, m.costo_unitario, m.total, m.saldo.cantidad, m.saldo.valor]), [
+            ['INGRESO', 10, 2, 20, 10, 20],
+            ['SALIDA',  4,  2, 8,  6,  12],
+            ['SALIDA',  1,  2, 2,  5,  10]
+        ]);
+        assert.deepEqual([k.totales.entradas, k.totales.valor_entradas, k.totales.salidas, k.totales.valor_salidas], [10, 20, 5, 10]);
+        assert.equal(k.final.cantidad, await stock(id));
+        const [{ valor }] = await bd.sql(`
+            SELECT SUM(l.cantidad_actual * l.costo_unitario)::float8 AS valor FROM lote_inventario l
+            JOIN inventario_sucursal i USING (id_inventario) WHERE i.id_producto = $1`, [id]);
+        assert.equal(k.final.valor, valor);
+
+        // Desde ayer: el saldo inicial ya trae lo que entró hace 3 días
+        const ayer = await kardex(id, await dia(-1), await dia(0));
+        assert.deepEqual(ayer.inicial, { cantidad: 10, valor: 20 });
+        assert.equal(ayer.movimientos.length, 2);
+    });
+
+    test('kardex: pide producto y fechas válidas', async () => {
+        assert.equal((await api('GET', `/reportes/kardex/1?fecha_inicio=2026-01-01&fecha_fin=2026-01-02`, { token: tAdmin })).status, 400);
+        const id = await crearProducto('Kardex fechas');
+        assert.equal((await api('GET', `/reportes/kardex/1?id_producto=${id}&fecha_inicio=2026-02-01&fecha_fin=2026-01-01`, { token: tAdmin })).status, 400);
+    });
+});
+
+describe('Inventario valorado y kardex: solo el administrador', () => {
+    test('un cajero con permiso de Reportes no los ve', async () => {
+        const hash = await bcrypt.hash(CLAVE, 4);
+        const [u] = await bd.sql(`
+            INSERT INTO usuario (id_sucursal, id_rol, nombre_completo, correo_electronico, contrasena_hash)
+            VALUES (1, 2, 'Cajero Reportes', 'cajero.reportes@prueba.com', $1) RETURNING id_usuario`, [hash]);
+        assert.equal((await api('PUT', `/permisos/usuario/${u.id_usuario}`,
+            { token: tAdmin, body: { permisos: { reportes: true } } })).status, 200);
+        const tCajero = await iniciarSesion('cajero.reportes@prueba.com', CLAVE);
+        assert.equal((await api('GET', '/reportes/inventario-valorado/1', { token: tCajero })).status, 403);
+        assert.equal((await api('GET', '/reportes/kardex/1?id_producto=1&fecha_inicio=2026-11-01&fecha_fin=2026-11-02', { token: tCajero })).status, 403);
+        assert.equal((await api('GET', '/reportes/inventario-valorado/1', { token: tAdmin })).status, 200);
+    });
+});

@@ -1,0 +1,135 @@
+<section class="inf-hoja p-3 flex flex-wrap items-center gap-3">
+  <label class="flex items-center gap-2">
+    <span class="inf-etiqueta mb-0!">Fecha de corte</span>
+    <input type="date" class="inf-campo" [value]="fecha()" [max]="hoy" (change)="cambiarFecha($any($event.target).value)">
+  </label>
+  <nav class="inf-segmentos">
+    @for (e of estados; track e.id) {
+      <button [class.activa]="estado() === e.id" (click)="estado.set(e.id)">{{ e.nombre }}</button>
+    }
+  </nav>
+  <nav class="inf-segmentos">
+    @for (t of tipos; track t.id) {
+      <button [class.activa]="tipo() === t.id" (click)="tipo.set(t.id)">{{ t.nombre }}</button>
+    }
+  </nav>
+  <select class="inf-campo" [value]="categoria()" (change)="categoria.set($any($event.target).value)" aria-label="Categoría">
+    <option value="">Todas las categorías</option>
+    @for (c of categorias(); track c) { <option [value]="c">{{ c }}</option> }
+  </select>
+  <div class="flex items-center gap-2 ml-auto">
+    <button class="inf-boton" [disabled]="!grupos().length" (click)="exportarExcel()">
+      <lucide-icon [img]="icons.excel" class="w-3.5 h-3.5"></lucide-icon> Excel
+    </button>
+    <button class="inf-boton" [disabled]="!grupos().length" (click)="exportarPDF()">
+      <lucide-icon [img]="icons.pdf" class="w-3.5 h-3.5"></lucide-icon> PDF
+    </button>
+  </div>
+</section>
+
+@switch (carga()) {
+  @case ('cargando') { <div class="inf-hoja p-5"><div class="inf-esqueleto h-48"></div></div> }
+  @case ('error') { <p class="inf-hoja inf-vacio">No se pudo calcular el inventario valorado.</p> }
+  @default {
+    @let t = total();
+    <section class="inf-hoja overflow-hidden">
+      <div class="inf-tira separador-inferior">
+        <div>
+          <p class="inf-etiqueta">Unidades</p>
+          <p class="inf-valor">{{ entero(t.cantidad) }}</p>
+        </div>
+        <div>
+          <p class="inf-etiqueta">Valor al costo</p>
+          <p class="inf-valor">{{ moneda() }} {{ cifra(t.valor_costo) }}</p>
+        </div>
+        <div>
+          <p class="inf-etiqueta">Valor a precio de venta</p>
+          <p class="inf-valor">{{ moneda() }} {{ cifra(t.valor_venta) }}</p>
+        </div>
+        <div>
+          <p class="inf-etiqueta">Ganancia esperada</p>
+          <p class="inf-valor inf-sube">{{ moneda() }} {{ cifra(t.ganancia) }}</p>
+        </div>
+        @if (t.sin_costo) {
+          <div>
+            <p class="inf-etiqueta">Sin costo conocido</p>
+            <p class="inf-valor">{{ entero(t.sin_costo) }} u</p>
+          </div>
+        }
+      </div>
+
+      @if (!grupos().length) {
+        <p class="inf-vacio">Sin stock con lotes en esa fecha.</p>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="inf-tabla">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                @if (todas()) { <th>Sucursal</th> }
+                <th class="num">Cantidad</th>
+                <th class="num">Costo por unidad</th>
+                <th class="num">Valor al costo</th>
+                <th class="num">Precio</th>
+                <th class="num">Valor a precio de venta</th>
+                <th class="num">Ganancia esperada</th>
+              </tr>
+            </thead>
+            @for (g of grupos(); track g.nombre) {
+              <tbody>
+                <tr class="fila-seccion"><td [attr.colspan]="todas() ? 8 : 7">{{ g.nombre }}</td></tr>
+                @for (p of g.productos; track p.clave) {
+                  <tr class="cursor-pointer" (click)="alternar(p.clave)">
+                    <td>
+                      <span class="fuerte inline-flex items-center gap-1">
+                        <lucide-icon [img]="abiertos().has(p.clave) ? icons.cerrar : icons.abrir" class="w-3.5 h-3.5 inf-tenue"></lucide-icon>
+                        {{ p.nombre_producto }}
+                      </span>
+                      @if (p.vencidos) { <span class="inf-estado mal ml-1">Vencidos: {{ p.vencidos }}</span> }
+                      @else if (p.por_vencer) { <span class="inf-estado aviso ml-1">Por vencer: {{ p.por_vencer }}</span> }
+                    </td>
+                    @if (todas()) { <td>{{ p.nombre_sucursal }}</td> }
+                    <td class="num">{{ entero(p.cantidad) }}</td>
+                    <td class="num">
+                      @if (p.costo_promedio == null) { <span class="inf-estado neutro">Sin costo</span> }
+                      @else { {{ moneda() }} {{ cifra(p.costo_promedio) }} }
+                    </td>
+                    <td class="num">{{ moneda() }} {{ cifra(p.valor_costo) }}</td>
+                    <td class="num">{{ moneda() }} {{ cifra(p.precio) }}</td>
+                    <td class="num">{{ moneda() }} {{ cifra(p.valor_venta) }}</td>
+                    <td class="num fuerte inf-sube">{{ moneda() }} {{ cifra(p.ganancia) }}</td>
+                  </tr>
+                  @if (abiertos().has(p.clave)) {
+                    @for (l of p.lotes; track l.id_lote) {
+                      <tr class="inf-secundario">
+                        <td class="pl-8!">
+                          Lote #{{ l.id_lote }} · ingresó {{ l.fecha_ingreso | date:'dd/MM HH:mm' }}
+                          @if (l.fecha_vencimiento) { · vence {{ l.fecha_vencimiento | date:'dd/MM HH:mm' }} }
+                        </td>
+                        @if (todas()) { <td></td> }
+                        <td class="num">{{ entero(l.cantidad) }}</td>
+                        <td class="num">@if (l.costo_unitario == null) { Sin costo } @else { {{ moneda() }} {{ cifra(l.costo_unitario) }} }</td>
+                        <td class="num">@if (l.costo_unitario != null) { {{ moneda() }} {{ cifra(l.cantidad * l.costo_unitario) }} }</td>
+                        <td colspan="3"></td>
+                      </tr>
+                    }
+                  }
+                }
+                <tr class="fuerte">
+                  <td>Total {{ g.nombre }}</td>
+                  @if (todas()) { <td></td> }
+                  <td class="num">{{ entero(g.totales.cantidad) }}</td>
+                  <td></td>
+                  <td class="num">{{ moneda() }} {{ cifra(g.totales.valor_costo) }}</td>
+                  <td></td>
+                  <td class="num">{{ moneda() }} {{ cifra(g.totales.valor_venta) }}</td>
+                  <td class="num inf-sube">{{ moneda() }} {{ cifra(g.totales.ganancia) }}</td>
+                </tr>
+              </tbody>
+            }
+          </table>
+        </div>
+      }
+    </section>
+  }
+}

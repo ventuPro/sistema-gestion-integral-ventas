@@ -10,6 +10,21 @@
                            (cambio)="cambiarSucursal($event)" />
   </header>
 
+  <!-- Inventario valorado y kardex: solo el administrador (muestran costos) -->
+  @if (esAdmin()) {
+    <nav class="inf-pestanas separador-inferior">
+      <button [class.activa]="vista() === 'ventas'" (click)="vista.set('ventas')">Ventas</button>
+      <button [class.activa]="vista() === 'valorado'" (click)="vista.set('valorado')">Inventario valorado</button>
+      <button [class.activa]="vista() === 'kardex'" (click)="vista.set('kardex')">Kardex</button>
+    </nav>
+  }
+
+  @if (esAdmin() && vista() === 'valorado') {
+    <app-inventario-valorado [idSucursal]="sucursalSeleccionada() ?? 0" [nombreSucursal]="nombreSucursal()" />
+  } @else if (esAdmin() && vista() === 'kardex') {
+    <app-kardex [idSucursal]="sucursalSeleccionada() ?? 0" [nombreSucursal]="nombreSucursal()" />
+  } @else {
+
   <!-- Controles: arriba períodos y descargas (no se mueven); abajo el rango -->
   <section class="inf-hoja p-3 space-y-2.5">
     <div class="flex flex-wrap items-center gap-3">
@@ -483,5 +498,6 @@
     }
 
   </div>
+  }
   }
 </div>
