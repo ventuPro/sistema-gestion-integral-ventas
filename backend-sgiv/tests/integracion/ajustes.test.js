@@ -203,7 +203,7 @@ test('sucursales: crear con horario, nombre único y solo administrador', async 
     assert.equal(r.status, 201);
 
     const lista = (await api('GET', '/sucursales', { token: tokenCajero })).body;
-    const norte = lista.find(s => s.nombre_sucursal === 'Sucursal Norte');
+    const norte = lista.find(s => s.nombre_sucursal === 'SUCURSAL NORTE');
     assert.equal(norte.estado_activo, true);
     assert.deepEqual(norte.horario.map(h => [h.dia_semana, h.abierto, h.hora_apertura]), [[1, true, '08:00'], [7, false, null]]);
 
@@ -231,7 +231,7 @@ test('validación de campos: nombre con solo signos, celular y teléfono de Boli
 
 test('sucursales: editar y desactivar con reglas de seguridad', async () => {
     const lista = (await api('GET', '/sucursales', { token: tokenAdmin })).body;
-    const norte = lista.find(s => s.nombre_sucursal === 'Sucursal Norte');
+    const norte = lista.find(s => s.nombre_sucursal === 'SUCURSAL NORTE');
 
     const ed = await api('PUT', `/sucursales/${norte.id_sucursal}`, {
         token: tokenAdmin,

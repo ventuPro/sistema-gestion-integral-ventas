@@ -113,6 +113,7 @@ const kardex = async ({ id_sucursal, id_producto, desde, hasta }) => {
     const [rMov, rDespues, rValorInicial] = await Promise.all([
         db.query(`
             SELECT h.id_historial, h.fecha_registro, h.tipo_movimiento, h.cantidad_movida, h.motivo_movimiento, h.detalle,
+                   h.id_detalle_cuenta, h.id_pedido,
                    u.nombre_completo AS usuario, v.valor::float8 AS valor, v.lotes, v.con_costo,
                    s.valor::float8 AS saldo_valor, s.unidades AS saldo_unidades, s.incompleto AS saldo_incompleto
             FROM historial_inventario h
@@ -163,23 +164,41 @@ const kardex = async ({ id_sucursal, id_producto, desde, hasta }) => {
     const inicial = { cantidad, valor: redondear(valor) };
 
     const totales = { entradas: 0, valor_entradas: 0, salidas: 0, valor_salidas: 0, sin_costo: false };
-    const movimientos = rMov.rows.map(m => {
+    const movimientos = [];
+    for (const m of rMov.rows) {
         const entra = m.tipo_movimiento === 'INGRESO';
         const conCosto = m.lotes > 0 && m.con_costo === m.lotes;
-        const total = conCosto ? redondear(m.valor) : null;
         cantidad += entra ? m.cantidad_movida : -m.cantidad_movida;
-        if (total == null) totales.sin_costo = true;
+        if (!conCosto) totales.sin_costo = true;
         // El saldo vale lo de sus lotes si los lotes explican todo el stock y todos tienen costo
         valor = m.saldo_unidades === cantidad && !m.saldo_incompleto ? (m.saldo_valor ?? 0) : null;
-        if (entra) { totales.entradas += m.cantidad_movida; if (total != null) totales.valor_entradas += m.valor; }
-        else       { totales.salidas  += m.cantidad_movida; if (total != null) totales.valor_salidas  += m.valor; }
-        return {
+        if (entra) { totales.entradas += m.cantidad_movida; if (conCosto) totales.valor_entradas += m.valor; }
+        else       { totales.salidas  += m.cantidad_movida; if (conCosto) totales.valor_salidas  += m.valor; }
+
+        // En una mesa cada toque reserva una unidad: lo seguido de la misma línea de la cuenta
+        // (o del mismo pedido QR) es un solo movimiento en el kardex
+        const referencia = m.id_detalle_cuenta || m.id_pedido ? `${m.id_detalle_cuenta ?? ''}-${m.id_pedido ?? ''}` : null;
+        const ultimo = movimientos.at(-1);
+        if (referencia && ultimo && ultimo.referencia === referencia && ultimo.tipo === m.tipo_movimiento
+            && ultimo.motivo === m.motivo_movimiento && ultimo.usuario === m.usuario) {
+            ultimo.cantidad += m.cantidad_movida;
+            ultimo.valor = ultimo.valor == null || !conCosto ? null : ultimo.valor + m.valor;
+            ultimo.fecha = m.fecha_registro;
+            ultimo.saldo = { cantidad, valor };
+            continue;
+        }
+        movimientos.push({
             id_historial: m.id_historial, fecha: m.fecha_registro, motivo: m.motivo_movimiento, detalle: m.detalle,
-            usuario: m.usuario, tipo: m.tipo_movimiento, cantidad: m.cantidad_movida,
-            costo_unitario: total == null ? null : redondear(m.valor / m.cantidad_movida, 4), total,
-            saldo: { cantidad, valor: redondear(valor) }
-        };
-    });
+            usuario: m.usuario, tipo: m.tipo_movimiento, cantidad: m.cantidad_movida, referencia,
+            valor: conCosto ? m.valor : null, saldo: { cantidad, valor }
+        });
+    }
+    for (const x of movimientos) {
+        x.total = redondear(x.valor);
+        x.costo_unitario = x.valor == null ? null : redondear(x.valor / x.cantidad, 4);
+        x.saldo = { cantidad: x.saldo.cantidad, valor: redondear(x.saldo.valor) };
+        delete x.valor; delete x.referencia;
+    }
     totales.valor_entradas = redondear(totales.valor_entradas);
     totales.valor_salidas  = redondear(totales.valor_salidas);
 

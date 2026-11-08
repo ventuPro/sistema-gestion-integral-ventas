@@ -569,7 +569,11 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
             JOIN receta r   ON r.id_producto = p.id_producto
             WHERE i.id_inventario = l.id_inventario AND p.tipo_producto <> 'COMPRADO';
         END IF;
-    END $$;`
+    END $$;`,
+
+    // Nombres de sucursales y de usuarios siempre en mayúsculas (2026-11-08)
+    `UPDATE sucursal SET nombre_sucursal = upper(nombre_sucursal) WHERE nombre_sucursal <> upper(nombre_sucursal);
+    UPDATE usuario  SET nombre_completo = upper(nombre_completo) WHERE nombre_completo <> upper(nombre_completo);`
 ];
 
 const aplicarMigraciones = async () => {

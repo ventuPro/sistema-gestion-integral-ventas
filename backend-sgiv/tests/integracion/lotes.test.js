@@ -599,3 +599,21 @@ describe('Receta elegida al crear o editar el producto', () => {
         assert.equal(await recetaDe(id), null);
     });
 });
+
+describe('Kardex: lo cargado de a uno en una mesa es un solo movimiento', () => {
+    test('4 toques a la misma línea de la cuenta = una salida de 4; otra venta queda aparte', async () => {
+        const id = await crearProducto('Kardex mesa de a uno');
+        await ingresar(id, 10);
+        const mesa = await nuevaMesa();
+        const cuenta = (await api('POST', '/cuentas/abrir', { token: tAdmin, body: { id_mesa: mesa.id_mesa } })).body.cuenta;
+        for (let i = 0; i < 4; i++)
+            assert.equal((await api('POST', `/cuentas/${cuenta.id_cuenta}/producto`, { token: tAdmin, body: { id_producto: id, cantidad: 1 } })).status, 201);
+        assert.equal((await cobrar([{ id_producto: id, cantidad: 2 }])).status, 201);
+
+        const hoy = (await bd.sql(`SELECT to_char((now() AT TIME ZONE 'America/La_Paz')::date, 'YYYY-MM-DD') AS d`))[0].d;
+        const k = (await api('GET', `/reportes/kardex/1?id_producto=${id}&fecha_inicio=${hoy}&fecha_fin=${hoy}`, { token: tAdmin })).body;
+        assert.deepEqual(k.movimientos.map(m => [m.motivo, m.cantidad, m.saldo.cantidad]),
+                         [['Producción', 10, 10], ['Cuenta de mesa', 4, 6], ['Venta en Caja', 2, 4]]);
+        assert.equal(k.totales.salidas, 6);
+    });
+});

@@ -73,3 +73,18 @@ tr.lotes:hover { background: transparent; }
 .recuadro .num { text-align: right; }
 
 @media (prefers-reduced-motion: reduce) { tr.producto .flecha { transition: none; } }
+
+/* Líneas visibles en toda la tabla principal */
+.cuadricula { border-collapse: collapse; }
+.cuadricula > thead > tr > th, .cuadricula > tbody > tr > td { border: 1px solid var(--i-linea); }
+.cuadricula > thead > tr > th {
+  background: var(--i-fondo); color: var(--i-tinta); font-weight: 600; font-size: calc(12px * var(--escala-texto));
+}
+.cuadricula > thead > tr > th.costo    { background: color-mix(in oklab, var(--c-costo) 13%, var(--i-papel)); color: var(--c-costo); }
+.cuadricula > thead > tr > th.venta    { background: color-mix(in oklab, var(--c-venta) 12%, var(--i-papel)); color: var(--c-venta); }
+.cuadricula > thead > tr > th.ganancia { background: color-mix(in oklab, var(--c-ganancia) 13%, var(--i-papel)); color: var(--c-ganancia); }
+/* La fila de categoría y la de lotes ocupan todo el ancho: sin líneas por dentro */
+.cuadricula > tbody > tr.categoria > td, .cuadricula > tbody > tr.lotes > td { border-left: none; border-right: none; }
+/* Recuadro de lotes: también con líneas */
+.recuadro table th, .recuadro table td { border: 1px solid var(--i-linea-suave); }
+.recuadro table th { background: var(--i-fondo); color: var(--i-tinta); }

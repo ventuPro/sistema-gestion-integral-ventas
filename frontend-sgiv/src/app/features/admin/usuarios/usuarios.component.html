@@ -130,7 +130,7 @@
         @if (mensajeError()) { <p class="error-formulario">{{ mensajeError() }}</p> }
         <div class="grupo">
           <label class="inf-etiqueta" for="usr-nombre">Nombre completo</label>
-          <input id="usr-nombre" type="text" data-regla="persona" required maxlength="100" class="campo" [(ngModel)]="formulario().nombre_completo" placeholder="Ej.: Juan Pérez">
+          <input id="usr-nombre" type="text" data-regla="persona" data-mayusculas required maxlength="100" class="campo" [(ngModel)]="formulario().nombre_completo" placeholder="Ej.: JUAN PÉREZ">
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="usr-correo">Correo</label>

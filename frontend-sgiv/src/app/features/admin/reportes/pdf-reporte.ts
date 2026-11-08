@@ -48,11 +48,12 @@ export const nuevoPdf = async (ajustes: AjustesService, titulo: string, lineas: 
     derecha.forEach(i => columnStyles[i] = { halign: 'right' });
     autoTable(doc, {
       startY: doc.lastAutoTable ? Math.max(y, doc.lastAutoTable.finalY + 2) : y,
-      head: [head], body, theme: 'plain',
-      styles: { fontSize: 8, cellPadding: 1.6, textColor: [51, 65, 85] },
-      headStyles: { textColor: [100, 116, 139], fontStyle: 'bold', lineWidth: { bottom: 0.3 }, lineColor: [203, 213, 225] },
+      head: [head], body, theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 1.6, textColor: [51, 65, 85], lineColor: [203, 213, 225], lineWidth: 0.2 },
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles, margin: { left: 14, right: 14 }, ...opciones
+      margin: { left: 14, right: 14 }, ...opciones,
+      columnStyles: { ...columnStyles, ...(opciones.columnStyles || {}) }
     });
   };
   const guardar = (archivo: string) => {

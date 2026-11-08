@@ -1,11 +1,13 @@
 const sucursalModel = require('../models/sucursalModel');
 const { ErrorValidacion, revisar } = require('../utils/validacion');
+const { mayusculas } = require('../utils/texto');
 
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // ─── Validación ───
 const validarDatos = (body) => ({
-    nombre:    revisar(body.nombre_sucursal, 'nombre', { etiqueta: 'El nombre', obligatorio: true, max: 100 }),
+    // En mayúsculas por regla: el mismo nombre no puede variar entre mayúsculas y minúsculas
+    nombre:    mayusculas(revisar(body.nombre_sucursal, 'nombre', { etiqueta: 'El nombre', obligatorio: true, max: 100 })),
     direccion: revisar(body.direccion_fisica, 'direccion', { etiqueta: 'La dirección', max: 250 }),
     telefono:  revisar(body.telefono_contacto, 'telefono', { etiqueta: 'El teléfono' }),
     horario:   validarHorario(body.horario)

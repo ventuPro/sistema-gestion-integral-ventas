@@ -61,59 +61,59 @@
         </div>
 
         <div class="overflow-x-auto">
-          <table class="inf-tabla">
+          <table class="cuadricula">
             <thead>
               <tr>
-                <th rowspan="2">Fecha</th>
-                <th rowspan="2">Detalle</th>
-                <th class="text-center!" colspan="3">Entrada</th>
-                <th class="text-center!" colspan="3">Salida</th>
-                <th class="text-center!" colspan="3">Saldo</th>
-              </tr>
-              <tr>
-                <th class="num">Cant.</th><th class="num">C. unit.</th><th class="num">Total</th>
-                <th class="num">Cant.</th><th class="num">C. unit.</th><th class="num">Total</th>
-                <th class="num">Cant.</th><th class="num">C. unit.</th><th class="num">Total</th>
+                <th>Fecha</th>
+                <th>Movimiento</th>
+                <th class="num entra">Entra</th>
+                <th class="num sale">Sale</th>
+                <th class="num">Costo por unidad</th>
+                <th class="num">Valor del movimiento</th>
+                <th class="num saldo">Saldo (unidades)</th>
+                <th class="num saldo">Valor del saldo</th>
               </tr>
             </thead>
             <tbody>
-              <tr class="fila-seccion">
-                <td colspan="8">Saldo inicial</td>
-                <td class="num">{{ entero(d.inicial.cantidad) }}</td>
-                <td class="num">@if (d.inicial.valor != null && d.inicial.cantidad) { {{ cifra(d.inicial.valor / d.inicial.cantidad) }} }</td>
-                <td class="num">@if (d.inicial.valor != null) { {{ cifra(d.inicial.valor) }} } @else { — }</td>
+              <tr class="inicial">
+                <td></td>
+                <td>Saldo inicial</td>
+                <td></td><td></td><td></td><td></td>
+                <td class="num saldo">{{ entero(d.inicial.cantidad) }}</td>
+                <td class="num saldo">@if (d.inicial.valor != null) { {{ moneda() }} {{ cifra(d.inicial.valor) }} } @else { — }</td>
               </tr>
               @for (m of d.movimientos; track m.id_historial) {
+                @let entra = m.tipo === 'INGRESO';
                 <tr>
-                  <td class="inf-tenue whitespace-nowrap">{{ fechaHora(m.fecha) }}</td>
-                  <td class="max-w-[280px]">
+                  <td class="whitespace-nowrap">{{ fechaHora(m.fecha) }}</td>
+                  <td class="movimiento">
                     <span class="fuerte">{{ m.motivo }}</span>
-                    @if (m.detalle) { <span class="inf-secundario"> · {{ m.detalle }}</span> }
+                    @if (subtitulo(m)) { <span class="detalle">{{ subtitulo(m) }}</span> }
                   </td>
-                  @if (m.tipo === 'INGRESO') {
-                    <td class="num inf-sube">{{ entero(m.cantidad) }}</td>
-                    <td class="num">@if (m.costo_unitario != null) { {{ cifra(m.costo_unitario) }} } @else { — }</td>
-                    <td class="num">@if (m.total != null) { {{ cifra(m.total) }} } @else { — }</td>
-                    <td></td><td></td><td></td>
-                  } @else {
-                    <td></td><td></td><td></td>
-                    <td class="num inf-baja">{{ entero(m.cantidad) }}</td>
-                    <td class="num">@if (m.costo_unitario != null) { {{ cifra(m.costo_unitario) }} } @else { — }</td>
-                    <td class="num">@if (m.total != null) { {{ cifra(m.total) }} } @else { — }</td>
-                  }
-                  <td class="num fuerte">{{ entero(m.saldo.cantidad) }}</td>
-                  <td class="num">@if (m.saldo.valor != null && m.saldo.cantidad) { {{ cifra(m.saldo.valor / m.saldo.cantidad) }} }</td>
-                  <td class="num fuerte">@if (m.saldo.valor != null) { {{ cifra(m.saldo.valor) }} } @else { — }</td>
+                  <td class="num entra">@if (entra) { +{{ entero(m.cantidad) }} }</td>
+                  <td class="num sale">@if (!entra) { −{{ entero(m.cantidad) }} }</td>
+                  <td class="num">@if (m.costo_unitario != null) { {{ moneda() }} {{ cifra(m.costo_unitario) }} } @else { — }</td>
+                  <td class="num" [class.entra]="entra && m.total != null" [class.sale]="!entra && m.total != null">
+                    @if (m.total != null) { {{ entra ? '+' : '−' }}{{ moneda() }} {{ cifra(m.total) }} } @else { — }
+                  </td>
+                  <td class="num saldo">{{ entero(m.saldo.cantidad) }}</td>
+                  <td class="num saldo">@if (m.saldo.valor != null) { {{ moneda() }} {{ cifra(m.saldo.valor) }} } @else { — }</td>
                 </tr>
               } @empty {
-                <tr><td colspan="11" class="inf-vacio">Sin movimientos en el período.</td></tr>
+                <tr><td colspan="8" class="inf-vacio">Sin movimientos en el período.</td></tr>
               }
-              <tr class="fuerte">
-                <td colspan="2">Totales</td>
-                <td class="num">{{ entero(d.totales.entradas) }}</td><td></td><td class="num">{{ cifra(d.totales.valor_entradas) }}</td>
-                <td class="num">{{ entero(d.totales.salidas) }}</td><td></td><td class="num">{{ cifra(d.totales.valor_salidas) }}</td>
-                <td class="num">{{ entero(d.final.cantidad) }}</td><td></td>
-                <td class="num">@if (d.final.valor != null) { {{ cifra(d.final.valor) }} } @else { — }</td>
+              <tr class="totales">
+                <td></td>
+                <td>Totales del período</td>
+                <td class="num entra">+{{ entero(d.totales.entradas) }}</td>
+                <td class="num sale">−{{ entero(d.totales.salidas) }}</td>
+                <td></td>
+                <td class="num">
+                  <span class="block entra">+{{ moneda() }} {{ cifra(d.totales.valor_entradas) }}</span>
+                  <span class="block sale">−{{ moneda() }} {{ cifra(d.totales.valor_salidas) }}</span>
+                </td>
+                <td class="num saldo">{{ entero(d.final.cantidad) }}</td>
+                <td class="num saldo">@if (d.final.valor != null) { {{ moneda() }} {{ cifra(d.final.valor) }} } @else { — }</td>
               </tr>
             </tbody>
           </table>

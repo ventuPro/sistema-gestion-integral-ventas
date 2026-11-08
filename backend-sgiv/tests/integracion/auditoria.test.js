@@ -203,7 +203,7 @@ describe('Auditoría de cambios con triggers', () => {
         assert.equal(update.operacion, 'UPDATE');
         assert.deepEqual(update.campos_modificados, ['nombre_completo']);
         assert.equal(update.datos_anteriores.nombre_completo, 'editar@prueba.com');
-        assert.equal(update.datos_nuevos.nombre_completo, 'Nombre Editado');
+        assert.equal(update.datos_nuevos.nombre_completo, 'NOMBRE EDITADO', 'los nombres de usuario se guardan en mayúsculas');
         assert.match(update.usuario, /<admin@rickys\.com>$/);
         assert.equal(update.origen, `PUT /api/usuarios/${id}`);
         assert.equal(update.ip, '127.0.0.1');

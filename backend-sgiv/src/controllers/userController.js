@@ -1,5 +1,6 @@
 const bcrypt      = require('bcryptjs');
 const { ErrorValidacion, revisar } = require('../utils/validacion');
+const { mayusculas } = require('../utils/texto');
 const jwt         = require('jsonwebtoken');
 const userModel   = require('../models/userModel');
 const ajusteModel = require('../models/ajusteModel');
@@ -25,7 +26,7 @@ const normalizarCorreo = (correo) => String(correo || '').trim().toLowerCase();
 
 /** Nombre y correo del formulario de usuario (lanza ErrorValidacion) */
 const datosUsuario = (body) => ({
-    nombre_completo:    revisar(body?.nombre_completo, 'persona', { etiqueta: 'El nombre', obligatorio: true, max: 100 }),
+    nombre_completo:    mayusculas(revisar(body?.nombre_completo, 'persona', { etiqueta: 'El nombre', obligatorio: true, max: 100 })),   // siempre en mayúsculas
     correo_electronico: revisar(body?.correo_electronico, 'correo', { etiqueta: 'El correo', obligatorio: true, max: 100 })
 });
 const MIN_CONTRASENA = 6;

@@ -16,7 +16,7 @@ const inicioDeMes = () => `${hoy().slice(0, 8)}01`;
   standalone: true,
   imports: [LucideAngularModule],
   templateUrl: './kardex.component.html',
-  styleUrls: ['../../../shared/informe/informe.css']
+  styleUrls: ['../../../shared/informe/informe.css', './kardex.component.css']
 })
 export class KardexComponent {
   private reportes  = inject(ReporteService);
@@ -87,6 +87,8 @@ export class KardexComponent {
 
   /** Detalle del movimiento: motivo · observación */
   detalle(m: any): string { return [m.motivo, m.detalle].filter(Boolean).join(' · '); }
+  /** Debajo del motivo: observación · usuario */
+  subtitulo(m: any): string { return [m.detalle, m.usuario].filter(Boolean).join(' · '); }
 
   // ─── Descargas ───
   private get titulo(): string {
@@ -103,19 +105,21 @@ export class KardexComponent {
       `Producto: ${d.producto.nombre_producto} (${d.producto.nombre_categoria})`, `Sucursal: ${this.nombreSucursal()}`,
       `Período: ${fechaDia(this.desde())} al ${fechaDia(this.hasta())} · Valores en ${mon}`
     ], true);
-    const vacio = ['', '', ''];
+    const firmado = (n: number | null, entra: boolean) => n == null ? '—' : `${entra ? '+' : '-'}${m(n)}`;
     const filas = [
-      ['', 'Saldo inicial', ...vacio, ...vacio, entero(d.inicial.cantidad), '', m(d.inicial.valor)],
+      ['', 'Saldo inicial', '', '', '', '', entero(d.inicial.cantidad), m(d.inicial.valor)],
       ...d.movimientos.map((x: any) => {
-        const mov = [entero(x.cantidad), m(x.costo_unitario), m(x.total)];
-        return [fechaHora(x.fecha), this.detalle(x), ...(x.tipo === 'INGRESO' ? mov : vacio), ...(x.tipo === 'INGRESO' ? vacio : mov),
-                entero(x.saldo.cantidad), x.saldo.valor == null || !x.saldo.cantidad ? '' : m(x.saldo.valor / x.saldo.cantidad), m(x.saldo.valor)];
+        const entra = x.tipo === 'INGRESO';
+        return [fechaHora(x.fecha), this.detalle(x), entra ? `+${entero(x.cantidad)}` : '', entra ? '' : `-${entero(x.cantidad)}`,
+                m(x.costo_unitario), firmado(x.total, entra), entero(x.saldo.cantidad), m(x.saldo.valor)];
       }),
-      ['', 'Totales', entero(d.totales.entradas), '', m(d.totales.valor_entradas), entero(d.totales.salidas), '', m(d.totales.valor_salidas),
-       entero(d.final.cantidad), '', m(d.final.valor)]
+      ['', 'Totales del período', `+${entero(d.totales.entradas)}`, `-${entero(d.totales.salidas)}`, '',
+       `+${m(d.totales.valor_entradas)} / -${m(d.totales.valor_salidas)}`, entero(d.final.cantidad), m(d.final.valor)]
     ];
-    pdf.tabla(['Fecha', 'Detalle', 'Entra', 'C. unit.', 'Total', 'Sale', 'C. unit.', 'Total', 'Saldo', 'C. unit.', 'Total'],
-      filas, [2, 3, 4, 5, 6, 7, 8, 9, 10], { columnStyles: { 1: { cellWidth: 70 } } });
+    pdf.tabla(['Fecha', 'Movimiento', 'Entra', 'Sale', 'Costo por unidad', 'Valor del movimiento', 'Saldo (unidades)', 'Valor del saldo'],
+      filas, [2, 3, 4, 5, 6, 7], {
+        columnStyles: { 1: { cellWidth: 80 } }
+      });
     pdf.guardar(`Kardex_${nombreArchivo(this.ajustes)}_${d.producto.id_producto}_${this.desde()}_${this.hasta()}.pdf`);
   }
 
@@ -125,20 +129,18 @@ export class KardexComponent {
     const XLSX = await import('xlsx');
     const mon = this.moneda();
     const filas: any[][] = [[`Kardex (PEPS) · ${this.titulo}`], [],
-      ['Fecha', 'Detalle', 'Usuario', 'Entrada', `C. unit. entrada (${mon})`, `Total entrada (${mon})`, 'Salida',
-       `C. unit. salida (${mon})`, `Total salida (${mon})`, 'Saldo', `Valor del saldo (${mon})`],
-      ['', 'Saldo inicial', '', '', '', '', '', '', '', d.inicial.cantidad, d.inicial.valor ?? '']];
+      ['Fecha', 'Movimiento', 'Usuario', 'Entra (u)', 'Sale (u)', `Costo por unidad (${mon})`, `Valor del movimiento (${mon})`,
+       'Saldo (u)', `Valor del saldo (${mon})`],
+      ['', 'Saldo inicial', '', '', '', '', '', d.inicial.cantidad, d.inicial.valor ?? '']];
     for (const x of d.movimientos) {
       const entra = x.tipo === 'INGRESO';
-      filas.push([fechaHora(x.fecha), this.detalle(x), x.usuario || '',
-                  entra ? x.cantidad : '', entra ? x.costo_unitario ?? '' : '', entra ? x.total ?? '' : '',
-                  entra ? '' : x.cantidad, entra ? '' : x.costo_unitario ?? '', entra ? '' : x.total ?? '',
-                  x.saldo.cantidad, x.saldo.valor ?? '']);
+      filas.push([fechaHora(x.fecha), this.detalle(x), x.usuario || '', entra ? x.cantidad : '', entra ? '' : x.cantidad,
+                  x.costo_unitario ?? '', x.total == null ? '' : (entra ? x.total : -x.total), x.saldo.cantidad, x.saldo.valor ?? '']);
     }
-    filas.push(['', 'Totales', '', d.totales.entradas, '', d.totales.valor_entradas, d.totales.salidas, '', d.totales.valor_salidas,
-                d.final.cantidad, d.final.valor ?? '']);
+    filas.push(['', 'Totales del período', '', d.totales.entradas, d.totales.salidas, '',
+                Math.round((d.totales.valor_entradas - d.totales.valor_salidas) * 100) / 100, d.final.cantidad, d.final.valor ?? '']);
     const ws = XLSX.utils.aoa_to_sheet(filas);
-    ws['!cols'] = [18, 40, 20, 9, 14, 14, 9, 14, 14, 9, 16].map(wch => ({ wch }));
+    ws['!cols'] = [18, 40, 20, 10, 10, 18, 22, 12, 18].map(wch => ({ wch }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Kardex');
     XLSX.writeFile(wb, `Kardex_${nombreArchivo(this.ajustes)}_${d.producto.id_producto}_${this.desde()}_${this.hasta()}.xlsx`);

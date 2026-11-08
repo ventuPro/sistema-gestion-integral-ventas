@@ -1,0 +1,31 @@
+/* ─── Kardex: tabla con líneas visibles y una columna por dato (sin repetir encabezados) ─── */
+:host {
+  --c-entra: var(--i-sube);
+  --c-sale: var(--i-baja);
+  --c-saldo: var(--i-acento);
+}
+
+.cuadricula { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--escala-texto)); }
+.cuadricula th, .cuadricula td { border: 1px solid var(--i-linea); padding: 8px 10px; }
+.cuadricula th {
+  background: var(--i-fondo); color: var(--i-tinta); font-weight: 600; text-align: left;
+  font-size: calc(12px * var(--escala-texto)); white-space: nowrap;
+}
+.cuadricula .num { text-align: right; white-space: nowrap; }
+.cuadricula tbody tr:hover td { background: var(--i-fondo); }
+
+/* Cada concepto con su color de fondo suave en el encabezado y en sus cifras */
+.cuadricula th.entra { background: color-mix(in oklab, var(--c-entra) 14%, var(--i-papel)); color: var(--c-entra); }
+.cuadricula th.sale  { background: color-mix(in oklab, var(--c-sale) 12%, var(--i-papel)); color: var(--c-sale); }
+.cuadricula th.saldo { background: color-mix(in oklab, var(--c-saldo) 12%, var(--i-papel)); color: var(--c-saldo); }
+.cuadricula td.entra { color: var(--c-entra); font-weight: 600; }
+.cuadricula td.sale  { color: var(--c-sale); font-weight: 600; }
+.cuadricula td.saldo { background: color-mix(in oklab, var(--c-saldo) 5%, transparent); color: var(--i-tinta); font-weight: 600; }
+
+/* Saldo inicial y totales */
+.cuadricula tr.inicial td, .cuadricula tr.totales td {
+  background: color-mix(in oklab, var(--i-acento) 9%, var(--i-papel)); font-weight: 700; color: var(--i-tinta);
+}
+.cuadricula tr.totales td { border-top: 2px solid var(--i-acento); }
+
+.movimiento .detalle { display: block; color: var(--i-tenue); font-size: calc(12px * var(--escala-texto)); }
