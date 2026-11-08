@@ -45,12 +45,12 @@
           </div>
           <div>
             <p class="inf-etiqueta">Entradas</p>
-            <p class="inf-valor inf-sube">+{{ entero(d.totales.entradas) }}</p>
+            <p class="inf-valor inf-sube">{{ entero(d.totales.entradas) }}</p>
             <p class="inf-sub">{{ moneda() }} {{ cifra(d.totales.valor_entradas) }}</p>
           </div>
           <div>
             <p class="inf-etiqueta">Salidas</p>
-            <p class="inf-valor inf-baja">−{{ entero(d.totales.salidas) }}</p>
+            <p class="inf-valor inf-baja">{{ entero(d.totales.salidas) }}</p>
             <p class="inf-sub">{{ moneda() }} {{ cifra(d.totales.valor_salidas) }}</p>
           </div>
           <div>
@@ -90,11 +90,11 @@
                     <span class="fuerte">{{ m.motivo }}</span>
                     @if (subtitulo(m)) { <span class="detalle">{{ subtitulo(m) }}</span> }
                   </td>
-                  <td class="num entra">@if (entra) { +{{ entero(m.cantidad) }} }</td>
-                  <td class="num sale">@if (!entra) { −{{ entero(m.cantidad) }} }</td>
+                  <td class="num entra">@if (entra) { {{ entero(m.cantidad) }} }</td>
+                  <td class="num sale">@if (!entra) { {{ entero(m.cantidad) }} }</td>
                   <td class="num">@if (m.costo_unitario != null) { {{ moneda() }} {{ cifra(m.costo_unitario) }} } @else { — }</td>
                   <td class="num" [class.entra]="entra && m.total != null" [class.sale]="!entra && m.total != null">
-                    @if (m.total != null) { {{ entra ? '+' : '−' }}{{ moneda() }} {{ cifra(m.total) }} } @else { — }
+                    @if (m.total != null) { {{ moneda() }} {{ cifra(m.total) }} } @else { — }
                   </td>
                   <td class="num saldo">{{ entero(m.saldo.cantidad) }}</td>
                   <td class="num saldo">@if (m.saldo.valor != null) { {{ moneda() }} {{ cifra(m.saldo.valor) }} } @else { — }</td>
@@ -105,12 +105,12 @@
               <tr class="totales">
                 <td></td>
                 <td>Totales del período</td>
-                <td class="num entra">+{{ entero(d.totales.entradas) }}</td>
-                <td class="num sale">−{{ entero(d.totales.salidas) }}</td>
+                <td class="num entra">{{ entero(d.totales.entradas) }}</td>
+                <td class="num sale">{{ entero(d.totales.salidas) }}</td>
                 <td></td>
                 <td class="num">
-                  <span class="block entra">+{{ moneda() }} {{ cifra(d.totales.valor_entradas) }}</span>
-                  <span class="block sale">−{{ moneda() }} {{ cifra(d.totales.valor_salidas) }}</span>
+                  <span class="block entra">{{ moneda() }} {{ cifra(d.totales.valor_entradas) }}</span>
+                  <span class="block sale">{{ moneda() }} {{ cifra(d.totales.valor_salidas) }}</span>
                 </td>
                 <td class="num saldo">{{ entero(d.final.cantidad) }}</td>
                 <td class="num saldo">@if (d.final.valor != null) { {{ moneda() }} {{ cifra(d.final.valor) }} } @else { — }</td>

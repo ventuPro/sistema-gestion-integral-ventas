@@ -29,3 +29,12 @@
 .cuadricula tr.totales td { border-top: 2px solid var(--i-acento); }
 
 .movimiento .detalle { display: block; color: var(--i-tenue); font-size: calc(12px * var(--escala-texto)); }
+
+/* Saldo inicial y totales: también con el color de cada concepto */
+.cuadricula .entra { color: var(--c-entra); font-weight: 600; }
+.cuadricula .sale  { color: var(--c-sale); font-weight: 600; }
+.cuadricula tr.inicial td.entra, .cuadricula tr.totales td.entra, .cuadricula tr.totales .entra { color: var(--c-entra); }
+.cuadricula tr.inicial td.sale,  .cuadricula tr.totales td.sale,  .cuadricula tr.totales .sale  { color: var(--c-sale); }
+.cuadricula tr.inicial td.saldo, .cuadricula tr.totales td.saldo {
+  color: var(--c-saldo); background: color-mix(in oklab, var(--c-saldo) 12%, var(--i-papel));
+}
