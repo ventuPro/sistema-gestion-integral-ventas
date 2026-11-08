@@ -64,8 +64,17 @@ export class AjustesTelegramComponent implements OnInit {
     return a.telefono.trim() !== b.telefono || a.avisos !== b.avisos;
   }
 
-  guardar(u: UsuarioTelegram) {
-    const b = this.borrador(u);
+  async guardar(u: UsuarioTelegram) {
+    const b = this.borrador(u), antes = this.original(u);
+    const advertencias: string[] = [];
+    if (u.vinculado && b.telefono.trim() !== antes.telefono)
+      advertencias.push('Cambiar el teléfono desvincula su Telegram: deberá volver a compartir su número con el bot.');
+    if (b.avisos === 'ninguna' && antes.avisos !== 'ninguna')
+      advertencias.push('Dejará de recibir avisos; solo le llegará el código de ingreso.');
+    if (!(await this.dialogo.confirmar({
+      titulo: `¿Guardar el Telegram de ${u.nombre_completo}?`, textoConfirmar: 'Guardar', advertencias,
+      peligro: advertencias.length > 0, mensaje: advertencias.length ? '' : 'Se actualizan su teléfono y los avisos que recibe.'
+    }))) return;
     this.ocupado.set(u.id_usuario);
     this.ajustes.guardarTelegramUsuario(u.id_usuario, {
       telefono: b.telefono.trim() || null,

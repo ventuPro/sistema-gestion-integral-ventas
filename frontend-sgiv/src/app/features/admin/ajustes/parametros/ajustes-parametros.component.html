@@ -33,7 +33,7 @@
         <div class="grupo">
           <label class="inf-etiqueta" for="moneda">Símbolo de moneda</label>
           <div class="flex flex-wrap items-center gap-2">
-            <input id="moneda" name="moneda" class="campo w-20! text-center font-semibold" [(ngModel)]="p().moneda_simbolo" maxlength="5">
+            <input id="moneda" name="moneda" class="campo w-20! text-center font-semibold" [(ngModel)]="p().moneda_simbolo" maxlength="5" data-regla="moneda" required>
             @for (m of monedas; track m) {
               <button type="button" class="eleccion py-1! px-2.5! rounded-full! text-xs!" [class.activa]="p().moneda_simbolo === m" (click)="p().moneda_simbolo = m">{{ m }}</button>
             }
@@ -42,7 +42,7 @@
 
         <div class="grupo">
           <label class="inf-etiqueta" for="pie">Mensaje al pie del ticket</label>
-          <input id="pie" name="pie" class="campo" [(ngModel)]="p().ticket_mensaje_pie" maxlength="150">
+          <input id="pie" name="pie" class="campo" [(ngModel)]="p().ticket_mensaje_pie" maxlength="150" data-regla="texto" required>
         </div>
 
         <div class="grupo">
@@ -111,7 +111,7 @@
 
         <div class="grupo md:col-span-2">
           <label class="inf-etiqueta" for="bienvenida">Mensaje de bienvenida <span class="inf-sutil">(opcional)</span></label>
-          <input id="bienvenida" name="bienvenida" class="campo" [(ngModel)]="p().menu_mensaje_bienvenida" maxlength="200"
+          <input id="bienvenida" name="bienvenida" class="campo" [(ngModel)]="p().menu_mensaje_bienvenida" maxlength="200" data-regla="texto"
                  placeholder="¡Bienvenido!">
         </div>
 

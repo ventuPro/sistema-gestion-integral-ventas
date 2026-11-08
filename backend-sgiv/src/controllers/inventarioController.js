@@ -1,5 +1,6 @@
 const inventarioModel = require('../models/inventarioModel');
 const { mayusculas } = require('../utils/texto');
+const { ErrorValidacion, revisar } = require('../utils/validacion');
 const transferenciaModel = require('../models/transferenciaModel');
 const { emitirStock, emitirCajeros } = require('../utils/tiempoReal');
 
@@ -21,7 +22,7 @@ const registrarMovimiento = async (req, res) => {
     try {
         const { id_producto, tipo, motivo } = req.body || {};
         const cantidad = Number(req.body?.cantidad);
-        const detalle  = mayusculas(String(req.body?.detalle ?? '').trim() || null);
+        const detalle  = mayusculas(revisar(req.body?.detalle, 'texto', { etiqueta: 'La observación', max: 200 }));
 
         const id_sucursal = sucursalPermitida(req, req.body?.id_sucursal);
         if (!id_sucursal) return res.status(403).json({ error: 'Solo puedes mover el inventario de tu sucursal' });
@@ -40,6 +41,7 @@ const registrarMovimiento = async (req, res) => {
         emitirStock([{ id_producto: Number(id_producto), id_sucursal, nuevo_stock: r.cantidad_actual }]);
         res.status(201).json({ mensaje: 'Movimiento registrado', stock_actual: r.cantidad_actual });
     } catch (error) {
+        if (error instanceof ErrorValidacion) return res.status(400).json({ error: error.message });
         if (error.codigo === 'SIN_STOCK') return res.status(409).json({ error: error.message, codigo: error.codigo });
         if (error.codigo === 'NO_EXISTE') return res.status(404).json({ error: error.message });
         console.error('registrarMovimiento:', error);

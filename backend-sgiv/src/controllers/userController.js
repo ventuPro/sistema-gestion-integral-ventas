@@ -1,5 +1,5 @@
 const bcrypt      = require('bcryptjs');
-const { soloLetras } = require('../utils/texto');
+const { ErrorValidacion, revisar } = require('../utils/validacion');
 const jwt         = require('jsonwebtoken');
 const userModel   = require('../models/userModel');
 const ajusteModel = require('../models/ajusteModel');
@@ -21,8 +21,15 @@ const tocaAdmin = async (id_usuario_objetivo, id_rol_nuevo) => {
     return Number(r.rows[0]?.id_rol) === 1;
 };
 
-const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const normalizarCorreo = (correo) => String(correo || '').trim().toLowerCase();
+
+/** Nombre y correo del formulario de usuario (lanza ErrorValidacion) */
+const datosUsuario = (body) => ({
+    nombre_completo:    revisar(body?.nombre_completo, 'persona', { etiqueta: 'El nombre', obligatorio: true, max: 100 }),
+    correo_electronico: revisar(body?.correo_electronico, 'correo', { etiqueta: 'El correo', obligatorio: true, max: 100 })
+});
+const MIN_CONTRASENA = 6;
+const contrasenaValida = (c) => typeof c === 'string' && c.length >= MIN_CONTRASENA && c.length <= 72;
 
 /** Mensaje si el correo ya lo usa otro usuario (también los desactivados: la BD no admite repetidos) */
 const motivoCorreoOcupado = async (correo, excluir = null) => {
@@ -33,12 +40,11 @@ const motivoCorreoOcupado = async (correo, excluir = null) => {
 
 const registrarUsuario = async (req, res) => {
     try {
-        const { id_sucursal, id_rol, nombre_completo, contrasena } = req.body || {};
-        const correo_electronico = normalizarCorreo(req.body?.correo_electronico);
-        if (!String(nombre_completo || '').trim() || !correo_electronico || !contrasena || !id_rol)
-            return res.status(400).json({ error: 'Faltan datos obligatorios' });
-        if (!soloLetras(String(nombre_completo).trim())) return res.status(400).json({ error: 'El nombre solo admite letras' });
-        if (!CORREO.test(correo_electronico)) return res.status(400).json({ error: 'El correo no es válido' });
+        const { id_sucursal, id_rol, contrasena } = req.body || {};
+        const { nombre_completo, correo_electronico } = datosUsuario(req.body);
+        if (!id_rol) return res.status(400).json({ error: 'Elige el rol' });
+        if (!contrasenaValida(contrasena))
+            return res.status(400).json({ error: `La contraseña debe tener entre ${MIN_CONTRASENA} y 72 caracteres` });
         if (!esAdmin(req) && await tocaAdmin(null, id_rol))
             return res.status(403).json({ error: 'Solo un administrador puede crear administradores' });
         const ocupado = await motivoCorreoOcupado(correo_electronico);
@@ -46,9 +52,10 @@ const registrarUsuario = async (req, res) => {
 
         const salt           = await bcrypt.genSalt(10);
         const contrasena_hash = await bcrypt.hash(contrasena, salt);
-        const nuevoUsuario   = await userModel.crearUsuario({ id_sucursal, id_rol, nombre_completo: String(nombre_completo).trim(), correo_electronico, contrasena_hash });
+        const nuevoUsuario   = await userModel.crearUsuario({ id_sucursal, id_rol, nombre_completo, correo_electronico, contrasena_hash });
         res.status(201).json({ mensaje: 'Usuario creado', usuario: nuevoUsuario });
     } catch (e) {
+        if (e instanceof ErrorValidacion) return res.status(400).json({ error: e.message });
         console.error('Error en registrarUsuario:', e);
         res.status(500).json({ error: 'Error al registrar usuario' });
     }
@@ -276,13 +283,9 @@ const listarUsuarios = async (req, res) => {
 const actualizarUsuario = async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const nombre_completo = String(req.body?.nombre_completo || '').trim();
-        const correo_electronico = normalizarCorreo(req.body?.correo_electronico);
+        const { nombre_completo, correo_electronico } = datosUsuario(req.body);
         const { id_rol, id_sucursal } = req.body || {};
-        if (!nombre_completo || !correo_electronico || !id_rol || !id_sucursal)
-            return res.status(400).json({ error: 'Completa todos los campos' });
-        if (!soloLetras(nombre_completo)) return res.status(400).json({ error: 'El nombre solo admite letras' });
-        if (!CORREO.test(correo_electronico)) return res.status(400).json({ error: 'El correo no es válido' });
+        if (!id_rol || !id_sucursal) return res.status(400).json({ error: 'Completa todos los campos' });
         if (!esAdmin(req) && await tocaAdmin(id, id_rol))
             return res.status(403).json({ error: 'Solo un administrador puede modificar administradores' });
         if (id === Number(req.usuario.id_usuario) && Number(id_rol) !== Number(req.usuario.id_rol))
@@ -293,6 +296,7 @@ const actualizarUsuario = async (req, res) => {
         if (!usuario) return res.status(404).json({ error: 'El usuario no existe' });
         res.json({ mensaje: 'Usuario actualizado', usuario });
     } catch (e) {
+        if (e instanceof ErrorValidacion) return res.status(400).json({ error: e.message });
         if (e.code === '23505') return res.status(409).json({ error: 'Ese correo ya lo usa otro usuario.' });
         if (e.code === '23503') return res.status(400).json({ error: 'El rol o la sucursal no existen.' });
         console.error('actualizarUsuario:', e);
@@ -325,8 +329,8 @@ const reactivarUsuario = async (req, res) => {
 const cambiarContrasena = async (req, res) => {
     try {
         const { nueva_contrasena } = req.body || {};
-        if (!nueva_contrasena || String(nueva_contrasena).length < 6)
-            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        if (!contrasenaValida(nueva_contrasena))
+            return res.status(400).json({ error: `La contraseña debe tener entre ${MIN_CONTRASENA} y 72 caracteres` });
         if (!esAdmin(req) && await tocaAdmin(req.params.id))
             return res.status(403).json({ error: 'Solo un administrador puede cambiar esa contraseña' });
         const salt           = await bcrypt.genSalt(10);

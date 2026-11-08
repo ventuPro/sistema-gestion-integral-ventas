@@ -87,23 +87,23 @@
         @if (errorFormulario()) { <p class="error-formulario sm:col-span-2" role="alert">{{ errorFormulario() }}</p> }
         <div class="grupo sm:col-span-2">
           <label class="inf-etiqueta" for="prop-nombre">Nombre completo</label>
-          <input id="prop-nombre" data-solo-letras name="nombre" class="campo" [(ngModel)]="formulario().nombre_completo" maxlength="100" required>
+          <input id="prop-nombre" data-regla="persona" name="nombre" class="campo" [(ngModel)]="formulario().nombre_completo" maxlength="100" required>
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="prop-ci">CI</label>
-          <input id="prop-ci" name="ci" class="campo uppercase" [(ngModel)]="formulario().ci" maxlength="20" placeholder="1234567 LP">
+          <input id="prop-ci" name="ci" class="campo uppercase" [(ngModel)]="formulario().ci" maxlength="17" data-regla="ci" placeholder="1234567 LP">
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="prop-cargo">Cargo</label>
-          <input id="prop-cargo" data-solo-letras name="cargo" class="campo" [(ngModel)]="formulario().cargo" maxlength="60" placeholder="Gerente propietario">
+          <input id="prop-cargo" data-regla="letras" name="cargo" class="campo" [(ngModel)]="formulario().cargo" maxlength="60" placeholder="Gerente propietario">
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="prop-telefono">Teléfono</label>
-          <input id="prop-telefono" name="telefono" type="tel" class="campo" [(ngModel)]="formulario().telefono" maxlength="20" placeholder="70000000">
+          <input id="prop-telefono" name="telefono" type="tel" class="campo" [(ngModel)]="formulario().telefono" maxlength="8" data-regla="telefono" placeholder="70000000">
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="prop-correo">Correo</label>
-          <input id="prop-correo" name="correo" type="email" class="campo" [(ngModel)]="formulario().correo" maxlength="100">
+          <input id="prop-correo" name="correo" type="email" class="campo" [(ngModel)]="formulario().correo" maxlength="100" data-regla="correo">
         </div>
         <div class="grupo sm:col-span-2">
           <label class="inf-etiqueta" for="prop-porcentaje">Participación (%)</label>

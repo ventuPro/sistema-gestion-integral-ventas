@@ -20,7 +20,7 @@ const listar = async () => (await db.query(`
 /** Cambiar el teléfono desvincula (la nueva persona debe compartir su número) */
 const actualizar = async (id_usuario, { telefono, avisos_telegram, avisos_sucursal }) => {
     const tel = telegram.normalizarTelefono(telefono);
-    if (telefono && (!tel || tel.length < 8 || tel.length > 15)) throw error('INVALIDO', 'El teléfono no es válido');
+    if (telefono && !/^591[67]\d{7}$/.test(tel || '')) throw error('INVALIDO', 'Celular inválido: 8 dígitos que empiezan con 6 o 7.');
     try {
         const r = await db.query(`
             UPDATE usuario SET

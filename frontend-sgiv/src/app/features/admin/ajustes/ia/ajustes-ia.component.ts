@@ -3,6 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { LucideAngularModule, Save, Undo2, Zap } from 'lucide-angular';
 import { AjustesService, PruebaChatbot } from '../../../../core/services/ajustes.service';
 import { DialogoService } from '../../../../core/services/dialogo.service';
+import { sinSentido } from '../../../../core/utils/validacion';
 
 export const MAX_INFO_CHATBOT = 3000;
 
@@ -68,9 +69,15 @@ export class AjustesIaComponent implements OnInit {
 
   descartar() { this.info.set(this.guardado()); }
 
-  guardar() {
+  async guardar() {
     if (this.info().length > MAX_INFO_CHATBOT)
       return this.dialogo.error(`La información admite hasta ${MAX_INFO_CHATBOT} caracteres.`);
+    const absurdo = sinSentido(this.info(), 'texto');
+    if (absurdo) return this.dialogo.error(`La información ${absurdo}`);
+    if (!(await this.dialogo.confirmar({
+      titulo: '¿Guardar la información del chatbot?', textoConfirmar: 'Guardar',
+      mensaje: 'El asistente del menú QR responderá a los clientes con esta información desde ahora.'
+    }))) return;
     this.guardando.set(true);
     this.ajustes.guardarIa({ ia_info_negocio: this.info() }).subscribe({
       next: (r) => { this.llenar(r.configuracion.ia_info_negocio); this.guardando.set(false); this.dialogo.avisar('Información del chatbot guardada'); },

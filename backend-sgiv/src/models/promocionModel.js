@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { REGLAS, revisar } = require('../utils/validacion');
 
 // ─── Promociones ───
 // PORCENTAJE (valor = %), PRECIO (valor = precio especial por unidad),
@@ -127,6 +128,7 @@ const descuentoManual = (totalCentavos, descuento) => {
     if (!Number.isFinite(valor) || valor < 0) throw invalido('El descuento debe ser un número positivo.');
     if (motivo.length < 3) throw invalido('Indica el motivo del descuento.');
     if (motivo.length > 120) throw invalido('El motivo admite hasta 120 caracteres.');
+    if (!REGLAS.texto.patron.test(motivo)) throw invalido(`El motivo ${REGLAS.texto.mensaje}`);
     const centavos = descuento.tipo === 'PORCENTAJE' ? Math.round(totalCentavos * valor / 100) : Math.round(valor * 100);
     if (centavos > totalCentavos) throw invalido('El descuento no puede superar el total de la venta.');
     return { centavos, motivo };
@@ -136,7 +138,8 @@ const descuentoManual = (totalCentavos, descuento) => {
 const CONDICION_VIGENTE = `
     p.estado_activo
     AND CURRENT_DATE BETWEEN p.fecha_inicio AND p.fecha_fin
-    AND (p.dias_semana IS NULL OR EXTRACT(ISODOW FROM NOW())::int = ANY(p.dias_semana))
+    AND (NOT EXISTS (SELECT 1 FROM promocion_dia pd WHERE pd.id_promocion = p.id_promocion)
+         OR EXISTS (SELECT 1 FROM promocion_dia pd WHERE pd.id_promocion = p.id_promocion AND pd.dia = EXTRACT(ISODOW FROM NOW())::int))
     AND (p.hora_inicio IS NULL OR CASE WHEN p.hora_inicio <= p.hora_fin
             THEN LOCALTIME BETWEEN p.hora_inicio AND p.hora_fin
             ELSE LOCALTIME >= p.hora_inicio OR LOCALTIME <= p.hora_fin END)`;
@@ -242,8 +245,9 @@ const HORA  = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
 const normalizar = (b = {}) => {
     const invalida = (m) => errorCodigo('PROMOCION_INVALIDA', m);
-    const nombre = String(b.nombre || '').replace(/\s+/g, ' ').trim();
-    if (nombre.length < 3 || nombre.length > 80) throw invalida('El nombre debe tener entre 3 y 80 caracteres.');
+    let nombre;
+    try { nombre = revisar(b.nombre, 'nombre', { etiqueta: 'El nombre', obligatorio: true, minimo: 3, max: 80 }); }
+    catch (e) { throw invalida(e.message); }
     if (!TIPOS.includes(b.tipo)) throw invalida('Tipo de promoción inválido.');
     const tipo = b.tipo;
 
@@ -297,7 +301,8 @@ const normalizar = (b = {}) => {
 const SELECT_PROMOCION = `
     SELECT p.id_promocion, p.nombre, p.tipo, p.valor::float8 AS valor, p.lleva, p.paga, p.id_sucursal, s.nombre_sucursal,
            to_char(p.fecha_inicio, 'YYYY-MM-DD') AS fecha_inicio, to_char(p.fecha_fin, 'YYYY-MM-DD') AS fecha_fin,
-           p.dias_semana, to_char(p.hora_inicio, 'HH24:MI') AS hora_inicio, to_char(p.hora_fin, 'HH24:MI') AS hora_fin,
+           (SELECT array_agg(pd.dia ORDER BY pd.dia) FROM promocion_dia pd WHERE pd.id_promocion = p.id_promocion) AS dias_semana,
+           to_char(p.hora_inicio, 'HH24:MI') AS hora_inicio, to_char(p.hora_fin, 'HH24:MI') AS hora_fin,
            p.estado_activo, p.fecha_registro, (${CONDICION_VIGENTE}) AS vigente,
            COALESCE((SELECT json_agg(json_build_object('id_producto', pp.id_producto, 'cantidad', pp.cantidad,
                                                        'nombre_producto', pr.nombre_producto, 'precio_unitario', pr.precio_unitario::float8)
@@ -358,26 +363,30 @@ const guardar = async (datos, id = null, id_usuario = null) => {
         }
 
         const valores = [datos.nombre, datos.tipo, datos.valor, datos.lleva, datos.paga, datos.id_sucursal, datos.fecha_inicio,
-                         datos.fecha_fin, datos.dias_semana, datos.hora_inicio, datos.hora_fin, datos.estado_activo];
+                         datos.fecha_fin, datos.hora_inicio, datos.hora_fin, datos.estado_activo];
         if (id) {
             const r = await client.query(`
                 UPDATE promocion SET nombre=$1, tipo=$2, valor=$3, lleva=$4, paga=$5, id_sucursal=$6, fecha_inicio=$7,
-                       fecha_fin=$8, dias_semana=$9, hora_inicio=$10, hora_fin=$11, estado_activo=$12
-                WHERE id_promocion = $13 RETURNING id_promocion`, [...valores, id]);
+                       fecha_fin=$8, hora_inicio=$9, hora_fin=$10, estado_activo=$11
+                WHERE id_promocion = $12 RETURNING id_promocion`, [...valores, id]);
             if (!r.rows.length) throw errorCodigo('NO_ENCONTRADA', 'La promoción no existe.');
             await client.query(`DELETE FROM promocion_producto  WHERE id_promocion = $1`, [id]);
             await client.query(`DELETE FROM promocion_categoria WHERE id_promocion = $1`, [id]);
+            await client.query(`DELETE FROM promocion_dia       WHERE id_promocion = $1`, [id]);
         } else {
             id = (await client.query(`
                 INSERT INTO promocion (nombre, tipo, valor, lleva, paga, id_sucursal, fecha_inicio, fecha_fin,
-                                       dias_semana, hora_inicio, hora_fin, estado_activo, id_usuario_creador)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id_promocion`, [...valores, id_usuario])).rows[0].id_promocion;
+                                       hora_inicio, hora_fin, estado_activo, id_usuario_creador)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id_promocion`, [...valores, id_usuario])).rows[0].id_promocion;
         }
         for (const p of datos.productos)
             await client.query(`INSERT INTO promocion_producto (id_promocion, id_producto, cantidad) VALUES ($1, $2, $3)`,
                                [id, p.id_producto, p.cantidad]);
         for (const c of datos.categorias)
             await client.query(`INSERT INTO promocion_categoria (id_promocion, id_categoria) VALUES ($1, $2)`, [id, c]);
+        // Sin filas = todos los días
+        if (datos.dias_semana)
+            await client.query(`INSERT INTO promocion_dia (id_promocion, dia) SELECT $1, unnest($2::smallint[])`, [id, datos.dias_semana]);
 
         await client.query('COMMIT');
         return id;

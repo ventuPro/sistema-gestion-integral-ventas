@@ -53,7 +53,7 @@
               <form class="campos" (submit)="$event.preventDefault(); hayCambios(u) && guardar(u)">
                 <div class="grupo">
                   <label class="inf-etiqueta" [for]="'tel' + u.id_usuario">Teléfono</label>
-                  <input class="campo" type="tel" [id]="'tel' + u.id_usuario" [value]="borrador(u).telefono" maxlength="20"
+                  <input class="campo" type="tel" [id]="'tel' + u.id_usuario" [value]="borrador(u).telefono" maxlength="8" data-regla="celular"
                          (input)="cambiar(u, 'telefono', $any($event.target).value)" placeholder="71234567">
                 </div>
                 <div class="grupo">

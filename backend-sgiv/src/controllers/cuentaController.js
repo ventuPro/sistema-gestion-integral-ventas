@@ -45,7 +45,7 @@ const agregarProducto = async (req, res) => {
         const { id_producto, cantidad, precio_unitario, nota } = req.body;
 
         const resultado = await cuentaModel.agregarProductoCuenta(
-            id_cuenta, id_producto, cantidad, precio_unitario, nota, 'cajero', req.usuario.id_usuario
+            id_cuenta, id_producto, cantidad, precio_unitario, nota, req.usuario.id_usuario
         );
 
         const cuentaActualizada = await cuentaModel.obtenerCuentaActiva(resultado.id_mesa);

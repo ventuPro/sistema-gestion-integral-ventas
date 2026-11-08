@@ -14,7 +14,7 @@ import { ConfirmacionComponent } from '../confirmacion/confirmacion.component';
     }
     @if (dialogo.confirmacion(); as c) {
       <app-confirmacion [titulo]="c.titulo" [mensaje]="c.mensaje || ''" [textoConfirmar]="c.textoConfirmar || 'Confirmar'"
-                        [peligro]="!!c.peligro" (confirmar)="c.responder(true)" (cancelar)="c.responder(false)" />
+                        [peligro]="!!c.peligro" [advertencias]="c.advertencias || []" (confirmar)="c.responder(true)" (cancelar)="c.responder(false)" />
     }
   `
 })

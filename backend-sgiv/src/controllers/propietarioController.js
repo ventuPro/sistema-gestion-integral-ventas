@@ -1,38 +1,16 @@
 const propietarioModel = require('../models/propietarioModel');
-const { soloLetras } = require('../utils/texto');
-
-class ErrorValidacion extends Error {}
+const { ErrorValidacion, revisar, numero } = require('../utils/validacion');
 
 // ─── Validación ───
-// CI boliviano: números, complemento opcional (-1A) y extensión opcional (LP, CB…)
-const CI     = /^\d{4,10}(-[0-9A-Z]{1,2})?( ?(LP|CB|SC|OR|PT|CH|TJ|BE|PD))?$/;
-const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TELEFONO = /^[0-9+()\s-]{6,20}$/;
-
-const texto = (valor, max, nombre) => {
-    const t = valor == null ? '' : String(valor).trim();
-    if (t.length > max) throw new ErrorValidacion(`El campo ${nombre} admite hasta ${max} caracteres`);
-    return t || null;
-};
-
 const validar = (body) => {
     const p = {
-        nombre_completo: texto(body.nombre_completo, 100, 'nombre'),
-        ci:              texto(body.ci, 20, 'CI')?.toUpperCase() ?? null,
-        cargo:           texto(body.cargo, 60, 'cargo'),
-        telefono:        texto(body.telefono, 20, 'teléfono'),
-        correo:          texto(body.correo, 100, 'correo')
+        nombre_completo: revisar(body.nombre_completo, 'persona', { etiqueta: 'El nombre', obligatorio: true, max: 100 }),
+        ci:              revisar(body.ci, 'ci', { etiqueta: 'El CI', max: 20 }),
+        cargo:           revisar(body.cargo, 'letras', { etiqueta: 'El cargo', max: 60 }),
+        telefono:        revisar(body.telefono, 'telefono', { etiqueta: 'El teléfono' }),
+        correo:          revisar(body.correo, 'correo', { etiqueta: 'El correo', max: 100 })
     };
-    if (!p.nombre_completo) throw new ErrorValidacion('El nombre es obligatorio');
-    if (!soloLetras(p.nombre_completo)) throw new ErrorValidacion('El nombre solo admite letras');
-    if (p.cargo && !soloLetras(p.cargo)) throw new ErrorValidacion('El cargo solo admite letras');
-    if (p.ci && !CI.test(p.ci)) throw new ErrorValidacion('CI inválido. Ejemplo: 1234567 LP o 1234567-1A LP');
-    if (p.telefono && !TELEFONO.test(p.telefono)) throw new ErrorValidacion('Teléfono inválido');
-    if (p.correo && !CORREO.test(p.correo)) throw new ErrorValidacion('Correo inválido');
-
-    const porcentaje = Number(body.porcentaje_participacion ?? 0);
-    if (!Number.isFinite(porcentaje) || porcentaje < 0 || porcentaje > 100)
-        throw new ErrorValidacion('La participación debe estar entre 0 y 100 %');
+    const porcentaje = numero(body.porcentaje_participacion ?? 0, { etiqueta: 'La participación', min: 0, max: 100 });
     p.porcentaje_participacion = Math.round(porcentaje * 100) / 100;
     return p;
 };

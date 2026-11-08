@@ -101,10 +101,13 @@ test('solo el administrador configura el chatbot', async () => {
 });
 
 test('la información para el chatbot admite hasta 3000 caracteres', async () => {
-    const largo = await api('PUT', '/ajustes/ia', { token: tokenAdmin, body: { ia_info_negocio: 'x'.repeat(3001) } });
+    const texto = 'Tortas por encargo.'.padEnd(20).repeat(150);
+    const largo = await api('PUT', '/ajustes/ia', { token: tokenAdmin, body: { ia_info_negocio: `${texto}X` } });
     assert.equal(largo.status, 400);
-    const justo = await api('PUT', '/ajustes/ia', { token: tokenAdmin, body: { ia_info_negocio: 'x'.repeat(3000) } });
+    const justo = await api('PUT', '/ajustes/ia', { token: tokenAdmin, body: { ia_info_negocio: texto } });
     assert.equal(justo.status, 200);
+    const absurdo = await api('PUT', '/ajustes/ia', { token: tokenAdmin, body: { ia_info_negocio: 'x'.repeat(50) } });
+    assert.equal(absurdo.status, 400);
 
     const r = await api('PUT', '/ajustes/ia', { token: tokenAdmin, body: {
         ia_info_negocio: '  Hacemos tortas por encargo con 2 días de anticipación.  ' } });

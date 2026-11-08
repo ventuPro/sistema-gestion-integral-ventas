@@ -3,7 +3,8 @@ const { guardarImagen, borrarImagen } = require('../utils/imagenes');
 const { emitirCatalogo } = require('../utils/tiempoReal');
 const db = require('../config/db');
 const { registrarHistorial } = require('../models/inventarioModel');
-const { soloLetras, mayusculas } = require('../utils/texto');
+const { mayusculas } = require('../utils/texto');
+const { ErrorValidacion, revisar, numero } = require('../utils/validacion');
 
 // Fotos de productos: el navegador ya las comprime (WebP, 800 px); el tope es por si llegan de otro cliente
 const FOTO = { carpeta: 'productos', prefijo: 'prod', maxBytes: 1024 * 1024, formatos: ['png', 'jpg', 'webp'] };
@@ -15,29 +16,33 @@ const fotoNueva = (url_imagen) => {
     catch (e) { e.status = 400; throw e; }
 };
 
-// ─── Ficha del producto para el menú QR (undefined = no cambia) ───
-const texto    = (v, max) => v === undefined ? undefined : (String(v ?? '').trim().slice(0, max) || null);
+// ─── Datos del producto (undefined = no cambia; al crear, nombre, categoría y precio son obligatorios) ───
 const booleano = (v) => v === undefined ? undefined : v === true || v === 'true';
+const siViene  = (v, fn) => v === undefined ? undefined : fn(v);
 
-const datosProducto = (b) => ({
-    id_categoria:         b.id_categoria,
-    nombre_producto:      mayusculas(b.nombre_producto),
-    descripcion_producto: mayusculas(b.descripcion_producto),
-    precio_unitario:      b.precio_unitario,
-    ingredientes:         mayusculas(texto(b.ingredientes, 400)),
-    preparacion:          mayusculas(texto(b.preparacion, 500)),
-    destacado:            booleano(b.destacado),
-    mostrar_en_menu:      booleano(b.mostrar_en_menu)
-});
+const datosProducto = (b, nuevo = false) => {
+    const exigido = (v) => nuevo && v === undefined ? null : v;
+    return {
+        id_categoria:         siViene(exigido(b.id_categoria), v => numero(v, { etiqueta: 'La categoría', obligatorio: true, min: 1, entero: true })),
+        nombre_producto:      siViene(exigido(b.nombre_producto), v => mayusculas(revisar(v, 'nombre', { etiqueta: 'El nombre del producto', obligatorio: true, max: 100 }))),
+        descripcion_producto: siViene(b.descripcion_producto, v => mayusculas(revisar(v, 'texto', { etiqueta: 'La descripción', max: 500, multilinea: true }))),
+        precio_unitario:      siViene(exigido(b.precio_unitario), v => numero(v, { etiqueta: 'El precio', obligatorio: true, min: 0.1, max: 99999 })),
+        ingredientes:         siViene(b.ingredientes, v => mayusculas(revisar(v, 'texto', { etiqueta: 'Los ingredientes', max: 400 }))),
+        preparacion:          siViene(b.preparacion, v => mayusculas(revisar(v, 'texto', { etiqueta: 'La preparación', max: 500, multilinea: true }))),
+        destacado:            booleano(b.destacado),
+        mostrar_en_menu:      booleano(b.mostrar_en_menu)
+    };
+};
 
 const agregarCategoria  = async (req, res) => {
     try {
-        const nombre = mayusculas(String(req.body?.nombre_categoria ?? '').trim());
-        if (!nombre) return res.status(400).json({ error: 'Escribe el nombre de la categoría' });
-        if (!soloLetras(nombre)) return res.status(400).json({ error: 'El nombre de la categoría solo admite letras' });
+        const nombre = mayusculas(revisar(req.body?.nombre_categoria, 'letras', { etiqueta: 'El nombre de la categoría', obligatorio: true, max: 50 }));
         const cat = await m.crearCategoria(nombre, req.body.descripcion_categoria || '');
         res.status(201).json({ categoria: cat });
-    } catch(e) { res.status(500).json({ error: e.message }); }
+    } catch(e) {
+        if (e instanceof ErrorValidacion) return res.status(400).json({ error: e.message });
+        res.status(500).json({ error: e.message });
+    }
 };
 
 const listarCategorias  = async (req, res) => {
@@ -107,12 +112,13 @@ const agregarProducto   = async (req, res) => {
     let url_imagen = null;
     try {
         const { id_sucursal, stock_inicial } = req.body;
+        const producto  = datosProducto(req.body, true);
+        const stock_ini = numero(stock_inicial, { etiqueta: 'El stock inicial', min: 0, max: 100000, entero: true }) ?? 0;
 
         url_imagen = fotoNueva(req.body.url_imagen) ?? null;
 
-        const datos     = { ...datosProducto(req.body), url_imagen };
+        const datos     = { ...producto, url_imagen };
         const id_suc    = Number(id_sucursal) || 1;
-        const stock_ini = Math.max(Math.trunc(Number(stock_inicial)) || 0, 0);
 
         // Producto, su fila de inventario en la sucursal y el historial del stock inicial: todo o nada
         const client = await db.connect();
@@ -152,8 +158,9 @@ const actualizarProducto = async (req, res) => {
         const anterior = await m.urlImagen(req.params.id);
         if (anterior === undefined) return res.status(404).json({ error: 'Producto no encontrado' });
 
+        const datos = datosProducto(req.body);
         url_imagen = fotoNueva(req.body.url_imagen);
-        const prod = await m.actualizarProducto(req.params.id, { ...datosProducto(req.body), url_imagen });
+        const prod = await m.actualizarProducto(req.params.id, { ...datos, url_imagen });
         if (url_imagen) borrarImagen(anterior);
         emitirCatalogo();
         res.json({ producto: prod });

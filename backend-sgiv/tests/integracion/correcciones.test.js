@@ -101,8 +101,8 @@ const reservarEnOtraConexion = async (id_cuenta, id_producto, id_sucursal = 1) =
     await otra.sql(`SELECT id_cuenta FROM cuenta_mesa WHERE id_cuenta = $1 FOR UPDATE`, [id_cuenta]);
     await otra.sql(`UPDATE inventario_sucursal SET cantidad_actual = cantidad_actual - 1 WHERE id_producto = $1 AND id_sucursal = $2`,
                    [id_producto, id_sucursal]);
-    await otra.sql(`INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, origen)
-                    VALUES ($1, $2, 1, 10, 'qr')`, [id_cuenta, id_producto]);
+    await otra.sql(`INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario)
+                    VALUES ($1, $2, 1, 10)`, [id_cuenta, id_producto]);
     return otra;
 };
 

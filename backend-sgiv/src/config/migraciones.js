@@ -117,8 +117,6 @@ const MIGRACIONES = [
     `ALTER TABLE pedido_mesa
         ADD COLUMN IF NOT EXISTS cliente_mesa VARCHAR(32);
     ALTER TABLE detalle_cuenta
-        ADD COLUMN IF NOT EXISTS cliente_mesa   VARCHAR(32),
-        ADD COLUMN IF NOT EXISTS nombre_cliente VARCHAR(40),
         ADD COLUMN IF NOT EXISTS id_venta       INT REFERENCES venta_caja(id_venta);`,
 
     // Promociones (reemplaza la tabla promocion original, que nunca se usó) y descuentos en las ventas
@@ -428,7 +426,43 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
                         ADD COLUMN IF NOT EXISTS avisos_telegram BOOLEAN NOT NULL DEFAULT TRUE,
                         ADD COLUMN IF NOT EXISTS avisos_sucursal INT REFERENCES sucursal(id_sucursal) ON DELETE SET NULL;
     CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_telefono ON usuario (telefono) WHERE telefono IS NOT NULL;
-    CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_telegram ON usuario (telegram_chat_id) WHERE telegram_chat_id IS NOT NULL;`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_telegram ON usuario (telegram_chat_id) WHERE telegram_chat_id IS NOT NULL;`,
+
+    // ─── Tercera forma normal (2026-11-07) ───
+    // Días de una promoción en su propia tabla (sin filas = todos los días), en lugar del arreglo dias_semana
+    `CREATE TABLE IF NOT EXISTS promocion_dia (
+        id_promocion INT NOT NULL REFERENCES promocion(id_promocion) ON DELETE CASCADE,
+        dia          SMALLINT NOT NULL CONSTRAINT promocion_dia_check CHECK (dia BETWEEN 1 AND 7),
+        PRIMARY KEY (id_promocion, dia)
+    );
+    DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'promocion' AND column_name = 'dias_semana') THEN
+            INSERT INTO promocion_dia (id_promocion, dia)
+            SELECT DISTINCT p.id_promocion, d FROM promocion p CROSS JOIN LATERAL unnest(p.dias_semana) d
+            ON CONFLICT DO NOTHING;
+            ALTER TABLE promocion DROP COLUMN dias_semana;
+        END IF;
+    END $$;`,
+
+    // Cada línea de la cuenta que vino del menú QR apunta a su pedido: el celular, el nombre
+    // del cliente y el origen se leen del pedido (id_pedido NULL = la cargó el cajero)
+    `ALTER TABLE detalle_cuenta ADD COLUMN IF NOT EXISTS id_pedido INT REFERENCES pedido_mesa(id_pedido);
+    CREATE INDEX IF NOT EXISTS idx_detalle_cuenta_pedido ON detalle_cuenta (id_pedido);
+    DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'detalle_cuenta' AND column_name = 'origen') THEN
+            UPDATE detalle_cuenta dc SET id_pedido = (
+                SELECT pm.id_pedido FROM pedido_mesa pm
+                WHERE pm.id_cuenta = dc.id_cuenta AND pm.cliente_mesa IS NOT DISTINCT FROM dc.cliente_mesa
+                  AND EXISTS (SELECT 1 FROM detalle_pedido dp WHERE dp.id_pedido = pm.id_pedido AND dp.id_producto = dc.id_producto)
+                ORDER BY abs(EXTRACT(EPOCH FROM pm.fecha_aprobacion - dc.fecha_agregado)) NULLS LAST, pm.id_pedido
+                LIMIT 1)
+            WHERE dc.origen = 'qr' AND dc.id_pedido IS NULL;
+            IF EXISTS (SELECT 1 FROM detalle_cuenta WHERE origen = 'qr' AND id_pedido IS NULL) THEN
+                RAISE EXCEPTION 'Hay productos de mesa pedidos por QR sin su pedido: revisar antes de quitar las columnas';
+            END IF;
+            ALTER TABLE detalle_cuenta DROP COLUMN origen, DROP COLUMN cliente_mesa, DROP COLUMN nombre_cliente;
+        END IF;
+    END $$;`
 ];
 
 const aplicarMigraciones = async () => {

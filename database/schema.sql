@@ -27,6 +27,7 @@ DROP TABLE IF EXISTS pedido_mesa CASCADE;
 DROP TABLE IF EXISTS mesa_local CASCADE;
 DROP TABLE IF EXISTS historial_inventario CASCADE;
 DROP TABLE IF EXISTS inventario_sucursal CASCADE;
+DROP TABLE IF EXISTS promocion_dia CASCADE;
 DROP TABLE IF EXISTS promocion_categoria CASCADE;
 DROP TABLE IF EXISTS promocion_producto CASCADE;
 DROP TABLE IF EXISTS promocion CASCADE;
@@ -123,7 +124,6 @@ CREATE TABLE promocion (
     id_sucursal   INT REFERENCES sucursal(id_sucursal),
     fecha_inicio  DATE NOT NULL,
     fecha_fin     DATE NOT NULL,
-    dias_semana   SMALLINT[],
     hora_inicio   TIME,
     hora_fin      TIME,
     estado_activo BOOLEAN NOT NULL DEFAULT TRUE,
@@ -145,6 +145,13 @@ CREATE TABLE promocion_categoria (
     id_promocion INT NOT NULL REFERENCES promocion(id_promocion) ON DELETE CASCADE,
     id_categoria INT NOT NULL REFERENCES categoria_producto(id_categoria),
     PRIMARY KEY (id_promocion, id_categoria)
+);
+
+-- Días de la semana en que vale (ISO: 1 = lunes … 7 = domingo); sin filas = todos los días
+CREATE TABLE promocion_dia (
+    id_promocion INT NOT NULL REFERENCES promocion(id_promocion) ON DELETE CASCADE,
+    dia          SMALLINT NOT NULL CONSTRAINT promocion_dia_check CHECK (dia BETWEEN 1 AND 7),
+    PRIMARY KEY (id_promocion, dia)
 );
 
 -- ==========================================
@@ -283,11 +290,9 @@ CREATE TABLE detalle_cuenta (
     precio_unitario DECIMAL(10, 2) NOT NULL,
     subtotal NUMERIC(10, 2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
     nota TEXT,
-    origen VARCHAR(20) DEFAULT 'cajero',
     fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    -- Quién lo pidió desde el menú QR (NULL = cargado por el cajero)
-    cliente_mesa VARCHAR(32),
-    nombre_cliente VARCHAR(40),
+    -- Pedido QR del que viene (NULL = cargado por el cajero): de ahí salen el celular y el nombre del cliente
+    id_pedido INT REFERENCES pedido_mesa(id_pedido),
     -- Cobro por separado: venta en la que ya se pagó (NULL = por cobrar; FK más abajo)
     id_venta INT
 );
@@ -453,6 +458,7 @@ CREATE INDEX idx_detalle_venta_venta      ON detalle_venta (id_venta);
 CREATE INDEX idx_detalle_venta_producto   ON detalle_venta (id_producto);
 CREATE INDEX idx_detalle_cuenta_cuenta    ON detalle_cuenta (id_cuenta);
 CREATE INDEX idx_detalle_cuenta_venta     ON detalle_cuenta (id_venta);
+CREATE INDEX idx_detalle_cuenta_pedido    ON detalle_cuenta (id_pedido);
 CREATE INDEX idx_detalle_pedido_pedido    ON detalle_pedido (id_pedido);
 CREATE INDEX idx_turno_sucursal_estado    ON turno_caja (id_sucursal, estado_turno);
 CREATE INDEX idx_historial_inv_fecha      ON historial_inventario (id_inventario, fecha_registro);

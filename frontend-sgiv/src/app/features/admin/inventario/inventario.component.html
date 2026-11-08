@@ -263,18 +263,18 @@
 
         <div class="grupo">
           <label class="inf-etiqueta" for="nombre-producto">Nombre</label>
-          <input id="nombre-producto" type="text" data-mayusculas class="campo" [(ngModel)]="formulario().nombre_producto" placeholder="Ej.: Torta de chocolate">
+          <input id="nombre-producto" type="text" data-mayusculas data-regla="nombre" required maxlength="100" class="campo" [(ngModel)]="formulario().nombre_producto" placeholder="Ej.: Torta de chocolate">
         </div>
 
         <div class="grupo">
           <label class="inf-etiqueta" for="descripcion-producto">Descripción <span class="inf-sutil">(opcional)</span></label>
-          <textarea id="descripcion-producto" data-mayusculas rows="2" class="campo" [(ngModel)]="formulario().descripcion_producto"></textarea>
+          <textarea id="descripcion-producto" data-mayusculas data-regla="texto" maxlength="500" rows="2" class="campo" [(ngModel)]="formulario().descripcion_producto"></textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div class="grupo">
             <label class="inf-etiqueta" for="precio-producto">Precio ({{ moneda() }})</label>
-            <input id="precio-producto" type="number" min="0" step="0.50" class="campo" [(ngModel)]="formulario().precio_unitario" placeholder="0.00">
+            <input id="precio-producto" type="number" min="0.1" max="99999" required step="0.50" class="campo" [(ngModel)]="formulario().precio_unitario" placeholder="0.00">
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="categoria-producto">Categoría</label>
@@ -301,12 +301,12 @@
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="ingredientes-producto">Ingredientes</label>
-            <textarea id="ingredientes-producto" data-mayusculas rows="2" maxlength="400" class="campo" [(ngModel)]="formulario().ingredientes"
+            <textarea id="ingredientes-producto" data-mayusculas data-regla="texto" rows="2" maxlength="400" class="campo" [(ngModel)]="formulario().ingredientes"
                       placeholder="Ej.: harina, huevo, chocolate, crema"></textarea>
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="preparacion-producto">Preparación</label>
-            <textarea id="preparacion-producto" data-mayusculas rows="3" maxlength="500" class="campo" [(ngModel)]="formulario().preparacion"
+            <textarea id="preparacion-producto" data-mayusculas data-regla="texto" rows="3" maxlength="500" class="campo" [(ngModel)]="formulario().preparacion"
                       placeholder="Ej.: Horneamos el bizcocho cada mañana&#10;Lo rellenamos con crema de chocolate"></textarea>
           </div>
         </section>
@@ -314,7 +314,7 @@
         @if (!editandoId()) {
           <div class="grupo">
             <label class="inf-etiqueta" for="stock-inicial">Stock inicial</label>
-            <input id="stock-inicial" type="number" min="0" step="1" inputmode="numeric" class="campo" [(ngModel)]="formulario().stock_inicial" placeholder="0">
+            <input id="stock-inicial" type="number" min="0" max="100000" step="1" inputmode="numeric" class="campo" [(ngModel)]="formulario().stock_inicial" placeholder="0">
           </div>
         }
       </div>
@@ -358,7 +358,7 @@
             <label class="inf-etiqueta" for="mov-cantidad">Cantidad</label>
             <div class="campo-monto">
               <span>{{ mov().tipo === 'INGRESO' ? '+' : '−' }}</span>
-              <input id="mov-cantidad" type="number" min="1" step="1" inputmode="numeric" [(ngModel)]="mov().cantidad" placeholder="0">
+              <input id="mov-cantidad" type="number" min="1" max="100000" step="1" inputmode="numeric" [(ngModel)]="mov().cantidad" placeholder="0">
             </div>
           </div>
           <div class="grupo">
@@ -373,7 +373,7 @@
           <label class="inf-etiqueta" for="mov-detalle">
             Observación <span class="inf-sutil">{{ mov().motivo === 'Otro' ? '(obligatoria)' : '(opcional)' }}</span>
           </label>
-          <textarea id="mov-detalle" data-mayusculas class="campo" rows="2" maxlength="200" [(ngModel)]="mov().detalle"
+          <textarea id="mov-detalle" data-mayusculas data-regla="texto" class="campo" rows="2" maxlength="200" [(ngModel)]="mov().detalle"
                     placeholder="Ej.: hornada de la mañana"></textarea>
         </div>
 
@@ -448,7 +448,7 @@
       <div class="p-5 space-y-3">
         <div class="grupo">
           <label class="inf-etiqueta" for="nombre-categoria">Nombre</label>
-          <input id="nombre-categoria" type="text" data-solo-letras data-mayusculas class="campo" [(ngModel)]="nombreCategoria"
+          <input id="nombre-categoria" type="text" data-regla="letras" data-mayusculas maxlength="50" class="campo" [(ngModel)]="nombreCategoria"
                  placeholder="Ej.: Tortas, Bebidas">
         </div>
         @if (errorCategoria()) { <p class="error-formulario">{{ errorCategoria() }}</p> }

@@ -255,7 +255,12 @@ export class PromocionesComponent implements OnInit {
     });
   }
 
-  alternarEstado(p: Promocion) {
+  async alternarEstado(p: Promocion) {
+    if (!(await this.dialogo.confirmar(p.estado_activo
+      ? { titulo: `¿Desactivar «${p.nombre}»?`, textoConfirmar: 'Desactivar', peligro: true,
+          mensaje: 'Dejará de aplicarse en los cobros y en el menú QR desde ahora.' }
+      : { titulo: `¿Activar «${p.nombre}»?`, textoConfirmar: 'Activar',
+          mensaje: 'Se aplicará sola en los cobros y en el menú QR dentro de sus fechas, días y horario.' }))) return;
     this.servicio.cambiarEstado(p.id_promocion!, !p.estado_activo).subscribe({
       next: (r) => { this.dialogo.avisar(r.mensaje); this.cargar(); },
       error: (e) => this.dialogo.error(e?.error?.error || 'No se pudo cambiar el estado.')

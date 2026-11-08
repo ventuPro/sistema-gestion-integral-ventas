@@ -112,7 +112,7 @@
 
         <div class="grupo">
           <label class="inf-etiqueta" for="obs-transferencia">Observación <span class="inf-sutil">(opcional)</span></label>
-          <input id="obs-transferencia" data-mayusculas class="campo" [(ngModel)]="observacion" maxlength="200">
+          <input id="obs-transferencia" data-mayusculas data-regla="texto" class="campo" [(ngModel)]="observacion" maxlength="200">
         </div>
 
         @if (errorNueva()) { <p class="error-formulario">{{ errorNueva() }}</p> }

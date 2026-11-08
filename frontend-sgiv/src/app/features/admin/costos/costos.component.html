@@ -155,7 +155,7 @@
         @if (errorInsumo()) { <p class="error-formulario" role="alert">{{ errorInsumo() }}</p> }
         <div class="grupo">
           <label class="inf-etiqueta" for="nombre-insumo">Nombre</label>
-          <input id="nombre-insumo" name="nombre" class="campo" maxlength="80" data-mayusculas [(ngModel)]="f.nombre" placeholder="HARINA">
+          <input id="nombre-insumo" name="nombre" class="campo" maxlength="80" data-mayusculas data-regla="nombre" required [(ngModel)]="f.nombre" placeholder="HARINA">
         </div>
         <div class="grupo">
           <span class="inf-etiqueta">Compra</span>
@@ -171,7 +171,7 @@
           <label class="inf-etiqueta" for="precio-insumo">Precio de compra</label>
           <div class="campo-monto">
             <span>{{ moneda() }}</span>
-            <input id="precio-insumo" name="precio" type="number" min="0" step="0.01" [(ngModel)]="f.precio_compra" placeholder="0.00">
+            <input id="precio-insumo" name="precio" type="number" min="0.01" max="1000000" step="0.01" required [(ngModel)]="f.precio_compra" placeholder="0.00">
           </div>
         </div>
         @if (costoForm(); as c) {
@@ -202,7 +202,7 @@
         <div class="grid sm:grid-cols-[1fr_1fr_140px] gap-3">
           <div class="grupo">
             <label class="inf-etiqueta" for="nombre-receta">Nombre</label>
-            <input id="nombre-receta" name="nombre" class="campo" maxlength="80" data-mayusculas
+            <input id="nombre-receta" name="nombre" class="campo" maxlength="80" data-mayusculas data-regla="nombre" required
                    [ngModel]="f.nombre" (ngModelChange)="cambiarDato('nombre', $event)" placeholder="CROISSANT">
           </div>
           <div class="grupo">

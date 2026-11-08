@@ -1,24 +1,15 @@
 const sucursalModel = require('../models/sucursalModel');
-
-class ErrorValidacion extends Error {}
+const { ErrorValidacion, revisar } = require('../utils/validacion');
 
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // ─── Validación ───
-const texto = (valor, max, nombre) => {
-    const t = valor == null ? '' : String(valor).trim();
-    if (t.length > max) throw new ErrorValidacion(`El campo ${nombre} admite hasta ${max} caracteres`);
-    return t || null;
-};
-
-const validarDatos = (body) => {
-    const nombre = texto(body.nombre_sucursal, 100, 'nombre');
-    if (!nombre) throw new ErrorValidacion('El nombre es obligatorio');
-    const direccion = texto(body.direccion_fisica, 250, 'dirección');
-    const telefono  = texto(body.telefono_contacto, 15, 'teléfono');
-    if (telefono && !/^[0-9+()\s-]{6,15}$/.test(telefono)) throw new ErrorValidacion('Teléfono inválido');
-    return { nombre, direccion, telefono, horario: validarHorario(body.horario) };
-};
+const validarDatos = (body) => ({
+    nombre:    revisar(body.nombre_sucursal, 'nombre', { etiqueta: 'El nombre', obligatorio: true, max: 100 }),
+    direccion: revisar(body.direccion_fisica, 'direccion', { etiqueta: 'La dirección', max: 250 }),
+    telefono:  revisar(body.telefono_contacto, 'telefono', { etiqueta: 'El teléfono' }),
+    horario:   validarHorario(body.horario)
+});
 
 const validarHorario = (horario) => {
     if (horario == null) return [];

@@ -139,7 +139,7 @@
         <label class="inf-etiqueta block mb-2">Número de mesa</label>
         <div class="campo-monto">
           <span>N.º</span>
-          <input type="number" min="1" step="1" inputmode="numeric" [(ngModel)]="nuevaMesaNum" placeholder="1">
+          <input type="number" min="1" max="999" step="1" inputmode="numeric" aria-label="Número de mesa" [(ngModel)]="nuevaMesaNum" placeholder="1">
         </div>
         @if (errorMesa()) { <p class="text-sm inf-baja mt-3">{{ errorMesa() }}</p> }
       </div>

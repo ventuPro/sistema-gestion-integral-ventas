@@ -5,6 +5,8 @@ export interface OpcionesConfirmacion {
   mensaje?:        string;
   textoConfirmar?: string;
   peligro?:        boolean;
+  /** Qué cambia en el funcionamiento del sistema */
+  advertencias?:   string[];
 }
 
 interface Confirmacion extends OpcionesConfirmacion { responder: (si: boolean) => void }

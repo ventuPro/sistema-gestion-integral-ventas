@@ -27,8 +27,9 @@ const enTransaccion = async (fn) => {
     }
 };
 
+// Notas del cliente: se quitan los caracteres no permitidos (regla «texto» de utils/validacion.js) sin rechazar el pedido
 const texto = (valor, max) => {
-    const t = String(valor ?? '').trim().slice(0, max);
+    const t = String(valor ?? '').replace(/[<>{}[\]\\^`|~*=_]/g, '').replace(/[ \t]+/g, ' ').trim().slice(0, max);
     return t || null;
 };
 
@@ -352,12 +353,11 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
 
         // Stock ya reservado: no se descuenta de nuevo
         await client.query(`
-            INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, nota, origen,
-                                        cliente_mesa, nombre_cliente)
-            SELECT $1, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente, 'qr', $3, $4
+            INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, nota, id_pedido)
+            SELECT $1, id_producto, cantidad_solicitada, precio_aplicado, nota_cliente, id_pedido
             FROM detalle_pedido WHERE id_pedido = $2
             ORDER BY id_detalle_pedido
-        `, [id_cuenta, id_pedido, pedido.cliente_mesa, pedido.nombre_cliente]);
+        `, [id_cuenta, id_pedido]);
         await visitaModel.habilitar(client, pedido.id_mesa);
 
         const rPed = await client.query(`
@@ -472,7 +472,8 @@ const obtenerEstadoMesa = async (id_mesa, cliente_mesa) => {
                    'subtotal', dc.subtotal, 'pagado', dc.id_venta IS NOT NULL
                ) ORDER BY dc.id_detalle_cuenta) FILTER (WHERE dc.id_detalle_cuenta IS NOT NULL), '[]'::json) AS items
         FROM cuenta_mesa c
-        LEFT JOIN detalle_cuenta dc ON dc.id_cuenta = c.id_cuenta AND dc.cliente_mesa = $2
+        LEFT JOIN detalle_cuenta dc ON dc.id_cuenta = c.id_cuenta
+                                    AND dc.id_pedido IN (SELECT id_pedido FROM pedido_mesa WHERE id_cuenta = c.id_cuenta AND cliente_mesa = $2)
         LEFT JOIN producto       p  ON p.id_producto = dc.id_producto
         WHERE c.id_mesa = $1 AND c.estado = 'Abierta'
         GROUP BY c.id_cuenta

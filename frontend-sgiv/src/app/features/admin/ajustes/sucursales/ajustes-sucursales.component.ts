@@ -100,7 +100,7 @@ export class AjustesSucursalesComponent implements OnInit {
     this.horario.update(h => h.map(d => ({ ...h[0], dia_semana: d.dia_semana })));
   }
 
-  guardar() {
+  async guardar() {
     const horario = this.horario();
     if (!this.formulario().nombre_sucursal.trim()) return this.errorFormulario.set('El nombre es obligatorio.');
     const incompleto = horario.find(d => d.abierto && (!d.hora_apertura || !d.hora_cierre || d.hora_apertura === d.hora_cierre));
@@ -108,6 +108,13 @@ export class AjustesSucursalesComponent implements OnInit {
       return this.errorFormulario.set(`Revisa el horario del ${DIAS[incompleto.dia_semana - 1].toLowerCase()}: apertura y cierre deben ser distintas.`);
     const datos = { ...this.formulario(), horario };
     const id = this.editandoId();
+    const nombre = datos.nombre_sucursal.trim();
+    if (!(await this.dialogo.confirmar({
+      titulo: id ? `¿Guardar los cambios de ${nombre}?` : `¿Crear la sucursal ${nombre}?`,
+      mensaje: id ? 'El nuevo horario y los datos de contacto se aplican de inmediato.'
+                  : 'Quedará activa: podrá abrir caja, tener mesas y recibir pedidos del menú QR.',
+      textoConfirmar: id ? 'Guardar' : 'Crear'
+    }))) return;
     this.guardando.set(true);
     const peticion = id
       ? this.sucursalService.actualizarSucursal(id, datos)
@@ -126,10 +133,13 @@ export class AjustesSucursalesComponent implements OnInit {
     });
   }
 
-  // Activar es directo; desactivar pide confirmación
-  pedirCambioEstado(s: any) {
-    if (s.estado_activo) { this.aDesactivar.set(s); this.errorEstado.set(''); }
-    else this.cambiarEstado(s);
+  // Desactivar abre su confirmación con el error del servidor junto al botón
+  async pedirCambioEstado(s: any) {
+    if (s.estado_activo) { this.aDesactivar.set(s); this.errorEstado.set(''); return; }
+    if (await this.dialogo.confirmar({
+      titulo: `¿Activar ${s.nombre_sucursal}?`, textoConfirmar: 'Activar',
+      mensaje: 'Volverá a abrir caja y a recibir pedidos del menú QR.'
+    })) this.cambiarEstado(s);
   }
 
   cancelarCambioEstado() {

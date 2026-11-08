@@ -130,16 +130,16 @@
         @if (mensajeError()) { <p class="error-formulario">{{ mensajeError() }}</p> }
         <div class="grupo">
           <label class="inf-etiqueta" for="usr-nombre">Nombre completo</label>
-          <input id="usr-nombre" type="text" data-solo-letras class="campo" [(ngModel)]="formulario().nombre_completo" placeholder="Ej.: Juan Pérez">
+          <input id="usr-nombre" type="text" data-regla="persona" required maxlength="100" class="campo" [(ngModel)]="formulario().nombre_completo" placeholder="Ej.: Juan Pérez">
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="usr-correo">Correo</label>
-          <input id="usr-correo" type="email" class="campo" [(ngModel)]="formulario().correo_electronico" placeholder="nombre@correo.com" autocomplete="off">
+          <input id="usr-correo" type="email" data-regla="correo" required maxlength="100" class="campo" [(ngModel)]="formulario().correo_electronico" placeholder="nombre@correo.com" autocomplete="off">
         </div>
         @if (!editandoId()) {
           <div class="grupo">
             <label class="inf-etiqueta" for="usr-contrasena">Contraseña</label>
-            <input id="usr-contrasena" type="password" class="campo" [(ngModel)]="formulario().contrasena" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            <input id="usr-contrasena" type="password" required minlength="6" maxlength="72" class="campo" [(ngModel)]="formulario().contrasena" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
           </div>
         }
         <div class="grid grid-cols-2 gap-4">
@@ -186,11 +186,11 @@
         @if (errorContrasena()) { <p class="error-formulario">{{ errorContrasena() }}</p> }
         <div class="grupo">
           <label class="inf-etiqueta" for="nueva-contrasena">Nueva contraseña</label>
-          <input id="nueva-contrasena" type="password" class="campo" [(ngModel)]="cambioContrasena().nueva" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          <input id="nueva-contrasena" type="password" required minlength="6" maxlength="72" class="campo" [(ngModel)]="cambioContrasena().nueva" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
         </div>
         <div class="grupo">
           <label class="inf-etiqueta" for="confirmar-contrasena">Repetir contraseña</label>
-          <input id="confirmar-contrasena" type="password" class="campo" [(ngModel)]="cambioContrasena().confirmar"
+          <input id="confirmar-contrasena" type="password" required maxlength="72" class="campo" [(ngModel)]="cambioContrasena().confirmar"
                  autocomplete="new-password">
         </div>
       </div>

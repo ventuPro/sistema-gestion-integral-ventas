@@ -5,33 +5,26 @@ const telegramApi = require('../utils/telegram');
 const QRCode = require('qrcode');
 const db = require('../config/db');
 const telegramModel = require('../models/telegramModel');
+const { ErrorValidacion, revisar, sinSentido } = require('../utils/validacion');
 
-// ─── Reglas de validación ───
-const TELEFONO = /^[0-9+()\s-]{6,20}$/;
-const URL_WEB  = /^https?:\/\/\S+$/i;
-
+// ─── Reglas de validación (utils/validacion.js) ───
 const REGLAS_EMPRESA = {
-    nombre_comercial: { max: 100, obligatorio: true },
-    razon_social:     { max: 150 },
-    nit:              { max: 20, patron: /^[0-9A-Za-z-]+$/, mensaje: 'El NIT solo admite números, letras y guiones' },
-    rubro:            { max: 60 },
-    eslogan:          { max: 150 },
-    telefono:         { max: 20, patron: TELEFONO, mensaje: 'Teléfono inválido' },
-    whatsapp:         { max: 20, patron: TELEFONO, mensaje: 'Número de WhatsApp inválido' },
-    correo:           { max: 100, patron: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, mensaje: 'Correo inválido' },
-    sitio_web:        { max: 150, patron: URL_WEB, mensaje: 'El sitio web debe empezar con http:// o https://' },
-    direccion:        { max: 250 },
-    ciudad:           { max: 60 },
-    pais:             { max: 60 },
-    facebook:         { max: 150, patron: URL_WEB, mensaje: 'El enlace de Facebook debe empezar con https://' },
-    instagram:        { max: 150, patron: URL_WEB, mensaje: 'El enlace de Instagram debe empezar con https://' },
-    tiktok:           { max: 150, patron: URL_WEB, mensaje: 'El enlace de TikTok debe empezar con https://' },
-    login_titulo:     { max: 100 }
-};
-
-const ETIQUETAS = {
-    nombre_comercial: 'nombre comercial', razon_social: 'razón social', sitio_web: 'sitio web',
-    direccion: 'dirección', pais: 'país', login_titulo: 'texto del inicio de sesión'
+    nombre_comercial: { regla: 'nombre',    max: 100, obligatorio: true, etiqueta: 'El nombre comercial' },
+    razon_social:     { regla: 'nombre',    max: 150, etiqueta: 'La razón social' },
+    nit:              { regla: 'nit',       etiqueta: 'El NIT' },
+    rubro:            { regla: 'texto',     max: 60,  etiqueta: 'El rubro' },
+    eslogan:          { regla: 'texto',     max: 150, etiqueta: 'El eslogan' },
+    telefono:         { regla: 'telefono',  etiqueta: 'El teléfono' },
+    whatsapp:         { regla: 'celular',   etiqueta: 'El WhatsApp' },
+    correo:           { regla: 'correo',    max: 100, etiqueta: 'El correo' },
+    sitio_web:        { regla: 'url',       max: 150, etiqueta: 'El sitio web' },
+    direccion:        { regla: 'direccion', max: 250, etiqueta: 'La dirección' },
+    ciudad:           { regla: 'letras',    max: 60,  etiqueta: 'La ciudad' },
+    pais:             { regla: 'letras',    max: 60,  etiqueta: 'El país' },
+    facebook:         { regla: 'url',       max: 150, etiqueta: 'El enlace de Facebook' },
+    instagram:        { regla: 'url',       max: 150, etiqueta: 'El enlace de Instagram' },
+    tiktok:           { regla: 'url',       max: 150, etiqueta: 'El enlace de TikTok' },
+    login_titulo:     { regla: 'texto',     max: 100, etiqueta: 'El texto del inicio de sesión' }
 };
 
 const COLOR = /^#[0-9a-f]{6}$/i;
@@ -42,24 +35,11 @@ const IMAGENES = {
     favicon: { campo: 'url_favicon', maxBytes: 512 * 1024 }
 };
 
-class ErrorValidacion extends Error {}
-
 /** Texto vacío → NULL; valida longitud y formato. */
 const validarEmpresa = (body) => {
     const datos = {};
-    for (const [campo, regla] of Object.entries(REGLAS_EMPRESA)) {
-        if (!(campo in body)) continue;
-        const valor = body[campo] == null ? '' : String(body[campo]).trim();
-        const nombre = ETIQUETAS[campo] || campo;
-        if (!valor) {
-            if (regla.obligatorio) throw new ErrorValidacion(`El ${nombre} es obligatorio`);
-            datos[campo] = null;
-            continue;
-        }
-        if (valor.length > regla.max) throw new ErrorValidacion(`El campo ${nombre} admite hasta ${regla.max} caracteres`);
-        if (regla.patron && !regla.patron.test(valor)) throw new ErrorValidacion(regla.mensaje);
-        datos[campo] = valor;
-    }
+    for (const [campo, r] of Object.entries(REGLAS_EMPRESA))
+        if (campo in body) datos[campo] = revisar(body[campo], r.regla, r);
     return datos;
 };
 
@@ -103,9 +83,9 @@ const ENTEROS = {
 };
 const BOOLEANOS = ['pago_efectivo', 'pago_qr', 'menu_activo', 'menu_qr_visita', 'captcha_activo'];
 const TEXTOS = {
-    moneda_simbolo:          { max: 5,   obligatorio: true, nombre: 'símbolo de moneda' },
-    ticket_mensaje_pie:      { max: 150, obligatorio: true, nombre: 'mensaje del pie del ticket' },
-    menu_mensaje_bienvenida: { max: 200, nombre: 'mensaje de bienvenida' }
+    moneda_simbolo:          { regla: 'moneda', max: 5,   obligatorio: true, etiqueta: 'El símbolo de moneda' },
+    ticket_mensaje_pie:      { regla: 'texto',  max: 150, obligatorio: true, etiqueta: 'El mensaje del pie del ticket' },
+    menu_mensaje_bienvenida: { regla: 'texto',  max: 200, etiqueta: 'El mensaje de bienvenida', multilinea: true }
 };
 
 const OPCIONES = {
@@ -131,13 +111,8 @@ const validarParametros = (body) => {
         if (typeof body[campo] !== 'boolean') throw new ErrorValidacion(`Valor inválido en ${campo}`);
         datos[campo] = body[campo];
     }
-    for (const [campo, r] of Object.entries(TEXTOS)) {
-        if (!(campo in body)) continue;
-        const valor = body[campo] == null ? '' : String(body[campo]).trim();
-        if (!valor && r.obligatorio) throw new ErrorValidacion(`El ${r.nombre} es obligatorio`);
-        if (valor.length > r.max) throw new ErrorValidacion(`El ${r.nombre} admite hasta ${r.max} caracteres`);
-        datos[campo] = valor || null;
-    }
+    for (const [campo, r] of Object.entries(TEXTOS))
+        if (campo in body) datos[campo] = revisar(body[campo], r.regla, r);
     return datos;
 };
 
@@ -169,6 +144,8 @@ const validarIa = (body) => {
     if ('ia_info_negocio' in body) {
         const valor = body.ia_info_negocio == null ? '' : String(body.ia_info_negocio).trim();
         if (valor.length > MAX_INFO_IA) throw new ErrorValidacion(`La información para el chatbot admite hasta ${MAX_INFO_IA} caracteres`);
+        const absurdo = sinSentido(valor, 'texto');
+        if (absurdo) throw new ErrorValidacion(`La información para el chatbot ${absurdo}`);
         datos.ia_info_negocio = valor || null;
     }
     return datos;

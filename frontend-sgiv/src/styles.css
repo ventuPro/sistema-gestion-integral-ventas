@@ -46,6 +46,12 @@ html.tema-oscuro {
   html.tema-oscuro body { background-color: var(--o-fondo); color: var(--o-texto); }
 }
 
+/* Campo con un dato inválido (lo marca core/utils/validacion.ts) */
+:is(input, textarea, select)[aria-invalid="true"] {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgb(220 38 38 / 0.15) !important;
+}
+
 /* Bordes sin color explícito (border, border-b...) */
 @layer base {
   @media screen {

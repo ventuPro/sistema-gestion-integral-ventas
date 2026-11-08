@@ -18,6 +18,9 @@ const agregarMesa = async (req, res) => {
         const { id_sucursal, numero_mesa } = req.body;
         if (!id_sucursal || !numero_mesa)
             return res.status(400).json({ error: 'id_sucursal y numero_mesa son requeridos' });
+        const n = Number(numero_mesa);
+        if (!Number.isInteger(n) || n < 1 || n > 999)
+            return res.status(400).json({ error: 'El número de mesa debe ser un entero entre 1 y 999' });
         const mesa = await m.crearMesa(id_sucursal, numero_mesa);
         res.status(201).json({ mesa });
     } catch(e) {

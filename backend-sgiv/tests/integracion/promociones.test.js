@@ -312,8 +312,10 @@ describe('Promociones en el menú QR', () => {
                                      VALUES (1, 81, md5(random()::text)) RETURNING id_mesa, codigo_qr`);
         const cuenta = (await api('POST', '/cuentas/abrir', { token: tCajero, body: { id_mesa: mesa.id_mesa } })).body.cuenta;
         const cliente = 'a'.repeat(32);
-        await bd.sql(`INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, origen, cliente_mesa)
-                      VALUES ($1, $2, 3, 6, 'qr', $3)`, [cuenta.id_cuenta, id, cliente]);
+        const [pedido] = await bd.sql(`INSERT INTO pedido_mesa (id_sucursal, id_mesa, id_cuenta, cliente_mesa, estado_pedido)
+                                       VALUES (1, $1, $2, $3, 'Confirmado') RETURNING id_pedido`, [mesa.id_mesa, cuenta.id_cuenta, cliente]);
+        await bd.sql(`INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, id_pedido)
+                      VALUES ($1, $2, 3, 6, $3)`, [cuenta.id_cuenta, id, pedido.id_pedido]);
 
         const e = (await api('GET', `/menu/m/${mesa.codigo_qr}/estado?cliente=${cliente}`)).body;
         assert.equal(e.cuenta.mi_pendiente, 12);

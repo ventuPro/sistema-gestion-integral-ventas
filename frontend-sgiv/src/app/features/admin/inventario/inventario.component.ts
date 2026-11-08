@@ -347,7 +347,12 @@ export class InventarioComponent implements OnInit, OnDestroy {
     }
   }
 
-  toggleEstadoProducto(prod: any) {
+  async toggleEstadoProducto(prod: any) {
+    if (!(await this.dialogo.confirmar(prod.estado_activo
+      ? { titulo: `¿Desactivar «${prod.nombre_producto}»?`, textoConfirmar: 'Desactivar', peligro: true,
+          mensaje: 'Dejará de venderse en Punto de venta y Mesas y no aparecerá en el menú QR. Su historial se conserva.' }
+      : { titulo: `¿Reactivar «${prod.nombre_producto}»?`, textoConfirmar: 'Reactivar',
+          mensaje: 'Volverá a venderse y a aparecer en el menú QR si tiene stock.' }))) return;
     const accion = prod.estado_activo
       ? this.productoService.desactivarProducto(prod.id_producto)
       : this.productoService.reactivarProducto(prod.id_producto);

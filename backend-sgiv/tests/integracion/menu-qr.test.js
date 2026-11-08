@@ -321,9 +321,10 @@ describe('Menú QR: confirmar, entregar y cobrar', () => {
         assert.equal(await stock(torta), 8);
         const id_cuenta = conf.body.id_cuenta;
 
-        const items = await bd.sql(`SELECT * FROM detalle_cuenta WHERE id_cuenta = $1`, [id_cuenta]);
+        const items = await bd.sql(`SELECT dc.*, pm.cliente_mesa, pm.nombre_cliente FROM detalle_cuenta dc
+                                    JOIN pedido_mesa pm ON pm.id_pedido = dc.id_pedido WHERE dc.id_cuenta = $1`, [id_cuenta]);
         assert.equal(items.length, 1);
-        assert.equal(items[0].origen, 'qr');
+        assert.equal(items[0].id_pedido, p1.body.id_pedido);
         assert.equal(items[0].nota, 'en trozos');
         assert.equal(items[0].cliente_mesa, celular);
         assert.equal(items[0].nombre_cliente, 'Ana');

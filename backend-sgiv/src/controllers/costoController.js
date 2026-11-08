@@ -1,16 +1,10 @@
 const costoModel = require('../models/costoModel');
 const { mayusculas } = require('../utils/texto');
+const { ErrorValidacion, revisar } = require('../utils/validacion');
 
 // ─── Costos de producción (solo administrador) ───
 
-class ErrorValidacion extends Error {}
-
-const nombre = (valor) => {
-    const t = mayusculas(String(valor ?? '').replace(/\s+/g, ' ').trim());
-    if (!t) throw new ErrorValidacion('El nombre es obligatorio');
-    if (t.length > 80) throw new ErrorValidacion('El nombre admite hasta 80 caracteres');
-    return t;
-};
+const nombre = (valor) => mayusculas(revisar(valor, 'nombre', { etiqueta: 'El nombre', obligatorio: true, max: 80 }));
 
 /** Número positivo con hasta `decimales` decimales */
 const positivo = (valor, campo, { decimales = 4, max = 1e9, cero = false } = {}) => {

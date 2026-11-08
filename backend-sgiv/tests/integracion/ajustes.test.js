@@ -64,11 +64,11 @@ test('solo el administrador puede ver y modificar los ajustes', async () => {
 test('el administrador guarda los datos de la empresa (vacío = NULL)', async () => {
     const r = await api('PUT', '/ajustes/empresa', {
         token: tokenAdmin,
-        body: { nombre_comercial: '  Café Andino ', nit: '1234567-1A', correo: 'hola@andino.bo', eslogan: '' }
+        body: { nombre_comercial: '  Café Andino ', nit: '1234567019', correo: 'hola@andino.bo', eslogan: '' }
     });
     assert.equal(r.status, 200);
     assert.equal(r.body.configuracion.nombre_comercial, 'Café Andino');
-    assert.equal(r.body.configuracion.nit, '1234567-1A');
+    assert.equal(r.body.configuracion.nit, '1234567019');
     assert.equal(r.body.configuracion.eslogan, null);
     assert.equal(r.body.configuracion.ciudad, 'La Paz');   // lo no enviado no cambia
 });
@@ -212,6 +212,21 @@ test('sucursales: crear con horario, nombre único y solo administrador', async 
     const malo = await api('POST', '/sucursales', {
         token: tokenAdmin, body: { nombre_sucursal: 'Sur', horario: [{ dia_semana: 2, abierto: true, hora_apertura: '25:00', hora_cierre: '10:00' }] } });
     assert.equal(malo.status, 400);
+});
+
+test('validación de campos: nombre con solo signos, celular y teléfono de Bolivia', async () => {
+    const crear = (body) => api('POST', '/sucursales', { token: tokenAdmin, body });
+    assert.equal((await crear({ nombre_sucursal: `/*-+.'"` })).status, 400);
+    assert.equal((await crear({ nombre_sucursal: 'Sucursal <b>Sur</b>' })).status, 400);
+    assert.equal((await crear({ nombre_sucursal: 'Sucursal Sur', telefono_contacto: '81234567' })).status, 400);
+    assert.equal((await crear({ nombre_sucursal: 'Sucursal Sur', telefono_contacto: '7123456789' })).status, 400);
+
+    const prop = (body) => api('POST', '/ajustes/propietarios', { token: tokenAdmin, body: { nombre_completo: 'Ana Quispe', ...body } });
+    assert.equal((await prop({ telefono: '5551234' })).status, 400);
+    assert.equal((await prop({ nombre_completo: 'Ana 123' })).status, 400);
+
+    assert.equal((await api('PUT', '/ajustes/empresa', { token: tokenAdmin, body: { whatsapp: '22412345' } })).status, 400);
+    assert.equal((await api('PUT', '/ajustes/parametros', { token: tokenAdmin, body: { moneda_simbolo: '<b>' } })).status, 400);
 });
 
 test('sucursales: editar y desactivar con reglas de seguridad', async () => {

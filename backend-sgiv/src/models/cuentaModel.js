@@ -9,6 +9,11 @@ const { turnoParaVender } = require('./cajaModel');
 // total_acumulado = lo que falta cobrar (las partes ya pagadas tienen id_venta); se calcula, no se guarda
 const PENDIENTE = `(SELECT COALESCE(SUM(dc.subtotal), 0) FROM detalle_cuenta dc WHERE dc.id_cuenta = c.id_cuenta AND dc.id_venta IS NULL)`;
 
+// Quién pidió cada línea: sale del pedido QR (id_pedido NULL = la cargó el cajero)
+const DE_PEDIDO   = `LEFT JOIN pedido_mesa pq ON pq.id_pedido = dc.id_pedido`;
+const CLIENTE     = `CASE WHEN dc.id_pedido IS NULL THEN 'cajero' ELSE 'qr' END AS origen, pq.cliente_mesa, pq.nombre_cliente`;
+const DE_LA_PARTE = `(NOT $2::boolean OR pq.cliente_mesa IS NOT DISTINCT FROM $3)`;
+
 // ─── ABRIR CUENTA / COMANDA ───
 const abrirCuenta = async (id_mesa, id_usuario) => {
     // Verificar que no haya cuenta abierta en esa mesa
@@ -52,8 +57,9 @@ const obtenerCuentaActiva = async (id_mesa) => {
 
     // Traer los productos de la comanda
     const rDetalle = await db.query(`
-        SELECT dc.*, dc.id_venta IS NOT NULL AS pagado, p.nombre_producto, p.url_imagen, cat.nombre_categoria
+        SELECT dc.*, ${CLIENTE}, dc.id_venta IS NOT NULL AS pagado, p.nombre_producto, p.url_imagen, cat.nombre_categoria
         FROM detalle_cuenta dc
+        ${DE_PEDIDO}
         JOIN producto          p   ON dc.id_producto = p.id_producto
         JOIN categoria_producto cat ON p.id_categoria  = cat.id_categoria
         WHERE dc.id_cuenta=$1
@@ -65,7 +71,7 @@ const obtenerCuentaActiva = async (id_mesa) => {
 };
 
 // ─── AGREGAR PRODUCTO A LA COMANDA (con reserva inmediata de stock) ───
-const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_unitario, nota, origen, id_usuario = null) => {
+const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_unitario, nota, id_usuario = null) => {
     cantidad = Math.floor(Number(cantidad));
     if (!(cantidad > 0)) throw new Error('CANTIDAD_INVALIDA');
 
@@ -121,8 +127,8 @@ const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_un
         const existe = await client.query(`
             SELECT id_detalle_cuenta, cantidad
             FROM detalle_cuenta
-            WHERE id_cuenta=$1 AND id_producto=$2 AND origen=$3 AND id_venta IS NULL AND cliente_mesa IS NULL
-        `, [id_cuenta, id_producto, origen]);
+            WHERE id_cuenta=$1 AND id_producto=$2 AND id_pedido IS NULL AND id_venta IS NULL
+        `, [id_cuenta, id_producto]);
 
         let detalle;
         if (existe.rows.length > 0) {
@@ -133,13 +139,13 @@ const agregarProductoCuenta = async (id_cuenta, id_producto, cantidad, precio_un
             `, [nuevaCantidad, existe.rows[0].id_detalle_cuenta])).rows[0];
         } else {
             detalle = (await client.query(`
-                INSERT INTO detalle_cuenta (id_cuenta,id_producto,cantidad,precio_unitario,nota,origen)
-                VALUES ($1,$2,$3,$4,$5,$6) RETURNING *
-            `, [id_cuenta, id_producto, cantidad, precio_unitario, nota||null, origen||'cajero'])).rows[0];
+                INSERT INTO detalle_cuenta (id_cuenta,id_producto,cantidad,precio_unitario,nota)
+                VALUES ($1,$2,$3,$4,$5) RETURNING *
+            `, [id_cuenta, id_producto, cantidad, precio_unitario, nota||null])).rows[0];
         }
 
         await client.query('COMMIT');
-        return { detalle, id_producto, nuevo_stock, id_sucursal, id_mesa };
+        return { detalle: { ...detalle, origen: 'cajero', cliente_mesa: null, nombre_cliente: null }, id_producto, nuevo_stock, id_sucursal, id_mesa };
     } catch (e) {
         await client.query('ROLLBACK');
         throw e;
@@ -318,8 +324,8 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         const rItems = await client.query(`
             SELECT dc.*, p.id_categoria FROM detalle_cuenta dc
             JOIN producto p ON p.id_producto = dc.id_producto
-            WHERE dc.id_cuenta=$1 AND dc.id_venta IS NULL
-              AND (NOT $2::boolean OR dc.cliente_mesa IS NOT DISTINCT FROM $3)
+            ${DE_PEDIDO}
+            WHERE dc.id_cuenta=$1 AND dc.id_venta IS NULL AND ${DE_LA_PARTE}
             ORDER BY dc.id_detalle_cuenta
         `, [id_cuenta, !!parte, parte?.cliente_mesa ?? null]);
         if (!rItems.rows.length) throw new Error('NADA_POR_COBRAR');
@@ -394,8 +400,8 @@ const cotizarCuenta = async (id_cuenta, parte = null, { descuento = null } = {})
         const rItems = await client.query(`
             SELECT dc.id_producto, dc.cantidad, dc.precio_unitario, p.id_categoria FROM detalle_cuenta dc
             JOIN producto p ON p.id_producto = dc.id_producto
-            WHERE dc.id_cuenta = $1 AND dc.id_venta IS NULL
-              AND (NOT $2::boolean OR dc.cliente_mesa IS NOT DISTINCT FROM $3)
+            ${DE_PEDIDO}
+            WHERE dc.id_cuenta = $1 AND dc.id_venta IS NULL AND ${DE_LA_PARTE}
             ORDER BY dc.id_detalle_cuenta`, [id_cuenta, !!parte, parte?.cliente_mesa ?? null]);
         const cot = await promocionModel.cotizar(client, {
             id_sucursal: rCuenta.rows[0].id_sucursal,

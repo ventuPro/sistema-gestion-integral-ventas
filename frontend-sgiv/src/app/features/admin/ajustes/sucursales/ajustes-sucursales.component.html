@@ -71,15 +71,15 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="grupo sm:col-span-2">
             <label class="inf-etiqueta" for="suc-nombre">Nombre</label>
-            <input id="suc-nombre" name="nombre" class="campo" [(ngModel)]="formulario().nombre_sucursal" maxlength="100" placeholder="Sucursal Norte">
+            <input id="suc-nombre" name="nombre" class="campo" [(ngModel)]="formulario().nombre_sucursal" maxlength="100" data-regla="nombre" required placeholder="Sucursal Norte">
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="suc-direccion">Dirección</label>
-            <input id="suc-direccion" name="direccion" class="campo" [(ngModel)]="formulario().direccion_fisica" maxlength="250" placeholder="Av. Principal #123">
+            <input id="suc-direccion" name="direccion" class="campo" [(ngModel)]="formulario().direccion_fisica" maxlength="250" data-regla="direccion" placeholder="Av. Principal #123">
           </div>
           <div class="grupo">
             <label class="inf-etiqueta" for="suc-telefono">Teléfono</label>
-            <input id="suc-telefono" name="telefono" type="tel" class="campo" [(ngModel)]="formulario().telefono_contacto" maxlength="15" placeholder="70000000">
+            <input id="suc-telefono" name="telefono" type="tel" class="campo" [(ngModel)]="formulario().telefono_contacto" maxlength="8" data-regla="telefono" placeholder="70000000">
           </div>
         </div>
 

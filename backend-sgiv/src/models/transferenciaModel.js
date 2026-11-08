@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { registrarHistorial } = require('./inventarioModel');
 const notificacionModel = require('./notificacionModel');
+const { revisar } = require('../utils/validacion');
 
 // ─── Transferencias directas entre sucursales ───
 // El stock sale del origen y entra al destino en la misma transacción.
@@ -30,7 +31,9 @@ const normalizarItems = (items) => {
 
 const crear = async ({ id_origen, id_destino, id_usuario, items, observacion }) => {
     const lista = normalizarItems(items);
-    const nota = String(observacion ?? '').trim().slice(0, MAX_OBSERVACION).toLocaleUpperCase('es') || null;
+    let nota;
+    try { nota = revisar(observacion, 'texto', { etiqueta: 'La observación', max: MAX_OBSERVACION })?.toLocaleUpperCase('es') ?? null; }
+    catch (e) { throw error('INVALIDA', e.message); }
     if (!Number.isInteger(id_origen) || !Number.isInteger(id_destino)) throw error('INVALIDA', 'Sucursal inválida');
     if (id_origen === id_destino) throw error('INVALIDA', 'El origen y el destino deben ser sucursales distintas');
 

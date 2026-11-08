@@ -25,7 +25,7 @@
 
         <div>
           <label class="inf-etiqueta mb-2 block" for="motivo-descuento">Motivo</label>
-          <input id="motivo-descuento" name="motivo" class="campo-texto" maxlength="120" [(ngModel)]="f.motivo" placeholder="Cliente frecuente">
+          <input id="motivo-descuento" name="motivo" class="campo-texto" maxlength="120" minlength="3" data-regla="texto" [(ngModel)]="f.motivo" placeholder="Cliente frecuente">
         </div>
 
         @if (error()) { <p class="error-descuento" role="alert">{{ error() }}</p> }

@@ -155,13 +155,42 @@ export class AjustesParametrosComponent implements OnInit {
     this.qrNuevo.set(undefined);
   }
 
-  guardar() {
+  /** Qué cambia en el funcionamiento del sistema con lo que se va a guardar */
+  private advertencias(): string[] {
+    const a = this.guardado, n = this.p(), lista: string[] = [];
+    const sesion = (h: number) => `${h} ${h === 1 ? 'hora' : 'horas'}`;
+    if (a.menu_activo && !n.menu_activo) lista.push('El menú QR dejará de recibir pedidos: los clientes solo verán la carta y pedirán en caja.');
+    if (!a.menu_activo && n.menu_activo) lista.push('El menú QR volverá a recibir pedidos de las mesas.');
+    if (a.pago_efectivo && !n.pago_efectivo) lista.push('Ya no se podrá cobrar en efectivo en Punto de venta ni en Mesas.');
+    if (a.pago_qr && !n.pago_qr) lista.push('Ya no se podrá cobrar por QR en Punto de venta ni en Mesas.');
+    if (a.captcha_activo && !n.captcha_activo) lista.push('El inicio de sesión dejará de pedir el código de la imagen (CAPTCHA): menos protección contra intentos automáticos.');
+    if (!a.menu_qr_visita && n.menu_qr_visita) lista.push('Los clientes solo podrán pedir con el QR temporal impreso de cada visita.');
+    if (a.moneda_simbolo !== n.moneda_simbolo) lista.push(`Precios, tickets y reportes mostrarán «${n.moneda_simbolo}» en lugar de «${a.moneda_simbolo}».`);
+    if (Number(a.stock_minimo_defecto) !== Number(n.stock_minimo_defecto))
+      lista.push(`El stock mínimo pasará de ${a.stock_minimo_defecto} a ${n.stock_minimo_defecto} en todos los productos de todas las sucursales.`);
+    if (a.ticket_ancho !== n.ticket_ancho) lista.push('Los tickets se imprimirán con el nuevo ancho: revisa que coincida con la impresora.');
+    if (Number(a.sesion_horas) !== Number(n.sesion_horas))
+      lista.push(`La sesión durará ${sesion(Number(n.sesion_horas))} desde el próximo inicio de sesión.`);
+    if (Number(n.login_max_intentos) < Number(a.login_max_intentos))
+      lista.push(`Las cuentas se bloquearán tras ${n.login_max_intentos} intentos fallidos.`);
+    if (this.qrNuevo() === null && this.qrGuardado()) lista.push('Se quitará la imagen del QR de cobro.');
+    return lista;
+  }
+
+  async guardar() {
     const fuera = [...this.camposMenu, ...this.camposSeguridad,
                    { clave: 'stock_minimo_defecto', etiqueta: 'Stock mínimo', min: 0, max: 10000 } as CampoNumero]
       .find(c => { const n = Number(this.p()[c.clave]); return !Number.isInteger(n) || n < c.min || n > c.max; });
     if (fuera) return this.dialogo.error(`${fuera.etiqueta}: debe ser un número entero entre ${fuera.min} y ${fuera.max}.`);
     if (!this.p().moneda_simbolo.trim()) return this.dialogo.error('El símbolo de moneda es obligatorio.');
     if (!this.p().ticket_mensaje_pie.trim()) return this.dialogo.error('El mensaje del pie del ticket es obligatorio.');
+
+    const advertencias = this.advertencias();
+    if (!(await this.dialogo.confirmar({
+      titulo: '¿Guardar los parámetros?',
+      mensaje: advertencias.length ? 'Este cambio modifica el funcionamiento del sistema:' : 'Los cambios se aplican a todo el sistema.',
+      advertencias, peligro: advertencias.length > 0, textoConfirmar: 'Guardar'
+    }))) return;
 
     const datos: any = { ...this.p() };
     if (this.qrNuevo() !== undefined) datos.qr_cobro = this.qrNuevo();

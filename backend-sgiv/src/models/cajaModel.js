@@ -414,8 +414,9 @@ const obtenerComprobante = async (id_venta, id_sucursal = null) => {
         FROM venta_caja v
         LEFT JOIN LATERAL (
             SELECT MIN(m.numero_mesa) AS numero_mesa,
-                   ARRAY_REMOVE(ARRAY_AGG(DISTINCT dc.nombre_cliente), NULL) AS clientes
+                   ARRAY_REMOVE(ARRAY_AGG(DISTINCT pq.nombre_cliente), NULL) AS clientes
             FROM detalle_cuenta dc
+            LEFT JOIN pedido_mesa pq ON pq.id_pedido = dc.id_pedido
             JOIN cuenta_mesa c ON c.id_cuenta = dc.id_cuenta
             JOIN mesa_local m  ON m.id_mesa   = c.id_mesa
             WHERE dc.id_venta = v.id_venta

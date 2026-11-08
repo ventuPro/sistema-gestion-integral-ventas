@@ -17,7 +17,7 @@ import { componenteDiferido } from '../../../core/utils/diferido';
 
 type Pestana = 'empresa' | 'apariencia' | 'propietarios' | 'sucursales' | 'parametros' | 'ia' | 'telegram' | 'auditoria';
 
-interface CampoEmpresa { clave: string; etiqueta: string; ejemplo: string; max: number; tipo?: string; ancho?: boolean }
+interface CampoEmpresa { clave: string; etiqueta: string; ejemplo: string; max: number; regla: string; tipo?: string; ancho?: boolean; requerido?: boolean }
 
 const CAMPOS_EMPRESA = ['nombre_comercial', 'razon_social', 'nit', 'rubro', 'eslogan', 'telefono', 'whatsapp',
                         'correo', 'sitio_web', 'direccion', 'ciudad', 'pais', 'facebook', 'instagram', 'tiktok',
@@ -72,32 +72,32 @@ export class AjustesComponent implements OnInit, OnDestroy {
 
   readonly gruposEmpresa: { titulo: string; campos: CampoEmpresa[] }[] = [
     { titulo: 'Identidad', campos: [
-      { clave: 'nombre_comercial', etiqueta: 'Nombre comercial *', ejemplo: "Pastelería Ricky's", max: 100 },
-      { clave: 'rubro',            etiqueta: 'Rubro',               ejemplo: 'Pastelería, cafetería, panadería…', max: 60 },
-      { clave: 'eslogan',          etiqueta: 'Eslogan',             ejemplo: 'El sabor de siempre', max: 150, ancho: true }
+      { clave: 'nombre_comercial', etiqueta: 'Nombre comercial *', ejemplo: "Pastelería Ricky's", max: 100, regla: 'nombre', requerido: true },
+      { clave: 'rubro',            etiqueta: 'Rubro',               ejemplo: 'Pastelería, cafetería, panadería…', max: 60, regla: 'texto' },
+      { clave: 'eslogan',          etiqueta: 'Eslogan',             ejemplo: 'El sabor de siempre', max: 150, ancho: true, regla: 'texto' }
     ]},
     { titulo: 'Inicio de sesión', campos: [
-      { clave: 'login_titulo', etiqueta: 'Texto del inicio de sesión', ejemplo: "Pastelería Ricky's", max: 100, ancho: true }
+      { clave: 'login_titulo', etiqueta: 'Texto del inicio de sesión', ejemplo: "Pastelería Ricky's", max: 100, ancho: true, regla: 'texto' }
     ]},
     { titulo: 'Datos legales', campos: [
-      { clave: 'razon_social', etiqueta: 'Razón social', ejemplo: 'Ricky’s S.R.L.', max: 150 },
-      { clave: 'nit',          etiqueta: 'NIT',          ejemplo: '1234567019', max: 20 }
+      { clave: 'razon_social', etiqueta: 'Razón social', ejemplo: 'Ricky’s S.R.L.', max: 150, regla: 'nombre' },
+      { clave: 'nit',          etiqueta: 'NIT',          ejemplo: '1234567019', max: 13, regla: 'nit' }
     ]},
     { titulo: 'Contacto', campos: [
-      { clave: 'telefono',  etiqueta: 'Teléfono',  ejemplo: '2 2123456', max: 20, tipo: 'tel' },
-      { clave: 'whatsapp',  etiqueta: 'WhatsApp',  ejemplo: '+591 70000000', max: 20, tipo: 'tel' },
-      { clave: 'correo',    etiqueta: 'Correo',    ejemplo: 'contacto@negocio.com', max: 100, tipo: 'email' },
-      { clave: 'sitio_web', etiqueta: 'Sitio web', ejemplo: 'https://www.negocio.com', max: 150, tipo: 'url' }
+      { clave: 'telefono',  etiqueta: 'Teléfono',  ejemplo: '2412345', max: 8, tipo: 'tel', regla: 'telefono' },
+      { clave: 'whatsapp',  etiqueta: 'WhatsApp',  ejemplo: '70000000', max: 8, tipo: 'tel', regla: 'celular' },
+      { clave: 'correo',    etiqueta: 'Correo',    ejemplo: 'contacto@negocio.com', max: 100, tipo: 'email', regla: 'correo' },
+      { clave: 'sitio_web', etiqueta: 'Sitio web', ejemplo: 'https://www.negocio.com', max: 150, tipo: 'url', regla: 'url' }
     ]},
     { titulo: 'Ubicación', campos: [
-      { clave: 'direccion', etiqueta: 'Dirección', ejemplo: 'Av. 6 de Agosto #123, Sopocachi', max: 250, ancho: true },
-      { clave: 'ciudad',    etiqueta: 'Ciudad',    ejemplo: 'La Paz', max: 60 },
-      { clave: 'pais',      etiqueta: 'País',      ejemplo: 'Bolivia', max: 60 }
+      { clave: 'direccion', etiqueta: 'Dirección', ejemplo: 'Av. 6 de Agosto #123, Sopocachi', max: 250, ancho: true, regla: 'direccion' },
+      { clave: 'ciudad',    etiqueta: 'Ciudad',    ejemplo: 'La Paz', max: 60, regla: 'letras' },
+      { clave: 'pais',      etiqueta: 'País',      ejemplo: 'Bolivia', max: 60, regla: 'letras' }
     ]},
     { titulo: 'Redes sociales', campos: [
-      { clave: 'facebook',  etiqueta: 'Facebook',  ejemplo: 'https://facebook.com/negocio', max: 150, tipo: 'url' },
-      { clave: 'instagram', etiqueta: 'Instagram', ejemplo: 'https://instagram.com/negocio', max: 150, tipo: 'url' },
-      { clave: 'tiktok',    etiqueta: 'TikTok',    ejemplo: 'https://tiktok.com/@negocio', max: 150, tipo: 'url' }
+      { clave: 'facebook',  etiqueta: 'Facebook',  ejemplo: 'https://facebook.com/negocio', max: 150, tipo: 'url', regla: 'url' },
+      { clave: 'instagram', etiqueta: 'Instagram', ejemplo: 'https://instagram.com/negocio', max: 150, tipo: 'url', regla: 'url' },
+      { clave: 'tiktok',    etiqueta: 'TikTok',    ejemplo: 'https://tiktok.com/@negocio', max: 150, tipo: 'url', regla: 'url' }
     ]}
   ];
 
@@ -169,8 +169,18 @@ export class AjustesComponent implements OnInit, OnDestroy {
   }
 
   // ─── Empresa ───
-  guardarEmpresa() {
+  async guardarEmpresa() {
     if (!this.empresa()['nombre_comercial']?.trim()) return this.dialogo.error('El nombre comercial es obligatorio.');
+    const antes: any = this.guardado() || {}, ahora = this.empresa();
+    const cambio = (c: string) => String(antes[c] ?? '').trim() !== String(ahora[c] ?? '').trim();
+    const advertencias: string[] = [];
+    if (cambio('nombre_comercial'))
+      advertencias.push(`El nombre «${ahora['nombre_comercial'].trim()}» se verá en el menú, los tickets, el inicio de sesión y el menú QR.`);
+    if (cambio('razon_social') || cambio('nit')) advertencias.push('Los comprobantes que se impriman desde ahora llevarán la nueva razón social o NIT.');
+    if (!(await this.dialogo.confirmar({
+      titulo: '¿Guardar los datos de la empresa?', advertencias, textoConfirmar: 'Guardar',
+      mensaje: advertencias.length ? '' : 'Se actualizarán los datos que aparecen en tickets y en el menú QR.'
+    }))) return;
     this.guardando.set(true);
     this.ajustes.guardarEmpresa(this.empresa()).subscribe({
       next: (r) => { this.llenar(r.configuracion); this.terminar('Datos de la empresa guardados'); },
@@ -239,7 +249,11 @@ export class AjustesComponent implements OnInit, OnDestroy {
     this.ajustes.restaurarVista();
   }
 
-  guardarApariencia() {
+  async guardarApariencia() {
+    if (!(await this.dialogo.confirmar({
+      titulo: '¿Guardar la apariencia?', textoConfirmar: 'Guardar',
+      mensaje: 'Todo el personal y los clientes del menú QR verán los nuevos colores, tema, logo e ícono.'
+    }))) return;
     const datos: any = { ...this.apariencia() };
     if (this.logoNuevo() !== undefined) datos.logo = this.logoNuevo();
     if (this.faviconNuevo() !== undefined) datos.favicon = this.faviconNuevo();

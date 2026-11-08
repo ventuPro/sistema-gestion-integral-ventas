@@ -87,6 +87,7 @@ export class UsuariosComponent implements OnInit {
   readonly mostrarModalPermisos = signal(false);
   readonly usuarioPermisos      = signal<any>(null);
   readonly permisosEdicion      = signal<Record<string, boolean>>({});
+  private permisosAntes: Record<string, boolean> = {};
   readonly cargandoPermisos     = signal(false);
   readonly modulosCargados      = signal(false);
   readonly errorPermisos        = signal('');
@@ -125,17 +126,29 @@ export class UsuariosComponent implements OnInit {
       nombre_completo: usr.nombre_completo, correo_electronico: usr.correo_electronico,
       contrasena: '', id_rol: Number(usr.id_rol), id_sucursal: Number(usr.id_sucursal)
     });
+    this.usuarioAntes = { id_rol: Number(usr.id_rol), id_sucursal: Number(usr.id_sucursal) };
     this.mostrarModal.set(true);
   }
 
+  private usuarioAntes = { id_rol: 0, id_sucursal: 0 };
+
   cerrarModal() { this.mostrarModal.set(false); this.editandoId.set(null); this.mensajeError.set(''); }
 
-  guardarUsuario() {
+  async guardarUsuario() {
     const f = this.formulario(), id = this.editandoId();
     if (!f.nombre_completo || !f.correo_electronico || !f.id_rol || !f.id_sucursal)
       return this.mensajeError.set('Completa todos los campos.');
     if (!id && (f.contrasena || '').length < 6)
       return this.mensajeError.set('La contraseña debe tener al menos 6 caracteres.');
+    if (id) {
+      const advertencias = [
+        ...(Number(f.id_rol) !== this.usuarioAntes.id_rol ? ['Cambia su rol: cambian las pantallas a las que puede entrar.'] : []),
+        ...(Number(f.id_sucursal) !== this.usuarioAntes.id_sucursal ? ['Cambia de sucursal: venderá y verá el inventario de la nueva sucursal.'] : [])
+      ];
+      if (advertencias.length && !(await this.dialogo.confirmar({
+        titulo: `¿Guardar los cambios de ${f.nombre_completo}?`, advertencias, peligro: true, textoConfirmar: 'Guardar'
+      }))) return;
+    }
     this.guardando.set(true); this.mensajeError.set('');
     const fallo = (e: any, msg: string) => { this.mensajeError.set(e?.error?.error || msg); this.guardando.set(false); };
 
@@ -244,6 +257,7 @@ export class UsuariosComponent implements OnInit {
     this.permisoService.obtenerPermisosUsuario(Number(usr.id_usuario)).subscribe({
       next: (res: any) => {
         this.permisosEdicion.set(Object.fromEntries(this.modulosSistema.map(m => [m.key, res?.permisos?.[m.key] === true])));
+        this.permisosAntes = { ...this.permisosEdicion() };
         this.cargandoPermisos.set(false);
         this.modulosCargados.set(true);
       },
@@ -256,11 +270,23 @@ export class UsuariosComponent implements OnInit {
 
   cerrarModalPermisos() { this.mostrarModalPermisos.set(false); this.usuarioPermisos.set(null); }
 
-  guardarPermisos() {
+  async guardarPermisos() {
     if (!this.usuarioPermisos()) return;
     const nombre = this.usuarioPermisos().nombre_completo;
     const permisos: Record<string, boolean> = {};
     this.modulosSistema.forEach(m => { permisos[m.key] = this.permisosEdicion()[m.key] === true; });
+
+    const lista = (valor: boolean) => this.modulosSistema
+      .filter(m => permisos[m.key] === valor && this.permisosAntes[m.key] !== valor).map(m => m.label).join(', ');
+    const quita = lista(false), da = lista(true);
+    const advertencias = [
+      ...(quita ? [`Dejará de entrar a: ${quita}.`] : []),
+      ...(da ? [`Podrá entrar a: ${da}.`] : [])
+    ];
+    if (!(await this.dialogo.confirmar({
+      titulo: `¿Guardar los permisos de ${nombre}?`, textoConfirmar: 'Guardar', advertencias, peligro: !!quita,
+      mensaje: advertencias.length ? 'Se aplica al instante, aunque tenga la sesión abierta:' : 'No hay cambios en sus accesos.'
+    }))) return;
 
     this.cargandoPermisos.set(true);
     this.errorPermisos.set('');

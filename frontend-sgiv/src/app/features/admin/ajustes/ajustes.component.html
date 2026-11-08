@@ -39,7 +39,7 @@
             @for (c of grupo.campos; track c.clave) {
               <div class="grupo" [ngClass]="{ 'md:col-span-2': c.ancho }">
                 <label class="inf-etiqueta" [for]="c.clave">{{ c.etiqueta }}</label>
-                <input class="campo" [id]="c.clave" [name]="c.clave" [type]="c.tipo || 'text'" [maxlength]="c.max"
+                <input class="campo" [id]="c.clave" [name]="c.clave" [type]="c.tipo || 'text'" [maxlength]="c.max" [attr.data-regla]="c.regla" [required]="!!c.requerido"
                        [(ngModel)]="empresa()[c.clave]" [placeholder]="c.ejemplo">
               </div>
             }

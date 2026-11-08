@@ -87,11 +87,16 @@ export class AjustesPropietariosComponent implements OnInit {
     if (!this.eliminando()) this.aEliminar.set(null);
   }
 
-  guardar() {
+  async guardar() {
     const f = this.formulario();
     if (!f.nombre_completo?.trim()) return this.errorFormulario.set('El nombre es obligatorio.');
     if (Number(f.porcentaje_participacion) > this.disponible())
       return this.errorFormulario.set(`La participación no puede pasar de ${this.disponible()} % (el total sería mayor a 100 %).`);
+    if (!(await this.dialogo.confirmar({
+      titulo: f.id_propietario ? '¿Guardar los cambios del propietario?' : '¿Registrar el propietario?',
+      mensaje: `${f.nombre_completo.trim()} · ${Number(f.porcentaje_participacion) || 0} % de participación`,
+      textoConfirmar: 'Guardar'
+    }))) return;
     this.guardando.set(true);
     this.ajustes.guardarPropietario(f).subscribe({
       next: (r) => {
