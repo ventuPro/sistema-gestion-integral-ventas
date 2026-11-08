@@ -27,7 +27,7 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
   standalone: true,
   imports: [LucideAngularModule, DatePipe],
   templateUrl: './inventario-valorado.component.html',
-  styleUrls: ['../../../shared/informe/informe.css']
+  styleUrls: ['../../../shared/informe/informe.css', './inventario-valorado.component.css']
 })
 export class InventarioValoradoComponent {
   private reportes = inject(ReporteService);
@@ -59,6 +59,7 @@ export class InventarioValoradoComponent {
   ];
 
   readonly todas = computed(() => this.idSucursal() === 0);
+  readonly columnas = computed(() => this.todas() ? 8 : 7);
   readonly categorias = computed<string[]>(() => (this.datos()?.categorias || []).map((c: any) => c.nombre));
 
   /** Filtros sobre los lotes: cada producto se vuelve a sumar con los lotes que quedan */

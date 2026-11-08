@@ -221,6 +221,15 @@
 .inf-tabla .num { text-align: right; white-space: nowrap; }
 .inf-tabla .fuerte { color: var(--i-tinta); font-weight: 600; }
 .inf-tabla .rango { color: var(--i-sutil); font-size: calc(12px * var(--escala-texto)); width: 36px; }
+/* Fila que separa grupos (categoría, «Vencidos», «Saldo inicial»…) */
+.inf-tabla tr.fila-seccion td {
+  padding-top: 11px; padding-bottom: 11px;
+  font-size: calc(13px * var(--escala-texto)); font-weight: 700;
+  color: var(--i-acento);
+  background: color-mix(in oklab, var(--i-acento) 9%, var(--i-papel));
+  border-top: 1px solid color-mix(in oklab, var(--i-acento) 35%, transparent);
+}
+.inf-tabla tbody tr.fila-seccion:hover { background: transparent; }
 .inf-secundario { display: block; font-size: calc(12px * var(--escala-texto)); color: var(--i-sutil); margin-top: 1px; }
 
 /* Barras de proporción */

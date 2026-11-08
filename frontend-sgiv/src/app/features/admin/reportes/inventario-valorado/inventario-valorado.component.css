@@ -1,0 +1,75 @@
+/* ─── Inventario valorado: colores por concepto (costo, venta, ganancia) y categorías destacadas ─── */
+:host {
+  --c-costo: #b45309;
+  --c-venta: var(--i-acento);
+  --c-ganancia: var(--i-sube);
+}
+@media screen {
+  :host-context(html.tema-oscuro) { --c-costo: #fbbf24; }
+}
+
+/* Tarjetas de arriba: una franja de color por concepto */
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; padding: 16px; }
+.tarjeta {
+  border: 1px solid var(--i-linea); border-left: 4px solid var(--color, var(--i-sutil));
+  border-radius: 10px; padding: 12px 14px; background: var(--i-papel);
+}
+.tarjeta .inf-valor { color: var(--color, var(--i-tinta)); }
+.tarjeta.costo    { --color: var(--c-costo); }
+.tarjeta.venta    { --color: var(--c-venta); }
+.tarjeta.ganancia { --color: var(--c-ganancia); }
+.tarjeta.sin-costo { --color: var(--i-sutil); }
+
+/* Encabezados y cifras de cada concepto con su color */
+th.costo, td.costo       { color: var(--c-costo); }
+th.venta, td.venta       { color: var(--c-venta); }
+th.ganancia, td.ganancia { color: var(--c-ganancia); }
+th.costo, th.venta, th.ganancia { font-weight: 600; }
+
+/* Categoría: franja de color que separa cada grupo */
+tr.categoria td {
+  background: color-mix(in oklab, var(--i-acento) 11%, var(--i-papel));
+  border-top: 2px solid var(--i-acento);
+  border-bottom: 1px solid color-mix(in oklab, var(--i-acento) 30%, transparent);
+  padding-top: 11px; padding-bottom: 11px;
+}
+tr.categoria .nombre {
+  color: var(--i-acento); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  font-size: calc(13px * var(--escala-texto));
+}
+tr.categoria .cuenta { color: var(--i-tenue); font-size: calc(12px * var(--escala-texto)); }
+tr.categoria:hover { background: transparent; }
+
+/* Total de la categoría */
+tr.total-categoria td {
+  background: var(--i-fondo); border-top: 1px solid var(--i-linea);
+  font-weight: 600; color: var(--i-tinta);
+}
+
+/* Producto: se puede abrir para ver sus lotes */
+tr.producto { cursor: pointer; }
+tr.producto.abierto td { background: color-mix(in oklab, var(--i-acento) 6%, var(--i-papel)); }
+tr.producto .flecha { color: var(--i-sutil); transition: transform 120ms ease; }
+tr.producto.abierto .flecha { color: var(--i-acento); }
+
+/* Lotes del producto: un recuadro aparte, no estira las columnas de la tabla */
+tr.lotes > td { padding: 0 14px 14px 40px; background: color-mix(in oklab, var(--i-acento) 6%, var(--i-papel)); }
+tr.lotes:hover { background: transparent; }
+.recuadro {
+  border: 1px solid var(--i-linea); border-left: 3px solid var(--i-acento); border-radius: 8px;
+  background: var(--i-papel); overflow-x: auto;
+}
+.recuadro .titulo {
+  padding: 8px 12px; font-weight: 600; color: var(--i-tinta);
+  font-size: calc(12.5px * var(--escala-texto)); border-bottom: 1px solid var(--i-linea-suave);
+}
+.recuadro table { width: 100%; border-collapse: collapse; font-size: calc(12.5px * var(--escala-texto)); }
+.recuadro th {
+  text-align: left; font-weight: 500; color: var(--i-tenue); white-space: nowrap;
+  font-size: calc(11px * var(--escala-texto)); padding: 6px 12px; border-bottom: 1px solid var(--i-linea-suave);
+}
+.recuadro td { padding: 6px 12px; border-bottom: 1px solid var(--i-linea-suave); white-space: nowrap; }
+.recuadro tr:last-child td { border-bottom: none; }
+.recuadro .num { text-align: right; }
+
+@media (prefers-reduced-motion: reduce) { tr.producto .flecha { transition: none; } }
