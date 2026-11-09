@@ -224,7 +224,7 @@ button { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-col
   color: var(--i-texto);
   background: rgba(255, 255, 255, 0.95);
 }
-.etiqueta.aviso { color: #b45309; }
+
 .ver-ficha {
   position: absolute;
   right: 8px;

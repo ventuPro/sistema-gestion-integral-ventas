@@ -1,0 +1,7 @@
+/* ─── Menú QR: unidades disponibles, con destello cuando cambian en vivo ─── */
+.plato .quedan{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;margin-left:-6px;padding:1px 6px;border-radius:999px;font-size:12px;font-weight:600;color:#15803d;font-variant-numeric:tabular-nums;transform-origin:left}
+.plato .quedan i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.plato .quedan.pocos{color:#b45309}
+.plato .quedan.cambio{animation:quedan-cambio .9s ease-out}
+@keyframes quedan-cambio{0%{transform:scale(1.15);background:rgba(250,204,21,.5)}}
+@media (prefers-reduced-motion: reduce) { .plato .quedan.cambio { animation: none; } }

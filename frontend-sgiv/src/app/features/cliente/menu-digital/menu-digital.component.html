@@ -151,7 +151,6 @@
                       @else { <lucide-icon [img]="sec.icono" class="w-10 h-10 inf-sutil" [strokeWidth]="1.25"></lucide-icon> }
                       @if (etiquetaPromo(prod); as e) { <span class="etiqueta-promo">{{ e }}</span> }
                       @if (disponible(prod) === 0) { <span class="etiqueta">En tu carrito</span> }
-                      @else if (disponible(prod) <= 5) { <span class="etiqueta aviso">Quedan {{ disponible(prod) }}</span> }
                       @if (prod.tiene_ficha) {
                         <button class="ver-ficha" (click)="$event.stopPropagation(); voltear(prod)" [attr.aria-label]="'¿Qué lleva ' + prod.nombre + '?'">
                           <lucide-icon [img]="icons.info" class="w-4 h-4"></lucide-icon>
@@ -160,6 +159,14 @@
                     </div>
                     <div class="datos">
                       <p class="nombre">{{ prod.nombre }}</p>
+                      @if (conLimite(prod) && disponible(prod) > 0) {
+                        <!-- Se vuelve a crear cuando cambia el número: así se repite el destello -->
+                        @for (n of [disponible(prod)]; track n) {
+                          <p class="quedan" [class.pocos]="n <= 5" [class.cambio]="destello().has(prod.id_producto)">
+                            <i aria-hidden="true"></i>{{ n }} {{ n === 1 ? 'disponible' : 'disponibles' }}
+                          </p>
+                        }
+                      }
                       @if (prod.descripcion_producto) { <p class="descripcion">{{ prod.descripcion_producto }}</p> }
                       <ng-container *ngTemplateOutlet="precioYControles; context: { $implicit: prod }" />
                     </div>

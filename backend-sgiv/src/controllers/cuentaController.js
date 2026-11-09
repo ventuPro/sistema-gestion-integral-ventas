@@ -2,7 +2,7 @@ const cuentaModel  = require('../models/cuentaModel');
 const productoModel = require('../models/productoModel');
 const mesaModel    = require('../models/mesaModel');
 const ajusteModel  = require('../models/ajusteModel');
-const { emitirMesa } = require('../utils/tiempoReal');
+const { emitirMesa, emitirStock } = require('../utils/tiempoReal');
 const io           = () => global.io;
 
 // POST /api/cuentas/abrir
@@ -59,11 +59,7 @@ const agregarProducto = async (req, res) => {
         emitirMesa(resultado.id_mesa, 'cuenta:actualizada', {});
 
         // Broadcast global: POS y Mesas deben repintar stock al instante
-        io()?.emit('actualizacion_stock_global', {
-            id_producto:               resultado.id_producto,
-            id_sucursal:               resultado.id_sucursal,
-            nueva_cantidad_disponible: resultado.nuevo_stock
-        });
+        emitirStock([resultado]);
 
         res.status(201).json({ detalle: resultado.detalle, total: cuentaActualizada?.total_acumulado, stock: resultado.nuevo_stock });
     } catch(e) {
@@ -93,13 +89,7 @@ const quitarProducto = async (req, res) => {
         });
         emitirMesa(resultado.id_mesa, 'cuenta:actualizada', {});
 
-        if (resultado.nuevo_stock != null) {
-            io()?.emit('actualizacion_stock_global', {
-                id_producto:               resultado.id_producto,
-                id_sucursal:               resultado.id_sucursal,
-                nueva_cantidad_disponible: resultado.nuevo_stock
-            });
-        }
+        emitirStock([resultado]);
 
         res.json({ mensaje: 'Producto eliminado', total: cuentaActualizada?.total_acumulado, stock: resultado.nuevo_stock });
     } catch(e) {
@@ -124,13 +114,7 @@ const cambiarCantidad = async (req, res) => {
             total_acumulado: cuentaActualizada?.total_acumulado
         });
         emitirMesa(r.id_mesa, 'cuenta:actualizada', {});
-        if (r.nuevo_stock != null) {
-            io()?.emit('actualizacion_stock_global', {
-                id_producto:               r.id_producto,
-                id_sucursal:               r.id_sucursal,
-                nueva_cantidad_disponible: r.nuevo_stock
-            });
-        }
+        emitirStock([r]);
         res.json({ total: cuentaActualizada?.total_acumulado, stock: r.nuevo_stock });
     } catch (e) {
         if (e.message === 'CANTIDAD_INVALIDA')

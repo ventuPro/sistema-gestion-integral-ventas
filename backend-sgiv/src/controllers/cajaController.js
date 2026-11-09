@@ -4,7 +4,7 @@ const ajusteModel   = require('../models/ajusteModel');
 const promocionModel = require('../models/promocionModel');
 const db            = require('../config/db');
 const { marcarEvento } = require('../auditoria/registroAcceso');
-const { emitirUsuario, emitirCajeros } = require('../utils/tiempoReal');
+const { emitirUsuario, emitirCajeros, emitirStock } = require('../utils/tiempoReal');
 
 // ─── ESTADO COMPLETO (la fuente de verdad para el front) ──────────
 const getEstadoCompleto = async (req, res) => {
@@ -204,13 +204,7 @@ const cobrarVenta = async (req, res) => {
         if (motivo) return res.status(400).json({ error: 'VENTA_INVALIDA', detalle: motivo });
         const { id_venta, cambiosStock, cotizacion } = await cajaModel.registrarVenta(datos);
 
-        for (const c of cambiosStock) {
-            global.io?.emit('actualizacion_stock_global', {
-                id_producto:               c.id_producto,
-                id_sucursal:               c.id_sucursal,
-                nueva_cantidad_disponible: c.nuevo_stock
-            });
-        }
+        emitirStock(cambiosStock);
 
         res.status(201).json({ mensaje: 'Venta registrada', id_venta, cotizacion, stock: cambiosStock });
     } catch (e) {

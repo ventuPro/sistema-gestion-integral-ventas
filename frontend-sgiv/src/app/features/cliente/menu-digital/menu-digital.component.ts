@@ -74,7 +74,7 @@ const leerNombre = (): string => {
                 CarruselRecomendadosComponent, BienvenidaMenuComponent, PanelMenuComponent, CintaPromocionesComponent],
   templateUrl: './menu-digital.component.html',
   styleUrls:   ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
-                '../../shared/formulario/formulario.css', './menu-digital.component.css']
+                '../../shared/formulario/formulario.css', './menu-digital.component.css', './menu-disponibles.css']
 })
 export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly Number = Number;
@@ -113,6 +113,8 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
   readonly promoFiltro     = signal<string | null>(null);
   readonly panel           = signal<'categorias' | 'promos' | null>(null);
   readonly volteadas       = signal<ReadonlySet<number>>(new Set());
+  /** Productos cuyo stock acaba de cambiar (destello en «N disponibles») */
+  readonly destello        = signal<ReadonlySet<number>>(new Set());
   readonly resaltado       = signal<number | null>(null);
 
   // ─── La cabecera muestra la categoría que se está viendo ───
@@ -372,6 +374,7 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
     this.socket.on('actualizacion_stock_global', (d: any) => {
       if (!this.info() || Number(d?.id_sucursal) !== Number(this.info()!.id_sucursal)) return;
+      if (d.nueva_cantidad_disponible == null) return;   // preparado al momento: sin límite
       if (this.fijarStock(Number(d.id_producto), Math.max(0, Number(d.nueva_cantidad_disponible) || 0)))
         this.ajustarCarritoAlStock();
     });
@@ -393,9 +396,18 @@ export class MenuDigitalComponent implements OnInit, OnDestroy {
 
   /** Cambia el stock de un producto del catálogo; false si no está en él */
   private fijarStock(id_producto: number, stock: number): boolean {
-    if (!this.catalogo().some(p => p.id_producto === id_producto)) return false;
+    const actual = this.catalogo().find(p => p.id_producto === id_producto);
+    if (!actual) return false;
+    if (Number(actual.stock_actual) === stock) return true;
     this.catalogo.update(c => c.map(p => p.id_producto === id_producto ? { ...p, stock_actual: stock } : p));
+    this.destello.update(s => new Set(s).add(id_producto));
+    setTimeout(() => this.destello.update(s => { const n = new Set(s); n.delete(id_producto); return n; }), 1000);
     return true;
+  }
+
+  /** Lo preparado al momento no tiene límite: no muestra «disponibles» */
+  conLimite(prod: any): boolean {
+    return prod.tipo_producto !== 'PREPARADO' && Number(prod.stock_actual) < 9999;
   }
 
   // ─── Disponibilidad ───
