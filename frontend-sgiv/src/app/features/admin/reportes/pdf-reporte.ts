@@ -1,5 +1,6 @@
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { fechaLarga, hora } from '../../../core/utils/informe';
+import { estiloTabla } from '../../../core/utils/pdf-tabla';
 
 // ─── PDF de los reportes (mismo estilo que el informe de ventas) ───
 // jspdf se carga recién al exportar.
@@ -39,22 +40,15 @@ export const nuevoPdf = async (ajustes: AjustesService, titulo: string, lineas: 
   const seccion = (t: string) => {
     y = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : y;
     if (y > alto - 40) { doc.addPage(); y = 20; }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...color);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5); doc.setTextColor(...color);
     doc.text(t, 14, y);
     y += 3;
   };
   const tabla = (head: string[], body: any[][], derecha: number[] = [], opciones: any = {}) => {
-    const columnStyles: any = {};
-    derecha.forEach(i => columnStyles[i] = { halign: 'right' });
-    autoTable(doc, {
+    autoTable(doc, estiloTabla(derecha, {
       startY: doc.lastAutoTable ? Math.max(y, doc.lastAutoTable.finalY + 2) : y,
-      head: [head], body, theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 1.6, textColor: [51, 65, 85], lineColor: [203, 213, 225], lineWidth: 0.2 },
-      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { left: 14, right: 14 }, ...opciones,
-      columnStyles: { ...columnStyles, ...(opciones.columnStyles || {}) }
-    });
+      head: [head], body, ...opciones
+    }));
   };
   const guardar = (archivo: string) => {
     const total = doc.getNumberOfPages();

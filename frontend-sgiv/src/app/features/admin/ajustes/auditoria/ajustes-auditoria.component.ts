@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { estiloTabla } from '../../../../core/utils/pdf-tabla';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { LucideAngularModule, Search, X, RefreshCw, FileText, FileSpreadsheet, ChevronDown, Monitor, Globe } from 'lucide-angular';
 import { AuditoriaService, Acceso, DetalleMovimiento, FiltrosAuditoria, Movimiento, OpcionesAuditoria }
@@ -279,14 +280,13 @@ export class AjustesAuditoriaComponent implements OnInit, OnDestroy {
       doc.setFontSize(9); doc.setTextColor(51, 65, 85);
       const lineas = this.textoFiltros();
       lineas.forEach((l, i) => doc.text(l, 14, 37 + i * 5));
-      autoTable(doc, {
-        startY: 40 + lineas.length * 5, head: [cabecera], body: filas, theme: 'grid',
-        styles: { fontSize: 7.5, cellPadding: 1.5, textColor: [51, 65, 85], lineColor: [226, 232, 240], overflow: 'linebreak' },
-        headStyles: { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold' },
+      autoTable(doc, estiloTabla([], {
+        startY: 40 + lineas.length * 5, head: [cabecera], body: filas,
+        styles: { fontSize: 8.5, overflow: 'linebreak' },
         columnStyles: this.vista() === 'movimientos'
           ? { 0: { cellWidth: 24 }, 1: { cellWidth: 30 }, 2: { cellWidth: 40 }, 4: { cellWidth: 24 }, 5: { cellWidth: 24 }, 6: { cellWidth: 24 } }
           : { 0: { cellWidth: 24 }, 1: { cellWidth: 40 }, 2: { cellWidth: 40 }, 3: { cellWidth: 26 }, 4: { cellWidth: 30 } }
-      });
+      }));
       doc.save(`${this.nombreArchivo}.pdf`);
     } catch {
       this.dialogo.error('No se pudo generar el PDF.');

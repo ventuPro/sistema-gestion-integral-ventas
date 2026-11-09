@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { estiloTabla } from '../../../../core/utils/pdf-tabla';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule, X, Printer, FileText, FileSpreadsheet, Check } from 'lucide-angular';
 import { ProductoService } from '../../../../core/services/producto.service';
@@ -180,12 +181,10 @@ export class DescargaInventarioComponent implements OnInit {
       }
       body.push([{ content: 'Total de unidades', styles: { fontStyle: 'bold' } },
                  { content: this.totales().unidades, styles: { fontStyle: 'bold' } }, '']);
-      autoTable(doc, {
-        startY: 48, head: [['Producto', 'Stock', 'Contado']], body, theme: 'grid',
-        styles: { fontSize: 9, cellPadding: 1.8, textColor: [51, 65, 85], lineColor: [226, 232, 240] },
-        headStyles: { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold' },
+      autoTable(doc, estiloTabla([], {
+        startY: 48, head: [['Producto', 'Stock', 'Contado']], body,
         columnStyles: { 1: { halign: 'right', cellWidth: 26 }, 2: { cellWidth: 30 } }
-      });
+      }));
       doc.save(`${this.nombreArchivo}.pdf`);
     } catch {
       this.dialogo.error('No se pudo generar el PDF.');

@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { estiloTabla } from '../../../core/utils/pdf-tabla';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
@@ -234,20 +235,12 @@ export class ReportesComponent implements OnInit, OnDestroy {
     const seccion = (titulo: string) => {
       y = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 10 : y;
       if (y > 255) { doc.addPage(); y = 20; }
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor(...color);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5); doc.setTextColor(...color);
       doc.text(titulo, 14, y);
       y += 3;
     };
     const tabla = (head: string[], body: any[][], derecha: number[] = []) => {
-      const columnStyles: any = {};
-      derecha.forEach(i => columnStyles[i] = { halign: 'right' });
-      autoTable(doc, {
-        startY: y, head: [head], body, theme: 'plain',
-        styles: { fontSize: 8.5, cellPadding: 1.8, textColor: [51, 65, 85] },
-        headStyles: { textColor: [100, 116, 139], fontStyle: 'bold', lineWidth: { bottom: 0.3 }, lineColor: [203, 213, 225] },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        columnStyles, margin: { left: 14, right: 14 }
-      });
+      autoTable(doc, estiloTabla(derecha, { startY: y, head: [head], body }));
     };
 
     seccion('Resumen del período');
