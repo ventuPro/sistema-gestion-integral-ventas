@@ -269,6 +269,36 @@ const netoDeCuentas = async (id_sucursal, ids) => {
     return netos;
 };
 
+/** Lo que falta cobrar en todas las mesas abiertas, con promociones (id_sucursal 0 = todas) */
+const porCobrarMesas = async (id_sucursal) => {
+    const r = await db.query(`
+        SELECT ml.id_sucursal, array_agg(c.id_cuenta) AS cuentas FROM cuenta_mesa c JOIN mesa_local ml ON ml.id_mesa = c.id_mesa
+        WHERE c.estado = 'Abierta' AND ($1::int = 0 OR ml.id_sucursal = $1) GROUP BY ml.id_sucursal`, [id_sucursal]);
+    let total = 0;
+    for (const s of r.rows) {
+        const netos = await netoDeCuentas(s.id_sucursal, s.cuentas);
+        const sinPromo = s.cuentas.filter(id => !netos.has(id));
+        if (sinPromo.length) total += Number((await db.query(`SELECT COALESCE(SUM(subtotal), 0) AS t FROM detalle_cuenta
+                                                              WHERE id_cuenta = ANY($1::int[]) AND id_venta IS NULL`, [sinPromo])).rows[0].t);
+        for (const v of netos.values()) total += v;
+    }
+    return Math.round(total * 100) / 100;
+};
+
+/** Pedidos con su monto ya con promociones (monto_total) y el de lista (monto_lista); los items traen id_producto, id_categoria, cantidad y precio */
+const pedidosConPromociones = async (id_sucursal, pedidos) => {
+    if (!pedidos.length) return pedidos;
+    const promos = await vigentes(db, id_sucursal);
+    if (!promos.length) return pedidos;
+    return pedidos.map(p => {
+        const lineas = aplicarPromociones((p.items || []).map(i => ({
+            id_producto: i.id_producto, id_categoria: i.id_categoria, cantidad: Number(i.cantidad),
+            precioCentavos: Math.round(Number(i.precio) * 100) })), promos);
+        const neto = lineas.reduce((s, l) => s + l.brutoCentavos - l.descuentoPromoCentavos, 0) / 100;
+        return { ...p, monto_lista: Number(p.monto_total), monto_total: neto };
+    });
+};
+
 /** Pone en total_acumulado de cada mesa lo que falta cobrar ya con promociones */
 const conPromociones = async (id_sucursal, mesas) => {
     const netos = await netoDeCuentas(id_sucursal, mesas.filter(m => m.id_cuenta).map(m => m.id_cuenta));
@@ -464,6 +494,6 @@ const eliminar = async (id) => {
 };
 
 module.exports = {
-    TIPOS, CONDICION_VIGENTE, repartir, aplicarPromociones, descuentoManual, normalizar, netoDeCuentas, conPromociones,
+    TIPOS, CONDICION_VIGENTE, repartir, aplicarPromociones, descuentoManual, normalizar, netoDeCuentas, conPromociones, porCobrarMesas, pedidosConPromociones,
     vigentes, vigentesDetalle, textoPromocion, promocionDeProducto, cotizar, enBolivianos, listar, obtener, guardar, cambiarEstado, eliminar
 };

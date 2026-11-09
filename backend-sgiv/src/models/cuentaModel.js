@@ -373,18 +373,29 @@ const cotizarCuenta = async (id_cuenta, parte = null, { descuento = null } = {})
             WHERE c.id_cuenta = $1 AND c.estado = 'Abierta'`, [id_cuenta]);
         if (!rCuenta.rows.length) return null;
         const rItems = await client.query(`
-            SELECT dc.id_producto, dc.cantidad, dc.precio_unitario, p.id_categoria FROM detalle_cuenta dc
+            SELECT dc.id_producto, dc.cantidad, dc.precio_unitario, p.id_categoria, pq.cliente_mesa FROM detalle_cuenta dc
             JOIN producto p ON p.id_producto = dc.id_producto
             ${DE_PEDIDO}
             WHERE dc.id_cuenta = $1 AND dc.id_venta IS NULL AND ${DE_LA_PARTE}
             ORDER BY dc.id_detalle_cuenta`, [id_cuenta, !!parte, parte?.cliente_mesa ?? null]);
+        const linea = (i) => ({ id_producto: i.id_producto, id_categoria: i.id_categoria, cantidad: Number(i.cantidad),
+                                precioCentavos: Math.round(Number(i.precio_unitario) * 100) });
         const cot = await promocionModel.cotizar(client, {
-            id_sucursal: rCuenta.rows[0].id_sucursal,
-            lineas: rItems.rows.map(i => ({ id_producto: i.id_producto, id_categoria: i.id_categoria, cantidad: Number(i.cantidad),
-                                             precioCentavos: Math.round(Number(i.precio_unitario) * 100) })),
-            descuento
+            id_sucursal: rCuenta.rows[0].id_sucursal, lineas: rItems.rows.map(linea), descuento
         });
-        return promocionModel.enBolivianos(cot);
+        const respuesta = promocionModel.enBolivianos(cot);
+        if (parte) return respuesta;
+
+        // Lo que falta cobrar a cada cliente, como se le cobraría solo su parte (null = lo cargado por el cajero)
+        const promos = await promocionModel.vigentes(client, rCuenta.rows[0].id_sucursal);
+        const porCliente = new Map();
+        for (const i of rItems.rows) porCliente.set(i.cliente_mesa ?? null, [...(porCliente.get(i.cliente_mesa ?? null) || []), linea(i)]);
+        respuesta.partes = [...porCliente].map(([cliente_mesa, lineas]) => ({
+            cliente_mesa,
+            total: promocionModel.aplicarPromociones(lineas, promos)
+                       .reduce((s, l) => s + l.brutoCentavos - l.descuentoPromoCentavos, 0) / 100
+        }));
+        return respuesta;
     } finally {
         client.release();
     }

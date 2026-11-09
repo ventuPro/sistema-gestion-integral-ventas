@@ -133,6 +133,11 @@ export class MesaModalComponent implements OnInit, OnDestroy {
       if (item.pagado) g.pagado = (centavos(g.pagado) + centavos(item.subtotal)) / 100;
       else g.pendiente = (centavos(g.pendiente) + centavos(item.subtotal)) / 100;
     }
+    // Lo pendiente de cada cliente con sus promociones (lo calcula el backend)
+    for (const p of this.cotizacionCuenta()?.partes || []) {
+      const g = mapa.get(p.cliente_mesa);
+      if (g && g.pendiente > 0) g.pendiente = p.total;
+    }
     // Lo del cajero al final
     return [...mapa.values()].sort((a, b) => Number(a.clave === null) - Number(b.clave === null));
   });

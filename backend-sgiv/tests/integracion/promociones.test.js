@@ -282,6 +282,55 @@ describe('Promociones en mesas', () => {
     });
 });
 
+describe('Totales por cobrar con promociones', () => {
+    test('cada cliente de la mesa ve lo suyo con promociones de cualquier tipo, el panel y la bandeja también', async () => {
+        const cat = await crearCategoria('Por cobrar');
+        const cafe = await crearProducto('Cafe PC', 5, cat), croa = await crearProducto('Croasant PC', 5, cat);
+        const emp1 = await crearProducto('Empanada PC 1', 3.5, cat), emp2 = await crearProducto('Empanada PC 2', 3.5, cat);
+        const jugo = await crearProducto('Jugo PC', 10, cat);
+        await crearPromo(tAdmin, { nombre: 'Combo PC', tipo: 'COMBO', valor: 8.5, productos: [{ id_producto: cafe, cantidad: 1 }, { id_producto: croa, cantidad: 1 }] });
+        await crearPromo(tAdmin, { nombre: 'Tres por dos PC', tipo: 'NXM', lleva: 3, paga: 2, productos: [{ id_producto: emp1 }, { id_producto: emp2 }] });
+        await crearPromo(tAdmin, { nombre: 'Jugo PC 20', tipo: 'PORCENTAJE', valor: 20, productos: [{ id_producto: jugo }] });
+
+        const [mesa] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr)
+                                     VALUES (1, 83, md5(random()::text)) RETURNING id_mesa`);
+        const cuenta = (await api('POST', '/cuentas/abrir', { token: tCajero, body: { id_mesa: mesa.id_mesa } })).body.cuenta;
+        const linea = async (cliente, id_producto, cantidad, precio) => {
+            let id_pedido = null;
+            if (cliente) [{ id_pedido }] = await bd.sql(`INSERT INTO pedido_mesa (id_sucursal, id_mesa, id_cuenta, cliente_mesa, estado_pedido)
+                                                       VALUES (1, $1, $2, $3, 'Confirmado') RETURNING id_pedido`, [mesa.id_mesa, cuenta.id_cuenta, cliente]);
+            await bd.sql(`INSERT INTO detalle_cuenta (id_cuenta, id_producto, cantidad, precio_unitario, id_pedido) VALUES ($1, $2, $3, $4, $5)`,
+                         [cuenta.id_cuenta, id_producto, cantidad, precio, id_pedido]);
+        };
+        const a = 'a'.repeat(32), b = 'b'.repeat(32);
+        await linea(a, cafe, 1, 5); await linea(a, croa, 1, 5);          // combo: 10 → 8,50
+        await linea(b, emp1, 2, 3.5); await linea(b, emp2, 1, 3.5);      // 3×2 combinado: 10,50 → 7
+        await linea(null, jugo, 1, 10);                                  // cajero, 20 %: 10 → 8
+
+        const c = (await api('POST', `/cuentas/${cuenta.id_cuenta}/cotizar`, { token: tCajero, body: {} })).body;
+        const parte = (cliente) => c.partes.find(p => p.cliente_mesa === cliente).total;
+        assert.deepEqual([parte(a), parte(b), parte(null)], [8.5, 7, 8]);
+        for (const cliente of [a, b, null]) {
+            const sola = (await api('POST', `/cuentas/${cuenta.id_cuenta}/cotizar`, { token: tCajero, body: { cliente_mesa: cliente } })).body;
+            assert.equal(sola.total, parte(cliente), 'lo que se muestra es lo que se cobra');
+            assert.equal(sola.partes, undefined);
+        }
+
+        const panel = (await api('GET', '/reportes/dashboard-completo/1', { token: tAdmin })).body;
+        const lista = (await api('GET', '/cuentas/mesas/1', { token: tAdmin })).body;
+        const enMesas = lista.filter(m => m.id_cuenta).reduce((s, m) => s + Number(m.total_acumulado), 0);
+        assert.equal(panel.mesas.por_cobrar, Math.round(enMesas * 100) / 100);
+        assert.equal(Number(lista.find(m => m.id_mesa === mesa.id_mesa).total_acumulado), 23.5);
+
+        const [ped] = await bd.sql(`INSERT INTO pedido_mesa (id_sucursal, id_mesa, cliente_mesa, estado_pedido)
+                                    VALUES (1, $1, $2, 'Pendiente_Cajero') RETURNING id_pedido`, [mesa.id_mesa, 'c'.repeat(32)]);
+        await bd.sql(`INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad_solicitada, precio_aplicado) VALUES ($1, $2, 3, 3.5)`, [ped.id_pedido, emp1]);
+        const bandeja = (await api('GET', '/pedidos/bandeja', { token: tCajero })).body;
+        const p = bandeja.find(x => x.id_pedido === ped.id_pedido);
+        assert.deepEqual([p.monto_lista, p.monto_total], [10.5, 7]);
+    });
+});
+
 describe('Promociones en el menú QR', () => {
     test('catálogo con la promoción de cada producto, lista de hoy y total estimado del carrito', async () => {
         const cat = await crearCategoria('Menú QR');

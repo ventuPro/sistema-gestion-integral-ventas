@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { METODO_PAGO } = require('../utils/metodosPago');
-const { CONDICION_VIGENTE } = require('./promocionModel');
+const promocionModel = require('./promocionModel');
+const { CONDICION_VIGENTE } = promocionModel;
 const { AVISO } = require('./loteModel');
 
 // id_sucursal = 0 → todas las sucursales (solo administrador, lo controla el controlador)
@@ -216,7 +217,7 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, esAdmin = false) =
         por_hora_promedio: promedioHora,
         top_productos: productos,
         turnos_abiertos: turnos,
-        mesas, pedidos_qr: pedidos,
+        mesas: { ...mesas, por_cobrar: await promocionModel.porCobrarMesas(Number(id_sucursal) || 0) }, pedidos_qr: pedidos,
         stock, stock_critico: stockCritico,
         ultimas_ventas: ultimas,
         sucursales,

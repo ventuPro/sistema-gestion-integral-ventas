@@ -78,6 +78,8 @@ export interface Cotizacion {
   descuento_promociones: number;
   descuento_manual:      number;
   total:                 number;
+  /** Cotización de toda la cuenta: lo que falta cobrar a cada cliente (null = lo cargado por el cajero) */
+  partes?:               { cliente_mesa: string | null; total: number }[];
 }
 
 // ─── Promociones: gestión y cotización de carritos ───

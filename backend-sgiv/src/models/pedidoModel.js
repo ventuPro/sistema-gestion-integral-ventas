@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { moverStock } = require('./inventarioModel');
 const { STOCK_VISIBLE } = require('./productoModel');
 const visitaModel = require('./visitaModel');
+const promocionModel = require('./promocionModel');
 
 // ─── Pedidos del cliente: Pendiente_Cajero → Confirmado → Entregado → Pagado / Cancelado ───
 
@@ -247,6 +248,7 @@ const obtenerBandeja = async (id_sucursal, minutos_expiracion) => {
                json_agg(json_build_object(
                    'id_detalle',      dp.id_detalle_pedido,
                    'id_producto',     dp.id_producto,
+                   'id_categoria',    p.id_categoria,
                    'nombre_producto', p.nombre_producto,
                    'cantidad',        dp.cantidad_solicitada,
                    'precio',          dp.precio_aplicado,
@@ -264,7 +266,7 @@ const obtenerBandeja = async (id_sucursal, minutos_expiracion) => {
         GROUP BY pm.id_pedido, m.numero_mesa
         ORDER BY pm.fecha_pedido ASC
     `, [id_sucursal, minutos_expiracion]);
-    return r.rows;
+    return promocionModel.pedidosConPromociones(id_sucursal, r.rows);
 };
 
 // ─── CAJERO: ajustar cantidad (0 = quitar) ───
