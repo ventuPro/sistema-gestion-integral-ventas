@@ -15,157 +15,143 @@
 </button>
 
 <!-- ═══ PANEL ═══ -->
-<div *ngIf="abierta()" class="fixed inset-0 z-50 flex justify-end">
+@if (abierta()) {
+<div class="fixed inset-0 z-50 flex justify-end">
   <div class="absolute inset-0 bg-gray-900/30" (click)="alternar()"></div>
 
-  <aside class="relative w-full max-w-md h-full bg-gray-50 shadow-2xl flex flex-col">
-
-    <!-- Encabezado -->
-    <div class="bg-gray-900 text-white px-5 py-4 flex items-center justify-between">
-      <div>
-        <h2 class="font-black text-lg">Pedidos del menú QR</h2>
-      </div>
-      <div class="flex items-center gap-1">
-        <button (click)="alternarSonido()"
-                class="p-2 rounded-lg hover:bg-gray-800"
-                [title]="sonidoActivo() ? 'Silenciar avisos' : 'Activar sonido de avisos'">
-          <lucide-icon [img]="sonidoActivo() ? icons.sonido : icons.silencio" class="w-5 h-5"></lucide-icon>
-        </button>
-        <button (click)="alternar()" class="p-2 rounded-lg hover:bg-gray-800" title="Cerrar">
-          <lucide-icon [img]="icons.x" class="w-5 h-5"></lucide-icon>
-        </button>
-      </div>
-    </div>
-
-    <!-- Pestañas -->
-    <div class="flex bg-white border-b">
-      <button (click)="pestana.set('pendientes')"
-              class="flex-1 py-3 text-sm font-bold border-b-2 transition-colors"
-              [class.border-amber-500]="pestana() === 'pendientes'" [class.text-amber-700]="pestana() === 'pendientes'"
-              [class.border-transparent]="pestana() !== 'pendientes'" [class.text-gray-500]="pestana() !== 'pendientes'">
-        Por confirmar ({{ pendientes().length }})
+  <aside class="panel">
+    <header class="cabeza">
+      <h2>Pedidos del menú QR</h2>
+      <button (click)="alternarSonido()" [attr.aria-label]="sonidoActivo() ? 'Silenciar avisos' : 'Activar sonido de avisos'">
+        <lucide-icon [img]="sonidoActivo() ? icons.sonido : icons.silencio" class="w-5 h-5"></lucide-icon>
       </button>
-      <button (click)="pestana.set('entregar')"
-              class="flex-1 py-3 text-sm font-bold border-b-2 transition-colors"
-              [class.border-blue-600]="pestana() === 'entregar'" [class.text-blue-700]="pestana() === 'entregar'"
-              [class.border-transparent]="pestana() !== 'entregar'" [class.text-gray-500]="pestana() !== 'entregar'">
-        Por entregar ({{ porEntregar().length }})
+      <button (click)="alternar()" aria-label="Cerrar"><lucide-icon [img]="icons.x" class="w-5 h-5"></lucide-icon></button>
+    </header>
+
+    <nav class="pestanas">
+      <button class="confirmar" [class.activa]="pestana() === 'pendientes'" (click)="pestana.set('pendientes')">
+        Por confirmar <b>{{ pendientes().length }}</b>
       </button>
-    </div>
+      <button class="entregar" [class.activa]="pestana() === 'entregar'" (click)="pestana.set('entregar')">
+        Por entregar <b>{{ porEntregar().length }}</b>
+      </button>
+    </nav>
 
-    <div class="flex-1 overflow-y-auto p-4 space-y-3">
-
+    <div class="lista">
       <!-- ─── POR CONFIRMAR ─── -->
-      <ng-container *ngIf="pestana() === 'pendientes'">
-        <p *ngIf="pendientes().length === 0" class="text-center text-gray-400 text-sm py-16">
-          No hay pedidos esperando confirmación.
-        </p>
-
-        <div *ngFor="let p of pendientes()"
-             class="bg-white rounded-xl border-2 shadow-sm overflow-hidden"
-             [class.border-red-300]="porVencer(p)"
-             [class.border-amber-300]="!porVencer(p)">
-
-          <div class="px-4 py-3 flex items-center justify-between"
-               [class.bg-red-50]="porVencer(p)" [class.bg-amber-50]="!porVencer(p)">
-            <div class="flex items-center gap-2">
-              <lucide-icon *ngIf="p.tipo_pedido === 'Delivery'" [img]="icons.delivery" class="w-4 h-4 text-gray-600"></lucide-icon>
-              <span class="font-black text-gray-800 text-lg">{{ etiqueta(p) }}</span>
-              <span *ngIf="p.sin_verificar"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-300">
-                <lucide-icon [img]="icons.sinVerificar" class="w-3.5 h-3.5"></lucide-icon> Sin verificar
-              </span>
+      @if (pestana() === 'pendientes') {
+        @for (p of pendientes(); track p.id_pedido) {
+          <article class="pedido" [class.urgente]="porVencer(p)">
+            <div class="pedido-cabeza">
+              <div class="quien">
+                <p class="donde">
+                  @if (p.tipo_pedido === 'Delivery') { <lucide-icon [img]="icons.delivery" class="w-4 h-4"></lucide-icon> Delivery }
+                  @else { Mesa {{ p.numero_mesa }} }
+                </p>
+                <p class="cliente">
+                  {{ p.nombre_cliente || 'Cliente' }} <span class="numero">· #{{ p.id_pedido }}</span>
+                  @if (p.sin_verificar) {
+                    <span class="sin-verificar"><lucide-icon [img]="icons.sinVerificar" class="w-3.5 h-3.5"></lucide-icon> Sin verificar</span>
+                  }
+                </p>
+              </div>
+              <div class="monto">
+                <b>{{ moneda() }} {{ (+p.monto_total).toFixed(2) }}</b>
+                @if (p.monto_lista && +p.monto_lista > +p.monto_total) { <s>{{ moneda() }} {{ (+p.monto_lista).toFixed(2) }}</s> }
+              </div>
             </div>
-            <span class="text-xs font-semibold"
-                  [class.text-red-600]="porVencer(p)" [class.text-gray-500]="!porVencer(p)">
-              {{ minutos(p.fecha_pedido) }} · vence en {{ minutosRestantes(p) }} min
-            </span>
-          </div>
 
-          <ul class="divide-y divide-gray-100">
-            <li *ngFor="let it of p.items" class="px-4 py-2.5 flex items-center gap-3">
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-gray-800">{{ it.nombre_producto }}</p>
-                <p *ngIf="it.nota_cliente" class="text-xs text-amber-700 flex items-center gap-1"><lucide-icon [img]="icons.nota" class="w-3 h-3 shrink-0"></lucide-icon> {{ it.nota_cliente }}</p>
-                <p class="text-xs text-gray-400">{{ moneda() }} {{ (+it.subtotal).toFixed(2) }}</p>
-              </div>
-              <div class="flex items-center gap-1.5 flex-shrink-0">
-                <button (click)="cambiarCantidad(p, it, it.cantidad - 1)" [disabled]="ocupado()[p.id_pedido] || it.cantidad <= 1"
-                        class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-40 flex items-center justify-center"
-                        title="Uno menos">
-                  <lucide-icon [img]="icons.minus" class="w-3.5 h-3.5"></lucide-icon>
+            <div class="tiempo">
+              <span class="barra"><i [style.width.%]="fraccion(p) * 100"></i></span>
+              <span>{{ minutos(p.fecha_pedido) }} · vence en {{ minutosRestantes(p) }} min</span>
+            </div>
+
+            <ul class="items">
+              @for (it of p.items; track it.id_detalle) {
+                <li>
+                  <span class="cant">{{ it.cantidad }}</span>
+                  <div class="producto">
+                    <p>{{ it.nombre_producto }}</p>
+                    <small>{{ moneda() }} {{ (+it.precio).toFixed(2) }} c/u</small>
+                    @if (it.nota_cliente) { <small class="nota"><lucide-icon [img]="icons.nota" class="w-3 h-3 shrink-0"></lucide-icon> {{ it.nota_cliente }}</small> }
+                  </div>
+                  <div class="derecha">
+                    <b>{{ moneda() }} {{ (+it.subtotal).toFixed(2) }}</b>
+                    <div class="contador">
+                      <button (click)="cambiarCantidad(p, it, it.cantidad - 1)" [disabled]="ocupado()[p.id_pedido] || it.cantidad <= 1" aria-label="Uno menos">
+                        <lucide-icon [img]="icons.minus" class="w-3.5 h-3.5"></lucide-icon>
+                      </button>
+                      <button (click)="cambiarCantidad(p, it, it.cantidad + 1)" [disabled]="ocupado()[p.id_pedido] || +it.stock_disponible <= 0" aria-label="Uno más">
+                        <lucide-icon [img]="icons.plus" class="w-3.5 h-3.5"></lucide-icon>
+                      </button>
+                      <button class="quitar" (click)="cambiarCantidad(p, it, 0)" [disabled]="ocupado()[p.id_pedido]" aria-label="Quitar del pedido">
+                        <lucide-icon [img]="icons.trash" class="w-3.5 h-3.5"></lucide-icon>
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              }
+            </ul>
+
+            @if (p.observacion_general) {
+              <p class="observacion"><lucide-icon [img]="icons.observacion" class="w-3.5 h-3.5 shrink-0"></lucide-icon> {{ p.observacion_general }}</p>
+            }
+            @if (errores()[p.id_pedido]) { <p class="error">{{ errores()[p.id_pedido] }}</p> }
+
+            <div class="acciones">
+              <button class="principal" (click)="confirmar(p)" [disabled]="ocupado()[p.id_pedido]">
+                <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> {{ ocupado()[p.id_pedido] ? 'Procesando…' : 'Confirmar' }}
+              </button>
+              <button class="secundaria" (click)="rechazar(p)" [disabled]="ocupado()[p.id_pedido]">Rechazar</button>
+              @if (p.tipo_pedido === 'Mesa') {
+                <button class="secundaria" (click)="rechazarFalso(p)" [disabled]="ocupado()[p.id_pedido]">
+                  <lucide-icon [img]="icons.falso" class="w-4 h-4"></lucide-icon> Falso
                 </button>
-                <span class="w-6 text-center font-black text-gray-800">{{ it.cantidad }}</span>
-                <button (click)="cambiarCantidad(p, it, it.cantidad + 1)" [disabled]="ocupado()[p.id_pedido] || +it.stock_disponible <= 0"
-                        class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-40 flex items-center justify-center"
-                        [title]="+it.stock_disponible <= 0 ? 'Sin más stock' : 'Uno más'">
-                  <lucide-icon [img]="icons.plus" class="w-3.5 h-3.5"></lucide-icon>
-                </button>
-                <button (click)="cambiarCantidad(p, it, 0)" [disabled]="ocupado()[p.id_pedido]"
-                        class="w-7 h-7 rounded-full text-red-500 hover:bg-red-50 disabled:opacity-40 flex items-center justify-center"
-                        title="Quitar del pedido">
-                  <lucide-icon [img]="icons.trash" class="w-3.5 h-3.5"></lucide-icon>
-                </button>
-              </div>
-            </li>
-          </ul>
-
-          <p *ngIf="p.observacion_general" class="mx-4 mb-2 text-xs bg-gray-50 border rounded-lg px-3 py-2 text-gray-600 flex items-start gap-1.5">
-            <lucide-icon [img]="icons.observacion" class="w-3.5 h-3.5 shrink-0 mt-px"></lucide-icon> {{ p.observacion_general }}
-          </p>
-
-          <p *ngIf="errores()[p.id_pedido]" class="mx-4 mb-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">
-            {{ errores()[p.id_pedido] }}
-          </p>
-
-          <div class="px-4 py-3 border-t flex items-center gap-2">
-            <span class="flex-1 font-black text-gray-800">{{ moneda() }} {{ (+p.monto_total).toFixed(2) }}
-              <s *ngIf="p.monto_lista && +p.monto_lista > +p.monto_total" class="ml-1 text-xs font-medium text-gray-400">{{ (+p.monto_lista).toFixed(2) }}</s>
-            </span>
-            <button *ngIf="p.tipo_pedido === 'Mesa'" (click)="rechazarFalso(p)" [disabled]="ocupado()[p.id_pedido]"
-                    class="px-2.5 py-2 rounded-lg text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-40 flex items-center gap-1">
-              <lucide-icon [img]="icons.falso" class="w-4 h-4"></lucide-icon> Falso
-            </button>
-            <button (click)="rechazar(p)" [disabled]="ocupado()[p.id_pedido]"
-                    class="px-3 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-40">
-              Rechazar
-            </button>
-            <button (click)="confirmar(p)" [disabled]="ocupado()[p.id_pedido]"
-                    class="px-4 py-2 rounded-lg text-sm font-bold bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 flex items-center gap-1">
-              <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon>
-              {{ ocupado()[p.id_pedido] ? 'Procesando…' : 'Confirmar' }}
-            </button>
-          </div>
-        </div>
-      </ng-container>
+              }
+            </div>
+          </article>
+        } @empty {
+          <p class="vacio">No hay pedidos esperando confirmación.</p>
+        }
+      }
 
       <!-- ─── POR ENTREGAR ─── -->
-      <ng-container *ngIf="pestana() === 'entregar'">
-        <p *ngIf="porEntregar().length === 0" class="text-center text-gray-400 text-sm py-16">
-          No hay pedidos pendientes de entrega.
-        </p>
-
-        <div *ngFor="let p of porEntregar()" class="bg-white rounded-xl border border-blue-200 shadow-sm p-4">
-          <div class="flex items-center justify-between mb-2">
-            <span class="font-black text-gray-800 text-lg">{{ etiqueta(p) }}</span>
-            <span class="text-xs text-gray-500">confirmado {{ minutos(p.fecha_aprobacion) }}</span>
-          </div>
-          <ul class="text-sm text-gray-700 space-y-1 mb-3">
-            <li *ngFor="let it of p.items">
-              <span class="font-bold">{{ it.cantidad }}×</span> {{ it.nombre_producto }}
-              <span *ngIf="it.nota_cliente" class="flex items-center gap-1 text-xs text-amber-700 ml-5"><lucide-icon [img]="icons.nota" class="w-3 h-3 shrink-0"></lucide-icon> {{ it.nota_cliente }}</span>
-            </li>
-          </ul>
-          <p *ngIf="errores()[p.id_pedido]" class="mb-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">
-            {{ errores()[p.id_pedido] }}
-          </p>
-          <button (click)="entregado(p)" [disabled]="ocupado()[p.id_pedido]"
-                  class="w-full py-2 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 flex items-center justify-center gap-1">
-            <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon>
-            Entregado en la mesa
-          </button>
-        </div>
-      </ng-container>
+      @if (pestana() === 'entregar') {
+        @for (p of porEntregar(); track p.id_pedido) {
+          <article class="pedido entregar">
+            <div class="pedido-cabeza">
+              <div class="quien">
+                <p class="donde">
+                  @if (p.tipo_pedido === 'Delivery') { <lucide-icon [img]="icons.delivery" class="w-4 h-4"></lucide-icon> Delivery }
+                  @else { Mesa {{ p.numero_mesa }} }
+                </p>
+                <p class="cliente">{{ p.nombre_cliente || 'Cliente' }} <span class="numero">· #{{ p.id_pedido }}</span></p>
+              </div>
+              <span class="hace">confirmado {{ minutos(p.fecha_aprobacion) }}</span>
+            </div>
+            <ul class="items">
+              @for (it of p.items; track $index) {
+                <li>
+                  <span class="cant">{{ it.cantidad }}</span>
+                  <div class="producto">
+                    <p>{{ it.nombre_producto }}</p>
+                    @if (it.nota_cliente) { <small class="nota"><lucide-icon [img]="icons.nota" class="w-3 h-3 shrink-0"></lucide-icon> {{ it.nota_cliente }}</small> }
+                  </div>
+                </li>
+              }
+            </ul>
+            @if (errores()[p.id_pedido]) { <p class="error">{{ errores()[p.id_pedido] }}</p> }
+            <div class="acciones">
+              <button class="principal azul" (click)="entregado(p)" [disabled]="ocupado()[p.id_pedido]">
+                <lucide-icon [img]="icons.check" class="w-4 h-4"></lucide-icon> Entregado en la mesa
+              </button>
+            </div>
+          </article>
+        } @empty {
+          <p class="vacio">No hay pedidos pendientes de entrega.</p>
+        }
+      }
     </div>
   </aside>
 </div>
+}

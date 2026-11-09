@@ -1,0 +1,88 @@
+/* ─── Bandeja de pedidos QR: panel lateral con un pedido por bloque ─── */
+.panel { position: relative; width: 100%; max-width: 440px; height: 100%; display: flex; flex-direction: column;
+         background: var(--i-fondo); box-shadow: -12px 0 40px rgb(15 23 42 / 0.18); }
+
+.cabeza { display: flex; align-items: center; gap: 4px; padding: 14px 12px 14px 20px; background: #0f172a; color: #fff; }
+.cabeza h2 { flex: 1; font-size: calc(17px * var(--escala-texto)); font-weight: 800; }
+.cabeza button { padding: 8px; border-radius: 8px; }
+.cabeza button:hover { background: rgb(255 255 255 / 0.1); }
+
+.pestanas { display: flex; background: var(--i-papel); border-bottom: 1px solid var(--i-linea); }
+.pestanas button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px;
+                   font-size: calc(14px * var(--escala-texto)); font-weight: 600; color: var(--i-tenue); border-bottom: 2px solid transparent; }
+.pestanas b { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--i-linea-suave); color: var(--i-texto);
+              font-size: calc(12px * var(--escala-texto)); }
+.pestanas .confirmar.activa { color: #b45309; border-color: #f59e0b; }
+.pestanas .confirmar.activa b { background: #f59e0b; color: #fff; }
+.pestanas .entregar.activa { color: #1d4ed8; border-color: #2563eb; }
+.pestanas .entregar.activa b { background: #2563eb; color: #fff; }
+
+.lista { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.vacio { padding: 64px 0; text-align: center; color: var(--i-sutil); font-size: calc(14px * var(--escala-texto)); }
+
+/* Un pedido: franja de color a la izquierda (ámbar por confirmar, rojo si está por vencer, azul por entregar) */
+.pedido { --tono: #f59e0b; background: var(--i-papel); border: 1px solid var(--i-linea); border-left: 4px solid var(--tono);
+          border-radius: 10px; overflow: hidden; }
+.pedido.urgente { --tono: #dc2626; }
+.pedido.entregar { --tono: #2563eb; }
+
+.pedido-cabeza { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px 8px; }
+.quien { flex: 1; min-width: 0; }
+.donde { display: flex; align-items: center; gap: 6px; font-size: calc(19px * var(--escala-texto)); font-weight: 800; color: var(--i-tinta); line-height: 1.2; }
+.cliente { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 2px; font-size: calc(13px * var(--escala-texto));
+           font-weight: 600; color: var(--i-texto); }
+.numero, .hace { color: var(--i-sutil); font-weight: 500; }
+.hace { font-size: calc(12px * var(--escala-texto)); white-space: nowrap; }
+.sin-verificar { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; white-space: nowrap;
+                 font-size: calc(11.5px * var(--escala-texto)); font-weight: 700; color: #9a3412; background: #ffedd5; }
+.monto { text-align: right; white-space: nowrap; }
+.monto b { display: block; font-size: calc(18px * var(--escala-texto)); font-weight: 800; color: var(--i-tinta); font-variant-numeric: tabular-nums; }
+.monto s { font-size: calc(12px * var(--escala-texto)); color: var(--i-sutil); }
+
+/* Tiempo que le queda para confirmarse */
+.tiempo { display: flex; align-items: center; gap: 10px; padding: 0 14px 10px; font-size: calc(12px * var(--escala-texto));
+          color: var(--i-tenue); white-space: nowrap; }
+.pedido.urgente .tiempo { color: #dc2626; font-weight: 600; }
+.barra { flex: 1; height: 4px; border-radius: 999px; background: var(--i-linea-suave); overflow: hidden; }
+.barra i { display: block; height: 100%; background: var(--tono); transition: width 30s linear; }
+
+.items { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--i-linea-suave); }
+.items li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 14px;
+            border-bottom: 1px solid var(--i-linea-suave); }
+.cant { display: flex; align-items: center; justify-content: center; height: 28px; border-radius: 7px; background: var(--i-linea-suave);
+        font-weight: 800; color: var(--i-tinta); font-variant-numeric: tabular-nums; }
+.producto p { font-size: calc(13.5px * var(--escala-texto)); font-weight: 600; color: var(--i-tinta); overflow-wrap: anywhere; }
+.producto small { display: flex; align-items: center; gap: 4px; font-size: calc(12px * var(--escala-texto)); color: var(--i-tenue); }
+.producto .nota { color: #b45309; }
+.derecha { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.derecha b { font-size: calc(13.5px * var(--escala-texto)); color: var(--i-tinta); font-variant-numeric: tabular-nums; }
+.contador { display: flex; gap: 4px; }
+.contador button { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 7px;
+                   border: 1px solid var(--i-linea); background: var(--i-papel); color: var(--i-texto); }
+.contador button:hover:not(:disabled) { border-color: var(--i-acento); }
+.contador .quitar { color: #dc2626; }
+.contador button:disabled { opacity: 0.4; }
+
+.observacion, .error { display: flex; gap: 6px; margin: 10px 14px 0; padding: 8px 10px; border-radius: 8px; font-size: calc(12.5px * var(--escala-texto)); }
+.observacion { background: var(--i-linea-suave); color: var(--i-texto); }
+.error { background: #fef2f2; color: #b91c1c; }
+
+.acciones { display: flex; gap: 8px; padding: 12px 14px 14px; }
+.acciones button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 12px; border-radius: 9px;
+                   font-size: calc(14px * var(--escala-texto)); font-weight: 700; }
+.acciones button:disabled { opacity: 0.45; }
+.principal { flex: 1; background: #16a34a; color: #fff; }
+.principal:hover:not(:disabled) { background: #15803d; }
+.principal.azul { background: #2563eb; }
+.principal.azul:hover:not(:disabled) { background: #1d4ed8; }
+.secundaria { border: 1px solid var(--i-linea); background: var(--i-papel); color: #b91c1c; }
+.secundaria:hover:not(:disabled) { background: #fef2f2; border-color: #fecaca; }
+
+@media screen {
+  :host-context(html.tema-oscuro) .sin-verificar { background: #431407; color: #fdba74; }
+  :host-context(html.tema-oscuro) .error { background: #450a0a; color: #fca5a5; }
+  :host-context(html.tema-oscuro) .secundaria { color: #fca5a5; }
+  :host-context(html.tema-oscuro) .secundaria:hover:not(:disabled) { background: #450a0a; border-color: #7f1d1d; }
+  :host-context(html.tema-oscuro) .producto .nota { color: #fbbf24; }
+}
+@media (prefers-reduced-motion: reduce) { .barra i { transition: none; } }

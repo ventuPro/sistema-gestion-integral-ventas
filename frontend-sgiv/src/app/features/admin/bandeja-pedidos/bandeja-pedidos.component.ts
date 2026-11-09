@@ -22,7 +22,8 @@ const sinClave = <T>(o: Record<number, T>, clave: number): Record<number, T> => 
   selector:    'app-bandeja-pedidos',
   standalone:  true,
   imports:     [CommonModule, LucideAngularModule],
-  templateUrl: './bandeja-pedidos.component.html'
+  templateUrl: './bandeja-pedidos.component.html',
+  styleUrls:   ['../../shared/informe/informe.css', './bandeja-pedidos.component.css']
 })
 export class BandejaPedidosComponent implements OnInit, OnDestroy {
   private readonly sesion = inject(SesionService);
@@ -203,6 +204,12 @@ export class BandejaPedidosComponent implements OnInit, OnDestroy {
 
   minutosRestantes(pedido: any): number {
     return Math.max(0, Math.ceil((new Date(pedido.fecha_expiracion).getTime() - this.ahora()) / 60000));
+  }
+
+  /** Lo que queda del tiempo para confirmar (1 = recién llegado, 0 = vencido) */
+  fraccion(pedido: any): number {
+    const inicio = new Date(pedido.fecha_pedido).getTime(), fin = new Date(pedido.fecha_expiracion).getTime();
+    return fin > inicio ? Math.min(1, Math.max(0, (fin - this.ahora()) / (fin - inicio))) : 0;
   }
 
   porVencer(pedido: any): boolean {
