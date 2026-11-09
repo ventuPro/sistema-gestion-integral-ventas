@@ -4,6 +4,7 @@ const QRCode = require('qrcode');
 const pedidoModel = require('./pedidoModel');
 const cuentaModel = require('./cuentaModel');
 const visitaModel = require('./visitaModel');
+const promocionModel = require('./promocionModel');
 
 // Código aleatorio que identifica la mesa en la URL del menú (/menu/<codigo>).
 // No se usa el id interno porque es fácil de adivinar.
@@ -39,7 +40,7 @@ const obtenerMesasPorSucursal = async (id_sucursal) => {
         WHERE m.id_sucursal=$1
         ORDER BY m.numero_mesa ASC
     `, [id_sucursal]);
-    return r.rows;
+    return promocionModel.conPromociones(id_sucursal, r.rows);
 };
 
 const imagenQR = (url) => QRCode.toDataURL(url, {

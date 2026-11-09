@@ -246,6 +246,35 @@ const cotizar = async (client, { id_sucursal, lineas, descuento = null }) => {
     };
 };
 
+/** Lo que falta cobrar de varias cuentas de mesa, con las promociones vigentes: id_cuenta → neto en bolivianos.
+ *  Una sola consulta para todas (la lista de mesas no pide una por mesa). */
+const netoDeCuentas = async (id_sucursal, ids) => {
+    const netos = new Map();
+    if (!ids.length) return netos;
+    const promos = await vigentes(db, id_sucursal);
+    if (!promos.length) return netos;
+    const r = await db.query(`
+        SELECT dc.id_cuenta, dc.id_producto, dc.cantidad, dc.precio_unitario, p.id_categoria
+        FROM detalle_cuenta dc JOIN producto p ON p.id_producto = dc.id_producto
+        WHERE dc.id_cuenta = ANY($1::int[]) AND dc.id_venta IS NULL
+        ORDER BY dc.id_detalle_cuenta`, [ids]);
+    const porCuenta = new Map();
+    for (const i of r.rows) porCuenta.set(i.id_cuenta, [...(porCuenta.get(i.id_cuenta) || []), {
+        id_producto: i.id_producto, id_categoria: i.id_categoria, cantidad: Number(i.cantidad),
+        precioCentavos: Math.round(Number(i.precio_unitario) * 100) }]);
+    for (const [id, lineas] of porCuenta) {
+        const l = aplicarPromociones(lineas, promos);
+        netos.set(id, l.reduce((s, x) => s + x.brutoCentavos - x.descuentoPromoCentavos, 0) / 100);
+    }
+    return netos;
+};
+
+/** Pone en total_acumulado de cada mesa lo que falta cobrar ya con promociones */
+const conPromociones = async (id_sucursal, mesas) => {
+    const netos = await netoDeCuentas(id_sucursal, mesas.filter(m => m.id_cuenta).map(m => m.id_cuenta));
+    return mesas.map(m => netos.has(m.id_cuenta) ? { ...m, total_acumulado: netos.get(m.id_cuenta) } : m);
+};
+
 /** La cotización en bolivianos, para la API */
 const enBolivianos = (c) => ({
     items: c.lineas.map(l => ({
@@ -435,6 +464,6 @@ const eliminar = async (id) => {
 };
 
 module.exports = {
-    TIPOS, CONDICION_VIGENTE, repartir, aplicarPromociones, descuentoManual, normalizar,
+    TIPOS, CONDICION_VIGENTE, repartir, aplicarPromociones, descuentoManual, normalizar, netoDeCuentas, conPromociones,
     vigentes, vigentesDetalle, textoPromocion, promocionDeProducto, cotizar, enBolivianos, listar, obtener, guardar, cambiarEstado, eliminar
 };

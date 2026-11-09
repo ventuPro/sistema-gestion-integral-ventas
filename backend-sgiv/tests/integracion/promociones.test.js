@@ -233,6 +233,12 @@ describe('Promociones en mesas', () => {
         assert.equal(c.status, 200);
         assert.equal(c.body.total, 10);
 
+        // La tarjeta de la mesa muestra lo mismo que la cuenta (con la promoción), en las dos listas
+        for (const ruta of ['/cuentas/mesas/1', '/mesas/sucursal/1']) {
+            const m = (await api('GET', ruta, { token: tCajero })).body.find(x => x.id_mesa === mesa.id_mesa);
+            assert.equal(Number(m.total_acumulado), 10, ruta);
+        }
+
         const cierre = await api('POST', `/cuentas/${cuenta.id_cuenta}/cerrar`, { token: tCajero, body: { metodo_pago: 'Efectivo' } });
         assert.equal(cierre.status, 200, JSON.stringify(cierre.body));
         assert.equal(cierre.body.total, 10);

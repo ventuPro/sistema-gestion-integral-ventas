@@ -411,7 +411,7 @@ const obtenerMesasConCuenta = async (id_sucursal) => {
                  c.id_cuenta, c.fecha_apertura
         ORDER BY m.numero_mesa ASC
     `, [id_sucursal]);
-    return r.rows;
+    return promocionModel.conPromociones(id_sucursal, r.rows);
 };
 
 module.exports = {
