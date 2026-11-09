@@ -34,6 +34,24 @@ test('3×2: una de cada tres gratis', () => {
     assert.equal(ahorro(aplicarPromociones([linea(1, 7, 5)], p)), 1000);
 });
 
+test('3×2 combinado: productos de la promoción con el mismo precio suman sus unidades', () => {
+    const p = [promo(1, 'NXM', { lleva: 3, paga: 2, productos: [{ id_producto: 1, cantidad: 1 }, { id_producto: 2, cantidad: 1 }] })];
+    const r = aplicarPromociones([linea(1, 2, 3.5), linea(2, 1, 3.5)], p);
+    assert.equal(ahorro(r), 350);                        // 2 integrales + 1 de royal: una gratis
+    assert.ok(r.every(l => l.id_promocion === 1));
+    assert.equal(ahorro(aplicarPromociones([linea(1, 4, 3.5), linea(2, 2, 3.5)], p)), 700);   // 6 u = dos gratis
+    assert.equal(ahorro(aplicarPromociones([linea(1, 2, 3.5), linea(2, 1, 5)], p)), 0);       // otro precio: no se combinan
+    assert.equal(ahorro(aplicarPromociones([linea(1, 2, 3.5), linea(3, 1, 3.5)], p)), 0);     // fuera de la promoción
+});
+
+test('3×2 combinado no quita una promoción mejor de otro producto', () => {
+    const r = aplicarPromociones([linea(1, 1, 10), linea(2, 2, 10)], [
+        promo(1, 'NXM', { lleva: 3, paga: 2, productos: [{ id_producto: 1, cantidad: 1 }, { id_producto: 2, cantidad: 1 }] }),
+        promo(2, 'PORCENTAJE', { valor: 90, productos: [{ id_producto: 2, cantidad: 1 }] })
+    ]);
+    assert.equal(ahorro(r), 1800);   // el 90 % de los 2 del producto 2 (18 Bs.) gana al 3×2 juntos (10 Bs.)
+});
+
 test('con varias promociones gana la que más ahorra', () => {
     const r = aplicarPromociones([linea(1, 3, 10)], [
         promo(1, 'PORCENTAJE', { valor: 20, productos: [{ id_producto: 1, cantidad: 1 }] }),   // 6 Bs.

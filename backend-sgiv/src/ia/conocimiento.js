@@ -115,7 +115,7 @@ Menú lateral → «Promociones» (el administrador da este permiso en Usuarios 
 «Nueva promoción»: «Nombre» y «Tipo»:
 - Porcentaje: descuento en % sobre productos o categorías (por ejemplo −20 % en toda la categoría Tortas).
 - Precio especial: un precio por unidad más bajo que el normal, para productos (por ejemplo cuñapé a 2 Bs.).
-- Lleva N, paga M: por ejemplo 3×2 (lleva 3, paga 2) en productos o categorías.
+- Lleva N, paga M: por ejemplo 3×2 (lleva 3, paga 2) en productos o categorías. Los productos de la promoción que tienen el mismo precio se pueden combinar: con un 3×2 en empanadas, 2 integrales + 1 de royal (todas a 3,50) cuentan como 3 y una sale gratis. Productos de distinto precio no se combinan entre sí. Si a un producto le conviene más otra promoción vigente, se aplica la que más ahorra.
 - Combo: varios productos con su cantidad a un precio fijo (por ejemplo café + porción de torta a 15 Bs.); se muestra el precio normal y el ahorro. El precio del combo debe ser menor al normal.
 Vigencia: «Desde» y «Hasta» (fechas), los «Días» de la semana en que vale y, opcional, «Solo en un horario» (por ejemplo la hora feliz de 18:00 a 21:00, o una liquidación al final del día). El administrador elige la «Sucursal» o «Todas las sucursales»; el cajero solo crea promociones de su sucursal, y las de todas las sucursales las ve con un candado (no puede cambiarlas).
 Se aplican solas al cobrar en el punto de venta y en las mesas; si un producto entra en varias, gana la que más ahorra al cliente. Un combo solo se usa cuando ahorra más que las otras promociones.

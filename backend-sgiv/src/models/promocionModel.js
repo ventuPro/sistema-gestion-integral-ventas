@@ -95,9 +95,35 @@ const aplicarPromociones = (lineas, promos) => {
         });
     }
 
-    // Las unidades que quedan: la mejor promoción simple
+    // Las unidades que quedan: la mejor promoción simple de cada producto
+    const elegida = new Map([...grupos.values()].map(g => [g.id_producto, mejorSimple(g, libres.get(g.id_producto))]));
+
+    // «Lleva N, paga M» combinado: los productos de la promoción con el MISMO precio suman sus unidades
+    // (2 integrales + 1 de royal = un 3×2). Se usa solo si ahorra más que lo que cada uno tenía por su lado.
+    const juntos = new Map();   // id_producto → { centavos, promo }
+    for (const p of simples.filter(x => x.tipo === 'NXM')) {
+        const porPrecio = new Map();
+        for (const g of grupos.values()) {
+            if (juntos.has(g.id_producto) || !libres.get(g.id_producto) || !cubre(p, g)) continue;
+            porPrecio.set(g.precio, [...(porPrecio.get(g.precio) || []), g]);
+        }
+        for (const [precio, lista] of porPrecio) {
+            if (lista.length < 2) continue;
+            const evaluar = (gs) => {
+                const q = gs.reduce((s, g) => s + libres.get(g.id_producto), 0);
+                return { gs, ahorro: descuentoSimple(p, q, precio) - gs.reduce((s, g) => s + elegida.get(g.id_producto).centavos, 0) };
+            };
+            // Todos juntos, o solo los que no tenían otra promoción mejor
+            const opciones = [evaluar(lista), evaluar(lista.filter(g => !elegida.get(g.id_producto).promo || elegida.get(g.id_producto).promo === p))];
+            const mejor = opciones.reduce((a, b) => (b.ahorro > a.ahorro ? b : a));
+            if (mejor.ahorro <= 0 || mejor.gs.length < 2) continue;
+            const q = mejor.gs.reduce((s, g) => s + libres.get(g.id_producto), 0);
+            const partes = repartir(descuentoSimple(p, q, precio), mejor.gs.map(g => libres.get(g.id_producto)));
+            mejor.gs.forEach((g, i) => juntos.set(g.id_producto, { centavos: partes[i], promo: p }));
+        }
+    }
     for (const g of grupos.values()) {
-        const m = mejorSimple(g, libres.get(g.id_producto));
+        const m = juntos.get(g.id_producto) ?? elegida.get(g.id_producto);
         anotar(g.id_producto, m.centavos, m.promo);
     }
 
