@@ -9,7 +9,7 @@ import { InventarioService, Movimiento, TipoMovimiento } from '../../../core/ser
 import { environment } from '../../../../environments/environment';
 import { LucideAngularModule,
          Pencil, ArrowUpDown, RotateCw, Plus, Tag, Search, X, ImagePlus, Ban, History,
-         ChevronUp, ChevronDown, ListOrdered, Star, Download, Trash2, PackagePlus, CalendarX } from 'lucide-angular';
+         ChevronUp, ChevronDown, ListOrdered, Star, Download, Trash2, PackagePlus, CalendarX, CopyPlus } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { CostoService, Receta } from '../../../core/services/costo.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
@@ -22,6 +22,7 @@ import { TransferenciasComponent } from './transferencias/transferencias.compone
 import { DescargaInventarioComponent } from './descarga-inventario/descarga-inventario.component';
 import { IngresosDiaComponent } from './ingresos-dia/ingresos-dia.component';
 import { VencidosComponent } from './vencidos/vencidos.component';
+import { AgregarExistenteComponent } from './agregar-existente/agregar-existente.component';
 import { BarraCategoriasComponent } from '../../shared/barra-categorias/barra-categorias.component';
 import { agruparPorCategoria } from '../../../core/utils/categorias';
 import { FondoModalDirective } from '../../../core/directives/fondo-modal.directive';
@@ -32,7 +33,7 @@ type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'vence' | 'inactivos' | 'todos'
   selector: 'app-inventario',
   standalone: true,
   imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, ImagenUrlPipe, TransferenciasComponent,
-            DescargaInventarioComponent, IngresosDiaComponent, VencidosComponent, BarraCategoriasComponent],
+            DescargaInventarioComponent, IngresosDiaComponent, VencidosComponent, AgregarExistenteComponent, BarraCategoriasComponent],
   templateUrl: './inventario.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css',
               '../../shared/formulario/formulario.css', './inventario.component.css']
@@ -72,6 +73,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     historial:  History,
     refresh:    RotateCw,
     mas:        Plus,
+    agregarExistente: CopyPlus,
     etiqueta:   Tag,
     buscar:     Search,
     cerrar:     X,
@@ -90,6 +92,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   readonly mostrarDescarga = signal(false);
   readonly mostrarIngresos = signal(false);
   readonly mostrarVencidos = signal(false);
+  readonly mostrarAgregarExistente = signal(false);
   /** Unidades vencidas en la sucursal (número del botón «Vencidos») */
   readonly totalVencidos = computed(() => this.productos().reduce((s, p) => s + (Number(p.vencidos) || 0), 0));
 

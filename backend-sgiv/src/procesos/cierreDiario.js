@@ -1,9 +1,10 @@
 const cajaModel = require('../models/cajaModel');
 const notificacionModel = require('../models/notificacionModel');
 const loteModel = require('../models/loteModel');
+const reservaModel = require('../models/reservaModel');
 const db = require('../config/db');
 const contexto  = require('../auditoria/contexto');
-const { emitirUsuario, emitirCajeros } = require('../utils/tiempoReal');
+const { emitirUsuario, emitirCajeros, emitirStock } = require('../utils/tiempoReal');
 
 // ─── Cierre del día (00:00, hora de La Paz) ───
 // Revisa cada minuto (y al arrancar, por si el servidor estuvo apagado a medianoche).
@@ -24,7 +25,12 @@ const ejecutar = () => contexto.ejecutar({ ...CONTEXTO }, async () => {
             emitirUsuario(t.id_usuario_cajero, 'caja:cerrada', datos);
             emitirCajeros('caja:cerrada', datos);
         }
-        if (turnos.length) console.log(`Cierre del día: ${turnos.length} turno(s) cerrados por el sistema`);
+        if (turnos.length) {
+            console.log(`Cierre del día: ${turnos.length} turno(s) cerrados por el sistema`);
+            emitirCajeros('cierres:actualizados', {});
+        }
+        // Carritos de caja olvidados o de cajas ya cerradas: el stock vuelve
+        emitirStock(await reservaModel.liberarVencidas());
         await notificacionModel.limpiarAntiguas();
         if (Date.now() - ultimaRevisionLotes >= CADA_HORA) {
             ultimaRevisionLotes = Date.now();

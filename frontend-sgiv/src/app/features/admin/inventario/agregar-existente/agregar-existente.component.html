@@ -1,0 +1,80 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrar.emit()">
+  <div class="inf-hoja ventana w-full max-w-3xl max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+    <div class="flex items-start justify-between gap-4 px-5 py-4 separador-inferior">
+      <div>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Agregar de otra sucursal</h3>
+        <p class="inf-sub mt-0!">A {{ nombreSucursal() }}</p>
+      </div>
+      <button class="quitar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
+      </button>
+    </div>
+
+    @if (lista().length > 8) {
+      <div class="px-5 pt-4">
+        <label class="relative block">
+          <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-sutil absolute left-3 top-1/2 -translate-y-1/2"></lucide-icon>
+          <input class="campo pl-9!" type="search" placeholder="Buscar producto" autofocus
+                 [value]="busqueda()" (input)="busqueda.set($any($event.target).value)" maxlength="60" data-regla="texto">
+        </label>
+      </div>
+    }
+
+    <div class="overflow-y-auto flex-1">
+      @switch (estado()) {
+        @case ('cargando') { <div class="p-5"><div class="inf-esqueleto h-40"></div></div> }
+        @case ('error') { <p class="inf-vacio">No se pudo cargar la lista.</p> }
+        @default {
+          @if (!lista().length) {
+            <p class="inf-vacio">Esta sucursal ya tiene todos los productos.</p>
+          } @else {
+            <table class="inf-tabla">
+              <thead>
+                <tr>
+                  <th class="w-10"></th>
+                  <th>Producto</th>
+                  <th>Está en</th>
+                  <th class="num">Precio</th>
+                  <th class="num w-32">Stock inicial</th>
+                </tr>
+              </thead>
+              @for (s of secciones(); track s.id) {
+                <tbody>
+                  <tr class="fila-seccion"><td colspan="5">{{ s.nombre }}</td></tr>
+                  @for (p of s.productos; track p.id_producto) {
+                    <tr class="cursor-pointer" [class.seleccionada]="elegidos().has(p.id_producto)" (click)="alternar(p)">
+                      <td><input type="checkbox" [checked]="elegidos().has(p.id_producto)" (click)="$event.stopPropagation()"
+                                 (change)="alternar(p)" [attr.aria-label]="'Agregar ' + p.nombre_producto"></td>
+                      <td class="fuerte">{{ p.nombre_producto }}</td>
+                      <td class="inf-tenue">{{ p.sucursales || '—' }}</td>
+                      <td class="num">{{ moneda() }} {{ (+p.precio_unitario).toFixed(2) }}</td>
+                      <td class="num" (click)="$event.stopPropagation()">
+                        @if (p.tipo_producto === 'PREPARADO') {
+                          <span class="inf-sutil">Al momento</span>
+                        } @else {
+                          <input class="campo text-right py-1!" type="number" min="0" max="100000" step="1" placeholder="0"
+                                 [value]="elegidos().get(p.id_producto) ?? ''" (input)="fijarStock(p, $any($event.target).value)"
+                                 [attr.aria-label]="'Stock inicial de ' + p.nombre_producto">
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              } @empty {
+                <tbody><tr><td colspan="5" class="inf-vacio">Ningún producto coincide.</td></tr></tbody>
+              }
+            </table>
+          }
+        }
+      }
+    </div>
+
+    <div class="inf-pie-hoja flex justify-end gap-2">
+      <button class="inf-boton" (click)="cerrar.emit()">Cerrar</button>
+      <button class="boton-primario" data-enter (click)="agregar()" [disabled]="guardando() || !cantidad()">
+        <lucide-icon [img]="icons.agregar" class="w-4 h-4"></lucide-icon>
+        {{ guardando() ? 'Agregando…' : 'Agregar (' + cantidad() + ')' }}
+      </button>
+    </div>
+  </div>
+</div>

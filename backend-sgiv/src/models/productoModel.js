@@ -120,7 +120,29 @@ const asignarProductoASucursal = async (id_producto, id_sucursal, cliente = db) 
     return r.rows[0];
 };
 
+// ─── Un producto para todo el negocio, con su fila de inventario en cada sucursal ───
+/** Productos activos que la sucursal todavía no tiene (para «Agregar a esta sucursal») */
+const productosFaltantes = async (id_sucursal) => (await db.query(`
+    SELECT p.id_producto, p.nombre_producto, p.precio_unitario, p.tipo_producto, p.url_imagen,
+           c.id_categoria, c.nombre_categoria, c.orden,
+           (SELECT string_agg(s.nombre_sucursal, ', ' ORDER BY s.nombre_sucursal)
+            FROM inventario_sucursal i JOIN sucursal s ON s.id_sucursal = i.id_sucursal
+            WHERE i.id_producto = p.id_producto) AS sucursales
+    FROM producto p
+    JOIN categoria_producto c ON c.id_categoria = p.id_categoria
+    WHERE p.estado_activo
+      AND NOT EXISTS (SELECT 1 FROM inventario_sucursal i WHERE i.id_producto = p.id_producto AND i.id_sucursal = $1)
+    ORDER BY c.orden, c.nombre_categoria, p.nombre_producto`, [id_sucursal])).rows;
+
+/** Otro producto con el mismo nombre (sin importar mayúsculas ni espacios), o null */
+const mismoNombre = async (nombre, excluir = null) => (await db.query(`
+    SELECT id_producto, nombre_producto, estado_activo FROM producto
+    WHERE upper(regexp_replace(trim(nombre_producto), '[[:space:]]+', ' ', 'g')) = upper(regexp_replace(trim($1), '[[:space:]]+', ' ', 'g'))
+      AND id_producto <> COALESCE($2::int, 0)
+    LIMIT 1`, [nombre, excluir])).rows[0] || null;
+
 module.exports = {
+    productosFaltantes, mismoNombre,
     crearCategoria,
     obtenerCategorias,
     ordenarCategorias,

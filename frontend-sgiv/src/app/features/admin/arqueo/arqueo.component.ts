@@ -1,7 +1,9 @@
-import { Component, computed, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
+import { Component, computed, ElementRef, inject, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
+import { Subscription } from 'rxjs';
+import { SocketService } from '../../../core/services/socket.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, RotateCw, ChevronDown, ChevronRight, X, Printer, Banknote, QrCode, Wallet } from 'lucide-angular';
+import { LucideAngularModule, ChevronDown, ChevronRight, X, Printer, Banknote, QrCode, Wallet } from 'lucide-angular';
 import { TecladoNumericoComponent } from '../../shared/teclado-numerico/teclado-numerico.component';
 import { EntradaMonto } from '../../shared/teclado-numerico/entrada-numero';
 import { METODO_PAGO } from '../../../core/utils/metodos-pago';
@@ -24,15 +26,18 @@ const DENOMINACIONES = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1];
   templateUrl: './arqueo.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './arqueo.component.css']
 })
-export class ArqueoComponent implements OnInit {
+export class ArqueoComponent implements OnInit, OnDestroy {
   private readonly sesion = inject(SesionService);
+  private socket = inject(SocketService);
+  private sub?: Subscription;
+  private espera: any;
   private cajaService = inject(CajaService);
   readonly ajustes    = inject(AjustesService);
   private impresion   = inject(ImpresionService);
   private dialogo     = inject(DialogoService);
   readonly moneda     = this.ajustes.moneda;
 
-  readonly icons = { actualizar: RotateCw, abajo: ChevronDown, derecha: ChevronRight, cerrar: X, imprimir: Printer,
+  readonly icons = { abajo: ChevronDown, derecha: ChevronRight, cerrar: X, imprimir: Printer,
                      efectivo: Banknote, qr: QrCode, total: Wallet };
   readonly cifra = cifra;
   readonly entero = entero;
@@ -63,7 +68,16 @@ export class ArqueoComponent implements OnInit {
 
   ngOnInit() {
     this.cargarArqueo();
+    // Una venta, un cobro de mesa o un cierre/reapertura de caja se ven al instante
+    this.socket.conectar('cajeros');
+    const recargar = () => { clearTimeout(this.espera); this.espera = setTimeout(() => this.cargarArqueo(), 300); };
+    this.sub = this.socket.escuchar<any>('ventas:actualizadas').subscribe(recargar);
+    this.sub.add(this.socket.escuchar<any>('cierres:actualizados').subscribe(recargar));
+    this.sub.add(this.socket.escuchar<any>('caja:cerrada').subscribe(recargar));
+    this.sub.add(this.socket.reconexiones.subscribe(recargar));
   }
+
+  ngOnDestroy() { this.sub?.unsubscribe(); clearTimeout(this.espera); }
 
   cargarArqueo() {
     const a = this.arqueo();

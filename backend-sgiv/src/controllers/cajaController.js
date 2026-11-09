@@ -2,6 +2,7 @@ const cajaModel     = require('../models/cajaModel');
 const sucursalModel = require('../models/sucursalModel');
 const ajusteModel   = require('../models/ajusteModel');
 const promocionModel = require('../models/promocionModel');
+const reservaModel  = require('../models/reservaModel');
 const db            = require('../config/db');
 const { marcarEvento } = require('../auditoria/registroAcceso');
 const { emitirUsuario, emitirCajeros, emitirStock } = require('../utils/tiempoReal');
@@ -62,6 +63,7 @@ const deshabilitarCajaUsuario = async (req, res) => {
             emitirUsuario(id_usuario, 'caja:cerrada', datos);
             emitirCajeros('caja:cerrada', datos);
         }
+        emitirCajeros('cierres:actualizados', {});
         res.json({ mensaje: 'Caja cerrada', usuario });
     } catch (e) {
         console.error('deshabilitarCaja:', e.message);
@@ -76,6 +78,7 @@ const reabrirCajaAdmin = async (req, res) => {
             return res.status(403).json({ error: 'Solo el administrador puede reabrir caja' });
         const id_usuario_cajero = Number(req.params.id_usuario);
         const turno = await cajaModel.reabrirTurno(id_usuario_cajero);
+        emitirCajeros('cierres:actualizados', {});
         res.json({ mensaje: 'Caja reabierta correctamente', turno });
     } catch (e) {
         if (e.message === 'YA_TIENE_TURNO_ABIERTO')
@@ -136,6 +139,7 @@ const cerrarCaja = async (req, res) => {
             req.usuario.id_usuario,
             contado
         );
+        emitirCajeros('cierres:actualizados', {});
         res.json(r);
     } catch (e) {
         console.error('cerrarCaja:', e.message);
@@ -205,6 +209,7 @@ const cobrarVenta = async (req, res) => {
         const { id_venta, numero_dia, cambiosStock, cotizacion } = await cajaModel.registrarVenta(datos);
 
         emitirStock(cambiosStock);
+        emitirUsuario(req.usuario.id_usuario, 'ventas:actualizadas', {});
 
         res.status(201).json({ mensaje: 'Venta registrada', id_venta, numero_dia, cotizacion, stock: cambiosStock });
     } catch (e) {
@@ -226,6 +231,31 @@ const cobrarVenta = async (req, res) => {
         if (e.code === 'VENTA_INVALIDA')
             return res.status(400).json({ error: 'VENTA_INVALIDA', detalle: e.message });
         res.status(500).json({ error: 'Error al registrar la venta.', detalle: e.message });
+    }
+};
+
+// ─── Carrito de caja: lo agregado se reserva al momento ───
+// GET /caja/reservas — para rearmar el carrito al volver a Punto de venta
+const getReservas = async (req, res) => {
+    try { res.json(await reservaModel.activas(req.usuario.id_usuario)); }
+    catch (e) { console.error('getReservas:', e.message); res.status(500).json({ error: 'No se pudo leer el carrito' }); }
+};
+
+// PUT /caja/reservas/:id_producto { cantidad } — 0 = quitar del carrito
+const putReserva = async (req, res) => {
+    try {
+        const id_producto = Number(req.params.id_producto), cantidad = Number(req.body?.cantidad);
+        if (!Number.isInteger(id_producto) || id_producto < 1 || !Number.isInteger(cantidad) || cantidad < 0 || cantidad > 10000)
+            return res.status(400).json({ error: 'Cantidad inválida' });
+        const r = await reservaModel.fijar({ id_usuario: req.usuario.id_usuario, id_producto, cantidad });
+        emitirStock(r.cambios);
+        res.json({ cantidad: r.cantidad, stock: r.stock });
+    } catch (e) {
+        if (e.code === 'CAJA_CERRADA')       return res.status(403).json({ error: 'CAJA_CERRADA', detalle: 'La caja está cerrada' });
+        if (e.code === 'STOCK_INSUFICIENTE') return res.status(409).json({ error: 'STOCK_INSUFICIENTE', maximo: e.maximo });
+        if (e.code === 'NO_DISPONIBLE')      return res.status(409).json({ error: 'NO_DISPONIBLE', maximo: 0 });
+        console.error('putReserva:', e.message);
+        res.status(500).json({ error: 'No se pudo reservar' });
     }
 };
 
@@ -291,5 +321,5 @@ module.exports = {
     habilitarCajaUsuario, deshabilitarCajaUsuario, reabrirCajaAdmin,
     getTurnoHoy, abrirCaja, cerrarCaja,
     getArqueoHoy, getVentasHoyPOS, getComprobante, getCierresCaja, cobrarVenta, cotizarVenta, promocionesVigentes,
-    getEstadoCajaSucursal
+    getEstadoCajaSucursal, getReservas, putReserva
 };

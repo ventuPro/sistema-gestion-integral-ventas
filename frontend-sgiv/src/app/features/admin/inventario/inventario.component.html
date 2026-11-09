@@ -8,15 +8,14 @@
       <button class="inf-boton" (click)="mostrarIngresos.set(true)">
         <lucide-icon [img]="icons.ingresos" class="w-3.5 h-3.5"></lucide-icon> Ingresos del día
       </button>
-      <button class="inf-boton" (click)="mostrarVencidos.set(true)">
-        <lucide-icon [img]="icons.vencidos" class="w-3.5 h-3.5"></lucide-icon> Vencidos
-        @if (totalVencidos()) { <span class="inf-estado mal py-0!">{{ totalVencidos() }}</span> }
-      </button>
       <button class="inf-boton" (click)="abrirOrdenCategorias()">
         <lucide-icon [img]="icons.ordenar" class="w-3.5 h-3.5"></lucide-icon> Ordenar categorías
       </button>
       <button class="inf-boton" (click)="abrirModalCategoria()">
         <lucide-icon [img]="icons.etiqueta" class="w-3.5 h-3.5"></lucide-icon> Nueva categoría
+      </button>
+      <button class="inf-boton" (click)="mostrarAgregarExistente.set(true)">
+        <lucide-icon [img]="icons.agregarExistente" class="w-3.5 h-3.5"></lucide-icon> Agregar de otra sucursal
       </button>
       <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!" (click)="abrirModalNuevo()">
         <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon> Nuevo producto
@@ -38,6 +37,12 @@
 
   @if (vista() === 'transferencias') {
     <app-transferencias [idSucursal]="idSucursal()" [productos]="productos()" />
+  }
+
+  @if (mostrarAgregarExistente()) {
+    <app-agregar-existente [idSucursal]="idSucursal()" [nombreSucursal]="sucursalSeleccionada()?.nombre_sucursal || ''"
+                           (cerrar)="mostrarAgregarExistente.set(false)"
+                           (agregados)="mostrarAgregarExistente.set(false); cargarProductos()" />
   }
 
   @if (mostrarVencidos()) {
@@ -73,6 +78,12 @@
             <button [class.activa]="filtroEstado() === f.valor" (click)="filtroEstado.set(f.valor)">{{ f.texto }}</button>
           }
         </div>
+        @if (filtroEstado() === 'vence') {
+          <button class="inf-boton" (click)="mostrarVencidos.set(true)">
+            <lucide-icon [img]="icons.vencidos" class="w-3.5 h-3.5"></lucide-icon> Dar de baja vencidos
+            @if (totalVencidos()) { <span class="inf-estado mal py-0!">{{ totalVencidos() }}</span> }
+          </button>
+        }
         <button class="inf-boton" (click)="mostrarDescarga.set(true)">
           <lucide-icon [img]="icons.descargar" class="w-3.5 h-3.5"></lucide-icon> Descargar
         </button>
@@ -135,7 +146,9 @@
                 <td>
                   @if (!prod.estado_activo) { <span class="inf-estado neutro">Inactivo</span> }
                   @else if (estadoStock(prod) === 'sin') { <span class="inf-estado mal">Sin stock</span> }
-                  @else if (prod.vencidos > 0) { <span class="inf-estado mal">Vencidos: {{ prod.vencidos }}</span> }
+                  @else if (prod.vencidos > 0) {
+                    <button class="inf-estado mal cursor-pointer" (click)="$event.stopPropagation(); mostrarVencidos.set(true)">Vencidos: {{ prod.vencidos }}</button>
+                  }
                   @else if (prod.por_vencer > 0) { <span class="inf-estado aviso">Por vencer: {{ prod.por_vencer }}</span> }
                   @else if (estadoStock(prod) === 'bajo') { <span class="inf-estado aviso">Stock bajo</span> }
                   @else { <span class="inf-estado ok">Disponible</span> }

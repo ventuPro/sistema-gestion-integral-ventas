@@ -2,7 +2,7 @@ const cuentaModel  = require('../models/cuentaModel');
 const productoModel = require('../models/productoModel');
 const mesaModel    = require('../models/mesaModel');
 const ajusteModel  = require('../models/ajusteModel');
-const { emitirMesa, emitirStock } = require('../utils/tiempoReal');
+const { emitirMesa, emitirStock, emitirUsuario } = require('../utils/tiempoReal');
 const io           = () => global.io;
 
 // POST /api/cuentas/abrir
@@ -169,6 +169,7 @@ const cerrarCuenta = async (req, res) => {
         if (resultado.pedidos_pagados.length)
             io()?.to('cajeros').emit('pedido:actualizado', { id_mesa, estado: 'Pagado' });
 
+        emitirUsuario(req.usuario.id_usuario, 'ventas:actualizadas', {});
         res.json({ mensaje: resultado.cuenta_cerrada ? 'Cuenta cerrada y mesa liberada' : 'Cobro registrado', ...resultado });
     } catch(e) {
         if (e.message === 'CUENTA_NO_ACTIVA')

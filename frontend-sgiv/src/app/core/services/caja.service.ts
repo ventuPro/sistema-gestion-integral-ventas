@@ -53,6 +53,15 @@ export class CajaService {
     return this.http.get(`${this.apiUrl}/caja/arqueo/${id_sucursal}`);
   }
   /** Comprobante de una venta ya registrada, para reimprimirlo */
+  // ── Carrito de caja: lo agregado se reserva en el servidor ──
+  reservas(): Observable<{ id_producto: number; cantidad: number }[]> {
+    return this.http.get<{ id_producto: number; cantidad: number }[]>(`${this.apiUrl}/caja/reservas`);
+  }
+  /** Deja reservadas esas unidades (0 = quitar); devuelve el stock que queda */
+  reservar(id_producto: number, cantidad: number): Observable<{ cantidad: number; stock: number | null }> {
+    return this.http.put<{ cantidad: number; stock: number | null }>(`${this.apiUrl}/caja/reservas/${id_producto}`, { cantidad });
+  }
+
   obtenerComprobante(id_venta: number): Observable<any> {
     return this.http.get(`${this.apiUrl}/caja/ventas/${id_venta}/comprobante`);
   }

@@ -592,7 +592,23 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
         END IF;
     END $$;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_venta_numero_dia  ON venta_caja  (id_sucursal, (fecha_venta::date), numero_dia);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_pedido_numero_dia ON pedido_mesa (id_sucursal, (fecha_pedido::date), numero_dia);`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_pedido_numero_dia ON pedido_mesa (id_sucursal, (fecha_pedido::date), numero_dia);`,
+
+    // ─── Reserva del carrito de caja (2026-11-08): el stock sale al agregar, como en Mesas ───
+    // Una fila activa (id_venta NULL) por cajero y producto; al cobrar queda con su venta.
+    `CREATE TABLE IF NOT EXISTS reserva_caja (
+        id_reserva          SERIAL PRIMARY KEY,
+        id_usuario          INT NOT NULL REFERENCES usuario(id_usuario),
+        id_sucursal         INT NOT NULL REFERENCES sucursal(id_sucursal),
+        id_producto         INT NOT NULL REFERENCES producto(id_producto),
+        cantidad            INT NOT NULL DEFAULT 0 CONSTRAINT reserva_caja_cantidad_check CHECK (cantidad >= 0),
+        id_venta            INT REFERENCES venta_caja(id_venta),
+        fecha_actualizacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_reserva_activa ON reserva_caja (id_usuario, id_producto) WHERE id_venta IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_reserva_pendiente ON reserva_caja (fecha_actualizacion) WHERE id_venta IS NULL AND cantidad > 0;
+    ALTER TABLE historial_inventario ADD COLUMN IF NOT EXISTS id_reserva INT REFERENCES reserva_caja(id_reserva);
+    CREATE INDEX IF NOT EXISTS idx_historial_reserva ON historial_inventario (id_reserva) WHERE id_reserva IS NOT NULL;`
 ];
 
 const aplicarMigraciones = async () => {

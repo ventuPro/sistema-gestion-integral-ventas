@@ -27,6 +27,8 @@ router.get   ('/ventas/:id_venta/comprobante', verificarToken, verificarPermiso(
 router.get   ('/cierres',                      verificarToken, soloAdministrador, ctrl.getCierresCaja);
 router.post  ('/cobrar',                       verificarToken, verificarPermiso('punto_venta'), ctrl.cobrarVenta);
 router.post  ('/cotizar',                      verificarToken, verificarPermiso('punto_venta'), ctrl.cotizarVenta);
+router.get   ('/reservas',                     verificarToken, verificarPermiso('punto_venta'), ctrl.getReservas);
+router.put   ('/reservas/:id_producto',        verificarToken, verificarPermiso('punto_venta'), ctrl.putReserva);
 router.get   ('/promociones-vigentes',         verificarToken, verificarPermiso('punto_venta'), ctrl.promocionesVigentes);
 router.get   ('/estado-sucursal/:id_sucursal', verificarToken, ctrl.getEstadoCajaSucursal);
 

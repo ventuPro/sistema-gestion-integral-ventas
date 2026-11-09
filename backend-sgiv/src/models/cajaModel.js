@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { moverStock } = require('./inventarioModel');
-const { costoActual, costoDeLotes } = require('./loteModel');
+const { costoActual, costoDeLotes, costoReservado } = require('./loteModel');
+const reservaModel = require('./reservaModel');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const promocionModel = require('./promocionModel');
 const notificacionModel = require('./notificacionModel');
@@ -601,30 +602,48 @@ const registrarVenta = async ({
         const id_venta = rVenta.rows[0].id_venta;
         if (cot.manualCentavos > 0) await notificacionModel.descuentoManual(client, id_venta);
 
-        // 4. Procesar cada ítem del carrito
+        // 4. Procesar cada ítem del carrito: lo reservado al agregarlo ya salió del stock; solo se descuenta lo que falte
         const cambiosStock = [];
+        const reservas = await reservaModel.bloquear(client, Number(id_usuario_cajero));
         for (const item of cot.lineas) {
             const { cantidad } = item;
             const id_prod  = item.id_producto;
-
-            // Fila bloqueada: dos cajas no pueden vender el mismo stock a la vez (sale del lote más antiguo)
-            const mov = await moverStock(client, {
-                id_sucursal: Number(id_sucursal), id_producto: id_prod, cantidad: -cantidad,
-                id_usuario: Number(id_usuario_cajero), motivo: 'Venta en Caja'
-            });
-            if (mov.falta || mov.existe === false) {
-                const rInfo = await client.query(`SELECT nombre_producto FROM producto WHERE id_producto = $1`, [id_prod]);
-                const err  = new Error(
-                    `Stock insuficiente de "${rInfo.rows[0]?.nombre_producto || id_prod}" (disponible: ${mov.disponible ?? 0})`
-                );
-                err.code = 'STOCK_INSUFICIENTE';
-                throw err;
+            const fila = reservas.get(id_prod);
+            reservas.delete(id_prod);
+            const usado = fila && fila.id_sucursal === Number(id_sucursal) ? Math.min(fila.cantidad, cantidad) : 0;
+            // Lo reservado de más vuelve a su lote antes de tomar el costo de lo vendido
+            if (fila) {
+                const c = await reservaModel.devolver(client, fila, fila.cantidad - usado, Number(id_usuario_cajero));
+                if (c) cambiosStock.push(c);
             }
-            if (!mov.preparado)
-                cambiosStock.push({ id_producto: id_prod, id_sucursal: Number(id_sucursal), nuevo_stock: mov.stock });
-
-            // Costo de lo vendido: el de los lotes de los que salió (lo preparado, el de su receta)
-            const costo = mov.preparado ? await costoActual(client, id_prod) : costoDeLotes(mov.lotes);
+            const partes = [];   // [unidades, costo por unidad]
+            if (usado > 0) {
+                const r = await costoReservado(client, { id_producto: id_prod, id_reserva: fila.id_reserva });
+                partes.push([usado, r.unidades ? r.costo : await costoActual(client, id_prod)]);
+                await reservaModel.vender(client, fila, id_venta);
+            }
+            const falta = cantidad - usado;
+            if (falta > 0) {
+                // Fila bloqueada: dos cajas no pueden vender el mismo stock a la vez (sale del lote más antiguo)
+                const mov = await moverStock(client, {
+                    id_sucursal: Number(id_sucursal), id_producto: id_prod, cantidad: -falta,
+                    id_usuario: Number(id_usuario_cajero), motivo: 'Venta en Caja'
+                });
+                if (mov.falta || mov.existe === false) {
+                    const rInfo = await client.query(`SELECT nombre_producto FROM producto WHERE id_producto = $1`, [id_prod]);
+                    const err  = new Error(
+                        `Stock insuficiente de "${rInfo.rows[0]?.nombre_producto || id_prod}" (disponible: ${mov.disponible ?? 0})`
+                    );
+                    err.code = 'STOCK_INSUFICIENTE';
+                    throw err;
+                }
+                if (!mov.preparado)
+                    cambiosStock.push({ id_producto: id_prod, id_sucursal: Number(id_sucursal), nuevo_stock: mov.stock });
+                // Costo de lo vendido: el de los lotes de los que salió (lo preparado, el de su receta)
+                partes.push([falta, mov.preparado ? await costoActual(client, id_prod) : costoDeLotes(mov.lotes)]);
+            }
+            const costo = partes.some(([, c]) => c == null) ? null
+                : Math.round(partes.reduce((s, [q, c]) => s + q * Number(c), 0) / cantidad * 10000) / 10000;
             await client.query(`
                 INSERT INTO detalle_venta
                     (id_venta, id_producto, cantidad_vendida, precio_unitario, subtotal_venta,
@@ -632,6 +651,12 @@ const registrarVenta = async ({
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             `, [id_venta, id_prod, cantidad, item.precioCentavos / 100, item.netoCentavos / 100,
                 item.descuentoPromoCentavos / 100, item.descuentoManualCentavos / 100, item.id_promocion, costo]);
+        }
+
+        // Lo que quedó reservado y no se vendió vuelve al stock
+        for (const fila of reservas.values()) {
+            const c = await reservaModel.devolver(client, fila, fila.cantidad, Number(id_usuario_cajero));
+            if (c) cambiosStock.push(c);
         }
 
         await client.query('COMMIT');

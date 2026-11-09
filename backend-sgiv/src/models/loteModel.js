@@ -106,19 +106,19 @@ const ingresar = async (client, { id_inventario, id_historial, cantidad, vence =
  * reciente con lugar y, si no hay, a uno nuevo.
  */
 const devolver = async (client, { id_inventario, id_historial, cantidad, referencia = {} }) => {
-    const { id_pedido = null, id_detalle_cuenta = null } = referencia;
+    const { id_pedido = null, id_detalle_cuenta = null, id_reserva = null } = referencia;
     const destinos = [];
     let resta = cantidad;
-    if (id_pedido || id_detalle_cuenta) {
+    if (id_pedido || id_detalle_cuenta || id_reserva) {
         const r = await client.query(`
             SELECT ml.id_lote, -SUM(ml.cantidad)::int AS pendiente
             FROM movimiento_lote ml
             JOIN historial_inventario h ON h.id_historial = ml.id_historial
             JOIN lote_inventario l      ON l.id_lote      = ml.id_lote
-            WHERE h.id_inventario = $1 AND (h.id_pedido = $2 OR h.id_detalle_cuenta = $3)
+            WHERE h.id_inventario = $1 AND (h.id_pedido = $2 OR h.id_detalle_cuenta = $3 OR h.id_reserva = $4)
             GROUP BY ml.id_lote, l.fecha_ingreso
             HAVING SUM(ml.cantidad) < 0
-            ORDER BY l.fecha_ingreso DESC, ml.id_lote DESC`, [id_inventario, id_pedido, id_detalle_cuenta]);
+            ORDER BY l.fecha_ingreso DESC, ml.id_lote DESC`, [id_inventario, id_pedido, id_detalle_cuenta, id_reserva]);
         for (const l of r.rows) {
             if (resta <= 0) break;
             const t = Math.min(resta, l.pendiente);
@@ -201,16 +201,16 @@ const cuadrarTodos = async (db) => {
  * Costo por unidad de lo que tiene reservado una línea de mesa: lo que salió de los lotes con su
  * referencia (la línea o el pedido QR del que vino), menos lo devuelto. null si no se puede saber.
  */
-const costoReservado = async (client, { id_producto, id_detalle_cuenta, id_pedido = null }) => {
+const costoReservado = async (client, { id_producto, id_detalle_cuenta = null, id_pedido = null, id_reserva = null }) => {
     const r = await client.query(`
         SELECT ml.id_lote, -SUM(ml.cantidad)::int AS cantidad, l.costo_unitario
         FROM movimiento_lote ml
         JOIN historial_inventario h ON h.id_historial  = ml.id_historial
         JOIN inventario_sucursal i  ON i.id_inventario = h.id_inventario
         JOIN lote_inventario l      ON l.id_lote       = ml.id_lote
-        WHERE i.id_producto = $1 AND (h.id_detalle_cuenta = $2 OR h.id_pedido = $3)
+        WHERE i.id_producto = $1 AND (h.id_detalle_cuenta = $2 OR h.id_pedido = $3 OR h.id_reserva = $4)
         GROUP BY ml.id_lote, l.costo_unitario
-        HAVING SUM(ml.cantidad) < 0`, [id_producto, id_detalle_cuenta, id_pedido]);
+        HAVING SUM(ml.cantidad) < 0`, [id_producto, id_detalle_cuenta, id_pedido, id_reserva]);
     return { unidades: r.rows.reduce((s, l) => s + l.cantidad, 0), costo: costoDeLotes(r.rows) };
 };
 

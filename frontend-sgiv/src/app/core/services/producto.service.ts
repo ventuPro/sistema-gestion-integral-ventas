@@ -15,6 +15,16 @@ export class ProductoService {
     );
   }
 
+  /** Productos activos que la sucursal todavía no tiene */
+  faltantes(id_sucursal: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/catalogo/productos/faltantes?id_sucursal=${id_sucursal}`);
+  }
+
+  /** El mismo producto en otra sucursal, cada uno con su stock inicial */
+  agregarASucursal(id_sucursal: number, productos: { id_producto: number; stock_inicial: number }[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/catalogo/productos/agregar-a-sucursal`, { id_sucursal, productos });
+  }
+
   obtenerCategorias(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/catalogo/categorias`);
   }

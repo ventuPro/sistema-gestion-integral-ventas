@@ -1,6 +1,8 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
-import { LucideAngularModule, RotateCw } from 'lucide-angular';
+import { LucideAngularModule } from 'lucide-angular';
+import { SocketService } from '../../../core/services/socket.service';
 import { CajaService } from '../../../core/services/caja.service';
 import { SucursalService } from '../../../core/services/sucursal.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
@@ -14,12 +16,13 @@ import { cifra, entero, fechaHora, hora } from '../../../core/utils/informe';
   templateUrl: './cierres-caja.component.html',
   styleUrls: ['../../shared/informe/informe.css']
 })
-export class CierresCajaComponent implements OnInit {
+export class CierresCajaComponent implements OnInit, OnDestroy {
   private cajaService     = inject(CajaService);
+  private socket          = inject(SocketService);
+  private sub?: Subscription;
   private sucursalService = inject(SucursalService);
   readonly moneda         = inject(AjustesService).moneda;
 
-  readonly icons = { actualizar: RotateCw };
   readonly cifra = cifra;
   readonly entero = entero;
   readonly fechaHora = fechaHora;
@@ -51,7 +54,13 @@ export class CierresCajaComponent implements OnInit {
       next: (s: any[]) => this.sucursales.set(s || [])
     });
     this.cargar();
+    // Un cierre o una reapertura (cajero, administrador o sistema) se ve al instante
+    this.socket.conectar('cajeros');
+    this.sub = this.socket.escuchar<any>('cierres:actualizados').subscribe(() => this.cargar());
+    this.sub.add(this.socket.reconexiones.subscribe(() => this.cargar()));
   }
+
+  ngOnDestroy() { this.sub?.unsubscribe(); }
 
   cargar() {
     this.cargando.set(!this.cierres().length);

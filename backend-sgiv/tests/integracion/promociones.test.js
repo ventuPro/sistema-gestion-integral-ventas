@@ -489,3 +489,84 @@ describe('Número del día', () => {
         assert.equal(comp.body.numero_dia, base + 2);
     });
 });
+
+describe('Reserva del carrito de caja', () => {
+    const reservar = (token, id_producto, cantidad) => api('PUT', `/caja/reservas/${id_producto}`, { token, body: { cantidad } });
+    const stockDe = async (id, suc = 1) => (await bd.sql(`SELECT cantidad_actual FROM inventario_sucursal WHERE id_producto = $1 AND id_sucursal = $2`, [id, suc]))[0].cantidad_actual;
+    const cobrar = (token, id_producto, cantidad, precio) => api('POST', '/caja/cobrar', { token, body: {
+        id_sucursal: 1, metodo_pago: 'Efectivo', monto_total_venta: cantidad * precio, detalles: [{ id_producto, cantidad }] } });
+
+    test('agregar al carrito descuenta el stock al momento y quitar lo devuelve a su lote', async () => {
+        const cat = await crearCategoria('Reservas A');
+        const id = await crearProducto('Pan reservado', 4, cat, 10);
+        const r = await reservar(tCajero, id, 3);
+        assert.equal(r.status, 200, JSON.stringify(r.body));
+        assert.deepEqual(r.body, { cantidad: 3, stock: 7 });
+        assert.equal(await stockDe(id), 7);
+        const [h] = await bd.sql(`SELECT motivo_movimiento, id_reserva FROM historial_inventario h JOIN inventario_sucursal i USING (id_inventario)
+                                  WHERE i.id_producto = $1 ORDER BY id_historial DESC LIMIT 1`, [id]);
+        assert.equal(h.motivo_movimiento, 'Venta en Caja');
+        assert.ok(h.id_reserva);
+
+        assert.equal((await reservar(tCajero, id, 1)).body.stock, 9);
+        assert.equal(await stockDe(id), 9);
+        const [{ lotes }] = await bd.sql(`SELECT SUM(l.cantidad_actual)::int AS lotes FROM lote_inventario l JOIN inventario_sucursal i USING (id_inventario)
+                                          WHERE i.id_producto = $1`, [id]);
+        assert.equal(lotes, 9, 'la suma de los lotes sigue siendo el stock');
+        const g = await api('GET', '/caja/reservas', { token: tCajero });
+        assert.deepEqual(g.body.find(x => x.id_producto === id), { id_producto: id, cantidad: 1 });
+        assert.equal((await reservar(tCajero, id, 0)).body.stock, 10);
+    });
+
+    test('nadie más puede tomar lo reservado; al cobrar no se descuenta dos veces', async () => {
+        const cat = await crearCategoria('Reservas B');
+        const id = await crearProducto('Queque reservado', 6, cat, 5);
+        assert.equal((await reservar(tCajero, id, 4)).status, 200);
+
+        // Otra cajera (otra sucursal no tiene el producto) y una venta directa por más de lo libre
+        const libre = await cobrar(tCajeroOtra, id, 2, 6);
+        assert.notEqual(libre.status, 201);
+
+        const venta = await cobrar(tCajero, id, 4, 6);
+        assert.equal(venta.status, 201, JSON.stringify(venta.body));
+        assert.equal(await stockDe(id), 1);
+        const [res] = await bd.sql(`SELECT cantidad, id_venta FROM reserva_caja WHERE id_producto = $1`, [id]);
+        assert.deepEqual(res, { cantidad: 4, id_venta: venta.body.id_venta });
+        const [{ salidas }] = await bd.sql(`SELECT SUM(cantidad_movida)::int AS salidas FROM historial_inventario h JOIN inventario_sucursal i USING (id_inventario)
+                                           WHERE i.id_producto = $1 AND tipo_movimiento = 'SALIDA'`, [id]);
+        assert.equal(salidas, 4);
+        assert.deepEqual((await api('GET', '/caja/reservas', { token: tCajero })).body.filter(x => x.id_producto === id), []);
+    });
+
+    test('se cobra más o menos de lo reservado y lo que no se vende vuelve', async () => {
+        const cat = await crearCategoria('Reservas C');
+        const a = await crearProducto('Alfajor reservado', 3, cat, 10);
+        const b = await crearProducto('Eclair reservado', 5, cat, 10);
+        await reservar(tCajero, a, 2);
+        await reservar(tCajero, b, 3);   // no se cobra: vuelve al stock
+
+        const venta = await cobrar(tCajero, a, 5, 3);   // 2 reservadas + 3 más
+        assert.equal(venta.status, 201, JSON.stringify(venta.body));
+        assert.equal(await stockDe(a), 5);
+        assert.equal(await stockDe(b), 10);
+        const [{ vendidas }] = await bd.sql(`SELECT cantidad_vendida AS vendidas FROM detalle_venta WHERE id_venta = $1`, [venta.body.id_venta]);
+        assert.equal(vendidas, 5);
+    });
+
+    test('no se reserva más de lo que hay; sin caja abierta no se reserva; lo olvidado vuelve solo', async () => {
+        const cat = await crearCategoria('Reservas D');
+        const id = await crearProducto('Torta reservada', 20, cat, 2);
+        const mucho = await reservar(tCajero, id, 5);
+        assert.equal(mucho.status, 409);
+        assert.equal(mucho.body.maximo, 2);
+        assert.equal(await stockDe(id), 2);
+
+        assert.equal((await reservar(tCajeroSinPermiso, id, 1)).status, 403);
+
+        assert.equal((await reservar(tCajero, id, 2)).status, 200);
+        await bd.sql(`UPDATE reserva_caja SET fecha_actualizacion = LOCALTIMESTAMP - INTERVAL '31 minutes' WHERE id_producto = $1`, [id]);
+        const cambios = await require('../../src/models/reservaModel').liberarVencidas();
+        assert.ok(cambios.some(c => c.id_producto === id && c.nuevo_stock === 2));
+        assert.equal(await stockDe(id), 2);
+    });
+});

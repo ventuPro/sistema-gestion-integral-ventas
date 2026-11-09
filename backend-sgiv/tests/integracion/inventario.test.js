@@ -289,7 +289,7 @@ describe('Fotos de productos', () => {
         for (const url_imagen of [svg, falso])
             assert.equal((await api('POST', '/catalogo/productos', { token: tAdmin, body: { ...base, url_imagen } })).status, 400);
 
-        const externo = await api('POST', '/catalogo/productos', { token: tAdmin, body: { ...base, url_imagen: 'https://otro.com/x.png' } });
+        const externo = await api('POST', '/catalogo/productos', { token: tAdmin, body: { ...base, nombre_producto: 'Con foto externa', url_imagen: 'https://otro.com/x.png' } });
         assert.equal(externo.body.producto.url_imagen, null);
 
         const r = await api('POST', '/catalogo/productos', { token: tAdmin, body: { ...base, url_imagen: PNG } });
@@ -501,5 +501,72 @@ describe('Transferencias entre sucursales', () => {
         assert.deepEqual([r1.status, r2.status].sort(), [201, 409]);
         assert.equal(await stock(p), 1);
         assert.equal(await stock(p, idOtraSucursal), 4);
+    });
+});
+
+describe('Un producto en varias sucursales', () => {
+    test('se agrega el mismo producto a otra sucursal con su stock inicial, sin duplicarlo', async () => {
+        const id = await crearProducto('Torta compartida', 5);
+        const faltan = await api('GET', `/catalogo/productos/faltantes?id_sucursal=${idOtraSucursal}`, { token: tAdmin });
+        assert.equal(faltan.status, 200);
+        assert.ok(faltan.body.some(p => p.id_producto === id));
+
+        const r = await api('POST', '/catalogo/productos/agregar-a-sucursal',
+            { token: tAdmin, body: { id_sucursal: idOtraSucursal, productos: [{ id_producto: id, stock_inicial: 7 }] } });
+        assert.equal(r.status, 201, JSON.stringify(r.body));
+        assert.equal(await stock(id, idOtraSucursal), 7);
+        assert.equal(await stock(id, 1), 5);
+        const [{ n }] = await bd.sql(`SELECT COUNT(*)::int AS n FROM producto WHERE nombre_producto = 'Torta compartida'`);
+        assert.equal(n, 1);
+        const [h] = await bd.sql(`SELECT h.motivo_movimiento AS motivo FROM historial_inventario h JOIN inventario_sucursal i ON i.id_inventario = h.id_inventario
+                                  WHERE i.id_producto = $1 AND i.id_sucursal = $2`, [id, idOtraSucursal]);
+        assert.equal(h.motivo, 'Stock inicial');
+        const [{ lotes }] = await bd.sql(`SELECT COALESCE(SUM(l.cantidad_actual), 0)::int AS lotes FROM lote_inventario l
+                                          JOIN inventario_sucursal i ON i.id_inventario = l.id_inventario
+                                          WHERE i.id_producto = $1 AND i.id_sucursal = $2`, [id, idOtraSucursal]);
+        assert.equal(lotes, 7);
+
+        // Ya no falta, y no se puede agregar dos veces
+        const otra = await api('GET', `/catalogo/productos/faltantes?id_sucursal=${idOtraSucursal}`, { token: tAdmin });
+        assert.ok(!otra.body.some(p => p.id_producto === id));
+        const dos = await api('POST', '/catalogo/productos/agregar-a-sucursal',
+            { token: tAdmin, body: { id_sucursal: idOtraSucursal, productos: [{ id_producto: id }] } });
+        assert.equal(dos.status, 409);
+    });
+
+    test('el cajero solo agrega a su sucursal y todo o nada', async () => {
+        const a = await crearProducto('Pan de la otra', 3, idOtraSucursal);
+        const b = await crearProducto('Queque de la otra', 3, idOtraSucursal);
+        const ajena = await api('POST', '/catalogo/productos/agregar-a-sucursal',
+            { token: tCajero, body: { id_sucursal: idOtraSucursal, productos: [{ id_producto: a }] } });
+        assert.equal(ajena.status, 403);
+
+        // b ya está en la sucursal 1: falla todo y a tampoco queda agregado
+        await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES (1, $1, 0)`, [b]);
+        const mal = await api('POST', '/catalogo/productos/agregar-a-sucursal',
+            { token: tCajero, body: { productos: [{ id_producto: a, stock_inicial: 2 }, { id_producto: b }] } });
+        assert.equal(mal.status, 409);
+        const [{ n }] = await bd.sql(`SELECT COUNT(*)::int AS n FROM inventario_sucursal WHERE id_producto = $1 AND id_sucursal = 1`, [a]);
+        assert.equal(n, 0);
+
+        const bien = await api('POST', '/catalogo/productos/agregar-a-sucursal',
+            { token: tCajero, body: { productos: [{ id_producto: a, stock_inicial: 2 }] } });
+        assert.equal(bien.status, 201, JSON.stringify(bien.body));
+        assert.equal(await stock(a, 1), 2);
+    });
+
+    test('no deja crear ni renombrar un producto con el nombre de otro', async () => {
+        await crearProducto('EMPANADA UNICA', 1);
+        const cat = (await bd.sql(`SELECT min(id_categoria) AS id FROM categoria_producto`))[0].id;
+        const nuevo = await api('POST', '/catalogo/productos', { token: tAdmin, body: {
+            nombre_producto: '  empanada   unica ', id_categoria: cat, precio_unitario: 4, id_sucursal: idOtraSucursal } });
+        assert.equal(nuevo.status, 409);
+        assert.match(nuevo.body.error, /Agregar de otra sucursal/);
+
+        const otro = await crearProducto('EMPANADA DISTINTA', 1);
+        const renombrar = await api('PUT', `/catalogo/productos/${otro}`, { token: tAdmin, body: { nombre_producto: 'Empanada única' } });
+        assert.equal(renombrar.status, 200, 'con tilde es otro nombre');
+        const igual = await api('PUT', `/catalogo/productos/${otro}`, { token: tAdmin, body: { nombre_producto: 'empanada unica' } });
+        assert.equal(igual.status, 409);
     });
 });

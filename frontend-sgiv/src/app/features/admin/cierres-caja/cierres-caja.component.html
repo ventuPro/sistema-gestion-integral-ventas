@@ -8,9 +8,6 @@
       <app-selector-sucursal [sucursales]="sucursales()" [todas]="true"
                              [seleccionada]="sucursalFiltro()?.id_sucursal ?? null"
                              (cambio)="cambiarSucursal($event)" />
-      <button class="inf-boton" (click)="cargar()">
-        <lucide-icon [img]="icons.actualizar" class="w-3.5 h-3.5"></lucide-icon> Actualizar
-      </button>
     </div>
   </header>
 

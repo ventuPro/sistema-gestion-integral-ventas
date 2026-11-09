@@ -294,6 +294,18 @@ op('POST /catalogo/productos', 'crear', (c) => {
     const p = c.fila('producto', 'INSERT')?.nuevo;
     return ['Creó un producto', p && conDetalle(p.nombre_producto, c.dinero(p.precio_unitario))];
 });
+op('PUT /caja/reservas/:id_producto', 'modificar', (c) => {
+    const f = c.fila('reserva_caja');
+    const antes = f?.anterior?.cantidad ?? 0, ahora = f?.nuevo?.cantidad ?? 0;
+    return [ahora > antes ? 'Agregó al carrito de caja' : 'Quitó del carrito de caja',
+            conDetalle(c.nombre('producto', c.ids[0]), f && `${ahora} en el carrito`)];
+});
+op('POST /catalogo/productos/agregar-a-sucursal', 'crear', (c) => {
+    const filas = c.filas('inventario_sucursal').filter(f => f.nuevo && !f.anterior);
+    const n = filas.length;
+    return [n === 1 ? 'Agregó un producto a una sucursal' : `Agregó ${n} productos a una sucursal`,
+            n ? conDetalle(c.nombre('sucursal', filas[0].nuevo.id_sucursal), n === 1 ? c.nombre('producto', filas[0].nuevo.id_producto) : null) : null];
+});
 op('PUT /catalogo/productos/:id', 'modificar', (c) => {
     const f = c.fila('producto', 'UPDATE');
     return ['Modificó un producto', f ? conDetalle(f.nuevo.nombre_producto, c.cambiosTexto(f)) : c.nombre('producto', c.ids[0])];

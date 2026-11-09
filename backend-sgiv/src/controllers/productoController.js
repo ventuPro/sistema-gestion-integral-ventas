@@ -140,6 +140,94 @@ const enlazarReceta = async (client, id_producto, id_receta) => {
     if (id_receta) await client.query(`UPDATE receta SET id_producto = $1 WHERE id_receta = $2`, [id_producto, id_receta]);
 };
 
+// ─── Un mismo producto en varias sucursales ───
+/** Mensaje si el nombre ya lo usa otro producto (los productos son de todo el negocio) */
+const nombreRepetido = async (nombre, excluir = null) => {
+    if (!nombre) return null;
+    const otro = await m.mismoNombre(nombre, excluir);
+    if (!otro) return null;
+    return otro.estado_activo
+        ? `Ya existe el producto «${otro.nombre_producto}». Si no aparece en esta sucursal, agrégalo con «Agregar de otra sucursal».`
+        : `Ya existe el producto «${otro.nombre_producto}», desactivado. Actívalo en vez de crear otro.`;
+};
+
+/** El cajero solo trabaja con su sucursal */
+const sucursalPermitida = (req, pedida) => {
+    const propia = Number(req.usuario.id_sucursal);
+    if (Number(req.usuario.id_rol) === 1) return Number(pedida) || propia;
+    return !pedida || Number(pedida) === propia ? propia : null;
+};
+
+// GET /catalogo/productos/faltantes?id_sucursal — los que la sucursal todavía no tiene
+const listarFaltantes = async (req, res) => {
+    try {
+        const id_sucursal = sucursalPermitida(req, req.query.id_sucursal);
+        if (!id_sucursal) return res.status(403).json({ error: 'Solo puedes ver tu sucursal' });
+        res.json(await m.productosFaltantes(id_sucursal));
+    } catch (e) {
+        console.error('listarFaltantes:', e);
+        res.status(500).json({ error: 'No se pudo cargar la lista' });
+    }
+};
+
+// POST /catalogo/productos/agregar-a-sucursal { id_sucursal, productos: [{ id_producto, stock_inicial }] }
+// El mismo producto (receta, costo y precio) en otra sucursal: todo o nada
+const agregarASucursal = async (req, res) => {
+    const client = await db.connect();
+    try {
+        const id_sucursal = sucursalPermitida(req, req.body?.id_sucursal);
+        if (!id_sucursal) return res.status(403).json({ error: 'Solo puedes agregar productos a tu sucursal' });
+        const lista = Array.isArray(req.body?.productos) ? req.body.productos : [];
+        if (!lista.length || lista.length > 200) return res.status(400).json({ error: 'Elige al menos un producto' });
+        const productos = lista.map(p => ({
+            id_producto: numero(p?.id_producto, { etiqueta: 'El producto', obligatorio: true, min: 1, entero: true }),
+            stock: numero(p?.stock_inicial, { etiqueta: 'El stock inicial', min: 0, max: 100000, entero: true }) ?? 0
+        }));
+        if (new Set(productos.map(p => p.id_producto)).size !== productos.length)
+            return res.status(400).json({ error: 'Un producto está repetido' });
+
+        await client.query('BEGIN');
+        const rSuc = await client.query(`SELECT estado_activo FROM sucursal WHERE id_sucursal = $1`, [id_sucursal]);
+        if (!rSuc.rows[0]?.estado_activo) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'La sucursal no está activa' });
+        }
+        const cambios = [];
+        for (const p of productos) {
+            const rProd = await client.query(
+                `SELECT nombre_producto, tipo_producto, estado_activo FROM producto WHERE id_producto = $1`, [p.id_producto]);
+            const prod = rProd.rows[0];
+            if (!prod?.estado_activo) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: 'Un producto elegido ya no está activo. Vuelve a abrir la lista.' });
+            }
+            const rInv = await client.query(`
+                INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES ($1, $2, 0)
+                ON CONFLICT (id_sucursal, id_producto) DO NOTHING RETURNING id_inventario`, [id_sucursal, p.id_producto]);
+            if (!rInv.rows.length) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: `«${prod.nombre_producto}» ya está en esta sucursal` });
+            }
+            if (p.stock > 0 && prod.tipo_producto !== 'PREPARADO') {
+                const r = await moverStock(client, { id_inventario: rInv.rows[0].id_inventario, id_usuario: req.usuario?.id_usuario,
+                                                     cantidad: p.stock, motivo: 'Stock inicial' });
+                cambios.push({ id_producto: p.id_producto, id_sucursal, nuevo_stock: r.stock });
+            }
+        }
+        await client.query('COMMIT');
+        emitirCatalogo();
+        emitirStock(cambios);
+        res.status(201).json({ agregados: productos.length });
+    } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        if (e.status === 400) return res.status(400).json({ error: e.message });
+        console.error('agregarASucursal:', e);
+        res.status(500).json({ error: 'No se pudieron agregar los productos' });
+    } finally {
+        client.release();
+    }
+};
+
 // Crear producto Y asignarlo a la sucursal seleccionada
 const agregarProducto   = async (req, res) => {
     let url_imagen = null;
@@ -153,6 +241,8 @@ const agregarProducto   = async (req, res) => {
 
         const datos     = { ...producto, url_imagen };
         const id_suc    = Number(id_sucursal) || 1;
+        const repetido  = await nombreRepetido(datos.nombre_producto);
+        if (repetido) { borrarImagen(url_imagen); return res.status(409).json({ error: repetido }); }
 
         // Producto, su fila de inventario en la sucursal y el historial del stock inicial: todo o nada
         const client = await db.connect();
@@ -229,6 +319,8 @@ const actualizarProducto = async (req, res) => {
         if (anterior === undefined) return res.status(404).json({ error: 'Producto no encontrado' });
 
         const datos = datosProducto(req.body);
+        const repetido = await nombreRepetido(datos.nombre_producto, Number(req.params.id));
+        if (repetido) return res.status(409).json({ error: repetido });
         url_imagen = fotoNueva(req.body.url_imagen);
         const { prod, cambios } = await guardarProducto(Number(req.params.id), { ...datos, url_imagen }, req.usuario?.id_usuario,
                                                         recetaElegida(req));
@@ -262,5 +354,5 @@ const reactivarProducto = async (req, res) => {
 
 module.exports = {
     agregarCategoria, listarCategorias, ordenarCategorias, eliminarCategoria, listarProductos,
-    agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto
+    agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto, listarFaltantes, agregarASucursal
 };

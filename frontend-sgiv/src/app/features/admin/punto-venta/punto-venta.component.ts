@@ -90,7 +90,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly entradaFondo = new EntradaMonto(this.montoInicial);
   readonly billetes     = [10, 20, 50, 100, 200];
 
-  // ─── Catálogo: stock del servidor; lo que está en el carrito se descuenta al mostrarlo ───
+  // ─── Catálogo: stock del servidor (ya sin lo reservado); lo agregado y aún no reservado se descuenta al mostrarlo ───
   private readonly catalogo = signal<any[]>([]);
   readonly busqueda         = signal('');
   readonly cargando         = signal(true);
@@ -99,16 +99,33 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   readonly sucursal = computed(() => Number(this.turnoActivo()?.id_sucursal) || this.sesion.idSucursal());
 
   private readonly enCarrito = computed(() => new Map(this.carrito().map(i => [i.id_producto, Number(i.cantidad)])));
-  private readonly stockServidor = computed(() => new Map(this.catalogo().map(p => [p.id_producto, p.stock_actual])));
+  /** Lo que el servidor ya tiene reservado de este carrito (el stock salió al agregarlo) */
+  private readonly reservado = signal<ReadonlyMap<number, number>>(new Map());
+  /** Lo más que puede llevar este carrito de cada producto: lo libre + lo ya reservado */
+  private readonly stockServidor = computed(() => {
+    const res = this.reservado();
+    return new Map(this.catalogo().map(p => [p.id_producto, p.stock_actual + (res.get(p.id_producto) ?? 0)]));
+  });
+  /** Unidades del carrito que todavía no confirmó el servidor (negativo = quitadas, aún por devolver) */
+  private readonly sinReservar = computed(() => {
+    const res = this.reservado(), dif = new Map<number, number>();
+    for (const [id, n] of this.enCarrito()) dif.set(id, n - (res.get(id) ?? 0));
+    for (const [id, n] of res) if (!dif.has(id)) dif.set(id, -n);
+    return dif;
+  });
+  private readonly reservando = new Set<number>();
+  private esperaReserva: any;
+  private carritoRestaurado = false;
   /** Agotados durante la venta: siguen en su lugar hasta cerrar el comprobante */
   private readonly retenidos = signal<ReadonlySet<number>>(new Set());
 
   readonly productosDisponibles = computed(() => {
-    const enCarrito = this.enCarrito();
+    const pendiente = this.sinReservar();
     const retenidos = this.retenidos();
+    const enCarrito = this.enCarrito();
     return this.catalogo()
-      .filter(p => p.stock_actual > 0 || retenidos.has(p.id_producto))
-      .map(p => enCarrito.has(p.id_producto) ? { ...p, stock_actual: Math.max(0, p.stock_actual - enCarrito.get(p.id_producto)!) } : p);
+      .filter(p => p.stock_actual > 0 || retenidos.has(p.id_producto) || enCarrito.has(p.id_producto))
+      .map(p => pendiente.has(p.id_producto) ? { ...p, stock_actual: Math.max(0, p.stock_actual - pendiente.get(p.id_producto)!) } : p);
   });
 
   readonly productosFiltrados = computed(() => {
@@ -242,6 +259,15 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
       const clave = this.clave();
       untracked(() => this.programarCotizacion(clave));
     });
+    // Cada cambio del carrito se reserva en el servidor (espera corta: varios clics van juntos)
+    effect(() => {
+      this.sinReservar();
+      if (this.cobrando()) return;
+      untracked(() => {
+        clearTimeout(this.esperaReserva);
+        this.esperaReserva = setTimeout(() => this.enviarReservas(), 200);
+      });
+    });
   }
 
   private detalles() { return this.carrito().map(i => ({ id_producto: i.id_producto, cantidad: i.cantidad })); }
@@ -276,6 +302,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearTimeout(this.esperaCotizacion);
+    clearTimeout(this.esperaReserva);
     clearTimeout(this.esperaRecarga);
     this.subCotizacion?.unsubscribe();
     this.detenerSondeo?.();
@@ -293,6 +320,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     });
     this.stockSub = this.socketService.escuchar<any>('actualizacion_stock_global').subscribe(payload => {
       if (!payload || Number(payload.id_sucursal) !== this.sucursal()) return;
+      // Mi propia reserva en camino: el stock llega con su respuesta (si no, se restaría dos veces)
+      if (this.reservando.has(Number(payload.id_producto))) return;
       this.fijarStock([{ id_producto: payload.id_producto, nuevo_stock: payload.nueva_cantidad_disponible }]);
     });
     // Productos nuevos, editados o desactivados y promociones
@@ -419,12 +448,79 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
         this.retener(new Map(productos.map(p => [p.id_producto, p.stock_actual])));
         this.catalogo.set(productos);
         this.sincronizarCarrito(productos);
+        if (!this.carritoRestaurado) { this.carritoRestaurado = true; this.restaurarCarrito(); }
         if (!silencioso) this.enfocarBuscador();
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false)
     });
     this.promociones.vigentesPuntoVenta().subscribe({ next: (v) => this.vigentes.set(v) });
+  }
+
+  // ─── Reserva: el carrito se guarda en el servidor y el stock sale al agregar (como en Mesas) ───
+  /** Al volver a la pantalla: el carrito que quedó reservado */
+  private restaurarCarrito() {
+    this.cajaService.reservas().subscribe({
+      next: (rs) => {
+        if (!rs.length) return;
+        const porId = new Map(this.catalogo().map(p => [p.id_producto, p]));
+        this.reservado.set(new Map(rs.map(r => [Number(r.id_producto), Number(r.cantidad)])));
+        const actuales = new Set(this.carrito().map(i => i.id_producto));
+        const nuevos = rs.filter(r => porId.has(Number(r.id_producto)) && !actuales.has(Number(r.id_producto))).map(r => {
+          const { stock_actual, ...datos } = porId.get(Number(r.id_producto));
+          return { ...datos, cantidad: Number(r.cantidad), subtotal: datos.precio_unitario * Number(r.cantidad) };
+        });
+        if (nuevos.length) this.carrito.update(c => [...c, ...nuevos]);
+      }
+    });
+  }
+
+  /** Manda al servidor lo que cambió en el carrito (un pedido a la vez por producto) */
+  private enviarReservas() {
+    if (this.cobrando() || this.estadoCaja() !== 'ABIERTA') return;
+    const quiero = this.enCarrito(), tengo = this.reservado();
+    for (const id of new Set([...quiero.keys(), ...tengo.keys()])) {
+      const cantidad = quiero.get(id) ?? 0;
+      if (cantidad === (tengo.get(id) ?? 0) || this.reservando.has(id)) continue;
+      this.reservando.add(id);
+      this.cajaService.reservar(id, cantidad).subscribe({
+        next: (r) => {
+          this.reservando.delete(id);
+          if (r.stock != null) this.fijarStock([{ id_producto: id, nuevo_stock: r.stock }]);
+          this.fijarReservado(id, r.cantidad);
+        },
+        error: (e) => {
+          this.reservando.delete(id);
+          if (e?.status === 409) {
+            // Otro se llevó el stock: el carrito queda con lo que se pudo
+            const maximo = Math.max(0, Number(e.error?.maximo) || 0);
+            const item = this.carrito().find(i => i.id_producto === id);
+            this.dialogo.error(maximo > 0 ? `Solo quedan ${maximo} de «${item?.nombre_producto}».` : `Se agotó: ${item?.nombre_producto}`);
+            this.carrito.update(c => maximo > 0
+              ? c.map(i => i.id_producto === id ? { ...i, cantidad: maximo, subtotal: maximo * i.precio_unitario } : i)
+              : c.filter(i => i.id_producto !== id));
+            this.recargarCatalogo();
+          } else if (e?.error?.error === 'CAJA_CERRADA') {
+            this.verificarAccesoCaja();
+          } else {
+            setTimeout(() => this.enviarReservas(), 3000);   // sin conexión: se reintenta
+          }
+        }
+      });
+    }
+  }
+
+  private fijarReservado(id: number, cantidad: number) {
+    this.reservado.update(m => {
+      const n = new Map(m);
+      if (cantidad > 0) n.set(id, cantidad); else n.delete(id);
+      return n;
+    });
+  }
+
+  /** Antes de cobrar: que no quede ninguna reserva en camino */
+  private async esperarReservas() {
+    for (let i = 0; i < 80 && this.reservando.size; i++) await new Promise(r => setTimeout(r, 50));
   }
 
   /** Precios al día en el carrito; lo que ya no se vende se quita */
@@ -607,8 +703,10 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     this.registrarVenta();
   }
 
-  registrarVenta() {
+  async registrarVenta() {
     this.cobrando.set(true);
+    clearTimeout(this.esperaReserva);
+    await this.esperarReservas();
 
     const datosVenta = {
       id_sucursal:       this.sucursal(),
@@ -649,6 +747,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
         this.fechaTicket.set(new Date());
         this.mostrarTicket.set(true);
         this.carrito.set([]);
+        this.reservado.set(new Map());   // lo reservado quedó en la venta
         this.descuento.set(null);
         this.fijarStock(res.stock || []);
         this.cargarVentasHoy();

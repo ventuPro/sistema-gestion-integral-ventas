@@ -13,16 +13,16 @@ const MOTIVOS = {
 
 const TIPOS_PRODUCTO = ['ELABORADO', 'PREPARADO', 'COMPRADO'];
 
-/** Devuelve el id del historial. referencia: { id_pedido, id_detalle_cuenta } */
+/** Devuelve el id del historial. referencia: { id_pedido, id_detalle_cuenta, id_reserva } */
 const registrarHistorial = async (cliente, { id_inventario, id_usuario, tipo, cantidad, motivo, detalle = null,
                                              stock_resultante, referencia = {} }) => {
     const r = await cliente.query(
         `INSERT INTO historial_inventario
             (id_inventario, id_usuario, tipo_movimiento, cantidad_movida, motivo_movimiento, detalle, stock_resultante,
-             id_pedido, id_detalle_cuenta)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id_historial`,
+             id_pedido, id_detalle_cuenta, id_reserva)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id_historial`,
         [id_inventario, id_usuario || null, tipo, Math.abs(cantidad), motivo, detalle, stock_resultante,
-         referencia.id_pedido || null, referencia.id_detalle_cuenta || null]
+         referencia.id_pedido || null, referencia.id_detalle_cuenta || null, referencia.id_reserva || null]
     );
     // Toda salida pasa por aquí: aviso de stock bajo o agotado
     if (tipo === 'SALIDA' && stock_resultante != null) {
@@ -35,7 +35,7 @@ const registrarHistorial = async (cliente, { id_inventario, id_usuario, tipo, ca
 /**
  * Cambia el stock de un producto en una sucursal dentro de la transacción de quien llama.
  * cantidad > 0 entra, < 0 sale. Opciones:
- *   referencia { id_pedido, id_detalle_cuenta }: las devoluciones vuelven a los lotes de esa referencia
+ *   referencia { id_pedido, id_detalle_cuenta, id_reserva }: las devoluciones vuelven a los lotes de esa referencia
  *   devolucion: el ingreso vuelve a sus lotes en vez de crear uno nuevo
  *   desde: lotes que salieron de otra sucursal (transferencia: conservan fecha y vencimiento)
  *   vence: vencimiento del lote nuevo (por defecto, la vida útil del producto)
@@ -198,7 +198,7 @@ const listarMovimientos = async ({ id_sucursal, id_producto, tipo, desde, hasta,
 };
 
 // ─── Ingresos del día (lo que se produjo o llegó; sin las devoluciones de pedidos y cuentas) ───
-const NO_SON_INGRESOS = ['Devuelto de cuenta de mesa', 'Pedido QR devuelto'];
+const NO_SON_INGRESOS = ['Devuelto de cuenta de mesa', 'Pedido QR devuelto', 'Devuelto del carrito de caja'];
 
 /** fecha: AAAA-MM-DD o null = hoy (hora de La Paz) */
 const ingresosDelDia = async ({ id_sucursal, fecha }) => {
