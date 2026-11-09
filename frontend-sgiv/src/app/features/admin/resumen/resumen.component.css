@@ -1,34 +1,66 @@
-.panel-linea { border-color: var(--i-linea); border-bottom: 1px solid var(--i-linea); }
-@media (min-width: 1024px) { .panel-linea { border-bottom: none; } }
-
-.panel-separador { border-top: 1px solid var(--i-linea); }
-
-.leyenda-linea {
-  display: inline-block;
-  width: 14px;
-  border-top: 1.5px dashed var(--i-tenue);
+/* ─── Panel del día: ticket a la izquierda, gráficos a la derecha, listas abajo ─── */
+:host {
+  --c-naranja: #eb6834;
+  --c-efectivo: #1baf7a;
+  --c-qr: #2a78d6;
+  --c-ganancia: #067a06;
+  --papel-ticket: #fffdf6;
+}
+@media screen {
+  :host-context(html.tema-oscuro) {
+    --c-naranja: #d95926;
+    --c-efectivo: #199e70;
+    --c-qr: #3987e5;
+    --c-ganancia: #34d399;
+    --papel-ticket: #1a2335;
+  }
 }
 
-.turno + .turno {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px dashed var(--i-linea);
-}
+.tablero { display: grid; grid-template-columns: minmax(260px, 310px) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 960px) { .tablero { grid-template-columns: 1fr; } }
 
-.fila-stock + .fila-stock { border-top: 1px solid var(--i-linea-suave); }
-
-.venta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 0;
+/* N1 · ticket del día (como el de la impresora: renglones con puntos guía y borde dentado) */
+.ticket {
+  --diente: 9px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  font-size: calc(12.5px * var(--escala-texto));
+  font-variant-numeric: tabular-nums;
+  color: var(--i-tinta);
+  background: var(--papel-ticket);
+  border: 1px solid var(--i-linea);
+  border-bottom: 0;
+  padding: 18px 16px 26px;
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - var(--diente)) no-repeat,
+                conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(var(--diente) * 2) var(--diente) repeat-x;
+          mask: linear-gradient(#000 0 0) top / 100% calc(100% - var(--diente)) no-repeat,
+                conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(var(--diente) * 2) var(--diente) repeat-x;
 }
-.venta + .venta { border-top: 1px solid var(--i-linea-suave); }
+@media (min-width: 961px) { .ticket { position: sticky; top: 16px; } }
+.ticket .cabeza { text-align: center; display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; margin-bottom: 8px;
+                  border-bottom: 1px dashed currentColor; }
+.ticket .cabeza b { text-transform: uppercase; letter-spacing: 0.06em; font-size: calc(13.5px * var(--escala-texto)); }
+.ticket .cabeza span { color: var(--i-tenue); }
+.renglon { display: flex; align-items: baseline; gap: 6px; padding-block: 3px; }
+.renglon i { flex: 1; min-width: 12px; border-bottom: 1px dotted color-mix(in oklab, currentColor 45%, transparent); transform: translateY(-3px); }
+.renglon b { font-weight: 600; white-space: nowrap; }
+.renglon.total { font-size: calc(14.5px * var(--escala-texto)); font-weight: 700; }
+.renglon.total b { font-weight: 800; }
+.renglon .ganancia { color: var(--c-ganancia); }
+.renglon.alerta, .renglon.alerta b { color: var(--i-baja); font-weight: 700; }
+.renglon.cuidado, .renglon.cuidado b, .renglon b.cuidado { color: var(--i-aviso); font-weight: 700; }
+.corte { margin-top: 7px; padding-top: 7px; border-top: 1px dashed currentColor; }
+.metodo { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; transform: translateY(-1px); }
+.metodo.efectivo { background: var(--c-efectivo); }
+.metodo.qr { background: var(--c-qr); }
+.ticket .nota { margin: 2px 0 0; color: var(--i-tenue); font-size: calc(11px * var(--escala-texto)); }
+.ticket .pie { margin: 12px 0 0; text-align: center; color: var(--i-tenue); font-size: calc(11px * var(--escala-texto)); }
 
-.venta-hora {
-  font-size: calc(12px * var(--escala-texto));
-  font-weight: 500;
-  color: var(--i-tenue);
-  width: 38px;
-  flex-shrink: 0;
-}
+.leyenda-linea { display: inline-block; width: 16px; border-top: 2.5px solid var(--i-aviso); border-radius: 2px; }
+
+/* Listas sin cajas */
+.inf-tabla.compacta th { padding: 6px 10px 6px 0; }
+.inf-tabla.compacta td { padding: 8px 10px 8px 0; font-size: calc(13px * var(--escala-texto)); }
+.pago { font-weight: 700; white-space: nowrap; font-size: calc(12.5px * var(--escala-texto)); }
+.pago::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: currentColor; }
+.pago.efectivo { color: color-mix(in oklab, var(--c-efectivo) 80%, var(--i-tinta)); }
+.pago.qr { color: var(--c-qr); }

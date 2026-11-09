@@ -1,4 +1,4 @@
-<div class="space-y-5">
+<div class="space-y-6">
 
   <!-- Encabezado -->
   <header class="flex flex-wrap items-end justify-between gap-4">
@@ -13,266 +13,243 @@
 
   @if (cargando()) {
     <div class="space-y-5">
-      <div class="inf-hoja p-6 grid lg:grid-cols-2 gap-6">
-        <div class="space-y-3">
-          <div class="inf-esqueleto h-4 w-32"></div>
-          <div class="inf-esqueleto h-12 w-64"></div>
-          <div class="inf-esqueleto h-4 w-48"></div>
-        </div>
-        <div class="inf-esqueleto h-44"></div>
-      </div>
-      <div class="inf-esqueleto h-24"></div>
-      <div class="grid lg:grid-cols-3 gap-5">
-        <div class="inf-esqueleto h-48"></div><div class="inf-esqueleto h-48"></div><div class="inf-esqueleto h-48"></div>
+      <div class="inf-esqueleto h-6 w-2/3"></div>
+      <div class="grid lg:grid-cols-[300px_1fr] gap-6">
+        <div class="inf-esqueleto h-96"></div>
+        <div class="grid md:grid-cols-2 gap-6"><div class="inf-esqueleto h-60"></div><div class="inf-esqueleto h-60"></div></div>
       </div>
     </div>
   }
 
   @if (!cargando() && datos()) {
-  <div class="space-y-5">
+  @let d = datos();
+  <div class="space-y-7" [class.inf-refrescando]="refrescando()">
 
-    <!-- Cifra principal y ritmo por hora -->
-    <section class="inf-hoja grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <div class="p-6 lg:border-r panel-linea">
-        <p class="inf-etiqueta">Ingresos de hoy</p>
-        <p class="inf-cifra-xl"><span class="inf-moneda">{{ moneda() }}</span>{{ cifra(hoy().ingresos) }}</p>
+    <!-- N4 · el día en una frase -->
+    <p class="inf-frase">
+      @if (hoy().ventas) {
+        Hoy se vendió <b>{{ moneda() }} {{ cifra(hoy().ingresos) }}</b> en <b>{{ entero(hoy().ventas) }} {{ hoy().ventas === 1 ? 'venta' : 'ventas' }}</b>@if (variacionAyer() !== null) {,
+          <span [class.sube]="variacionAyer()! >= 0" [class.baja]="variacionAyer()! < 0">{{ cifra(abs(variacionAyer()!), 0) }} % {{ variacionAyer()! >= 0 ? 'más' : 'menos' }}</span> que ayer a esta hora}.
+        @if (masVendido()) { Lo que más salió: <b>{{ masVendido().nombre_producto }}</b>. }
+      } @else {
+        Todavía no hay ventas hoy.
+      }
+      @if (vencimientos().vencidos) { <span class="resaltado">Hay {{ vencimientos().vencidos }} {{ vencimientos().vencidos === 1 ? 'unidad vencida' : 'unidades vencidas' }}</span>. }
+      @if (d.stock?.agotados) { <span class="baja">{{ d.stock.agotados }} {{ d.stock.agotados === 1 ? 'producto agotado' : 'productos agotados' }}</span>. }
+    </p>
 
-        <div class="inf-montos mt-5">
-          @if (ajustes.config().pago_efectivo) {
-            <div class="inf-monto">
-              <p class="inf-etiqueta"><lucide-icon [img]="icons.efectivo" class="w-4 h-4"></lucide-icon> Efectivo</p>
-              <p class="inf-monto-valor">{{ moneda() }} {{ cifra(cobradoHoy().efectivo) }}</p>
-            </div>
-          }
-          @if (ajustes.config().pago_qr) {
-            <div class="inf-monto">
-              <p class="inf-etiqueta"><lucide-icon [img]="icons.qr" class="w-4 h-4"></lucide-icon> QR</p>
-              <p class="inf-monto-valor">{{ moneda() }} {{ cifra(cobradoHoy().qr) }}</p>
-            </div>
-          }
+    <div class="tablero">
+
+      <!-- N1 · ticket del día -->
+      <aside class="ticket" aria-label="Resumen del día">
+        <div class="cabeza">
+          <b>{{ ajustes.nombre() }}</b>
+          <span>Resumen del día · {{ fechaHoy }}</span>
+          <span>{{ nombreSucursal() }}</span>
         </div>
+        <div class="renglon"><span>Ventas</span><i></i><b>{{ entero(hoy().ventas) }}</b></div>
+        <div class="renglon"><span>Ticket promedio</span><i></i><b>{{ enBs(hoy().ticket) }}</b></div>
+        @if (ajustes.config().pago_efectivo) {
+          <div class="renglon"><span><em class="metodo efectivo"></em>Efectivo</span><i></i><b>{{ enBs(cobradoHoy().efectivo) }}</b></div>
+        }
+        @if (ajustes.config().pago_qr) {
+          <div class="renglon"><span><em class="metodo qr"></em>QR</span><i></i><b>{{ enBs(cobradoHoy().qr) }}</b></div>
+        }
+        <div class="renglon total corte"><span>INGRESOS</span><i></i><b>{{ enBs(hoy().ingresos) }}</b></div>
+        @if (costoHoy(); as c) {
+          <div class="renglon"><span>Costo de insumos</span><i></i><b>{{ enBs(c.costo) }}</b></div>
+          <div class="renglon total"><span>GANANCIA</span><i></i><b class="ganancia">{{ enBs(c.ganancia) }}</b></div>
+          @if (c.unidades_sin_costo) { <p class="nota">{{ c.unidades_sin_costo }} u vendidas sin receta: fuera de la ganancia</p> }
+        }
+        <div class="corte"></div>
+        <div class="renglon"><span>Efectivo en caja</span><i></i><b>{{ enBs(efectivoEsperado()) }}</b></div>
+        <div class="renglon"><span>Por cobrar · {{ d.mesas?.ocupadas || 0 }} {{ d.mesas?.ocupadas === 1 ? 'mesa' : 'mesas' }}</span><i></i><b>{{ enBs(d.mesas?.por_cobrar) }}</b></div>
+        <div class="renglon"><span>Pedidos QR por confirmar</span><i></i><b [class.cuidado]="d.pedidos_qr?.pendientes > 0">{{ d.pedidos_qr?.pendientes || 0 }}</b></div>
+        <div class="corte"></div>
+        <div class="renglon" [class.alerta]="d.stock?.agotados > 0"><span>Agotados</span><i></i><b>{{ d.stock?.agotados || 0 }}</b></div>
+        <div class="renglon" [class.cuidado]="d.stock?.bajos > 0"><span>Stock bajo</span><i></i><b>{{ d.stock?.bajos || 0 }}</b></div>
+        <div class="renglon" [class.alerta]="vencimientos().vencidos > 0"><span>Vencidos</span><i></i><b>{{ vencimientos().vencidos }} u</b></div>
+        <div class="renglon" [class.cuidado]="vencimientos().por_vencer > 0"><span>Por vencer</span><i></i><b>{{ vencimientos().por_vencer }} u</b></div>
+        @if (actualizado()) { <p class="pie">Actualizado {{ hora(actualizado()!) }}</p> }
+      </aside>
 
-        <dl class="inf-pares mt-6 pt-5 panel-separador">
-          <div><dt>Ayer cerró en</dt><dd>{{ moneda() }} {{ cifra(comp().ayer_total?.ingresos) }}</dd></div>
-          <div><dt>Venta más alta de hoy</dt><dd>{{ moneda() }} {{ cifra(hoy().venta_maxima) }}</dd></div>
-          <div><dt>Primera venta</dt><dd>{{ hoy().primera_venta ? hora(hoy().primera_venta) : '—' }}</dd></div>
-        </dl>
-      </div>
+      <!-- Gráficos del día, cada uno con su cifra -->
+      <div class="inf-bloques dos">
 
-      <div class="p-6 flex flex-col">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <p class="inf-etiqueta">Ritmo de ventas por hora</p>
+        <section class="inf-bloque">
+          <div class="inf-bloque-cabeza">
+            <h3>Ventas por hora</h3>
+            <nav class="inf-segmentos" aria-label="Qué mostrar">
+              <button [class.activa]="metricaHoras() === 'ingresos'" (click)="metricaHoras.set('ingresos')">{{ moneda() }}</button>
+              <button [class.activa]="metricaHoras() === 'ventas'" (click)="metricaHoras.set('ventas')">Ventas</button>
+            </nav>
+          </div>
+          <div class="inf-cifra">
+            <b>{{ metricaHoras() === 'ingresos' ? enBs(hoy().ingresos) : entero(hoy().ventas) + ' ventas' }}</b>
+            @if (variacionAyer() !== null) {
+              <span><span [class.sube]="variacionAyer()! >= 0" [class.baja]="variacionAyer()! < 0">{{ variacionAyer()! >= 0 ? '▲' : '▼' }} {{ cifra(abs(variacionAyer()!), 0) }} %</span> frente a ayer a esta hora</span>
+            } @else { <span>hoy</span> }
+          </div>
           <div class="inf-leyenda">
             <span><i class="inf-muestra" style="background: var(--i-acento)"></i>Hoy</span>
-            <span><i class="leyenda-linea"></i>Promedio últimos 7 días</span>
+            <span><i class="leyenda-linea"></i>Un día normal (promedio de 7 días)</span>
           </div>
-        </div>
-        <div class="relative flex-1 min-h-[190px]">
-          <canvas #graficoHoras></canvas>
-        </div>
-      </div>
-    </section>
+          <div class="inf-lienzo"><canvas #graficoHoras role="img" aria-label="Ventas por hora de hoy y de un día normal"></canvas></div>
+        </section>
 
-    <!-- Indicadores -->
-    <section class="inf-hoja inf-tira overflow-hidden">
-      <div>
-        <p class="inf-etiqueta">Ventas</p>
-        <p class="inf-valor">{{ entero(hoy().ventas) }}</p>
-        <p class="inf-sub">{{ entero(hoy().unidades) }} unidades</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Ticket promedio</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(hoy().ticket) }}</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Por cobrar en mesas</p>
-        <p class="inf-valor">{{ moneda() }} {{ cifra(datos().mesas?.por_cobrar) }}</p>
-        <p class="inf-sub">{{ datos().mesas?.ocupadas || 0 }} de {{ datos().mesas?.total || 0 }} mesas ocupadas</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Pedidos del menú QR</p>
-        <p class="inf-valor" [class.inf-aviso]="datos().pedidos_qr?.pendientes > 0">{{ datos().pedidos_qr?.pendientes || 0 }} por confirmar</p>
-        <p class="inf-sub">{{ datos().pedidos_qr?.por_entregar || 0 }} por entregar · {{ datos().pedidos_qr?.hoy || 0 }} hoy</p>
-      </div>
-      <div>
-        <p class="inf-etiqueta">Alertas de stock</p>
-        <p class="inf-valor" [class.inf-baja]="datos().stock?.agotados > 0">{{ alertasStock() }}</p>
-        <p class="inf-sub">{{ datos().stock?.agotados || 0 }} agotados · {{ datos().stock?.bajos || 0 }} bajo mínimo</p>
-      </div>
-    </section>
+        <section class="inf-bloque">
+          <div class="inf-bloque-cabeza"><h3>Cobros por método</h3></div>
+          @if (partesMetodos().length) {
+            <div class="inf-cifra"><b>{{ cifra(partEfectivo(), 0) }} %</b><span>se cobró en efectivo</span></div>
+          }
+          <app-pizza [partes]="partesMetodos()" [formato]="enBs" titulo="Cobros por método" vacio="Todavía no hay cobros hoy." />
+        </section>
 
-    <!-- Comparativo de sucursales -->
-    @if (todas() && datos().sucursales?.length) {
-      <section class="inf-hoja overflow-hidden">
-        <div class="px-5 pt-5"><div class="inf-seccion"><h2>Sucursales hoy</h2></div></div>
-        <div class="overflow-x-auto">
-          <table class="inf-tabla">
-            <thead>
-              <tr><th>Sucursal</th><th>Caja</th><th class="num">Ventas</th><th class="num">Ingresos</th><th class="w-1/3">Participación</th></tr>
-            </thead>
-            <tbody>
-              @for (s of datos().sucursales; track s.id_sucursal) {
-                <tr>
-                  <td class="fuerte">{{ s.nombre_sucursal }} @if (!s.estado_activo) { <span class="inf-ficha ml-1">inactiva</span> }</td>
-                  <td><span class="inf-estado" [ngClass]="s.caja_abierta ? 'ok' : 'neutro'">{{ s.caja_abierta ? 'Abierta' : 'Cerrada' }}</span></td>
-                  <td class="num">{{ entero(s.ventas) }}</td>
-                  <td class="num fuerte">{{ moneda() }} {{ cifra(s.ingresos) }}</td>
-                  <td>
-                    <div class="flex items-center gap-3">
-                      <div class="inf-barra flex-1"><span [style.width.%]="porcentaje(s.ingresos, totalSucursales())"></span></div>
-                      <span class="inf-tenue text-xs w-12 text-right">{{ porcentaje(s.ingresos, totalSucursales()).toFixed(1) }} %</span>
-                    </div>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      </section>
-    }
-
-    <div class="grid lg:grid-cols-3 gap-5">
-
-      <!-- Cobros por método -->
-      <section class="inf-hoja p-5">
-        <div class="inf-seccion"><h2>Cobros por método</h2></div>
-        @if (datos().metodos_pago?.length) {
-          <div class="inf-apilada mb-4">
-            @for (m of datos().metodos_pago; track m.metodo_pago; let i = $index) {
-              <span [style.width.%]="porcentaje(m.ingresos, totalMetodos())" [style.background]="colorMetodo(i)"></span>
-            }
+        <section class="inf-bloque">
+          <div class="inf-bloque-cabeza">
+            <h3>Lo más vendido</h3>
+            <select class="inf-campo" [value]="categoriaFiltro() ?? ''" (change)="filtrarCategoria($any($event.target).value)" aria-label="Categoría">
+              <option value="">Todas las categorías</option>
+              @for (c of categorias(); track c.id_categoria) { <option [value]="c.id_categoria">{{ c.nombre_categoria }}</option> }
+            </select>
+            <nav class="inf-segmentos" aria-label="Ordenar por">
+              <button [class.activa]="metricaTop() === 'ingresos'" (click)="metricaTop.set('ingresos')">{{ moneda() }}</button>
+              <button [class.activa]="metricaTop() === 'unidades'" (click)="metricaTop.set('unidades')">Unidades</button>
+            </nav>
           </div>
-          <table class="inf-tabla">
-            <tbody>
-              @for (m of datos().metodos_pago; track m.metodo_pago; let i = $index) {
-                <tr>
-                  <td class="pl-0!"><span class="flex items-center gap-2"><i class="inf-muestra" [style.background]="colorMetodo(i)"></i>{{ m.metodo_pago }}</span></td>
-                  <td class="num inf-tenue">{{ m.ventas }} vta.</td>
-                  <td class="num fuerte">{{ moneda() }} {{ cifra(m.ingresos) }}</td>
-                  <td class="num inf-tenue pr-0!">{{ porcentaje(m.ingresos, totalMetodos()).toFixed(0) }} %</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        } @else {
-          <p class="inf-vacio">Todavía no hay cobros hoy.</p>
-        }
-      </section>
+          @if (masVendido(); as m) {
+            <div class="inf-cifra"><b>{{ m.nombre_producto }}</b><span>{{ enBs(m.ingresos) }} · {{ entero(m.unidades) }} u</span></div>
+          }
+          <app-ranking [filas]="filasTop()" [formato]="metricaTop() === 'ingresos' ? enBs : enEntero" color="var(--c-naranja)"
+                       [vacio]="categoriaFiltro() ? 'Sin ventas hoy en esta categoría.' : 'Sin ventas hoy.'" />
+        </section>
 
-      <!-- Caja -->
-      <section class="inf-hoja p-5">
-        <div class="inf-seccion">
-          <h2>Caja</h2>
-          <span class="inf-nota">
-            <span class="inf-estado" [ngClass]="datos().turnos_abiertos?.length ? 'ok' : 'neutro'">
-              {{ datos().turnos_abiertos?.length ? (datos().turnos_abiertos.length + (datos().turnos_abiertos.length === 1 ? ' turno abierto' : ' turnos abiertos')) : 'Cerrada' }}
-            </span>
-          </span>
-        </div>
-        @for (t of datos().turnos_abiertos; track t.id_turno) {
-          <div class="turno">
-            <div class="flex items-baseline justify-between gap-2">
-              <p class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))] truncate">{{ t.cajero }}</p>
-              <p class="inf-tenue text-xs whitespace-nowrap">desde {{ desde(t.fecha_hora_apertura) }}</p>
+        <section class="inf-bloque">
+          <div class="inf-bloque-cabeza"><h3>Ventas por categoría</h3></div>
+          @if (categoriaPrincipal(); as c) {
+            <div class="inf-cifra"><b>{{ cifra(c.porcentaje, 0) }} %</b><span>es {{ c.nombre }}</span></div>
+          }
+          <app-pizza [partes]="partesCategorias()" [formato]="enBs" titulo="Ventas por categoría" vacio="Sin ventas hoy." />
+        </section>
+
+        @if (todas() && d.sucursales?.length) {
+          <section class="inf-bloque">
+            <div class="inf-bloque-cabeza">
+              <h3>Sucursales hoy</h3>
+              <nav class="inf-segmentos" aria-label="Qué mostrar">
+                <button [class.activa]="metricaSucursal() === 'ingresos'" (click)="metricaSucursal.set('ingresos')">{{ moneda() }}</button>
+                <button [class.activa]="metricaSucursal() === 'ventas'" (click)="metricaSucursal.set('ventas')">Ventas</button>
+              </nav>
             </div>
-            @if (todas()) { <p class="inf-sub mt-0!">{{ t.nombre_sucursal }}</p> }
-            <dl class="inf-pares mt-2.5">
-              <div><dt>Fondo inicial</dt><dd>{{ moneda() }} {{ cifra(t.monto_inicial) }}</dd></div>
-              <div><dt>Cobrado en efectivo</dt><dd>{{ moneda() }} {{ cifra(t.efectivo) }}</dd></div>
-              <div><dt>Total del turno · {{ t.ventas }} vta.</dt><dd>{{ moneda() }} {{ cifra(t.total) }}</dd></div>
-            </dl>
-          </div>
-        } @empty {
-          <p class="inf-vacio">No hay turnos abiertos.<br>Para vender, un cajero debe abrir caja.</p>
-        }
-        @if (datos().turnos_abiertos?.length) {
-          <div class="flex items-baseline justify-between mt-3 pt-3 panel-separador">
-            <span class="inf-etiqueta">Efectivo que debería haber en caja</span>
-            <span class="inf-tinta font-semibold">{{ moneda() }} {{ cifra(efectivoEsperado()) }}</span>
-          </div>
-        }
-      </section>
-
-      <!-- Stock crítico -->
-      <section class="inf-hoja p-5">
-        <div class="inf-seccion">
-          <h2>Stock por reponer</h2>
-          <a routerLink="/dashboard/inventario" class="inf-nota inf-enlace">Ver inventario</a>
-        </div>
-        @for (p of datos().stock_critico; track $index) {
-          <div class="flex items-center gap-3 py-2 fila-stock">
-            <div class="min-w-0 flex-1">
-              <p class="text-[length:calc(13px*var(--escala-texto))] inf-tinta truncate">{{ p.nombre_producto }}</p>
-              @if (todas()) { <p class="inf-sub mt-0!">{{ p.nombre_sucursal }}</p> }
-            </div>
-            @if (p.cantidad_actual <= 0) {
-              <span class="inf-estado mal">Agotado</span>
-            } @else {
-              <span class="text-xs inf-tenue whitespace-nowrap">
-                <b class="inf-aviso">{{ p.cantidad_actual }}</b> / mín. {{ p.stock_minimo_alerta }}
-              </span>
+            @if (sucursalPrincipal(); as s) {
+              <div class="inf-cifra"><b>{{ s.nombre }}</b><span>vende el {{ cifra(s.porcentaje, 0) }} % del día</span></div>
             }
-          </div>
-        } @empty {
-          <p class="inf-vacio">Todo el stock está sobre el mínimo.</p>
+            <app-ranking [filas]="filasSucursales()" [formato]="metricaSucursal() === 'ingresos' ? enBs : enEntero" />
+          </section>
         }
-      </section>
+
+        <section class="inf-bloque">
+          <div class="inf-bloque-cabeza">
+            <h3>Lotes por vencer</h3>
+            <a routerLink="/dashboard/inventario" class="inf-enlace ml-auto">Ir a Inventario → Vencidos</a>
+          </div>
+          @if (d.por_vencer?.length) {
+            <div class="overflow-x-auto">
+              <table class="inf-tabla compacta">
+                <thead><tr><th>Producto</th>@if (todas()) { <th>Sucursal</th> }<th>Vence</th><th class="num">Cantidad</th></tr></thead>
+                <tbody>
+                  @for (l of d.por_vencer; track $index) {
+                    <tr>
+                      <td class="fuerte">{{ l.nombre_producto }}</td>
+                      @if (todas()) { <td>{{ l.nombre_sucursal }}</td> }
+                      <td><span class="inf-estado" [class.mal]="l.vencido" [class.aviso]="!l.vencido">{{ l.vencido ? 'Venció' : 'Vence' }} {{ desde(l.fecha_vencimiento) }}</span></td>
+                      <td class="num">{{ entero(l.cantidad) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <p class="inf-vacio">Nada por vencer.</p>
+          }
+        </section>
+      </div>
     </div>
 
-    <div class="grid lg:grid-cols-5 gap-5">
-
-      <!-- Productos del día -->
-      <section class="inf-hoja lg:col-span-3 min-w-0">
-        <div class="px-5 pt-5">
-          <div class="inf-seccion mb-2!"><h2>Lo más vendido hoy</h2></div>
-          <nav class="inf-pestanas">
-            <button [class.activa]="categoriaFiltro() === null" (click)="filtrarCategoria(null)">Todas</button>
-            @for (c of categorias(); track c.id_categoria) {
-              <button [class.activa]="categoriaFiltro() === c.id_categoria" (click)="filtrarCategoria(c.id_categoria)">{{ c.nombre_categoria }}</button>
-            }
-          </nav>
-        </div>
-        <div class="overflow-x-auto" [class.inf-refrescando]="refrescando()">
-          @if (datos().top_productos?.length) {
-            <table class="inf-tabla">
-              <thead><tr><th class="rango">#</th><th>Producto</th><th class="num">Unidades</th><th class="num">Ingresos</th><th class="w-1/4"></th></tr></thead>
-              <tbody>
-                @for (p of datos().top_productos; track p.nombre_producto; let i = $index) {
-                  <tr>
-                    <td class="rango">{{ i + 1 }}</td>
-                    <td><span class="fuerte">{{ p.nombre_producto }}</span><span class="inf-secundario">{{ p.nombre_categoria }}</span></td>
-                    <td class="num">{{ entero(p.unidades) }}</td>
-                    <td class="num fuerte">{{ moneda() }} {{ cifra(p.ingresos) }}</td>
-                    <td><div class="inf-barra"><span [style.width.%]="p.unidades / maxProducto() * 100"></span></div></td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          } @else {
-            <p class="inf-vacio">{{ categoriaFiltro() ? 'Sin ventas hoy en esta categoría.' : 'Sin ventas hoy.' }}</p>
-          }
-        </div>
+    <!-- Listas del día -->
+    <div class="inf-bloques">
+      <section class="inf-bloque">
+        <div class="inf-bloque-cabeza"><h3>Últimas ventas</h3></div>
+        @if (d.ultimas_ventas?.length) {
+          <table class="inf-tabla compacta">
+            <thead><tr><th>Hora</th><th>Cajero</th><th>Pago</th><th class="num">Total</th></tr></thead>
+            <tbody>
+              @for (v of d.ultimas_ventas; track v.id_venta) {
+                <tr>
+                  <td class="inf-tenue">{{ hora(v.fecha_venta) }}</td>
+                  <td>{{ v.cajero || 'Sin cajero' }}@if (todas()) { <span class="inf-secundario">{{ v.nombre_sucursal }}</span> }</td>
+                  <td><span class="pago" [class.efectivo]="v.metodo_pago === metodo.efectivo" [class.qr]="v.metodo_pago === metodo.qr">{{ v.metodo_pago }}</span></td>
+                  <td class="num fuerte">{{ enBs(v.monto) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else { <p class="inf-vacio">Aún no hay ventas hoy.</p> }
       </section>
 
-      <!-- Últimas ventas -->
-      <section class="inf-hoja lg:col-span-2 min-w-0">
-        <div class="px-5 pt-5"><div class="inf-seccion mb-1!"><h2>Últimas ventas</h2></div></div>
-        @if (datos().ultimas_ventas?.length) {
-          <ul class="px-5 pb-3">
-            @for (v of datos().ultimas_ventas; track v.id_venta) {
-              <li class="venta">
-                <span class="venta-hora">{{ hora(v.fecha_venta) }}</span>
-                <div class="min-w-0 flex-1">
-                  <p class="text-[length:calc(13px*var(--escala-texto))] inf-tinta truncate">{{ v.cajero || 'Sin cajero' }}</p>
-                  <p class="inf-sub mt-0! truncate">{{ v.unidades }} uds. · {{ v.metodo_pago }}@if (todas()) { · {{ v.nombre_sucursal }} }</p>
-                </div>
-                <span class="inf-tinta font-semibold text-[length:calc(13.5px*var(--escala-texto))] whitespace-nowrap">{{ moneda() }} {{ cifra(v.monto) }}</span>
-              </li>
-            }
-          </ul>
-        } @else {
-          <p class="inf-vacio">Aún no hay ventas hoy.</p>
-        }
+      <section class="inf-bloque">
+        <div class="inf-bloque-cabeza"><h3>Stock por reponer</h3><a routerLink="/dashboard/inventario" class="inf-enlace ml-auto">Ver inventario</a></div>
+        @if (d.stock_critico?.length) {
+          <table class="inf-tabla compacta">
+            <thead><tr><th>Producto</th><th>Estado</th><th class="num">Quedan</th></tr></thead>
+            <tbody>
+              @for (p of d.stock_critico; track $index) {
+                <tr>
+                  <td class="fuerte">{{ p.nombre_producto }}@if (todas()) { <span class="inf-secundario">{{ p.nombre_sucursal }}</span> }</td>
+                  <td><span class="inf-estado" [class.mal]="p.cantidad_actual <= 0" [class.aviso]="p.cantidad_actual > 0">{{ p.cantidad_actual <= 0 ? 'Agotado' : 'Stock bajo' }}</span></td>
+                  <td class="num">{{ entero(p.cantidad_actual) }} <span class="inf-tenue">/ mín. {{ p.stock_minimo_alerta }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else { <p class="inf-vacio">Todo el stock está sobre el mínimo.</p> }
+      </section>
+
+      <section class="inf-bloque">
+        <div class="inf-bloque-cabeza"><h3>Cajas abiertas</h3></div>
+        @if (d.turnos_abiertos?.length) {
+          <table class="inf-tabla compacta">
+            <thead><tr><th>Cajero</th><th>Desde</th><th class="num">Efectivo</th><th class="num">Lleva</th></tr></thead>
+            <tbody>
+              @for (t of d.turnos_abiertos; track t.id_turno) {
+                <tr>
+                  <td class="fuerte">{{ t.cajero }}@if (todas()) { <span class="inf-secundario">{{ t.nombre_sucursal }}</span> }</td>
+                  <td class="inf-tenue">{{ desde(t.fecha_hora_apertura) }}</td>
+                  <td class="num">{{ enBs(t.monto_inicial + t.efectivo) }}</td>
+                  <td class="num fuerte">{{ enBs(t.total) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else { <p class="inf-vacio">No hay cajas abiertas. Para vender, un cajero debe abrir caja.</p> }
+      </section>
+
+      <section class="inf-bloque">
+        <div class="inf-bloque-cabeza"><h3>Descuentos manuales de hoy</h3></div>
+        @if (d.descuentos_hoy?.length) {
+          <table class="inf-tabla compacta">
+            <thead><tr><th>Hora</th><th>Motivo</th><th class="num">Descuento</th></tr></thead>
+            <tbody>
+              @for (x of d.descuentos_hoy; track x.id_venta) {
+                <tr>
+                  <td class="inf-tenue">{{ hora(x.fecha_venta) }}</td>
+                  <td>{{ x.motivo }}<span class="inf-secundario">{{ x.cajero }}@if (todas()) { · {{ x.nombre_sucursal }} }</span></td>
+                  <td class="num"><b class="inf-baja">{{ enBs(x.descuento) }}</b></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else { <p class="inf-vacio">Sin descuentos manuales hoy.</p> }
       </section>
     </div>
 
@@ -280,6 +257,6 @@
   }
 
   @if (!cargando() && !datos()) {
-    <div class="inf-hoja inf-vacio">No se pudo cargar el panel. Revisa la conexión con el servidor.</div>
+    <p class="inf-vacio">No se pudo cargar el panel. Revisa la conexión con el servidor.</p>
   }
 </div>

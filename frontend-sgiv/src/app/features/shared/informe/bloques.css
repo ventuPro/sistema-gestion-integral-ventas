@@ -1,0 +1,56 @@
+/* ═══ Panel y Reportes sin tarjetas (rediseño 2026-11-08) ═══
+   Secciones con una regla de color bajo el título, bloques separados por líneas finas,
+   cada gráfico encabezado por su cifra. */
+.inf-apartado { display: flex; flex-direction: column; gap: 18px; }
+.inf-apartado-titulo {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px;
+  padding-bottom: 9px; border-bottom: 3px solid var(--color, var(--i-acento));
+}
+.inf-apartado-titulo h2 { margin: 0; color: var(--i-tinta); font-size: calc(17px * var(--escala-texto)); font-weight: 800; }
+.inf-apartado-titulo .inf-sub { margin: 0; }
+
+/* Bloques divididos por líneas finas */
+.inf-bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); border-top: 1px solid var(--i-linea); }
+.inf-bloques.dos { grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); }
+.inf-bloque { padding: 18px 20px 20px 0; border-bottom: 1px solid var(--i-linea); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+@media (min-width: 760px) { .inf-bloque + .inf-bloque { padding-left: 20px; border-left: 1px solid var(--i-linea); } }
+.inf-bloque-cabeza { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.inf-bloque-cabeza h3 { margin: 0; font-size: calc(13px * var(--escala-texto)); font-weight: 700; color: var(--i-texto); }
+.inf-bloque-cabeza .inf-segmentos { margin-left: auto; }
+.inf-bloque-cabeza select.inf-campo { margin-left: auto; padding-block: 4px; font-size: calc(12px * var(--escala-texto)); }
+
+/* N2: la cifra encabeza su gráfico */
+.inf-cifra { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.inf-cifra b { font-size: calc(26px * var(--escala-texto)); font-weight: 800; color: var(--i-tinta); letter-spacing: -0.01em; line-height: 1.12; }
+.inf-cifra span { font-size: calc(13px * var(--escala-texto)); color: var(--i-texto); }
+.inf-cifra .sube { color: var(--i-sube); font-weight: 700; }
+.inf-cifra .baja { color: var(--i-baja); font-weight: 700; }
+
+/* N4: frase resumen */
+.inf-frase { margin: 0; font-size: calc(16px * var(--escala-texto)); line-height: 1.55; color: var(--i-tinta); max-width: 75ch; }
+.inf-frase b { font-weight: 800; }
+.inf-frase .sube { color: var(--i-sube); font-weight: 700; }
+.inf-frase .baja { color: var(--i-baja); font-weight: 700; }
+.inf-frase .resaltado { background: color-mix(in oklab, var(--i-aviso) 22%, transparent); padding: 0 3px; border-radius: 3px; }
+
+/* N3: estado del mes */
+.inf-estado-mes { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: calc(14px * var(--escala-texto)); }
+.inf-estado-mes td { padding: 9px 4px; border-bottom: 1px solid var(--i-linea-suave); color: var(--i-texto); }
+.inf-estado-mes td.num { text-align: right; white-space: nowrap; font-weight: 600; color: var(--i-tinta); }
+.inf-estado-mes td.signo { width: 24px; font-weight: 800; text-align: center; }
+.inf-estado-mes td.var { width: 1%; white-space: nowrap; padding-left: 12px; font-size: calc(12px * var(--escala-texto)); font-weight: 700; }
+.inf-estado-mes tr.resultado td { border-top: 2px solid var(--i-tinta); border-bottom: none; font-weight: 800; color: var(--i-tinta); }
+.inf-estado-mes tr.resultado td.num { font-size: calc(17px * var(--escala-texto)); }
+.inf-estado-mes .color { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; }
+
+/* Lienzos de gráficos */
+.inf-lienzo { position: relative; height: 230px; }
+.inf-lienzo.bajo { height: 200px; }
+
+/* Mapa de calor día × hora */
+.inf-calor { display: grid; gap: 3px; font-size: calc(11px * var(--escala-texto)); color: var(--i-tenue); min-width: 440px; }
+.inf-calor .celda { aspect-ratio: 1.45; border-radius: 3px; min-height: 18px; }
+.inf-calor .eje { display: flex; align-items: center; justify-content: center; }
+.inf-calor .dia { display: flex; align-items: center; font-weight: 600; color: var(--i-texto); }
+.inf-escala { display: flex; align-items: center; gap: 6px; font-size: calc(11.5px * var(--escala-texto)); color: var(--i-tenue); }
+.inf-escala i { width: 18px; height: 11px; border-radius: 2px; display: inline-block; }

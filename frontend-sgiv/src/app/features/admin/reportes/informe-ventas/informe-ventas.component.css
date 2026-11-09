@@ -1,0 +1,52 @@
+/* ─── Reportes → Ventas: un color por apartado y por concepto; sin tarjetas ─── */
+:host {
+  --c-azul: #2a78d6; --c-naranja: #eb6834; --c-turquesa: #1baf7a; --c-amarillo: #eda100;
+  --c-rosado: #e87ba4; --c-verde: #008300; --c-violeta: #6250d6;
+  --c-ganancia: #067a06;
+  /* Mapa de calor: un solo color de claro a oscuro */
+  --t0: #f1f5f9; --t1: #e3eefc; --t2: #a9cbf5; --t3: #5f9ee8; --t4: #2a78d6; --t5: #17539c;
+  display: block;
+}
+@media screen {
+  :host-context(html.tema-oscuro) {
+    --c-azul: #3987e5; --c-naranja: #d95926; --c-turquesa: #199e70; --c-amarillo: #c98500;
+    --c-rosado: #d55181; --c-verde: #008300; --c-violeta: #9085e9;
+    --c-ganancia: #34d399;
+    --t0: #1c273a; --t1: #16304f; --t2: #1c4a86; --t3: #2a78d6; --t4: #5598e7; --t5: #9ec5f4;
+  }
+}
+
+.informe { display: flex; flex-direction: column; gap: 36px; }
+.dos-columnas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 32px; align-items: start; }
+@media (max-width: 1000px) { .dos-columnas { grid-template-columns: 1fr; } }
+.estado { display: flex; flex-direction: column; gap: 10px; }
+.inf-estado-mes td.num.ganancia { color: var(--c-ganancia); }
+.inf-bloque.sin-borde { padding: 0; border: 0; }
+.inf-bloque.ancho-total { grid-column: 1 / -1; padding-left: 0; border-left: 0; }
+.self-start { align-self: flex-start; }
+
+/* Mapa de calor */
+.celda.tono-0, .inf-escala i.tono-0 { background: var(--t0); }
+.celda.tono-1, .inf-escala i.tono-1 { background: var(--t1); }
+.celda.tono-2, .inf-escala i.tono-2 { background: var(--t2); }
+.celda.tono-3, .inf-escala i.tono-3 { background: var(--t3); }
+.celda.tono-4, .inf-escala i.tono-4 { background: var(--t4); }
+.celda.tono-5, .inf-escala i.tono-5 { background: var(--t5); }
+
+/* Productos estrella (A), de venta media (B) y de poca venta (C) */
+.abc-barra { display: flex; height: 26px; gap: 2px; }
+.abc-barra span { display: flex; align-items: center; justify-content: center; min-width: 24px; color: #fff; font-weight: 800;
+                  font-size: calc(12px * var(--escala-texto)); }
+.abc-barra span:first-child { border-radius: 5px 0 0 5px; }
+.abc-barra span:last-child { border-radius: 0 5px 5px 0; }
+.abc-barra .a { background: var(--i-sube); } .abc-barra .b { background: var(--c-amarillo); } .abc-barra .c { background: var(--i-baja); }
+.abc-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: calc(13px * var(--escala-texto)); }
+.abc-lista li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; }
+.abc-lista b { color: var(--i-tinta); }
+.abc-lista .letra { font-weight: 800; }
+.abc-lista .letra.a { color: var(--i-sube); } .abc-lista .letra.b { color: var(--c-amarillo); } .abc-lista .letra.c { color: var(--i-baja); }
+
+/* Tablas sin cajas */
+.inf-tabla.compacta th { padding: 6px 10px 6px 0; }
+.inf-tabla.compacta td { padding: 8px 10px 8px 0; font-size: calc(13px * var(--escala-texto)); }
+.lista-corta { max-height: 320px; overflow-y: auto; }

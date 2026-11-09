@@ -1,8 +1,7 @@
-import { Component, computed, inject, Injector, OnInit, OnDestroy, afterNextRender, effect, signal, untracked, ElementRef, ViewChild } from '@angular/core';
+import { Component, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { Chart } from '../../../core/utils/graficos';
 import { LucideAngularModule, ChevronDown, ChevronRight, X, Check, SlidersHorizontal, FileSpreadsheet, FileText } from 'lucide-angular';
 import { ReporteService } from '../../../core/services/reporte.service';
 import { ProductoService } from '../../../core/services/producto.service';
@@ -10,17 +9,18 @@ import { SucursalService } from '../../../core/services/sucursal.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { SelectorSucursalComponent } from '../../shared/selector-sucursal/selector-sucursal.component';
 import { etiquetaPromocion } from '../../../core/services/promocion.service';
-import { cifra, entero, porcentaje, fechaCorta, fechaLarga, fechaHora, hora, temaGrafico, opcionesBase, DIAS_SEMANA } from '../../../core/utils/informe';
+import { cifra, entero, porcentaje, fechaCorta, fechaLarga, fechaHora, hora, DIAS_SEMANA } from '../../../core/utils/informe';
 import { SesionService } from '../../../core/services/sesion.service';
 import { InventarioValoradoComponent } from './inventario-valorado/inventario-valorado.component';
 import { KardexComponent } from './kardex/kardex.component';
+import { InformeVentasComponent } from './informe-ventas/informe-ventas.component';
 
 type Periodo = 'hoy' | 'ayer' | 'semana' | 'mes' | 'mes_anterior' | 'personalizado';
 
 @Component({
   selector: 'app-reportes',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, InventarioValoradoComponent, KardexComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, SelectorSucursalComponent, InventarioValoradoComponent, KardexComponent, InformeVentasComponent],
   templateUrl: './reportes.component.html',
   styleUrls: ['../../shared/informe/informe.css', './reportes.component.css']
 })
@@ -30,12 +30,7 @@ export class ReportesComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
   private sucursalService = inject(SucursalService);
   private ajustes         = inject(AjustesService);
-  private injector        = inject(Injector);
   readonly moneda         = this.ajustes.moneda;
-
-  @ViewChild('graficoDiario') graficoDiarioRef?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('graficoHoras')  graficoHorasRef?:  ElementRef<HTMLCanvasElement>;
-  @ViewChild('graficoSemana') graficoSemanaRef?: ElementRef<HTMLCanvasElement>;
 
   readonly icons = {
     abajo: ChevronDown, derecha: ChevronRight, cerrar: X, check: Check, filtro: SlidersHorizontal,
@@ -73,20 +68,8 @@ export class ReportesComponent implements OnInit, OnDestroy {
   readonly categoriasSeleccionadas = signal(new Set<number>());
   readonly mostrarFiltroCategorias = signal(false);
 
-  readonly verTodosProductos = signal(false);
-  readonly verTodosTurnos    = signal(false);
-
   private reporteSub: Subscription | null = null;
   private debounceTimer: any = null;
-  private graficos: Chart[] = [];
-
-  constructor() {
-    effect(() => {
-      this.ajustes.oscuro();
-      this.ajustes.config();
-      untracked(() => this.renderizarGraficos());
-    });
-  }
 
   ngOnInit() {
     this.sucursalSeleccionada.set(this.sesion.idSucursal());
@@ -102,7 +85,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.reporteSub?.unsubscribe();
     clearTimeout(this.debounceTimer);
-    this.graficos.forEach(g => g.destroy());
   }
 
   // ─── Filtros ───
@@ -187,7 +169,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
           this.datos.set(d);
           this.cargando.set(false);
           this.refrescando.set(false);
-          afterNextRender(() => this.renderizarGraficos(), { injector: this.injector });
         },
         error: (e) => {
           this.cargando.set(false);
@@ -215,146 +196,9 @@ export class ReportesComponent implements OnInit, OnDestroy {
     return inicio === fin ? fechaLarga(inicio) : `${fechaCorta(inicio)} – ${fechaCorta(fin)} ${fin.slice(0, 4)}`;
   });
 
-  readonly promedioDiario = computed(() => (this.r().ingresos_totales || 0) / Math.max(1, this.diasPeriodo()));
-
-  readonly mejorDia = computed(() => {
-    const d = (this.datos()?.ventas_diarias || []).filter((x: any) => x.ventas > 0);
-    return d.length ? d.reduce((a: any, b: any) => b.ingresos > a.ingresos ? b : a) : null;
-  });
-
-  readonly horaPico = computed(() => {
-    const h = this.datos()?.por_hora || [];
-    return h.length ? h.reduce((a: any, b: any) => b.ingresos > a.ingresos ? b : a) : null;
-  });
-
-  readonly mejorDiaSemana = computed(() => {
-    const d = (this.datos()?.por_dia_semana || []).filter((x: any) => x.ventas > 0);
-    return d.length ? d.reduce((a: any, b: any) => this.promedioDow(b) > this.promedioDow(a) ? b : a) : null;
-  });
-
   promedioDow(d: any): number { return d.dias ? d.ingresos / d.dias : 0; }
 
-  readonly productosVisibles = computed<any[]>(() => {
-    const p = this.datos()?.productos || [];
-    return this.verTodosProductos() ? p : p.slice(0, 10);
-  });
-
-  readonly turnosVisibles = computed<any[]>(() => {
-    const t = this.datos()?.cierres || [];
-    return this.verTodosTurnos() ? t : t.slice(0, 8);
-  });
-
-  /** Promociones aplicadas y descuentos manuales del período */
-  readonly descuentos = computed(() => this.datos()?.descuentos ?? null);
-  readonly hayDescuentos = computed(() => {
-    const r = this.descuentos()?.resumen;
-    return !!r && (r.promociones > 0 || r.manual > 0);
-  });
   etiquetaPromo(p: any): string { return etiquetaPromocion(p, this.moneda()); }
-
-  /** Costo de lo vendido (solo insumos) y ganancia: solo llega al administrador */
-  readonly costos = computed(() => this.datos()?.costos ?? null);
-  readonly verTodosCostos = signal(false);
-  readonly productosCosto = computed(() => {
-    const p = this.costos()?.productos || [];
-    return this.verTodosCostos() ? p : p.slice(0, 10);
-  });
-
-  readonly totalTurnos     = computed(() => (this.datos()?.cierres || []).reduce((s: number, t: any) => s + t.total, 0));
-  readonly maxCategoria    = computed(() => Math.max(1, ...(this.datos()?.por_categoria || []).map((c: any) => c.ingresos)));
-  readonly tasaCancelacion = computed(() => porcentaje(this.datos()?.pedidos_qr?.cancelados, this.datos()?.pedidos_qr?.total));
-
-  colorSerie(i: number): string { return temaGrafico(this.ajustes).serie[i % 6]; }
-
-  // ─── Gráficos ───
-  private renderizarGraficos() {
-    this.graficos.forEach(g => g.destroy());
-    this.graficos = [];
-    const datos = this.datos();
-    if (!datos) return;
-    const t = temaGrafico(this.ajustes);
-    const fmt = (v: number) => cifra(v, 0);
-    const mon = this.moneda();
-
-    const diario = this.graficoDiarioRef?.nativeElement;
-    const dias = datos.ventas_diarias || [];
-    if (diario && dias.length) {
-      const prom = this.promedioDiario();
-      const base = opcionesBase(t, fmt);
-      base.plugins.tooltip.callbacks = {
-        title: (i: any) => fechaLarga(dias[i[0].dataIndex].dia),
-        label: (i: any) => i.datasetIndex ? `Promedio diario: ${mon} ${cifra(i.raw)}` : `${mon} ${cifra(i.raw)} · ${dias[i.dataIndex].ventas} ventas`
-      };
-      this.graficos.push(new Chart(diario, {
-        type: dias.length > 45 ? 'line' : 'bar',
-        data: {
-          labels: dias.map((d: any) => fechaCorta(d.dia)),
-          datasets: [
-            {
-              data: dias.map((d: any) => d.ingresos),
-              backgroundColor: dias.length > 45 ? t.acentoSuave : t.acentoMedio,
-              borderColor: t.acento, borderWidth: dias.length > 45 ? 2 : 0,
-              fill: dias.length > 45, pointRadius: 0, tension: 0.3, borderRadius: 3, barPercentage: 0.8, order: 2
-            } as any,
-            {
-              type: 'line', data: dias.map(() => prom),
-              borderColor: t.texto, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, order: 1
-            } as any
-          ]
-        },
-        options: base
-      }));
-    }
-
-    const horas = this.graficoHorasRef?.nativeElement;
-    if (horas && datos.por_hora?.length) {
-      const mapa = new Map<number, any>(datos.por_hora.map((h: any) => [h.hora, h]));
-      const lista = [...mapa.keys()];
-      const desde = Math.min(7, ...lista), hasta = Math.max(21, ...lista);
-      const etiquetas = Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i);
-      const pico = this.horaPico()?.hora;
-      const base = opcionesBase(t, fmt);
-      base.plugins.tooltip.callbacks = {
-        title: (i: any) => `${String(etiquetas[i[0].dataIndex]).padStart(2, '0')}:00 – ${String(etiquetas[i[0].dataIndex] + 1).padStart(2, '0')}:00`,
-        label: (i: any) => `${mon} ${cifra(i.raw)} · ${mapa.get(etiquetas[i.dataIndex])?.ventas || 0} ventas`
-      };
-      this.graficos.push(new Chart(horas, {
-        type: 'bar',
-        data: {
-          labels: etiquetas.map(h => `${h}h`),
-          datasets: [{
-            data: etiquetas.map(h => mapa.get(h)?.ingresos || 0),
-            backgroundColor: etiquetas.map(h => h === pico ? t.acento : t.fantasma),
-            borderRadius: 3, barPercentage: 0.75
-          }]
-        },
-        options: base
-      }));
-    }
-
-    const semana = this.graficoSemanaRef?.nativeElement;
-    if (semana && datos.por_dia_semana?.length) {
-      const dow = datos.por_dia_semana;
-      const mejor = this.mejorDiaSemana()?.dia_semana;
-      const base = opcionesBase(t, fmt);
-      base.plugins.tooltip.callbacks = {
-        title: (i: any) => DIAS_SEMANA[dow[i[0].dataIndex].dia_semana - 1],
-        label: (i: any) => `Promedio: ${mon} ${cifra(i.raw)} (${dow[i.dataIndex].dias} día/s)`
-      };
-      this.graficos.push(new Chart(semana, {
-        type: 'bar',
-        data: {
-          labels: dow.map((d: any) => DIAS_SEMANA[d.dia_semana - 1].slice(0, 3)),
-          datasets: [{
-            data: dow.map((d: any) => this.promedioDow(d)),
-            backgroundColor: dow.map((d: any) => d.dia_semana === mejor ? t.acento : t.fantasma),
-            borderRadius: 3, barPercentage: 0.6
-          }]
-        },
-        options: base
-      }));
-    }
-  }
 
   // ─── Exportar PDF ───
   async exportarPDF() {
@@ -475,6 +319,19 @@ export class ReportesComponent implements OnInit, OnDestroy {
         ['Ganancia bruta', m(cos.resumen.ganancia) + (cos.resumen.margen == null ? '' : ` (${cos.resumen.margen} %)`)],
         ...(cos.resumen.unidades_sin_costo ? [['Vendido sin costo conocido', `${cos.resumen.unidades_sin_costo} u · ${m(cos.resumen.ventas_sin_costo)}`]] : [])
       ], [1]);
+      if (cos.por_categoria?.length) {
+        seccion('Ganancia por categoría');
+        tabla(['Categoría', 'Ingresos', 'Costo', 'Ganancia', 'Margen'],
+          cos.por_categoria.map((x: any) => [x.nombre_categoria, m(x.ingresos), m(x.costo), m(x.ganancia), x.margen == null ? '' : `${x.margen} %`]),
+          [1, 2, 3, 4]);
+      }
+      if (d.mermas) {
+        seccion('Mermas y vencidos');
+        tabla(['Motivo', 'Unidades', 'Valor al costo'],
+          [...d.mermas.por_motivo.map((x: any) => [x.motivo, entero(x.unidades), x.sin_costo ? 'sin costo' : m(x.valor)]),
+           ['Total', entero(d.mermas.unidades), m(d.mermas.total)],
+           ['Ganancia después de mermas', '', m(cos.resumen.ganancia - d.mermas.total)]], [1, 2]);
+      }
       seccion('Costo y ganancia por producto');
       tabla(['Producto', 'Unidades', 'Ingresos', 'Costo', 'Ganancia', 'Margen'],
         cos.productos.map((x: any) => [x.nombre_producto, x.unidades, m(x.ingresos),
@@ -519,11 +376,6 @@ export class ReportesComponent implements OnInit, OnDestroy {
       ['Unidades', d.resumen.unidades],
       [`Venta más alta (${mon})`, d.resumen.venta_maxima],
       [],
-      ['Inventario actual'],
-      ['Productos', d.inventario.productos], ['Unidades en stock', d.inventario.unidades],
-      [`Valor a precio de venta (${mon})`, d.inventario.valor_venta],
-      ['Agotados', d.inventario.agotados], ['Bajo mínimo', d.inventario.bajos],
-      [],
       ['Pedidos del menú QR'],
       ['Recibidos', d.pedidos_qr.total], ['Atendidos', d.pedidos_qr.atendidos], ['Cancelados', d.pedidos_qr.cancelados],
       [`Monto (${mon})`, d.pedidos_qr.monto]
@@ -550,6 +402,12 @@ export class ReportesComponent implements OnInit, OnDestroy {
         [18, 24, 18, 36, 16, 14]);
     }
 
+    if (d.costos?.por_categoria?.length)
+      hoja('Ganancia por categoría', [['Categoría', `Ingresos (${mon})`, `Costo (${mon})`, `Ganancia (${mon})`, 'Margen %'],
+        ...d.costos.por_categoria.map((x: any) => [x.nombre_categoria, x.ingresos, x.costo, x.ganancia, x.margen ?? ''])], [24, 14, 14, 14, 10]);
+    if (d.mermas)
+      hoja('Mermas', [['Motivo', 'Unidades', `Valor al costo (${mon})`],
+        ...d.mermas.por_motivo.map((x: any) => [x.motivo, x.unidades, x.sin_costo ? '' : x.valor]), [], ['Total', d.mermas.unidades, d.mermas.total]], [22, 10, 18]);
     if (d.costos) {
       hoja('Costo y ganancia', [['Producto', 'Unidades', `Ingresos (${mon})`, `Costo (${mon})`, `Ganancia (${mon})`, 'Margen %'],
         ...d.costos.productos.map((x: any) => [x.nombre_producto, x.unidades, x.ingresos, x.costo ?? 'sin costo', x.ganancia ?? '', x.margen ?? ''])],

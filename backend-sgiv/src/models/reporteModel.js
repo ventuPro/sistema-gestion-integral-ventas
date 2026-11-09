@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const { CONDICION_VIGENTE } = require('./promocionModel');
+const { AVISO } = require('./loteModel');
 
 // id_sucursal = 0 → todas las sucursales (solo administrador, lo controla el controlador)
 const deSucursal = (columna) => `($1::int = 0 OR ${columna} = $1)`;
@@ -8,8 +9,8 @@ const deSucursal = (columna) => `($1::int = 0 OR ${columna} = $1)`;
 const filas = (sql, params) => db.query(sql, params).then(r => r.rows);
 
 // ─── Panel del día ───
-// conCajas: id de las sucursales con caja abierta (para el selector del administrador)
-const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) => {
+// esAdmin: trae las sucursales con caja abierta (selector) y la ganancia del día
+const obtenerPanel = async (id_sucursal, id_categoria = null, esAdmin = false) => {
     const p = [id_sucursal];
 
     const totales = (desde, hasta) => filas(`
@@ -21,7 +22,8 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
 
     const [
         hoy, ayerHora, ayerTotal, semanaHora, metodos, porHora, promedioHora,
-        productos, turnos, mesas, pedidos, stock, stockCritico, ultimas, sucursales, cajas, promociones
+        productos, turnos, mesas, pedidos, stock, stockCritico, ultimas, sucursales, cajas, promociones,
+        costoHoy, categoriasHoy, vencimientos, porVencer, descuentosHoy
     ] = await Promise.all([
         filas(`
             SELECT COUNT(*)::int AS ventas,
@@ -54,7 +56,8 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
         `, p),
         filas(`
             SELECT EXTRACT(HOUR FROM fecha_venta)::int AS hora,
-                   ROUND(SUM(monto_total_venta) / 7, 2)::float8 AS ingresos
+                   ROUND(SUM(monto_total_venta) / 7, 2)::float8 AS ingresos,
+                   ROUND(COUNT(*) / 7.0, 1)::float8 AS ventas
             FROM venta_caja
             WHERE ${deSucursal('id_sucursal')} AND fecha_venta >= CURRENT_DATE - 7 AND fecha_venta < CURRENT_DATE
             GROUP BY 1 ORDER BY 1
@@ -141,7 +144,7 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
             GROUP BY s.id_sucursal
             ORDER BY ingresos DESC, s.nombre_sucursal
         `),
-        !conCajas ? [] : filas(`SELECT DISTINCT id_sucursal FROM turno_caja WHERE estado_turno = 'Abierto'`)
+        !esAdmin ? [] : filas(`SELECT DISTINCT id_sucursal FROM turno_caja WHERE estado_turno = 'Abierto'`)
             .then(r => r.map(x => x.id_sucursal)),
         filas(`
             SELECT (SELECT COUNT(*) FROM promocion p
@@ -151,7 +154,58 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
                    COUNT(*) FILTER (WHERE v.descuento_manual > 0)::int AS ventas_con_descuento
             FROM venta_caja v
             WHERE ${deSucursal('v.id_sucursal')} AND v.fecha_venta >= CURRENT_DATE
-        `, p).then(r => r[0])
+        `, p).then(r => r[0]),
+        // Ganancia de hoy (solo administrador): lo vendido con costo conocido menos su costo
+        !esAdmin ? null : filas(`
+            SELECT ROUND(COALESCE(SUM(dv.subtotal_venta) FILTER (WHERE dv.costo_unitario IS NOT NULL), 0), 2)::float8 AS ventas,
+                   ROUND(COALESCE(SUM(dv.costo_unitario * dv.cantidad_vendida), 0), 2)::float8 AS costo,
+                   COALESCE(SUM(dv.cantidad_vendida) FILTER (WHERE dv.costo_unitario IS NULL), 0)::int AS unidades_sin_costo
+            FROM detalle_venta dv JOIN venta_caja v ON v.id_venta = dv.id_venta
+            WHERE ${deSucursal('v.id_sucursal')} AND v.fecha_venta >= CURRENT_DATE
+        `, p).then(r => ({ ...r[0], ganancia: Math.round((r[0].ventas - r[0].costo) * 100) / 100 })),
+        filas(`
+            SELECT c.id_categoria, c.nombre_categoria, ROUND(SUM(dv.subtotal_venta), 2)::float8 AS ingresos
+            FROM detalle_venta dv
+            JOIN venta_caja v         ON v.id_venta = dv.id_venta
+            JOIN producto p           ON p.id_producto = dv.id_producto
+            JOIN categoria_producto c ON c.id_categoria = p.id_categoria
+            WHERE ${deSucursal('v.id_sucursal')} AND v.fecha_venta >= CURRENT_DATE
+            GROUP BY c.id_categoria, c.nombre_categoria ORDER BY ingresos DESC
+        `, p),
+        // Unidades vencidas y por vencer (lotes con stock)
+        filas(`
+            SELECT COALESCE(SUM(l.cantidad_actual) FILTER (WHERE l.fecha_vencimiento <= LOCALTIMESTAMP), 0)::int AS vencidos,
+                   COALESCE(SUM(l.cantidad_actual) FILTER (WHERE l.fecha_vencimiento > LOCALTIMESTAMP
+                                                            AND l.fecha_vencimiento <= LOCALTIMESTAMP + ${AVISO('p', 'cfg')}), 0)::int AS por_vencer
+            FROM lote_inventario l
+            JOIN inventario_sucursal i ON i.id_inventario = l.id_inventario
+            JOIN producto p            ON p.id_producto   = i.id_producto
+            CROSS JOIN configuracion cfg
+            WHERE cfg.id_configuracion = 1 AND ${deSucursal('i.id_sucursal')} AND l.cantidad_actual > 0
+        `, p).then(r => r[0]),
+        filas(`
+            SELECT p.nombre_producto, s.nombre_sucursal, l.cantidad_actual AS cantidad, l.fecha_vencimiento,
+                   l.fecha_vencimiento <= LOCALTIMESTAMP AS vencido
+            FROM lote_inventario l
+            JOIN inventario_sucursal i ON i.id_inventario = l.id_inventario
+            JOIN producto p            ON p.id_producto   = i.id_producto
+            JOIN sucursal s            ON s.id_sucursal   = i.id_sucursal
+            CROSS JOIN configuracion cfg
+            WHERE cfg.id_configuracion = 1 AND ${deSucursal('i.id_sucursal')} AND l.cantidad_actual > 0
+              AND l.fecha_vencimiento <= LOCALTIMESTAMP + ${AVISO('p', 'cfg')}
+            ORDER BY l.fecha_vencimiento, p.nombre_producto
+            LIMIT 8
+        `, p),
+        filas(`
+            SELECT v.id_venta, v.fecha_venta, v.descuento_manual::float8 AS descuento, v.motivo_descuento AS motivo,
+                   u.nombre_completo AS cajero, s.nombre_sucursal
+            FROM venta_caja v
+            JOIN sucursal s     ON s.id_sucursal = v.id_sucursal
+            LEFT JOIN usuario u ON u.id_usuario = v.id_usuario_cajero
+            WHERE ${deSucursal('v.id_sucursal')} AND v.fecha_venta >= CURRENT_DATE AND v.descuento_manual > 0
+            ORDER BY v.fecha_venta DESC
+            LIMIT 8
+        `, p)
     ]);
 
     return {
@@ -167,7 +221,11 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, conCajas = false) 
         ultimas_ventas: ultimas,
         sucursales,
         cajas_abiertas: cajas,
-        promociones
+        promociones,
+        ...(costoHoy ? { costo_hoy: costoHoy } : {}),
+        categorias_hoy: categoriasHoy,
+        vencimientos, por_vencer: porVencer,
+        descuentos_hoy: descuentosHoy
     };
 };
 
@@ -361,8 +419,50 @@ const obtenerInforme = async (id_sucursal, inicio, fin, categorias = null, { con
         por_sucursal: sucursales,
         filtro_categorias: filtra ? categorias : [],
         descuentos: await descuentosDelPeriodo(id_sucursal, inicio, fin),
-        ...(conCostos ? { costos: await costosDelPeriodo(cte, params, soloCat) } : {})
+        ...(await ritmoDelPeriodo(cte, params)),
+        ...(conCostos ? { costos: await costosDelPeriodo(cte, params, soloCat),
+                          mermas: await mermasDelPeriodo(id_sucursal, inicio, fin, categorias) } : {})
     };
+};
+
+// ─── Cuándo se vende y cómo se cobra cada día ───
+// calor: ventas por día de la semana (1 = lunes) y hora; la pantalla saca el promedio con por_dia_semana[].dias
+const ritmoDelPeriodo = async (cte, params) => {
+    const [calor, metodosPorDia] = await Promise.all([
+        filas(`
+            ${cte}
+            SELECT EXTRACT(ISODOW FROM fecha_venta)::int AS dia_semana, EXTRACT(HOUR FROM fecha_venta)::int AS hora,
+                   COUNT(*)::int AS ventas, ROUND(SUM(monto), 2)::float8 AS ingresos
+            FROM v GROUP BY 1, 2 ORDER BY 1, 2`, params),
+        filas(`
+            ${cte}
+            SELECT to_char(fecha_venta::date, 'YYYY-MM-DD') AS dia, metodo_pago, ROUND(SUM(monto), 2)::float8 AS ingresos
+            FROM v GROUP BY 1, 2 ORDER BY 1`, params)
+    ]);
+    return { calor, metodos_por_dia: metodosPorDia };
+};
+
+// ─── Mermas y vencidos del período (solo administrador): salidas manuales, valoradas con el costo de sus lotes ───
+const MOTIVOS_MERMA = ['Vencido', 'Dañado', 'Consumo interno', 'Degustación', 'Ajuste de conteo', 'Otro'];
+const mermasDelPeriodo = async (id_sucursal, inicio, fin, categorias = null) => {
+    const sql = (desde, hasta) => filas(`
+        SELECT h.motivo_movimiento AS motivo, SUM(h.cantidad_movida)::int AS unidades,
+               ROUND(COALESCE(SUM(v.valor), 0), 2)::float8 AS valor, bool_or(v.valor IS NULL) AS sin_costo
+        FROM historial_inventario h
+        JOIN inventario_sucursal i ON i.id_inventario = h.id_inventario
+        JOIN producto p            ON p.id_producto   = i.id_producto
+        LEFT JOIN LATERAL (
+            SELECT CASE WHEN COUNT(*) > 0 AND COUNT(l.costo_unitario) = COUNT(*) THEN ABS(SUM(ml.cantidad * l.costo_unitario)) END AS valor
+            FROM movimiento_lote ml JOIN lote_inventario l ON l.id_lote = ml.id_lote
+            WHERE ml.id_historial = h.id_historial
+        ) v ON TRUE
+        WHERE ${deSucursal('i.id_sucursal')} AND h.tipo_movimiento = 'SALIDA' AND h.motivo_movimiento = ANY($4::text[])
+          AND h.fecha_registro >= $2::date AND h.fecha_registro < $3::date + 1
+          AND ($5::int[] IS NULL OR p.id_categoria = ANY($5::int[]))
+        GROUP BY 1 ORDER BY valor DESC, unidades DESC`, [id_sucursal, desde, hasta, MOTIVOS_MERMA, categorias]);
+    const [actual, anterior] = await Promise.all([sql(inicio, fin), sql(...periodoAnterior(inicio, fin))]);
+    const suma = (l) => Math.round(l.reduce((t, m) => t + m.valor, 0) * 100) / 100;
+    return { por_motivo: actual, total: suma(actual), unidades: actual.reduce((t, m) => t + m.unidades, 0), total_anterior: suma(anterior) };
 };
 
 // ─── Costo de lo vendido (solo administrador) ───
@@ -373,7 +473,7 @@ const costosDelPeriodo = async (cte, params, soloCat) => {
         JOIN detalle_venta dv ON dv.id_venta = v.id_venta
         JOIN producto p       ON p.id_producto = dv.id_producto
         WHERE TRUE ${soloCat}`;
-    const [resumen, productos] = await Promise.all([
+    const [resumen, productos, porCategoria] = await Promise.all([
         filas(`
             ${cte}
             SELECT ROUND(COALESCE(SUM(dv.subtotal_venta) FILTER (WHERE dv.costo_unitario IS NOT NULL), 0), 2)::float8 AS ventas,
@@ -390,11 +490,27 @@ const costosDelPeriodo = async (cte, params, soloCat) => {
                    bool_or(dv.costo_unitario IS NULL) AS sin_costo
             ${LINEAS}
             GROUP BY p.id_producto, p.nombre_producto
-            ORDER BY ingresos DESC`, params)
+            ORDER BY ingresos DESC`, params),
+        // Por categoría: solo lo que tiene costo conocido
+        filas(`
+            ${cte}
+            SELECT c.id_categoria, c.nombre_categoria,
+                   ROUND(SUM(dv.subtotal_venta), 2)::float8 AS ingresos,
+                   ROUND(SUM(dv.costo_unitario * dv.cantidad_vendida), 2)::float8 AS costo
+            FROM v
+            JOIN detalle_venta dv     ON dv.id_venta = v.id_venta
+            JOIN producto p           ON p.id_producto = dv.id_producto
+            JOIN categoria_producto c ON c.id_categoria = p.id_categoria
+            WHERE dv.costo_unitario IS NOT NULL ${soloCat}
+            GROUP BY c.id_categoria, c.nombre_categoria`, params)
     ]);
     const ganancia = Math.round((resumen.ventas - resumen.costo) * 100) / 100;
     return {
         resumen: { ...resumen, ganancia, margen: resumen.ventas ? Math.round(ganancia * 1000 / resumen.ventas) / 10 : null },
+        por_categoria: porCategoria.map(c => {
+            const g = Math.round((c.ingresos - c.costo) * 100) / 100;
+            return { ...c, ganancia: g, margen: c.ingresos ? Math.round(g * 1000 / c.ingresos) / 10 : null };
+        }).sort((a, b) => b.ganancia - a.ganancia),
         productos: productos.map(p => {
             const g = p.sin_costo ? null : Math.round((p.ingresos - p.costo) * 100) / 100;
             return { ...p, costo: p.sin_costo ? null : p.costo, ganancia: g,

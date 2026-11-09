@@ -200,3 +200,23 @@ describe('Arqueo y cierre de caja con efectivo contado', () => {
         assert.equal(c.diferencia, -5);
     });
 });
+
+describe('Panel e informe rediseñados', () => {
+    test('informe: mapa de calor día × hora, cobros por día y método; costos y mermas solo para el administrador', async () => {
+        const { body } = await api(`/reportes/periodo/1${PERIODO}`, tAdmin);
+        assert.deepEqual(body.calor.map(c => [c.dia_semana, c.hora, c.ingresos]), [[1, 10, 110], [3, 16, 30]]);
+        assert.deepEqual(body.metodos_por_dia.map(m => [m.dia, m.metodo_pago, m.ingresos]),
+                         [['2026-03-02', 'Efectivo', 110], ['2026-03-04', 'QR', 30]]);
+        assert.ok(Array.isArray(body.costos.por_categoria));
+        assert.deepEqual(Object.keys(body.mermas).sort(), ['por_motivo', 'total', 'total_anterior', 'unidades']);
+    });
+
+    test('panel: ganancia de hoy solo para el administrador; categorías, vencimientos y descuentos para todos', async () => {
+        const admin = (await api('/reportes/dashboard-completo/1', tAdmin)).body;
+        const cajero = (await api('/reportes/dashboard-completo/1', tCajero)).body;
+        assert.ok('costo_hoy' in admin && 'ganancia' in admin.costo_hoy);
+        assert.equal('costo_hoy' in cajero, false);
+        for (const k of ['categorias_hoy', 'vencimientos', 'por_vencer', 'descuentos_hoy']) assert.ok(k in cajero, k);
+        assert.deepEqual(Object.keys(cajero.vencimientos).sort(), ['por_vencer', 'vencidos']);
+    });
+});

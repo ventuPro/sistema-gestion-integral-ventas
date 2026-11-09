@@ -435,3 +435,4 @@
 .inf-monto.total .inf-etiqueta, .inf-monto.total .inf-monto-valor { color: #fff; }
 .inf-montos.grandes .inf-monto { padding: 18px 20px; }
 .inf-montos.grandes .inf-monto-valor { font-size: calc(32px * var(--escala-texto)); }
+
