@@ -28,7 +28,10 @@
   .ventana:not(.ventana-completa) { max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }
 }
 /* Celular: los grupos de filtros (Activos, Stock bajo…) pasan a varias líneas en vez de cortarse */
-@media (max-width: 639px) { .inf-segmentos { flex-wrap: wrap; } }
+@media (max-width: 639px) {
+  .inf-segmentos { flex-wrap: wrap; }
+  .inf-pestanas { flex-wrap: wrap; row-gap: 2px; }
+}
 
 /* ─── Modo oscuro (Ajustes → Apariencia) ───
    AjustesService pone la clase .tema-oscuro en <html>. Las reglas usan :where()
