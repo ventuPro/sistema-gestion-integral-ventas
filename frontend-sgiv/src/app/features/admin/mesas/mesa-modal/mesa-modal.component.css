@@ -13,3 +13,16 @@
 }
 
 /* ─── Descuento manual al cobrar ─── */
+
+/* ─── Celular y tablet: la mesa a pantalla completa, productos y consumo en pestañas ─── */
+.pestanas-movil { display: flex; flex-shrink: 0; border-bottom: 1px solid var(--i-linea); }
+.pestanas-movil button { flex: 1; padding: 11px 8px; font-size: calc(13.5px * var(--escala-texto)); font-weight: 600;
+                         color: var(--i-tenue); border-bottom: 2px solid transparent; }
+.pestanas-movil button.activa { color: var(--i-acento); border-color: var(--i-acento); }
+@media (max-width: 1023px) {
+  .fondo-mesa { padding: 0 !important; }
+  .ventana-mesa { height: 100dvh; max-width: none; border: 0; border-radius: 0; }
+  .paneles { display: flex; flex-direction: column; }
+  .paneles > * { flex: 1; }
+  .oculto-movil { display: none !important; }
+}

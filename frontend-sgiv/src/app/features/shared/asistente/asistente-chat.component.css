@@ -188,3 +188,6 @@
   text-align: center;
   color: var(--i-sutil);
 }
+
+/* Celular: en Punto de venta el botón queda sobre la barra «Ver venta» */
+@media (max-width: 1023px) { .chat-boton.izquierda { bottom: calc(88px + env(safe-area-inset-bottom)); } }

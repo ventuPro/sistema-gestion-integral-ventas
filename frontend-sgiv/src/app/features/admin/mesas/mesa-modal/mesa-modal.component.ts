@@ -69,6 +69,8 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly cargando     = signal(false);
   readonly cuentaActiva = signal<any>(null);
   readonly vista        = signal<'info' | 'comanda' | 'pago' | 'qr' | 'ticket'>('info');
+  /** Celular: productos o consumo (en la computadora se ven los dos) */
+  readonly panelMovil   = signal<'catalogo' | 'consumo'>('catalogo');
 
   readonly productos       = signal<any[]>([]);
   readonly busqueda        = signal('');

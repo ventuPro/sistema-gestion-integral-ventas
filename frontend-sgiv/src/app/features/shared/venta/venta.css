@@ -93,7 +93,7 @@
 .producto .stock.bajo { color: var(--i-aviso); font-weight: 600; }
 
 /* Ventana de cobro: datos a la izquierda; tablero (efectivo) o QR a la derecha. Sin scroll. */
-.cobro { display: grid; }
+.cobro { display: grid; grid-template-columns: minmax(0, 1fr); }
 .cobro-datos { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
 .cobro-datos .inf-cifra-xl { font-size: calc(40px * var(--escala-texto)); }
 .cobro-teclado { padding: 0 20px 20px; }
@@ -291,3 +291,11 @@
 .aviso-flotante.error { background: #b42318; max-width: 380px; }
 @keyframes entrar { from { opacity: 0; transform: translateY(-6px); } }
 
+
+/* Celular: dos productos por fila, tarjetas compactas */
+@media (max-width: 639px) {
+  .catalogo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .producto .foto { aspect-ratio: 4 / 3; }
+  .producto .datos { padding: 7px 8px 8px; }
+  .producto .nombre { font-size: calc(12.5px * var(--escala-texto)); }
+}

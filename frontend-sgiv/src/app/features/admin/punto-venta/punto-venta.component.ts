@@ -12,7 +12,7 @@ import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { TicketComponent } from '../../shared/ticket/ticket.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Search, X, ReceiptText, Trash2,
-         ShoppingCart, Banknote, QrCode, Printer, BadgePercent, Minus, Plus } from 'lucide-angular';
+         ShoppingCart, Banknote, QrCode, Printer, BadgePercent, Minus, Plus, ArrowLeft } from 'lucide-angular';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../core/services/impresion.service';
 import { sondeo } from '../../../core/utils/sondeo';
@@ -60,6 +60,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     check:       Check,
     search:      Search,
     close:       X,
+    volver:      ArrowLeft,
     historial:   ReceiptText,
     quitar:      Trash2,
     carrito:     ShoppingCart,
@@ -143,6 +144,9 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   // ─── Carrito ───
   readonly carrito = signal<any[]>([]);
+  /** Celular: la venta abierta a pantalla completa */
+  readonly verVenta = signal(false);
+  readonly unidadesCarrito = computed(() => this.carrito().reduce((s, i) => s + Number(i.cantidad), 0));
 
   // El tablero cambia la cantidad de la línea elegida (la última agregada si no se tocó otra)
   private readonly seleccionado = signal<number | null>(null);
@@ -747,6 +751,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
         this.fechaTicket.set(new Date());
         this.mostrarTicket.set(true);
         this.carrito.set([]);
+        this.verVenta.set(false);
         this.reservado.set(new Map());   // lo reservado quedó en la venta
         this.descuento.set(null);
         this.fijarStock(res.stock || []);
@@ -807,6 +812,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
 
   toggleHistorial() {
     this.mostrarHistorial.set(!this.mostrarHistorial());
+    this.verVenta.set(false);   // celular: «Ventas de hoy» se ve sobre el catálogo
     if (this.mostrarHistorial()) this.cargarVentasHoy();
   }
 

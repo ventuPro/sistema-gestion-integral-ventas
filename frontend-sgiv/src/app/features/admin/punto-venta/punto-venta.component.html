@@ -194,9 +194,12 @@
         }
       </section>
 
-      <!-- Carrito -->
-      <section class="inf-hoja flex flex-col min-h-0 overflow-hidden">
+      <!-- Carrito (en el celular, a pantalla completa con «Ver venta») -->
+      <section class="venta-panel inf-hoja flex flex-col min-h-0 overflow-hidden" [class.abierta]="verVenta()">
         <div class="flex items-center gap-3 px-4 py-2.5 separador-inferior flex-shrink-0">
+          <button class="quitar lg:hidden -ml-1" (click)="verVenta.set(false)" aria-label="Volver al catálogo">
+            <lucide-icon [img]="icons.volver" class="w-5 h-5"></lucide-icon>
+          </button>
           <h2 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))] whitespace-nowrap">Venta actual</h2>
           <button class="inf-boton ml-auto" [class.activo]="mostrarHistorial()" (click)="toggleHistorial()">
             <lucide-icon [img]="icons.historial" class="w-3.5 h-3.5"></lucide-icon>
@@ -294,6 +297,13 @@
         </div>
       </section>
     </div>
+
+    <!-- Celular: la venta se abre desde abajo -->
+    <button class="barra-venta lg:hidden" (click)="verVenta.set(true)">
+      <span class="cuenta"><lucide-icon [img]="icons.carrito" class="w-4 h-4"></lucide-icon> {{ unidadesCarrito() }}</span>
+      <span class="flex-1 text-left">Ver venta</span>
+      <b>{{ moneda() }} {{ cifra(total()) }}</b>
+    </button>
   </div>
 }
 

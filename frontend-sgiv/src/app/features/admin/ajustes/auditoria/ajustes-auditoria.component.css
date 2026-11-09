@@ -124,3 +124,9 @@ li:last-child > .fila, li.fila:last-child { border-bottom: none; }
   .quien { grid-column: 2; text-align: left; }
   .datos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Celular: filtros y datos en dos columnas */
+@media (max-width: 639px) {
+  .rejilla, .datos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rejilla .buscar { grid-column: span 2; }
+}

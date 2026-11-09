@@ -76,3 +76,9 @@
 @media (prefers-reduced-motion: reduce) {
   .flecha { transition: none; }
 }
+
+/* Celular: el buscador de al lado necesita espacio */
+@media (max-width: 639px) {
+  :host(.externa) .actual { max-width: 150px; }
+  :host(.externa) .cantidad { display: none; }
+}

@@ -38,9 +38,9 @@
   </div>
 </ng-template>
 
-<div #fondoMesa class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModal()">
+<div #fondoMesa class="fondo-mesa fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="cerrarModal()">
 
-  <div class="inf-hoja ventana w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden relative">
+  <div class="ventana-mesa inf-hoja ventana ventana-completa w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden relative">
 
     <!-- Encabezado -->
     <div class="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 separador-inferior flex-shrink-0">
@@ -77,9 +77,16 @@
 
     <!-- Consumo -->
     @if ((!cargando() || vista() === 'pago') && (vista() === 'comanda' || vista() === 'pago')) {
-      <div class="flex-1 min-h-0 grid lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
+      <!-- Celular: una cosa a la vez -->
+      <nav class="pestanas-movil lg:hidden">
+        <button [class.activa]="panelMovil() === 'catalogo'" (click)="panelMovil.set('catalogo')">Productos</button>
+        <button [class.activa]="panelMovil() === 'consumo'" (click)="panelMovil.set('consumo')">
+          Consumo <span class="inf-ficha">{{ itemsPendientes().length }}</span> · {{ moneda() }} {{ cifra(totalCuenta()) }}
+        </button>
+      </nav>
+      <div class="paneles flex-1 min-h-0 grid lg:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
 
-        <div class="flex flex-col min-h-0 lg:border-r" style="border-color: var(--i-linea)">
+        <div class="flex flex-col min-h-0 lg:border-r" [class.oculto-movil]="panelMovil() !== 'catalogo'" style="border-color: var(--i-linea)">
           <div class="p-3 separador-inferior flex-shrink-0 flex items-center gap-2">
             <div class="buscador flex-1 min-w-0">
               <lucide-icon [img]="icons.buscar" class="w-4 h-4 inf-tenue"></lucide-icon>
@@ -125,7 +132,7 @@
           </div>
         </div>
 
-        <div class="flex flex-col min-h-0 overflow-y-auto">
+        <div class="flex flex-col min-h-0 overflow-y-auto" [class.oculto-movil]="panelMovil() !== 'consumo'">
           <div class="flex items-center justify-between px-5 py-3 separador-inferior flex-shrink-0">
             <h3 class="inf-tinta font-semibold text-[length:calc(14px*var(--escala-texto))]">Consumo actual</h3>
             <span class="inf-nota">{{ itemsPendientes().length }} por cobrar</span>

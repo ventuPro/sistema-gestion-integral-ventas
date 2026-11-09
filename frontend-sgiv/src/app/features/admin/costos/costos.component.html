@@ -221,6 +221,7 @@
           </div>
         </div>
 
+        <div class="overflow-x-auto">
         <table class="inf-tabla ingredientes">
           <thead>
             <tr><th>Insumo</th><th class="num">Cantidad</th><th>Unidad</th><th class="num">Costo</th><th></th></tr>
@@ -256,6 +257,7 @@
             }
           </tbody>
         </table>
+        </div>
         <button type="button" class="inf-boton" (click)="agregarFila()">
           <lucide-icon [img]="icons.nuevo" class="w-3.5 h-3.5"></lucide-icon> Agregar insumo
         </button>
@@ -295,6 +297,7 @@
         </button>
       </div>
       <div class="overflow-y-auto">
+        <div class="overflow-x-auto">
         <table class="inf-tabla">
           @if (h.tipo === 'insumo') {
             <thead><tr><th>Fecha</th><th>Compra</th><th class="num">Precio</th><th>Usuario</th></tr></thead>
@@ -322,6 +325,7 @@
             </tbody>
           }
         </table>
+        </div>
       </div>
     </div>
   </div>

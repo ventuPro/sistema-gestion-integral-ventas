@@ -22,6 +22,13 @@
 /* ─── Ventanas modales: fondo oscurecido y sombra (todas, para que nunca se mezclen con la pantalla) ─── */
 .fondo-modal { background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(3px); }
 .ventana { box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.45); }
+/* Celular y tablet: toda ventana cabe en la pantalla y se desplaza por dentro (nada queda fuera de alcance) */
+@media (max-width: 1023px) {
+  .fondo-modal { padding: 8px; }
+  .ventana:not(.ventana-completa) { max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+}
+/* Celular: los grupos de filtros (Activos, Stock bajo…) pasan a varias líneas en vez de cortarse */
+@media (max-width: 639px) { .inf-segmentos { flex-wrap: wrap; } }
 
 /* ─── Modo oscuro (Ajustes → Apariencia) ───
    AjustesService pone la clase .tema-oscuro en <html>. Las reglas usan :where()

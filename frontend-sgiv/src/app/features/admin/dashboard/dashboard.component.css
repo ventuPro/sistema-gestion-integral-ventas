@@ -9,9 +9,9 @@
   flex-direction: column;
   transform: translateX(-100%);
   transition: transform 200ms ease;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
 }
-.lateral.abierta { transform: none; }
+/* La sombra solo con el menú abierto (escondido no debe asomar en el borde) */
+.lateral.abierta { transform: none; box-shadow: 0 0 40px rgba(0, 0, 0, 0.35); }
 
 /* Logo y nombre del negocio (Ajustes → Empresa / Apariencia) */
 .marca {

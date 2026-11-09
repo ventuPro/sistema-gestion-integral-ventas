@@ -181,6 +181,7 @@
       <section class="inf-bloque">
         <div class="inf-bloque-cabeza"><h3>Últimas ventas</h3></div>
         @if (d.ultimas_ventas?.length) {
+          <div class="overflow-x-auto">
           <table class="inf-tabla compacta">
             <thead><tr><th>Hora</th><th>Cajero</th><th>Pago</th><th class="num">Total</th></tr></thead>
             <tbody>
@@ -194,12 +195,14 @@
               }
             </tbody>
           </table>
+          </div>
         } @else { <p class="inf-vacio">Aún no hay ventas hoy.</p> }
       </section>
 
       <section class="inf-bloque">
         <div class="inf-bloque-cabeza"><h3>Stock por reponer</h3><a routerLink="/dashboard/inventario" class="inf-enlace ml-auto">Ver inventario</a></div>
         @if (d.stock_critico?.length) {
+          <div class="overflow-x-auto">
           <table class="inf-tabla compacta">
             <thead><tr><th>Producto</th><th>Estado</th><th class="num">Quedan</th></tr></thead>
             <tbody>
@@ -212,12 +215,14 @@
               }
             </tbody>
           </table>
+          </div>
         } @else { <p class="inf-vacio">Todo el stock está sobre el mínimo.</p> }
       </section>
 
       <section class="inf-bloque">
         <div class="inf-bloque-cabeza"><h3>Cajas abiertas</h3></div>
         @if (d.turnos_abiertos?.length) {
+          <div class="overflow-x-auto">
           <table class="inf-tabla compacta">
             <thead><tr><th>Cajero</th><th>Desde</th><th class="num">Efectivo</th><th class="num">Lleva</th></tr></thead>
             <tbody>
@@ -231,12 +236,14 @@
               }
             </tbody>
           </table>
+          </div>
         } @else { <p class="inf-vacio">No hay cajas abiertas. Para vender, un cajero debe abrir caja.</p> }
       </section>
 
       <section class="inf-bloque">
         <div class="inf-bloque-cabeza"><h3>Descuentos manuales de hoy</h3></div>
         @if (d.descuentos_hoy?.length) {
+          <div class="overflow-x-auto">
           <table class="inf-tabla compacta">
             <thead><tr><th>Hora</th><th>Motivo</th><th class="num">Descuento</th></tr></thead>
             <tbody>
@@ -249,6 +256,7 @@
               }
             </tbody>
           </table>
+          </div>
         } @else { <p class="inf-vacio">Sin descuentos manuales hoy.</p> }
       </section>
     </div>
