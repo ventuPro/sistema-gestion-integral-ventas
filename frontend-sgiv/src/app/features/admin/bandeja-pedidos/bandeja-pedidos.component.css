@@ -21,7 +21,7 @@
 .vacio { padding: 64px 0; text-align: center; color: var(--i-sutil); font-size: calc(14px * var(--escala-texto)); }
 
 /* Un pedido: franja de color a la izquierda (ámbar por confirmar, rojo si está por vencer, azul por entregar) */
-.pedido { --tono: #f59e0b; background: var(--i-papel); border: 1px solid var(--i-linea); border-left: 4px solid var(--tono);
+.pedido { --tono: #f59e0b; flex-shrink: 0; background: var(--i-papel); border: 1px solid var(--i-linea); border-left: 4px solid var(--tono);
           border-radius: 10px; overflow: hidden; }
 .pedido.urgente { --tono: #dc2626; }
 .pedido.entregar { --tono: #2563eb; }
