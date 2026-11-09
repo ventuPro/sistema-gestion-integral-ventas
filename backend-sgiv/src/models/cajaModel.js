@@ -4,6 +4,7 @@ const { costoActual, costoDeLotes } = require('./loteModel');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const promocionModel = require('./promocionModel');
 const notificacionModel = require('./notificacionModel');
+const { siguienteNumero } = require('../utils/numeroDia');
 
 // Efectivo esperado de un turno t: fondo inicial + ventas en efectivo (igual en todo cierre)
 const EFECTIVO_ESPERADO = `t.monto_inicial + COALESCE((
@@ -334,6 +335,7 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
     const ventas = await db.query(`
         SELECT
             v.id_venta,
+            v.numero_dia,
             v.monto_total_venta,
             v.metodo_pago,
             v.fecha_venta,
@@ -409,7 +411,7 @@ const obtenerArqueoHoy = async (id_sucursal, id_usuario_cajero) => {
 // id_sucursal: si viene, la venta debe ser de esa sucursal (cajero). Devuelve null si no existe.
 const obtenerComprobante = async (id_venta, id_sucursal = null) => {
     const venta = await db.query(`
-        SELECT v.id_venta, v.id_sucursal, v.fecha_venta, v.monto_total_venta, v.metodo_pago,
+        SELECT v.id_venta, v.numero_dia, v.id_sucursal, v.fecha_venta, v.monto_total_venta, v.metodo_pago,
                v.descuento_promociones, v.descuento_manual, v.motivo_descuento,
                mesa.numero_mesa, mesa.clientes
         FROM venta_caja v
@@ -438,6 +440,7 @@ const obtenerComprobante = async (id_venta, id_sucursal = null) => {
 
     return {
         id_venta: v.id_venta,
+        numero_dia: v.numero_dia,
         fecha_venta: v.fecha_venta,
         items: lineas.rows.map(l => ({
             nombre_producto: l.nombre_producto,
@@ -461,6 +464,7 @@ const obtenerVentasHoyPOS = async (id_sucursal, id_usuario_cajero) => {
     const resVentas = await db.query(`
         SELECT
             v.id_venta,
+            v.numero_dia,
             v.monto_total_venta,
             v.metodo_pago,
             v.fecha_venta
@@ -575,12 +579,13 @@ const registrarVenta = async ({
             throw err;
         }
 
-        // 3. Registrar la venta principal
+        // 3. Registrar la venta principal (con su número del día)
+        const numero_dia = await siguienteNumero(client, 'venta_caja', id_sucursal);
         const rVenta = await client.query(`
             INSERT INTO venta_caja
                 (id_sucursal, id_usuario_cajero, id_turno, monto_total_venta, metodo_pago,
-                 descuento_promociones, descuento_manual, motivo_descuento)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 descuento_promociones, descuento_manual, motivo_descuento, numero_dia)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id_venta
         `, [
             Number(id_sucursal),
@@ -590,7 +595,8 @@ const registrarVenta = async ({
             metodo_pago,
             cot.promoCentavos / 100,
             cot.manualCentavos / 100,
-            cot.motivo
+            cot.motivo,
+            numero_dia
         ]);
         const id_venta = rVenta.rows[0].id_venta;
         if (cot.manualCentavos > 0) await notificacionModel.descuentoManual(client, id_venta);
@@ -629,7 +635,7 @@ const registrarVenta = async ({
         }
 
         await client.query('COMMIT');
-        return { id_venta, cambiosStock, cotizacion: promocionModel.enBolivianos(cot) };
+        return { id_venta, numero_dia, cambiosStock, cotizacion: promocionModel.enBolivianos(cot) };
 
     } catch (e) {
         await client.query('ROLLBACK');

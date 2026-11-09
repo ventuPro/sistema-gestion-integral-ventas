@@ -139,7 +139,7 @@ const crearHerramientas = ({ usuario, esAdmin, permisos, guias }) => {
             const p = await ajusteModel.parametros();
             const pedidos = await pedidoModel.obtenerBandeja(sucursal(id_sucursal, false), p.menu_minutos_expiracion);
             return pedidos.map(x => ({
-                pedido: x.id_pedido, mesa: x.numero_mesa, estado: x.estado_pedido, monto: Number(x.monto_total),
+                pedido: x.numero_dia ?? x.id_pedido, mesa: x.numero_mesa, estado: x.estado_pedido, monto: Number(x.monto_total),
                 minutos_esperando: Math.round((Date.now() - new Date(x.fecha_pedido)) / 60000),
                 productos: x.items.map(i => `${i.cantidad} x ${i.nombre_producto}`).join(', ')
             }));

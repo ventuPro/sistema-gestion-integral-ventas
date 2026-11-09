@@ -161,7 +161,7 @@
                     @for (venta of ventasHoy(); track venta.id_venta) {
                       <tr>
                         <td class="align-top">
-                          <span class="fuerte">#{{ venta.id_venta }}</span>
+                          <span class="fuerte">#{{ venta.numero_dia ?? venta.id_venta }}</span>
                           <span class="inf-secundario">{{ venta.fecha_venta | date:'HH:mm' }}</span>
                         </td>
                         <td>
@@ -389,7 +389,7 @@
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
         <div>
           <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Venta registrada</h3>
-          <p class="inf-sub mt-0!">Comprobante #{{ datosTicket()?.id_venta }}</p>
+          <p class="inf-sub mt-0!">Comprobante #{{ datosTicket()?.numero_dia ?? datosTicket()?.id_venta }}</p>
         </div>
         <button class="quitar" (click)="cerrarTicket()" aria-label="Cerrar">
           <lucide-icon [img]="icons.close" class="w-4 h-4"></lucide-icon>

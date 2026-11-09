@@ -202,11 +202,11 @@ const cobrarVenta = async (req, res) => {
         const datos = { ...req.body, id_usuario_cajero: req.usuario.id_usuario };
         const motivo = await ajusteModel.motivoMetodoPago(datos.metodo_pago);
         if (motivo) return res.status(400).json({ error: 'VENTA_INVALIDA', detalle: motivo });
-        const { id_venta, cambiosStock, cotizacion } = await cajaModel.registrarVenta(datos);
+        const { id_venta, numero_dia, cambiosStock, cotizacion } = await cajaModel.registrarVenta(datos);
 
         emitirStock(cambiosStock);
 
-        res.status(201).json({ mensaje: 'Venta registrada', id_venta, cotizacion, stock: cambiosStock });
+        res.status(201).json({ mensaje: 'Venta registrada', id_venta, numero_dia, cotizacion, stock: cambiosStock });
     } catch (e) {
         console.error('cobrarVenta:', e.message);
         if (e.message === 'CAJA_CERRADA')

@@ -3,6 +3,7 @@ const { moverStock } = require('./inventarioModel');
 const { STOCK_VISIBLE } = require('./productoModel');
 const visitaModel = require('./visitaModel');
 const promocionModel = require('./promocionModel');
+const { siguienteNumero } = require('../utils/numeroDia');
 
 // ─── Pedidos del cliente: Pendiente_Cajero → Confirmado → Entregado → Pagado / Cancelado ───
 
@@ -211,13 +212,14 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
                               { id_producto: noDisponible.id_producto });
 
         const totalCentavos = lista.reduce((s, i) => s + precios.get(i.id_producto) * i.cantidad, 0);
+        const numero_dia = await siguienteNumero(client, 'pedido_mesa', mesa.id_sucursal);
         const rPed = await client.query(`
             INSERT INTO pedido_mesa (tipo_pedido, id_sucursal, id_mesa, estado_pedido, observacion_general,
-                                     cliente_mesa, nombre_cliente, sin_verificar, ip_cliente)
-            VALUES ('Mesa', $1, $2, 'Pendiente_Cajero', $3, $4, $5, $6, $7)
+                                     cliente_mesa, nombre_cliente, sin_verificar, ip_cliente, numero_dia)
+            VALUES ('Mesa', $1, $2, 'Pendiente_Cajero', $3, $4, $5, $6, $7, $8)
             RETURNING *
         `, [mesa.id_sucursal, mesa.id_mesa, texto(observacion_general, MAX_LARGO_NOTA),
-            cliente_mesa, nombre_cliente, sin_verificar, ip_cliente]);
+            cliente_mesa, nombre_cliente, sin_verificar, ip_cliente, numero_dia]);
         const pedido = { ...rPed.rows[0], monto_total: totalCentavos / 100 };
 
         for (const it of lista) {
@@ -240,7 +242,7 @@ const crearPedidoMesa = async ({ mesa, items, observacion_general, maxPendientes
 // ─── CAJERO: bandeja ───
 const obtenerBandeja = async (id_sucursal, minutos_expiracion) => {
     const r = await db.query(`
-        SELECT pm.id_pedido, pm.tipo_pedido, pm.id_mesa, pm.id_sucursal, pm.estado_pedido,
+        SELECT pm.id_pedido, pm.numero_dia, pm.tipo_pedido, pm.id_mesa, pm.id_sucursal, pm.estado_pedido,
                SUM(dp.subtotal_detalle) AS monto_total, pm.fecha_pedido, pm.fecha_aprobacion, pm.observacion_general,
                pm.fecha_pedido + make_interval(mins => $2) AS fecha_expiracion,
                pm.nombre_cliente, pm.telefono_cliente, pm.direccion_entrega, pm.sin_verificar,
@@ -288,7 +290,7 @@ const ajustarDetalle = async ({ id_pedido, id_detalle, cantidad, id_sucursal, id
         const delta = nueva - Number(det.cantidad_solicitada);
 
         let cambios = [];
-        const registro = { id_usuario, id_pedido, detalle: `Pedido #${id_pedido} ajustado` };
+        const registro = { id_usuario, id_pedido, detalle: `Pedido #${pedido.numero_dia ?? id_pedido} ajustado` };
         if (nueva === 0) {
             const rOtros = await client.query(
                 `SELECT COUNT(*)::int AS n FROM detalle_pedido WHERE id_pedido = $1 AND id_detalle_pedido <> $2`,
@@ -359,7 +361,7 @@ const confirmarPedido = async ({ id_pedido, id_usuario, id_sucursal }) =>
 // Pedido ya bloqueado
 const cancelarPendiente = async (client, pedido, id_usuario = null) => {
     const cambios = await devolverStock(client, pedido.id_sucursal, await itemsDelPedido(client, pedido.id_pedido),
-                                        { id_usuario, id_pedido: pedido.id_pedido, detalle: `Pedido #${pedido.id_pedido} cancelado` });
+                                        { id_usuario, id_pedido: pedido.id_pedido, detalle: `Pedido #${pedido.numero_dia ?? pedido.id_pedido} cancelado` });
     const r = await client.query(`
         UPDATE pedido_mesa SET estado_pedido = 'Cancelado', id_usuario_atencion = COALESCE($2, id_usuario_atencion)
         WHERE id_pedido = $1 RETURNING *
@@ -429,7 +431,7 @@ const obtenerEstadoMesa = async (id_mesa, cliente_mesa) => {
 
     // En curso, más los no atendidos de las últimas 2 horas
     const rPed = await db.query(`
-        SELECT pm.id_pedido, pm.estado_pedido, SUM(dp.subtotal_detalle) AS monto_total, pm.fecha_pedido,
+        SELECT pm.id_pedido, pm.numero_dia, pm.estado_pedido, SUM(dp.subtotal_detalle) AS monto_total, pm.fecha_pedido,
                json_agg(json_build_object(
                    'nombre_producto', p.nombre_producto,
                    'cantidad',        dp.cantidad_solicitada,

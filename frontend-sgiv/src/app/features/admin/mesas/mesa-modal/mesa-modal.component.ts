@@ -581,6 +581,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
         const nombres = new Map<number, string>((this.cuentaActiva()?.items || []).map((i: any) => [i.id_producto, i.nombre_producto]));
         this.datosTicket.set({
           id_venta:     res.id_venta,
+          numero_dia:   res.numero_dia,
           numero_mesa:  this.mesa.numero_mesa,
           cliente:      parte?.clave ? parte.nombre : undefined,
           items:        cot

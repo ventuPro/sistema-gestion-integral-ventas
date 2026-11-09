@@ -124,7 +124,7 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, esAdmin = false) =
             LIMIT 8
         `, p),
         filas(`
-            SELECT v.id_venta, v.fecha_venta, v.metodo_pago, s.nombre_sucursal,
+            SELECT v.id_venta, v.numero_dia, v.fecha_venta, v.metodo_pago, s.nombre_sucursal,
                    v.monto_total_venta::float8 AS monto, u.nombre_completo AS cajero,
                    (SELECT COALESCE(SUM(cantidad_vendida), 0) FROM detalle_venta WHERE id_venta = v.id_venta)::int AS unidades
             FROM venta_caja v
@@ -198,7 +198,7 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, esAdmin = false) =
             LIMIT 8
         `, p),
         filas(`
-            SELECT v.id_venta, v.fecha_venta, v.descuento_manual::float8 AS descuento, v.motivo_descuento AS motivo,
+            SELECT v.id_venta, v.numero_dia, v.fecha_venta, v.descuento_manual::float8 AS descuento, v.motivo_descuento AS motivo,
                    u.nombre_completo AS cajero, s.nombre_sucursal
             FROM venta_caja v
             JOIN sucursal s     ON s.id_sucursal = v.id_sucursal
@@ -555,7 +555,7 @@ const descuentosDelPeriodo = async (id_sucursal, inicio, fin) => {
             ORDER BY descuento DESC
         `, params),
         filas(`
-            SELECT vc.id_venta, vc.fecha_venta, u.nombre_completo AS cajero, s.nombre_sucursal,
+            SELECT vc.id_venta, vc.numero_dia, vc.fecha_venta, u.nombre_completo AS cajero, s.nombre_sucursal,
                    vc.monto_total_venta::float8 AS cobrado, vc.descuento_manual::float8 AS descuento, vc.motivo_descuento AS motivo
             FROM venta_caja vc
             JOIN usuario  u ON u.id_usuario  = vc.id_usuario_cajero

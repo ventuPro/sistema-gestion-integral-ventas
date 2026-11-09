@@ -632,6 +632,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
         const lineas = new Map((cot?.items || []).map(l => [l.id_producto, l]));
         this.datosTicket.set({
           id_venta: res.id_venta,
+          numero_dia: res.numero_dia,
           items:    this.carrito().map(i => {
             const l = lineas.get(i.id_producto);
             return { nombre_producto: i.nombre_producto, cantidad: i.cantidad, precio_unitario: Number(i.precio_unitario),

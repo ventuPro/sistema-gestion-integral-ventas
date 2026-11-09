@@ -166,7 +166,7 @@ const conDetalle = (...partes) => partes.filter(Boolean).join(' · ');
 op('POST /caja/cobrar', 'crear', (c) => {
     const v = c.fila('venta_caja', 'INSERT')?.nuevo;
     if (!v) return ['Registró una venta'];
-    return ['Registró una venta', conDetalle(`Venta #${v.id_venta}`, c.dinero(v.monto_total_venta), v.metodo_pago,
+    return ['Registró una venta', conDetalle(`Venta #${v.numero_dia ?? v.id_venta}`, c.dinero(v.monto_total_venta), v.metodo_pago,
         Number(v.descuento_manual) > 0 && `Descuento manual ${c.dinero(v.descuento_manual)} (${v.motivo_descuento || 'sin motivo'})`)];
 });
 op('POST /caja/turnos/abrir', 'crear', (c) => {
@@ -217,7 +217,7 @@ op('PATCH /cuentas/detalle/:id', 'modificar', (c) => {
 op('POST /cuentas/:id/cerrar', 'crear', (c) => {
     const v = c.fila('venta_caja', 'INSERT')?.nuevo;
     return ['Cobró una mesa', conDetalle(mesaDeCuenta(c, c.ids[0]),
-        v && `Venta #${v.id_venta}`, v && c.dinero(v.monto_total_venta), v?.metodo_pago,
+        v && `Venta #${v.numero_dia ?? v.id_venta}`, v && c.dinero(v.monto_total_venta), v?.metodo_pago,
         v && Number(v.descuento_manual) > 0 && `Descuento manual ${c.dinero(v.descuento_manual)} (${v.motivo_descuento || 'sin motivo'})`)];
 });
 op('POST /cuentas/:id/cancelar-si-vacia', 'modificar', (c) => ['Cerró una cuenta vacía', mesaDeCuenta(c, c.ids[0])]);
@@ -239,7 +239,7 @@ op('POST /mesas/:id/habilitar',     'modificar', (c) => ['Habilitó una mesa', c
 op('POST /mesas/:id/liberar',       'modificar', (c) => ['Liberó una mesa', c.nombre('mesa', c.ids[0])]);
 
 // Pedidos QR
-const pedidoTexto = (c, p) => p && conDetalle(`Pedido #${p.id_pedido}`, c.nombre('mesa', p.id_mesa), p.nombre_cliente);
+const pedidoTexto = (c, p) => p && conDetalle(`Pedido #${p.numero_dia ?? p.id_pedido}`, c.nombre('mesa', p.id_mesa), p.nombre_cliente);
 
 op('POST /menu/m/:codigo/pedidos', 'crear', (c) => {
     const p = c.fila('pedido_mesa', 'INSERT')?.nuevo;

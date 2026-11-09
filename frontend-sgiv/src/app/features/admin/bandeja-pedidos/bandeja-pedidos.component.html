@@ -49,7 +49,7 @@
                   @else { Mesa {{ p.numero_mesa }} }
                 </p>
                 <p class="cliente">
-                  {{ p.nombre_cliente || 'Cliente' }} <span class="numero">· #{{ p.id_pedido }}</span>
+                  {{ p.nombre_cliente || 'Cliente' }} <span class="numero">· #{{ p.numero_dia ?? p.id_pedido }}</span>
                   @if (p.sin_verificar) {
                     <span class="sin-verificar"><lucide-icon [img]="icons.sinVerificar" class="w-3.5 h-3.5"></lucide-icon> Sin verificar</span>
                   }
@@ -125,7 +125,7 @@
                   @if (p.tipo_pedido === 'Delivery') { <lucide-icon [img]="icons.delivery" class="w-4 h-4"></lucide-icon> Delivery }
                   @else { Mesa {{ p.numero_mesa }} }
                 </p>
-                <p class="cliente">{{ p.nombre_cliente || 'Cliente' }} <span class="numero">· #{{ p.id_pedido }}</span></p>
+                <p class="cliente">{{ p.nombre_cliente || 'Cliente' }} <span class="numero">· #{{ p.numero_dia ?? p.id_pedido }}</span></p>
               </div>
               <span class="hace">confirmado {{ minutos(p.fecha_aprobacion) }}</span>
             </div>

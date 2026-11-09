@@ -260,6 +260,8 @@ CREATE TABLE pedido_mesa (
     -- Pedido hecho con la mesa libre: el cajero lo verifica
     sin_verificar BOOLEAN NOT NULL DEFAULT FALSE,
     ip_cliente VARCHAR(45),
+    -- Número del día (empieza en 1 cada día en cada sucursal); id_pedido sigue siendo la clave
+    numero_dia INT CONSTRAINT pedido_mesa_numero_dia_check CHECK (numero_dia > 0),
     CONSTRAINT pedido_mesa_estado_check
         CHECK (estado_pedido IN ('Pendiente_Cajero', 'Confirmado', 'Entregado', 'Pagado', 'Cancelado')),
     CONSTRAINT pedido_mesa_tipo_check
@@ -337,7 +339,9 @@ CREATE TABLE venta_caja (
     -- Descuentos ya restados de monto_total_venta
     descuento_promociones DECIMAL(10, 2) NOT NULL DEFAULT 0,
     descuento_manual      DECIMAL(10, 2) NOT NULL DEFAULT 0,
-    motivo_descuento      VARCHAR(120)
+    motivo_descuento      VARCHAR(120),
+    -- Número del día (empieza en 1 cada día en cada sucursal); id_venta sigue siendo la clave
+    numero_dia            INT CONSTRAINT venta_caja_numero_dia_check CHECK (numero_dia > 0)
 );
 
 CREATE TABLE detalle_venta (
@@ -502,6 +506,8 @@ CREATE INDEX idx_transferencia_origen_fecha  ON transferencia (id_sucursal_orige
 CREATE INDEX idx_transferencia_destino_fecha ON transferencia (id_sucursal_destino, fecha_transferencia);
 CREATE INDEX idx_venta_caja_sucursal_fecha ON venta_caja (id_sucursal, fecha_venta);
 CREATE INDEX idx_venta_caja_turno         ON venta_caja (id_turno);
+CREATE UNIQUE INDEX idx_venta_numero_dia  ON venta_caja  (id_sucursal, (fecha_venta::date), numero_dia);
+CREATE UNIQUE INDEX idx_pedido_numero_dia ON pedido_mesa (id_sucursal, (fecha_pedido::date), numero_dia);
 CREATE INDEX idx_detalle_venta_venta      ON detalle_venta (id_venta);
 CREATE INDEX idx_detalle_venta_producto   ON detalle_venta (id_producto);
 CREATE INDEX idx_detalle_cuenta_cuenta    ON detalle_cuenta (id_cuenta);

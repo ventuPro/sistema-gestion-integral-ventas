@@ -357,7 +357,7 @@
         @for (p of pedidos(); track p.id_pedido) {
           <article class="inf-hoja overflow-hidden">
             <div class="px-4 py-3 flex items-center justify-between separador-inferior">
-              <span class="inf-tinta font-semibold">Pedido #{{ p.id_pedido }}</span>
+              <span class="inf-tinta font-semibold">Pedido #{{ p.numero_dia ?? p.id_pedido }}</span>
               <span class="inf-estado" [ngClass]="infoEstado(p.estado_pedido).clase">{{ infoEstado(p.estado_pedido).texto }}</span>
             </div>
 

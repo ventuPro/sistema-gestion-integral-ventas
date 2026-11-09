@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { finalizarPedidosDeCuenta } = require('./pedidoModel');
 const { moverStock } = require('./inventarioModel');
 const { costoActual, costoReservado } = require('./loteModel');
+const { siguienteNumero } = require('../utils/numeroDia');
 const promocionModel = require('./promocionModel');
 const notificacionModel = require('./notificacionModel');
 const visitaModel = require('./visitaModel');
@@ -310,12 +311,13 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         });
         const total = cot.totalCentavos / 100;
 
+        const numero_dia = await siguienteNumero(client, 'venta_caja', cuenta.id_sucursal);
         const rVenta = await client.query(`
             INSERT INTO venta_caja (id_sucursal,id_usuario_cajero,id_turno,monto_total_venta,metodo_pago,
-                                    descuento_promociones,descuento_manual,motivo_descuento)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id_venta
+                                    descuento_promociones,descuento_manual,motivo_descuento,numero_dia)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id_venta
         `, [cuenta.id_sucursal, id_usuario_cajero, id_turno, total, metodo_pago,
-            cot.promoCentavos / 100, cot.manualCentavos / 100, cot.motivo]);
+            cot.promoCentavos / 100, cot.manualCentavos / 100, cot.motivo, numero_dia]);
         const id_venta = rVenta.rows[0].id_venta;
         if (cot.manualCentavos > 0) await notificacionModel.descuentoManual(client, id_venta);
 
@@ -354,7 +356,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         }
 
         await client.query('COMMIT');
-        return { id_venta, total, id_mesa: cuenta.id_mesa, pedidos_pagados, cuenta_cerrada,
+        return { id_venta, numero_dia, total, id_mesa: cuenta.id_mesa, pedidos_pagados, cuenta_cerrada,
                  cotizacion: promocionModel.enBolivianos(cot) };
     } catch(e) {
         await client.query('ROLLBACK');

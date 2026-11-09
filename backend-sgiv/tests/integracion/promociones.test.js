@@ -452,3 +452,40 @@ describe('Promociones en informes', () => {
         assert.ok(panel.body.promociones.descuentos >= 4);
     });
 });
+
+describe('Número del día', () => {
+    test('las ventas se numeran desde 1 cada día y en cada sucursal, sin repetir aunque lleguen a la vez', async () => {
+        const cat = await crearCategoria('Numeros del dia');
+        const id = await crearProducto('Pan numerado', 5, cat, 100);
+        await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES ($1, $2, 20)`, [idOtraSucursal, id]);
+        const maximo = async (suc) => (await bd.sql(`SELECT COALESCE(MAX(numero_dia), 0)::int AS n FROM venta_caja
+                                                     WHERE id_sucursal = $1 AND fecha_venta::date = CURRENT_DATE`, [suc]))[0].n;
+        const vender = (token, id_sucursal) => api('POST', '/caja/cobrar', { token, body: {
+            id_sucursal, metodo_pago: 'Efectivo', monto_total_venta: 5, detalles: [{ id_producto: id, cantidad: 1 }] } });
+
+        // Lo de ayer no cuenta para hoy
+        await bd.sql(`INSERT INTO venta_caja (id_sucursal, id_usuario_cajero, id_turno, monto_total_venta, metodo_pago, fecha_venta, numero_dia)
+                      SELECT id_sucursal, id_usuario_cajero, id_turno, 5, 'Efectivo', CURRENT_DATE - 1 + TIME '12:00', 900
+                      FROM venta_caja WHERE id_sucursal = 1 LIMIT 1`);
+        const base = await maximo(1);
+        const v1 = await vender(tCajero, 1), v2 = await vender(tCajero, 1);
+        assert.equal(v1.status, 201, JSON.stringify(v1.body));
+        assert.deepEqual([v1.body.numero_dia, v2.body.numero_dia], [base + 1, base + 2]);
+
+        // A la vez: todos distintos y seguidos
+        const juntas = await Promise.all(Array.from({ length: 6 }, () => vender(tCajero, 1)));
+        assert.ok(juntas.every(r => r.status === 201), JSON.stringify(juntas.map(r => r.body)));
+        assert.deepEqual(juntas.map(r => r.body.numero_dia).sort((a, b) => a - b), [3, 4, 5, 6, 7, 8].map(n => base + n));
+
+        // Otra sucursal lleva su propia cuenta
+        const turno = await api('POST', '/caja/turnos/abrir', { token: tCajeroOtra, body: { id_sucursal: idOtraSucursal, monto_inicial: 50 } });
+        assert.equal(turno.status, 201, JSON.stringify(turno.body));
+        const baseOtra = await maximo(idOtraSucursal);
+        const otra = await vender(tCajeroOtra, idOtraSucursal);
+        assert.equal(otra.body.numero_dia, baseOtra + 1);
+
+        // El comprobante lleva el número del día
+        const comp = await api('GET', `/caja/ventas/${v2.body.id_venta}/comprobante`, { token: tCajero });
+        assert.equal(comp.body.numero_dia, base + 2);
+    });
+});

@@ -573,7 +573,26 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
 
     // Nombres de sucursales y de usuarios siempre en mayúsculas (2026-11-08)
     `UPDATE sucursal SET nombre_sucursal = upper(nombre_sucursal) WHERE nombre_sucursal <> upper(nombre_sucursal);
-    UPDATE usuario  SET nombre_completo = upper(nombre_completo) WHERE nombre_completo <> upper(nombre_completo);`
+    UPDATE usuario  SET nombre_completo = upper(nombre_completo) WHERE nombre_completo <> upper(nombre_completo);`,
+
+    // ─── Número del día (2026-11-08): ventas y pedidos QR empiezan en #1 cada día en cada sucursal ───
+    // El id sigue siendo la clave; la primera vez se numera lo que ya había, día por día.
+    `DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'venta_caja' AND column_name = 'numero_dia') THEN
+            ALTER TABLE venta_caja ADD COLUMN numero_dia INT CONSTRAINT venta_caja_numero_dia_check CHECK (numero_dia > 0);
+            UPDATE venta_caja v SET numero_dia = x.n
+            FROM (SELECT id_venta, ROW_NUMBER() OVER (PARTITION BY id_sucursal, fecha_venta::date ORDER BY id_venta) AS n FROM venta_caja) x
+            WHERE x.id_venta = v.id_venta;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pedido_mesa' AND column_name = 'numero_dia') THEN
+            ALTER TABLE pedido_mesa ADD COLUMN numero_dia INT CONSTRAINT pedido_mesa_numero_dia_check CHECK (numero_dia > 0);
+            UPDATE pedido_mesa p SET numero_dia = x.n
+            FROM (SELECT id_pedido, ROW_NUMBER() OVER (PARTITION BY id_sucursal, fecha_pedido::date ORDER BY id_pedido) AS n FROM pedido_mesa) x
+            WHERE x.id_pedido = p.id_pedido;
+        END IF;
+    END $$;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_venta_numero_dia  ON venta_caja  (id_sucursal, (fecha_venta::date), numero_dia);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_pedido_numero_dia ON pedido_mesa (id_sucursal, (fecha_pedido::date), numero_dia);`
 ];
 
 const aplicarMigraciones = async () => {

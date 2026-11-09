@@ -7,6 +7,8 @@ import { TicketCabeceraComponent } from './ticket-cabecera.component';
 
 export interface DatosTicket {
   id_venta: number;
+  /** Número del día (empieza en 1 cada día); es el que se imprime */
+  numero_dia?: number;
   /** subtotal = cantidad × precio de lista; descuento = ahorro por promoción en esa línea */
   items: { nombre_producto: string; cantidad: number; precio_unitario?: number; subtotal: number; descuento?: number; promocion?: string }[];
   total: number;

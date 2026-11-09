@@ -147,7 +147,7 @@
               @for (v of arqueo().ventas; track v.id_venta) {
                 <tr>
                   <td class="inf-tenue">{{ hora(v.fecha_venta) }}</td>
-                  <td class="fuerte">#{{ v.id_venta }}</td>
+                  <td class="fuerte">#{{ v.numero_dia ?? v.id_venta }}</td>
                   <td class="num">{{ v.num_items }}</td>
                   <td><span class="inf-ficha">{{ v.metodo_pago }}</span></td>
                   <td class="num fuerte">{{ moneda() }} {{ cifra(v.monto_total_venta) }}</td>
@@ -206,7 +206,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 fondo-modal" (fondoModal)="comprobante.set(null)">
     <div class="inf-hoja ventana w-full max-w-md flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between px-5 py-4 separador-inferior">
-        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Comprobante #{{ c.id_venta }}</h3>
+        <h3 class="inf-tinta font-semibold text-[length:calc(15px*var(--escala-texto))]">Comprobante #{{ c.numero_dia ?? c.id_venta }}</h3>
         <button class="quitar" (click)="comprobante.set(null)" aria-label="Cerrar">
           <lucide-icon [img]="icons.cerrar" class="w-4 h-4"></lucide-icon>
         </button>

@@ -135,7 +135,7 @@ const transferencia = (cliente, { id_transferencia, origen, destino, id_destino,
 /** Venta con descuento manual */
 const descuentoManual = async (cliente, id_venta) => {
     const r = await cliente.query(`
-        SELECT v.id_venta, v.descuento_manual, v.motivo_descuento, v.id_sucursal, v.id_usuario_cajero,
+        SELECT v.id_venta, v.numero_dia, v.descuento_manual, v.motivo_descuento, v.id_sucursal, v.id_usuario_cajero,
                u.nombre_completo, s.nombre_sucursal
         FROM venta_caja v
         JOIN usuario u ON u.id_usuario = v.id_usuario_cajero
@@ -146,7 +146,7 @@ const descuentoManual = async (cliente, id_venta) => {
     await crear(cliente, {
         tipo: 'DESCUENTO', id_sucursal: v.id_sucursal, ruta: 'reportes', leida_por: v.id_usuario_cajero,
         titulo:  `Descuento manual de ${await dinero(v.descuento_manual)}`,
-        mensaje: `${v.nombre_completo} · ${v.nombre_sucursal} · venta #${v.id_venta} · Motivo: ${v.motivo_descuento || '-'}`
+        mensaje: `${v.nombre_completo} · ${v.nombre_sucursal} · venta #${v.numero_dia} · Motivo: ${v.motivo_descuento || '-'}`
     });
 };
 
