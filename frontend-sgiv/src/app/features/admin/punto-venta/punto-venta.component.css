@@ -14,12 +14,13 @@
   .pos { height: calc(100dvh - 56px - 3rem); }
 }
 .barra-venta {
-  flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px;
+  flex-shrink: 0; display: none; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px;
   background: var(--i-acento); color: #fff; font-weight: 600; font-size: calc(15px * var(--escala-texto));
   box-shadow: 0 8px 20px -10px rgba(15, 23, 42, 0.5);
 }
 .barra-venta .cuenta { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; background: rgb(255 255 255 / 0.2); }
 .barra-venta b { font-variant-numeric: tabular-nums; }
+@media (max-width: 1023px) { .barra-venta { display: flex; } }
 
 .historial { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--i-papel); border-radius: 8px; }
 
