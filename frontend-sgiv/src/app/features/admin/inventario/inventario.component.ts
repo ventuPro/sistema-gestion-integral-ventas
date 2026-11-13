@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
-import { ProductoService } from '../../../core/services/producto.service';
+import { ProductoParecido, ProductoService } from '../../../core/services/producto.service';
 import { SocketService } from '../../../core/services/socket.service';
 import { InventarioService, Movimiento, TipoMovimiento } from '../../../core/services/inventario.service';
 import { environment } from '../../../../environments/environment';
@@ -16,6 +16,7 @@ import { SelectorSucursalComponent } from '../../shared/selector-sucursal/select
 import { ImagenUrlPipe } from '../../../core/pipes/imagen-url.pipe';
 import { cifra } from '../../../core/utils/informe';
 import { DialogoService } from '../../../core/services/dialogo.service';
+import { PermisoService } from '../../../core/services/permiso.service';
 import { SesionService } from '../../../core/services/sesion.service';
 import { comprimirImagen } from '../../../core/utils/imagen';
 import { TransferenciasComponent } from './transferencias/transferencias.component';
@@ -40,6 +41,7 @@ type FiltroEstado = 'activos' | 'bajo' | 'sin' | 'vence' | 'inactivos' | 'todos'
 })
 export class InventarioComponent implements OnInit, OnDestroy {
   private readonly sesion = inject(SesionService);
+  private readonly permisos = inject(PermisoService);
   private productoService = inject(ProductoService);
   private dialogo         = inject(DialogoService);
   private socketService   = inject(SocketService);
@@ -161,6 +163,8 @@ export class InventarioComponent implements OnInit, OnDestroy {
   readonly hoy         = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
   readonly motivos     = signal<Record<TipoMovimiento, string[]>>({ INGRESO: [], SALIDA: [] });
   readonly errorMov    = signal('');
+  /** Producción repartida a otras sucursales (permiso «reparto»): cantidad por sucursal, se edita en el lugar */
+  readonly reparto     = signal<{ id_sucursal: number; nombre_sucursal: string; cantidad: number | null }[]>([]);
 
   // ─── Pestaña Movimientos ───
   readonly vista             = signal<'productos' | 'movimientos' | 'transferencias'>('productos');
@@ -299,6 +303,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
       tipo_producto: 'ELABORADO', vida_util: null, stock_inicial: null, id_receta: null
     });
     this.tipoAntes = 'ELABORADO';
+    this.parecidos.set([]);
     this.cargarRecetas(null);
     this.mostrarModal.set(true);
   }
@@ -323,11 +328,52 @@ export class InventarioComponent implements OnInit, OnDestroy {
       id_receta:            null
     });
     this.tipoAntes = prod.tipo_producto || 'ELABORADO';
+    this.parecidos.set([]);
     this.cargarRecetas(Number(prod.id_producto));
     this.mostrarModal.set(true);
   }
 
-  cerrarModal() { this.mostrarModal.set(false); this.editandoId.set(null); this.errorModal.set(''); this.guardando.set(false); }
+  cerrarModal() {
+    this.mostrarModal.set(false); this.editandoId.set(null); this.errorModal.set(''); this.guardando.set(false);
+    this.parecidos.set([]); clearTimeout(this.esperaParecidos);
+  }
+
+  // ─── Productos con nombre parecido (contra duplicados con otro nombre) ───
+  readonly parecidos = signal<ProductoParecido[]>([]);
+  private esperaParecidos?: ReturnType<typeof setTimeout>;
+
+  buscarParecidos(nombre: string) {
+    clearTimeout(this.esperaParecidos);
+    const texto = (nombre || '').trim();
+    if (texto.length < 3) return this.parecidos.set([]);
+    this.esperaParecidos = setTimeout(() => {
+      this.productoService.parecidos(texto, this.idSucursal(), this.editandoId()).subscribe({
+        next: (l) => { if (this.mostrarModal() && this.formulario().nombre_producto.trim() === texto) this.parecidos.set(l); },
+        error: () => this.parecidos.set([])
+      });
+    }, 300);
+  }
+
+  /** Usar el producto que ya existe: se agrega a esta sucursal con el stock inicial escrito */
+  async usarExistente(p: ProductoParecido) {
+    const stock = Number(this.formulario().stock_inicial) || 0;
+    if (!(await this.dialogo.confirmar({
+      titulo: `¿Agregar «${p.nombre_producto}» a ${this.sucursalSeleccionada()?.nombre_sucursal || 'esta sucursal'}?`,
+      mensaje: `Se usa el producto que ya existe${stock ? ` con ${stock} de stock inicial` : ''} y no se crea otro.`,
+      textoConfirmar: 'Agregar'
+    }))) return;
+    this.productoService.agregarASucursal(this.idSucursal(), [{ id_producto: p.id_producto, stock_inicial: stock }]).subscribe({
+      next: () => { this.cerrarModal(); this.dialogo.avisar(`${p.nombre_producto} agregado`); this.cargarProductos(); },
+      error: (e: any) => this.errorModal.set(e?.error?.error || 'No se pudo agregar el producto.')
+    });
+  }
+
+  /** Ya está en esta sucursal: se cierra la ventana y se busca en la lista */
+  verExistente(p: ProductoParecido) {
+    this.cerrarModal();
+    this.filtroEstado.set(p.estado_activo ? 'activos' : 'inactivos');
+    this.filtroBusqueda.set(p.nombre_producto);
+  }
 
   async onArchivoSeleccionado(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -379,11 +425,11 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.formulario.update(f => ({ ...f, tipo_producto: tipo, vida_util: null }));
   }
 
-  async guardarProducto() {
+  async guardarProducto(confirmar_parecido = false) {
     const f = this.formulario(), id = this.editandoId();
     if (!f.nombre_producto || !f.precio_unitario || !f.id_categoria)
       return this.errorModal.set('Completa nombre, precio y categoría.');
-    if (id && f.tipo_producto === 'PREPARADO' && this.tipoAntes !== 'PREPARADO' && !(await this.dialogo.confirmar({
+    if (!confirmar_parecido && id && f.tipo_producto === 'PREPARADO' && this.tipoAntes !== 'PREPARADO' && !(await this.dialogo.confirmar({
       titulo: '¿Pasar a «Preparado al momento»?', textoConfirmar: 'Cambiar', peligro: true,
       advertencias: ['Su stock de todas las sucursales sale como «Ajuste de conteo».',
                      'Desde ahora se vende siempre, sin stock ni lotes.']
@@ -406,11 +452,22 @@ export class InventarioComponent implements OnInit, OnDestroy {
       tipo_producto:        f.tipo_producto,
       vida_util_horas,
       // La receta la elige solo el administrador (lo comprado toma el costo de la compra)
-      ...(this.esAdmin() ? { id_receta: f.tipo_producto === 'COMPRADO' ? null : f.id_receta ?? null } : {})
+      ...(this.esAdmin() ? { id_receta: f.tipo_producto === 'COMPRADO' ? null : f.id_receta ?? null } : {}),
+      ...(confirmar_parecido ? { confirmar_parecido: true } : {})
     };
-    const fallo = (e: any, msg: string) => {
-      this.errorModal.set(e?.error?.error || msg);
+    const fallo = async (e: any, msg: string) => {
       this.guardando.set(false);
+      // Casi igual a otro producto: se confirma que es otro o se usa el que existe (en la lista de parecidos)
+      if (e?.error?.codigo === 'PARECIDO') {
+        this.parecidos.set(e.error.parecidos || []);
+        if (await this.dialogo.confirmar({
+          titulo: `¿«${f.nombre_producto}» es otro producto?`, mensaje: 'Ya existe uno casi igual:',
+          advertencias: (e.error.parecidos || []).map((p: ProductoParecido) => `${p.nombre_producto}${p.sucursales ? ' · ' + p.sucursales : ''}`),
+          peligro: true, textoConfirmar: id ? 'Guardar de todos modos' : 'Crear de todos modos'
+        })) this.guardarProducto(true);
+        return;
+      }
+      this.errorModal.set(e?.error?.error || msg);
     };
 
     if (id) {
@@ -452,6 +509,8 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.errorMov.set('');
     this.guardando.set(false);
     this.mov.set({ tipo: 'INGRESO', cantidad: null, motivo: '', detalle: '', vence: this.venceSugerido(prod), costo: null });
+    this.reparto.set([]);
+    if (this.puedeRepartir() && prod?.tipo_producto !== 'PREPARADO') this.prepararReparto(prod);
     // Lo comprado: el administrador ve el costo de la última compra ya escrito (los costos son solo suyos)
     if (this.esAdmin() && prod?.tipo_producto === 'COMPRADO')
       this.inventarioService.costoActual(prod.id_producto).subscribe({
@@ -481,7 +540,34 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
   get stockTrasMovimiento(): number {
     const mov = this.mov(), n = Math.trunc(Number(mov.cantidad)) || 0;
-    return (Number(this.productoMov()?.stock_actual) || 0) + (mov.tipo === 'SALIDA' ? -n : n);
+    return (Number(this.productoMov()?.stock_actual) || 0) + (mov.tipo === 'SALIDA' ? -n : n - this.totalRepartido);
+  }
+
+  puedeRepartir() { return this.esAdmin() || this.permisos.tienePermiso('reparto'); }
+
+  /** El cajero solo carga su sucursal: para repartir se piden todas (una vez) */
+  private destinosReparto: any[] | null = null;
+
+  private prepararReparto(prod: any) {
+    const llenar = (lista: any[]) => {
+      if (this.productoMov() !== prod) return;
+      this.reparto.set(lista.filter(s => s.estado_activo !== false && s.id_sucursal !== this.idSucursal())
+        .map(s => ({ id_sucursal: s.id_sucursal, nombre_sucursal: s.nombre_sucursal, cantidad: null })));
+    };
+    if (this.esAdmin()) return llenar(this.sucursales());
+    if (this.destinosReparto) return llenar(this.destinosReparto);
+    this.http.get<any[]>(`${this.apiUrl}/sucursales`).subscribe({
+      next: (l) => { this.destinosReparto = l || []; llenar(this.destinosReparto); }
+    });
+  }
+
+  /** El reparto solo se ve en una entrada por producción */
+  get repartiendo(): boolean {
+    return this.mov().tipo === 'INGRESO' && this.mov().motivo === 'Producción' && this.reparto().length > 0;
+  }
+
+  get totalRepartido(): number {
+    return this.repartiendo ? this.reparto().reduce((s, x) => s + (Math.trunc(Number(x.cantidad)) || 0), 0) : 0;
   }
 
   guardarMovimiento() {
@@ -490,6 +576,12 @@ export class InventarioComponent implements OnInit, OnDestroy {
     if (!Number.isInteger(cantidad) || cantidad < 1) return this.errorMov.set('La cantidad debe ser un número entero mayor a 0.');
     if (this.stockTrasMovimiento < 0) return this.errorMov.set(`Solo hay ${this.productoMov().stock_actual || 0} en stock.`);
     if (this.mov().motivo === 'Otro' && !detalle) return this.errorMov.set('Describe el motivo en la observación.');
+    if (this.reparto().some(x => x.cantidad != null && String(x.cantidad) !== '' && (!Number.isInteger(Number(x.cantidad)) || Number(x.cantidad) < 0)))
+      return this.errorMov.set('Las cantidades a repartir deben ser números enteros.');
+    if (this.totalRepartido > cantidad) return this.errorMov.set(`Se reparten ${this.totalRepartido} y solo se produjeron ${cantidad}.`);
+    const reparto = this.repartiendo
+      ? this.reparto().filter(x => Number(x.cantidad) > 0).map(x => ({ id_sucursal: x.id_sucursal, cantidad: Number(x.cantidad) }))
+      : [];
 
     const prod = this.productoMov();
     this.guardando.set(true);
@@ -498,12 +590,15 @@ export class InventarioComponent implements OnInit, OnDestroy {
       tipo: this.mov().tipo, cantidad, motivo: this.mov().motivo, detalle: detalle || undefined,
       fecha_vencimiento: this.mov().tipo === 'INGRESO' && this.mov().vence ? this.mov().vence : undefined,
       costo_unitario: this.mov().tipo === 'INGRESO' && this.mov().costo != null && String(this.mov().costo) !== ''
-                      ? Number(this.mov().costo) : undefined
+                      ? Number(this.mov().costo) : undefined,
+      reparto: reparto.length ? reparto : undefined
     }).subscribe({
       next: (r) => {
         this.fijarStock(Number(prod.id_producto), r.stock_actual);
         this.cerrarMovimiento();
-        this.dialogo.avisar(`${this.mov().tipo === 'INGRESO' ? 'Entrada' : 'Merma'} registrada: ${prod.nombre_producto} queda en ${r.stock_actual}`);
+        this.dialogo.avisar(r.repartido
+          ? `Producción registrada: ${r.repartido} repartidos, ${prod.nombre_producto} queda en ${r.stock_actual}`
+          : `${this.mov().tipo === 'INGRESO' ? 'Entrada' : 'Merma'} registrada: ${prod.nombre_producto} queda en ${r.stock_actual}`);
         if (this.vista() === 'movimientos') this.cargarMovimientos();
       },
       error: (e: any) => {

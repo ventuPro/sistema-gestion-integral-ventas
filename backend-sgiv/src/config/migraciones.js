@@ -662,7 +662,11 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
             SELECT DISTINCT p.id_usuario, 'encargos', TRUE FROM permiso_usuario p
             ON CONFLICT (id_usuario, modulo) DO NOTHING;
         END IF;
-    END $$;`
+    END $$;`,
+
+    // ─── Reparto de la producción (2026-11-13): la entrada «Producción» que la originó (para «Ingresos del día») ───
+    `ALTER TABLE transferencia ADD COLUMN IF NOT EXISTS id_historial_produccion INT REFERENCES historial_inventario(id_historial);
+    CREATE INDEX IF NOT EXISTS idx_transferencia_produccion ON transferencia (id_historial_produccion) WHERE id_historial_produccion IS NOT NULL;`
 ];
 
 const aplicarMigraciones = async () => {

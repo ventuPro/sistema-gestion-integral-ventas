@@ -4,6 +4,7 @@ const { ErrorValidacion, revisar, numero } = require('../utils/validacion');
 const loteModel = require('../models/loteModel');
 const db = require('../config/db');
 const transferenciaModel = require('../models/transferenciaModel');
+const permisoModel = require('../models/permisoModel');
 const { emitirStock, emitirCajeros } = require('../utils/tiempoReal');
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,6 +51,25 @@ const registrarMovimiento = async (req, res) => {
             ? numero(req.body?.costo_unitario, { etiqueta: 'El costo por unidad', min: 0, max: 99999 }) ?? undefined
             : undefined;
 
+        // Producción repartida a otras sucursales (permiso «reparto»)
+        const reparto = Array.isArray(req.body?.reparto) ? req.body.reparto.filter(x => Number(x?.cantidad) > 0) : [];
+        if (reparto.length) {
+            if (tipo !== 'INGRESO' || motivo !== 'Producción')
+                return res.status(400).json({ error: 'Solo la producción se reparte a otras sucursales' });
+            const permisos = await permisoModel.obtenerPermisosEfectivos(req.usuario.id_usuario, req.usuario.id_rol);
+            if (!esAdmin(req) && permisos.reparto !== true)
+                return res.status(403).json({ error: 'No tienes permiso para repartir a otras sucursales' });
+            const rr = await transferenciaModel.repartirProduccion({
+                id_origen: id_sucursal, id_producto: Number(id_producto), id_usuario: req.usuario.id_usuario, cantidad, detalle,
+                vence: fecha_vencimiento ? `${fecha_vencimiento} 23:59:59` : null, costo, reparto
+            });
+            emitirStock(rr.cambios);
+            for (const t of rr.transferencias) avisarTransferencia(req, t);
+            const enviados = rr.transferencias.reduce((s, t) => s + t.items[0].cantidad, 0);
+            return res.status(201).json({ mensaje: `Producción registrada: ${enviados} repartidos`, stock_actual: rr.stock,
+                                          repartido: enviados });
+        }
+
         const r = await inventarioModel.registrarMovimiento({
             id_sucursal, id_producto: Number(id_producto), id_usuario: req.usuario.id_usuario,
             tipo, cantidad, motivo, detalle, vence: fecha_vencimiento ? `${fecha_vencimiento} 23:59:59` : null, costo
@@ -61,6 +81,7 @@ const registrarMovimiento = async (req, res) => {
         if (error.codigo === 'SIN_STOCK') return res.status(409).json({ error: error.message, codigo: error.codigo });
         if (error.codigo === 'NO_EXISTE') return res.status(404).json({ error: error.message });
         if (error.codigo === 'PREPARADO') return res.status(409).json({ error: error.message, codigo: error.codigo });
+        if (ERRORES_TRANSFERENCIA[error.codigo]) return res.status(ERRORES_TRANSFERENCIA[error.codigo]).json({ error: error.message });
         console.error('registrarMovimiento:', error);
         res.status(500).json({ error: 'No se pudo registrar el movimiento' });
     }
@@ -145,7 +166,15 @@ const darDeBajaVencidos = async (req, res) => {
 };
 
 // ─── Transferencias entre sucursales ───
-const ERRORES_TRANSFERENCIA = { INVALIDA: 400, NO_EXISTE: 404, SIN_STOCK: 409 };
+const ERRORES_TRANSFERENCIA = { INVALIDA: 400, NO_EXISTE: 404, SIN_STOCK: 409, LOTE_CAMBIO: 409 };
+
+/** Aviso en pantalla a la sucursal de destino y al administrador */
+const avisarTransferencia = (req, { transferencia: t, items }) => emitirCajeros('transferencia:nueva', {
+    id_transferencia: t.id_transferencia, id_usuario: req.usuario.id_usuario,
+    id_sucursal_origen: t.id_sucursal_origen, nombre_origen: t.nombre_origen,
+    id_sucursal_destino: t.id_sucursal_destino, nombre_destino: t.nombre_destino,
+    resumen: items.map(i => `${i.cantidad} ${i.nombre_producto}`).join(', ')
+});
 
 // POST /api/inventario/transferencias { id_sucursal_origen?, id_sucursal_destino, items, observacion }
 const crearTransferencia = async (req, res) => {
@@ -158,12 +187,7 @@ const crearTransferencia = async (req, res) => {
         });
         const t = r.transferencia;
         emitirStock(r.cambios);
-        emitirCajeros('transferencia:nueva', {
-            id_transferencia: t.id_transferencia, id_usuario: req.usuario.id_usuario,
-            id_sucursal_origen: t.id_sucursal_origen, nombre_origen: t.nombre_origen,
-            id_sucursal_destino: t.id_sucursal_destino, nombre_destino: t.nombre_destino,
-            resumen: r.items.map(i => `${i.cantidad} ${i.nombre_producto}`).join(', ')
-        });
+        avisarTransferencia(req, r);
         res.status(201).json({ mensaje: `Transferencia #${t.id_transferencia} a ${t.nombre_destino} registrada`,
                                id_transferencia: t.id_transferencia });
     } catch (e) {

@@ -271,6 +271,10 @@ op('PATCH /pedidos/:id/detalle/:id', 'modificar', (c) => {
 op('POST /inventario/movimientos', 'crear', (c) => {
     const h = c.fila('historial_inventario', 'INSERT')?.nuevo;
     if (!h) return ['Registró un movimiento de stock'];
+    const repartos = c.filas('transferencia').filter(f => f.nuevo && !f.anterior);
+    if (repartos.length) return ['Registró y repartió una producción',
+        conDetalle(`${c.nombre('inventario', h.id_inventario)} × ${h.cantidad_movida}`, c.sucursalDeInventario(h.id_inventario),
+            repartos.map(f => c.nombre('sucursal', f.nuevo.id_sucursal_destino)).join(', '))];
     return [h.tipo_movimiento === 'INGRESO' ? 'Registró un ingreso de stock' : 'Registró una salida de stock',
         conDetalle(`${c.nombre('inventario', h.id_inventario)} × ${h.cantidad_movida}`, h.motivo_movimiento,
             c.sucursalDeInventario(h.id_inventario), `stock ${h.stock_resultante}`)];

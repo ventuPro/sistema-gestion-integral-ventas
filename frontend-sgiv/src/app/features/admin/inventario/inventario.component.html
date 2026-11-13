@@ -292,7 +292,28 @@
 
         <div class="grupo">
           <label class="inf-etiqueta" for="nombre-producto">Nombre</label>
-          <input id="nombre-producto" type="text" data-mayusculas data-regla="nombre" required maxlength="100" class="campo" [(ngModel)]="formulario().nombre_producto" placeholder="Ej.: Torta de chocolate">
+          <input id="nombre-producto" type="text" data-mayusculas data-regla="nombre" required maxlength="100" class="campo" [(ngModel)]="formulario().nombre_producto"
+                 (ngModelChange)="buscarParecidos($event)" placeholder="Ej.: Torta de chocolate">
+          @if (parecidos().length) {
+            <div class="parecidos" role="status">
+              <p class="titulo">Ya existen productos parecidos</p>
+              <ul>
+                @for (p of parecidos(); track p.id_producto) {
+                  <li [class.fuerte]="p.tipo === 'igual' || p.tipo === 'casi'">
+                    <span class="min-w-0">
+                      <span class="nombre">{{ p.nombre_producto }}</span>
+                      <span class="inf-secundario">{{ p.estado_activo ? (p.sucursales || 'Sin sucursal') : 'Desactivado' }}</span>
+                    </span>
+                    @if (p.en_sucursal) {
+                      <button type="button" class="inf-boton" (click)="verExistente(p)">Ver</button>
+                    } @else if (p.estado_activo && !editandoId()) {
+                      <button type="button" class="inf-boton" (click)="usarExistente(p)">Agregar a esta sucursal</button>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          }
         </div>
 
         <div class="grupo">
@@ -462,10 +483,26 @@
                     placeholder="Ej.: hornada de la mañana"></textarea>
         </div>
 
+        @if (repartiendo) {
+          <div class="grupo">
+            <span class="inf-etiqueta">Repartir a sucursales</span>
+            <ul class="reparto">
+              @for (x of reparto(); track x.id_sucursal) {
+                <li>
+                  <label [for]="'rep-' + x.id_sucursal">{{ x.nombre_sucursal }}</label>
+                  <input [id]="'rep-' + x.id_sucursal" type="number" min="0" max="100000" step="1" inputmode="numeric"
+                         class="campo" [(ngModel)]="x.cantidad" placeholder="0">
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
         <dl class="inf-pares">
           <div><dt>Stock actual</dt><dd>{{ productoMov().stock_actual || 0 }}</dd></div>
+          @if (totalRepartido) { <div><dt>Se reparten</dt><dd>{{ totalRepartido }}</dd></div> }
           <div>
-            <dt>Queda en</dt>
+            <dt>Queda en {{ totalRepartido ? sucursalSeleccionada()?.nombre_sucursal : '' }}</dt>
             <dd class="inf-tinta" [class.inf-baja]="stockTrasMovimiento < 0">{{ stockTrasMovimiento }}</dd>
           </div>
         </dl>

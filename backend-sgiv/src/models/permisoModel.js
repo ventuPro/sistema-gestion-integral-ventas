@@ -2,10 +2,10 @@ const db = require('../config/db');
 
 const PERMISOS_DEFAULT = {
     2: { dashboard: true,  punto_venta: true,  mesas: true,  arqueo: true,
-         inventario: false, reportes: false, usuarios: false, promociones: false, encargos: true }
+         inventario: false, reportes: false, usuarios: false, promociones: false, encargos: true, reparto: false }
 };
 
-const MODULOS = ['dashboard','punto_venta','mesas','arqueo','inventario','reportes','usuarios','promociones','encargos'];
+const MODULOS = ['dashboard','punto_venta','mesas','arqueo','inventario','reportes','usuarios','promociones','encargos','reparto'];
 
 // ────────────────────────────────────────────────────────────────
 //  Garantía de esquema: la tabla DEBE existir con el shape correcto.

@@ -141,8 +141,18 @@ const mismoNombre = async (nombre, excluir = null) => (await db.query(`
       AND id_producto <> COALESCE($2::int, 0)
     LIMIT 1`, [nombre, excluir])).rows[0] || null;
 
+/** Todos los productos con sus sucursales, para buscar nombres parecidos (en_sucursal: ya está en esa) */
+const paraComparar = async (id_sucursal = null) => (await db.query(`
+    SELECT p.id_producto, p.nombre_producto, p.estado_activo,
+           COALESCE(string_agg(s.nombre_sucursal, ', ' ORDER BY s.id_sucursal), '') AS sucursales,
+           COALESCE(bool_or(i.id_sucursal = $1), FALSE) AS en_sucursal
+    FROM producto p
+    LEFT JOIN inventario_sucursal i ON i.id_producto = p.id_producto
+    LEFT JOIN sucursal s ON s.id_sucursal = i.id_sucursal
+    GROUP BY p.id_producto`, [id_sucursal])).rows;
+
 module.exports = {
-    productosFaltantes, mismoNombre,
+    productosFaltantes, mismoNombre, paraComparar,
     crearCategoria,
     obtenerCategorias,
     ordenarCategorias,

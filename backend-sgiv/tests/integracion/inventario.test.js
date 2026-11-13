@@ -564,8 +564,12 @@ describe('Un producto en varias sucursales', () => {
         assert.match(nuevo.body.error, /Agregar de otra sucursal/);
 
         const otro = await crearProducto('EMPANADA DISTINTA', 1);
+        // Con tilde es casi igual: hay que confirmar que es otro producto
         const renombrar = await api('PUT', `/catalogo/productos/${otro}`, { token: tAdmin, body: { nombre_producto: 'Empanada única' } });
-        assert.equal(renombrar.status, 200, 'con tilde es otro nombre');
+        assert.equal(renombrar.status, 409);
+        assert.equal(renombrar.body.codigo, 'PARECIDO');
+        const confirmado = await api('PUT', `/catalogo/productos/${otro}`, { token: tAdmin, body: { nombre_producto: 'Empanada única', confirmar_parecido: true } });
+        assert.equal(confirmado.status, 200);
         const igual = await api('PUT', `/catalogo/productos/${otro}`, { token: tAdmin, body: { nombre_producto: 'empanada unica' } });
         assert.equal(igual.status, 409);
     });

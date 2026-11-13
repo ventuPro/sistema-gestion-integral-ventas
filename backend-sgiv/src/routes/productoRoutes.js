@@ -16,6 +16,7 @@ router.delete('/categorias/:id', editar, productoController.eliminarCategoria);
 router.post('/productos', editar, productoController.agregarProducto);   
 router.get('/productos', verificarToken, productoController.listarProductos);
 router.get ('/productos/faltantes',         editar, productoController.listarFaltantes);
+router.get ('/productos/parecidos',         editar, productoController.listarParecidos);
 router.post('/productos/agregar-a-sucursal', editar, productoController.agregarASucursal);    
 // Usamos router.delete y le pasamos un parámetro /:id
 router.delete('/productos/:id',        editar, productoController.eliminarProducto);

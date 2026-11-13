@@ -31,3 +31,23 @@ tr.inactivo .miniatura { opacity: 0.5; }
 .menu-qr { border-top: 1px solid var(--i-linea-suave); padding-top: 14px; }
 .estrella { color: #d97706; }
 .accion:disabled { opacity: 0.35; cursor: default; }
+
+/* Reparto de la producción a otras sucursales */
+.reparto { display: flex; flex-direction: column; gap: 6px; }
+.reparto li { display: grid; grid-template-columns: minmax(0, 1fr) 110px; align-items: center; gap: 10px; }
+.reparto label { color: var(--i-tinta); font-weight: 500; font-size: calc(13.5px * var(--escala-texto)); overflow-wrap: anywhere; }
+
+/* Productos con nombre parecido al que se escribe */
+.parecidos {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--i-aviso) 45%, transparent);
+  background: color-mix(in oklab, var(--i-aviso) 9%, transparent);
+}
+.parecidos .titulo { font-weight: 600; color: var(--i-aviso); font-size: calc(12.5px * var(--escala-texto)); margin-bottom: 6px; }
+.parecidos ul { display: flex; flex-direction: column; gap: 6px; }
+.parecidos li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.parecidos .nombre { display: block; color: var(--i-tinta); font-size: calc(13px * var(--escala-texto)); font-weight: 500; overflow-wrap: anywhere; }
+.parecidos li.fuerte .nombre { font-weight: 700; }
+.parecidos .inf-boton { flex-shrink: 0; padding-block: 4px; }

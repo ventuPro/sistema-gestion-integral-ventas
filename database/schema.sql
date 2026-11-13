@@ -194,8 +194,11 @@ CREATE TABLE transferencia (
     id_usuario          INT REFERENCES usuario(id_usuario),
     observacion         VARCHAR(200),
     fecha_transferencia TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Reparto de la producción: la entrada «Producción» que la originó (NULL = transferencia común)
+    id_historial_produccion INT REFERENCES historial_inventario(id_historial),
     CHECK (id_sucursal_origen <> id_sucursal_destino)
 );
+CREATE INDEX idx_transferencia_produccion ON transferencia (id_historial_produccion) WHERE id_historial_produccion IS NOT NULL;
 CREATE TABLE detalle_transferencia (
     id_transferencia INT NOT NULL REFERENCES transferencia(id_transferencia),
     id_producto      INT NOT NULL REFERENCES producto(id_producto),

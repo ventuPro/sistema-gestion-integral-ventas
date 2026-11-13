@@ -1,4 +1,5 @@
 const m = require('../models/productoModel');
+const parecidos = require('../utils/parecidos');
 const { guardarImagen, borrarImagen } = require('../utils/imagenes');
 const { emitirCatalogo, emitirStock } = require('../utils/tiempoReal');
 const db = require('../config/db');
@@ -151,6 +152,35 @@ const nombreRepetido = async (nombre, excluir = null) => {
         : `Ya existe el producto «${otro.nombre_producto}», desactivado. Actívalo en vez de crear otro.`;
 };
 
+/**
+ * Nombre casi igual al de otro producto (plurales, acentos, errores de escritura, otro orden):
+ * hay que confirmarlo con confirmar_parecido. Devuelve la respuesta 409 o null.
+ */
+const parecidoSinConfirmar = async (req, nombre, id_sucursal, excluir = null) => {
+    if (!nombre || req.body?.confirmar_parecido === true) return null;
+    const lista = await m.paraComparar(id_sucursal);
+    const propio = excluir && lista.find(p => p.id_producto === excluir);
+    if (propio && parecidos.comparar(propio.nombre_producto, nombre).tipo === 'igual') return null;   // no cambió el nombre
+    const casi = parecidos.buscar(nombre, lista, { excluir }).filter(parecidos.esCasiIgual);
+    if (!casi.length) return null;
+    return { error: `Ya existe «${casi[0].nombre_producto}», casi igual. Usa ese producto o confirma que es otro.`,
+             codigo: 'PARECIDO', parecidos: casi };
+};
+
+// GET /api/catalogo/productos/parecidos?nombre&id_sucursal&excluir  (mientras se escribe el nombre)
+const listarParecidos = async (req, res) => {
+    try {
+        const nombre = String(req.query.nombre || '').trim().slice(0, 100);
+        if (nombre.length < 3) return res.json([]);
+        const id_sucursal = sucursalPermitida(req, req.query.id_sucursal);
+        const lista = await m.paraComparar(id_sucursal);
+        res.json(parecidos.buscar(nombre, lista, { excluir: Number(req.query.excluir) || null }));
+    } catch (e) {
+        console.error('listarParecidos:', e.message);
+        res.status(500).json({ error: 'No se pudieron buscar productos parecidos' });
+    }
+};
+
 /** El cajero solo trabaja con su sucursal */
 const sucursalPermitida = (req, pedida) => {
     const propia = Number(req.usuario.id_sucursal);
@@ -243,6 +273,8 @@ const agregarProducto   = async (req, res) => {
         const id_suc    = Number(id_sucursal) || 1;
         const repetido  = await nombreRepetido(datos.nombre_producto);
         if (repetido) { borrarImagen(url_imagen); return res.status(409).json({ error: repetido }); }
+        const parecido  = await parecidoSinConfirmar(req, datos.nombre_producto, id_suc);
+        if (parecido) { borrarImagen(url_imagen); return res.status(409).json(parecido); }
 
         // Producto, su fila de inventario en la sucursal y el historial del stock inicial: todo o nada
         const client = await db.connect();
@@ -321,6 +353,8 @@ const actualizarProducto = async (req, res) => {
         const datos = datosProducto(req.body);
         const repetido = await nombreRepetido(datos.nombre_producto, Number(req.params.id));
         if (repetido) return res.status(409).json({ error: repetido });
+        const parecido = await parecidoSinConfirmar(req, datos.nombre_producto, Number(req.usuario.id_sucursal), Number(req.params.id));
+        if (parecido) return res.status(409).json(parecido);
         url_imagen = fotoNueva(req.body.url_imagen);
         const { prod, cambios } = await guardarProducto(Number(req.params.id), { ...datos, url_imagen }, req.usuario?.id_usuario,
                                                         recetaElegida(req));
@@ -354,5 +388,5 @@ const reactivarProducto = async (req, res) => {
 
 module.exports = {
     agregarCategoria, listarCategorias, ordenarCategorias, eliminarCategoria, listarProductos,
-    agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto, listarFaltantes, agregarASucursal
+    agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto, listarFaltantes, agregarASucursal, listarParecidos
 };

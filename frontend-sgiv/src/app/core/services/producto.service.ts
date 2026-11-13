@@ -3,6 +3,11 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
+export interface ProductoParecido {
+  id_producto: number; nombre_producto: string; estado_activo: boolean; sucursales: string; en_sucursal: boolean;
+  parecido: number; tipo: 'igual' | 'casi' | 'parecido' | 'contiene';
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProductoService {
   private apiUrl = environment.apiUrl;
@@ -18,6 +23,13 @@ export class ProductoService {
   /** Productos activos que la sucursal todavía no tiene */
   faltantes(id_sucursal: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/catalogo/productos/faltantes?id_sucursal=${id_sucursal}`);
+  }
+
+  /** Productos con nombre parecido (contra duplicados con otro nombre) */
+  parecidos(nombre: string, id_sucursal: number, excluir: number | null = null): Observable<ProductoParecido[]> {
+    let params = new HttpParams().set('nombre', nombre).set('id_sucursal', id_sucursal);
+    if (excluir) params = params.set('excluir', excluir);
+    return this.http.get<ProductoParecido[]>(`${this.apiUrl}/catalogo/productos/parecidos`, { params });
   }
 
   /** El mismo producto en otra sucursal, cada uno con su stock inicial */

@@ -18,7 +18,7 @@
       </div>
     </div>
 
-    <div class="overflow-y-auto flex-1">
+    <div class="overflow-auto flex-1">
       @switch (estado()) {
         @case ('cargando') { <div class="p-5"><div class="inf-esqueleto h-40"></div></div> }
         @case ('error') { <p class="inf-vacio">No se pudieron cargar los ingresos.</p> }
@@ -31,19 +31,23 @@
                 <tr>
                   <th>Producto</th>
                   <th class="num">Entradas</th>
-                  <th class="num">Última</th>
-                  <th class="num">Cantidad</th>
+                  @if (!destinos().length) { <th class="num">Última</th> }
+                  <th class="num">{{ destinos().length ? 'Ingresó' : 'Cantidad' }}</th>
+                  @for (d of destinos(); track d.id_sucursal) { <th class="num">{{ d.nombre_sucursal }}</th> }
+                  @if (destinos().length) { <th class="num">Quedó</th> }
                 </tr>
               </thead>
               @for (g of grupos(); track g.id) {
                 <tbody>
-                  <tr class="fila-seccion"><td colspan="4">{{ g.categoria }}</td></tr>
+                  <tr class="fila-seccion"><td [attr.colspan]="destinos().length ? destinos().length + 4 : 4">{{ g.categoria }}</td></tr>
                   @for (p of g.productos; track p.id_producto) {
                     <tr>
                       <td class="fuerte">{{ p.nombre_producto }}</td>
                       <td class="num">{{ p.entradas }}</td>
-                      <td class="num">{{ p.ultima | date:'HH:mm' }}</td>
+                      @if (!destinos().length) { <td class="num">{{ p.ultima | date:'HH:mm' }}</td> }
                       <td class="num"><span class="font-semibold inf-sube">+{{ p.cantidad }}</span></td>
+                      @for (d of destinos(); track d.id_sucursal) { <td class="num">{{ p.repartido[d.id_sucursal] || '—' }}</td> }
+                      @if (destinos().length) { <td class="num fuerte">{{ p.quedo }}</td> }
                     </tr>
                   }
                 </tbody>
@@ -69,6 +73,7 @@
                     <td>
                       {{ m.motivo_movimiento }}
                       @if (m.detalle) { <span class="inf-secundario">{{ m.detalle }}</span> }
+                      @if (m.repartido?.length) { <span class="inf-secundario">Repartido: {{ textoReparto(m) }}</span> }
                     </td>
                     <td>{{ m.usuario || '—' }}</td>
                   </tr>
@@ -82,7 +87,7 @@
 
     @if (estado() === 'listo' && ingresos().length) {
       <div class="inf-pie-hoja flex flex-wrap items-center justify-between gap-2">
-        <span class="inf-tinta">{{ totales().productos }} producto(s) · {{ totales().unidades }} unidad(es)</span>
+        <span class="inf-tinta">{{ totales().productos }} producto(s) · {{ totales().unidades }} unidad(es)@if (totales().repartidas) { · {{ totales().repartidas }} repartida(s) }</span>
         <button class="inf-boton" (click)="abrirTicket()">
           <lucide-icon [img]="icons.ticket" class="w-4 h-4"></lucide-icon> Ticket
         </button>

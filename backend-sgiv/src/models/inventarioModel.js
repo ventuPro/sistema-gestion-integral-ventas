@@ -90,7 +90,7 @@ const moverStock = async (client, { id_sucursal, id_producto, id_inventario = nu
     } else {
         await loteModel.ingresar(client, { ...base, vence, desde, costo });
     }
-    return { id_inventario: inv.id_inventario, stock, lotes: tomados };
+    return { id_inventario: inv.id_inventario, id_historial, stock, lotes: tomados };
 };
 
 /** Entrada o merma manual. Lanza { codigo: 'SIN_STOCK' | 'NO_EXISTE' | 'PREPARADO' }. */
@@ -198,6 +198,7 @@ const listarMovimientos = async ({ id_sucursal, id_producto, tipo, desde, hasta,
 };
 
 // ─── Ingresos del día (lo que se produjo o llegó; sin las devoluciones de pedidos y cuentas) ───
+// repartido: lo que de esa producción salió a otras sucursales
 const NO_SON_INGRESOS = ['Devuelto de cuenta de mesa', 'Pedido QR devuelto', 'Devuelto del carrito de caja'];
 
 /** fecha: AAAA-MM-DD o null = hoy (hora de La Paz) */
@@ -205,12 +206,22 @@ const ingresosDelDia = async ({ id_sucursal, fecha }) => {
     const r = await db.query(`
         SELECT h.id_historial, h.fecha_registro, h.cantidad_movida, h.motivo_movimiento, h.detalle,
                h.stock_resultante, p.id_producto, p.nombre_producto, u.nombre_completo AS usuario,
-               c.id_categoria, c.nombre_categoria, COALESCE(c.orden, 0) AS orden_categoria
+               c.id_categoria, c.nombre_categoria, COALESCE(c.orden, 0) AS orden_categoria,
+               COALESCE(rep.repartido, '[]') AS repartido
         FROM historial_inventario h
         JOIN inventario_sucursal i       ON i.id_inventario = h.id_inventario
         JOIN producto p                  ON p.id_producto   = i.id_producto
         LEFT JOIN categoria_producto c   ON c.id_categoria  = p.id_categoria
         LEFT JOIN usuario u              ON u.id_usuario    = h.id_usuario
+        -- Producción repartida: a qué sucursales salió y cuánto
+        LEFT JOIN LATERAL (
+            SELECT json_agg(json_build_object('id_sucursal', t.id_sucursal_destino, 'nombre_sucursal', s.nombre_sucursal,
+                                              'cantidad', d.cantidad) ORDER BY t.id_sucursal_destino) AS repartido
+            FROM transferencia t
+            JOIN detalle_transferencia d ON d.id_transferencia = t.id_transferencia
+            JOIN sucursal s ON s.id_sucursal = t.id_sucursal_destino
+            WHERE t.id_historial_produccion = h.id_historial
+        ) rep ON TRUE
         WHERE i.id_sucursal = $1
           AND h.tipo_movimiento = 'INGRESO'
           AND h.motivo_movimiento <> ALL($3)

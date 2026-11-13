@@ -39,6 +39,8 @@ export interface IngresoDia {
   id_categoria:      number | null;
   nombre_categoria:  string | null;
   orden_categoria:   number;
+  /** Producción repartida a otras sucursales */
+  repartido:         { id_sucursal: number; nombre_sucursal: string; cantidad: number }[];
 }
 
 /** Lote con stock vencido o por vencer */
@@ -86,8 +88,9 @@ export class InventarioService {
     this.http.get<Record<TipoMovimiento, string[]>>(`${this.api}/motivos`).pipe(shareReplay(1));
 
   registrar(datos: { id_producto: number; id_sucursal: number; tipo: TipoMovimiento; cantidad: number; motivo: string;
-                     detalle?: string; fecha_vencimiento?: string; costo_unitario?: number }) {
-    return this.http.post<{ mensaje: string; stock_actual: number }>(`${this.api}/movimientos`, datos);
+                     detalle?: string; fecha_vencimiento?: string; costo_unitario?: number;
+                     reparto?: { id_sucursal: number; cantidad: number }[] }) {
+    return this.http.post<{ mensaje: string; stock_actual: number; repartido?: number }>(`${this.api}/movimientos`, datos);
   }
 
   listar(f: FiltrosMovimientos): Observable<Movimiento[]> {
