@@ -81,6 +81,7 @@ const ENTEROS = {
     vida_util_comprado_dias:   { min: 1, max: 3650, nombre: 'Vida útil de lo comprado (días)' },
     aviso_vence_elaborado_horas: { min: 1, max: 720, nombre: 'Aviso de por vencer de lo elaborado (horas antes)' },
     aviso_vence_comprado_dias:   { min: 1, max: 365, nombre: 'Aviso de por vencer de lo comprado (días antes)' },
+    aviso_encargo_dias:          { min: 0, max: 30,  nombre: 'Aviso de encargos (días antes de la entrega)' },
     login_max_intentos:       { min: 3, max: 20,    nombre: 'Intentos de inicio de sesión' },
     login_minutos_bloqueo:    { min: 1, max: 1440,  nombre: 'Minutos de bloqueo' },
     sesion_horas:             { min: 1, max: 24,    nombre: 'Duración de la sesión (horas)' }

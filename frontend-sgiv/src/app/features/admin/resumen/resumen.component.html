@@ -35,6 +35,7 @@
         Todavía no hay ventas hoy.
       }
       @if (vencimientos().vencidos) { <span class="resaltado">Hay {{ vencimientos().vencidos }} {{ vencimientos().vencidos === 1 ? 'unidad vencida' : 'unidades vencidas' }}</span>. }
+      @if (d.encargos?.hoy) { <span class="resaltado">{{ d.encargos.hoy === 1 ? 'Hay 1 encargo' : 'Hay ' + d.encargos.hoy + ' encargos' }} para entregar hoy</span>. }
       @if (d.stock?.agotados) { <span class="baja">{{ d.stock.agotados }} {{ d.stock.agotados === 1 ? 'producto agotado' : 'productos agotados' }}</span>. }
     </p>
 
@@ -65,6 +66,13 @@
         <div class="renglon"><span>Efectivo en caja</span><i></i><b>{{ enBs(efectivoEsperado()) }}</b></div>
         <div class="renglon"><span>Por cobrar · {{ d.mesas?.ocupadas || 0 }} {{ d.mesas?.ocupadas === 1 ? 'mesa' : 'mesas' }}</span><i></i><b>{{ enBs(d.mesas?.por_cobrar) }}</b></div>
         <div class="renglon"><span>Pedidos QR por confirmar</span><i></i><b [class.cuidado]="d.pedidos_qr?.pendientes > 0">{{ d.pedidos_qr?.pendientes || 0 }}</b></div>
+        @if (d.encargos; as e) {
+          <div class="corte"></div>
+          <div class="renglon" [class.cuidado]="e.hoy > 0"><span>Encargos para hoy</span><i></i><b>{{ e.hoy }}</b></div>
+          @if (e.atrasados) { <div class="renglon alerta"><span>Encargos atrasados</span><i></i><b>{{ e.atrasados }}</b></div> }
+          <div class="renglon"><span>Encargos próximos 7 días</span><i></i><b>{{ e.semana }}</b></div>
+          <div class="renglon"><span>Saldo por cobrar en encargos</span><i></i><b>{{ enBs(e.saldo) }}</b></div>
+        }
         <div class="corte"></div>
         <div class="renglon" [class.alerta]="d.stock?.agotados > 0"><span>Agotados</span><i></i><b>{{ d.stock?.agotados || 0 }}</b></div>
         <div class="renglon" [class.cuidado]="d.stock?.bajos > 0"><span>Stock bajo</span><i></i><b>{{ d.stock?.bajos || 0 }}</b></div>
@@ -259,6 +267,36 @@
           </div>
         } @else { <p class="inf-vacio">Sin descuentos manuales hoy.</p> }
       </section>
+
+      @if (d.encargos) {
+        <section class="inf-bloque">
+          <div class="inf-bloque-cabeza">
+            <h3>Encargos para hoy</h3>
+            @if (puedeVerEncargos()) { <a routerLink="/dashboard/encargos" class="inf-enlace ml-auto">Ver encargos</a> }
+          </div>
+          @if (d.encargos.lista_hoy?.length) {
+            <div class="overflow-x-auto">
+            <table class="inf-tabla compacta">
+              <thead><tr><th>Hora</th><th>Cliente</th><th class="num">Saldo</th></tr></thead>
+              <tbody>
+                @for (x of d.encargos.lista_hoy; track x.id_encargo) {
+                  <tr>
+                    <td class="inf-tenue whitespace-nowrap">
+                      @if (x.atrasado) { <span class="inf-estado mal">{{ x.fecha === fechaISO ? x.hora : desdeDia(x.fecha) }}</span> } @else { {{ x.hora }} }
+                    </td>
+                    <td>
+                      <span class="fuerte">{{ x.nombre_cliente }}</span>
+                      <span class="inf-secundario">{{ resumenEncargo(x) }}@if (todas()) { · {{ x.nombre_sucursal }} }</span>
+                    </td>
+                    <td class="num">{{ x.saldo ? enBs(x.saldo) : 'Pagado' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            </div>
+          } @else { <p class="inf-vacio">Sin encargos para hoy.</p> }
+        </section>
+      }
     </div>
 
   </div>

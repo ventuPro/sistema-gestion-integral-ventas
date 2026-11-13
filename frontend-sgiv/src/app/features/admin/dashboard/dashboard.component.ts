@@ -5,7 +5,7 @@ import { LucideAngularModule,
          LayoutDashboard, Package, ShoppingCart,
          LayoutGrid, FileText, TrendingUp, Users,
          Landmark, LogOut, Building2,
-         Settings, Menu, X, Bell, BadgePercent, ChevronsUpDown, Calculator, PanelLeftClose, PanelLeftOpen, CircleUser, QrCode } from 'lucide-angular';
+         Settings, Menu, X, Bell, BadgePercent, ChevronsUpDown, Calculator, PanelLeftClose, PanelLeftOpen, CircleUser, QrCode, CakeSlice } from 'lucide-angular';
 import { PermisoService } from '../../../core/services/permiso.service';
 import { AuthService }    from '../../../core/services/auth.service';
 import { SocketService }  from '../../../core/services/socket.service';
@@ -20,6 +20,8 @@ import { DialogoService } from '../../../core/services/dialogo.service';
 import { SesionService } from '../../../core/services/sesion.service';
 import { NotificacionService } from '../../../core/services/notificacion.service';
 import { PanelNotificacionesComponent } from '../../shared/notificaciones/panel-notificaciones.component';
+import { AvisoEncargosComponent } from '../encargos/aviso-encargos.component';
+import { Encargo, EncargoService } from '../../../core/services/encargo.service';
 
 const CLAVE_PLEGADO = 'menu_plegado';
 const leerPlegado = () => { try { return localStorage.getItem(CLAVE_PLEGADO) === '1'; } catch { return false; } };
@@ -29,7 +31,7 @@ interface Enlace { ruta: string; texto: string; icono: any; modulo?: string }
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterOutlet, RouterModule, CommonModule, LucideAngularModule, BandejaPedidosComponent, PanelNotificacionesComponent],
+  imports: [RouterOutlet, RouterModule, CommonModule, LucideAngularModule, BandejaPedidosComponent, PanelNotificacionesComponent, AvisoEncargosComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -43,6 +45,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly ajustes       = inject(AjustesService);
   private http           = inject(HttpClient);
   readonly notificaciones = inject(NotificacionService);
+  private encargoService = inject(EncargoService);
 
   // ─── Asistente con IA (se descarga solo si está activado) ───
   readonly chatAsistente = componenteDiferido(() => this.ajustes.config().ia_interno_disponible,
@@ -64,6 +67,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private subPermisos?: Subscription;
   private subRuta?: Subscription;
+
+  /** Encargos de hoy: se muestran una vez al día por usuario (al primer ingreso) */
+  readonly encargosHoy = signal<Encargo[]>([]);
 
   /** Panel de la campana */
   readonly panelNotificaciones = signal(false);
@@ -112,6 +118,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     sucursal:   Building2,
     ajustes:    Settings,
     promociones: BadgePercent,
+    encargos:   CakeSlice,
     cuenta:     ChevronsUpDown,
     costos:     Calculator,
     plegar:     PanelLeftClose,
@@ -148,6 +155,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Las notificaciones llegan a la sala propia del usuario (se une con 'cajeros')
     this.socketService.conectar('cajeros');
     this.notificaciones.iniciar();
+    this.revisarEncargosDelDia();
+  }
+
+  // ─── Encargos para hoy ───
+  private claveEncargos() { return `aviso_encargos_${this.usuario()?.id_usuario}`; }
+
+  private revisarEncargosDelDia() {
+    const hoy = new Date().toLocaleDateString('en-CA');
+    try { if (localStorage.getItem(this.claveEncargos()) === hoy) return; } catch { }
+    // Los permisos guardados en el equipo pueden ser de antes del módulo: solo se omite si dicen que no
+    if (this.permisosActuales()['encargos'] === false && !this.esAdmin()) return;
+    this.encargoService.deHoy().subscribe({ next: (l) => this.encargosHoy.set(l || []), error: () => {} });
+  }
+
+  cerrarEncargosHoy(ver = false) {
+    try { localStorage.setItem(this.claveEncargos(), new Date().toLocaleDateString('en-CA')); } catch { }
+    this.encargosHoy.set([]);
+    if (ver) this.router.navigate(['/dashboard/encargos']);
   }
 
   abrirNotificaciones() {
@@ -170,6 +195,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       { titulo: 'Administración', enlaces: [
         { ruta: 'resumen',      texto: 'Panel principal', icono: i.dashboard },
         { ruta: 'inventario',   texto: 'Inventario',      icono: i.inventario },
+        { ruta: 'encargos',     texto: 'Encargos',        icono: i.encargos },
         { ruta: 'reportes',     texto: 'Reportes',        icono: i.reportes },
         { ruta: 'promociones',  texto: 'Promociones',     icono: i.promociones },
         { ruta: 'costos',       texto: 'Costos',          icono: i.costos },
@@ -186,6 +212,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         { ruta: 'punto-venta', texto: 'Punto de venta',  icono: i.pos,        modulo: 'punto_venta' },
         { ruta: 'mesas',       texto: 'Mesas',           icono: i.mesas,      modulo: 'mesas' },
         { ruta: 'arqueo',      texto: 'Arqueo de caja',  icono: i.arqueo,     modulo: 'arqueo' },
+        { ruta: 'encargos',    texto: 'Encargos',        icono: i.encargos,   modulo: 'encargos' },
         { ruta: 'inventario',  texto: 'Inventario',      icono: i.inventario, modulo: 'inventario' },
         { ruta: 'reportes',    texto: 'Reportes',        icono: i.reportes,   modulo: 'reportes' },
         { ruta: 'promociones', texto: 'Promociones',     icono: i.promociones, modulo: 'promociones' },

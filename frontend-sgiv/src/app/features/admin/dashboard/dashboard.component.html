@@ -78,6 +78,10 @@
     </div>
   </aside>
 
+  @if (encargosHoy().length) {
+    <app-aviso-encargos [encargos]="encargosHoy()" [multiSucursal]="esAdmin()"
+                        (cerrar)="cerrarEncargosHoy()" (verEncargos)="cerrarEncargosHoy(true)" />
+  }
   @if (panelNotificaciones()) {
     <app-panel-notificaciones [rutas]="rutasPermitidas()" (cerrar)="panelNotificaciones.set(false)" />
   }

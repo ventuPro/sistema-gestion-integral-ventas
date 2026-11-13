@@ -7,6 +7,7 @@ const sucursalModel = require('../models/sucursalModel');
 const permisoModel  = require('../models/permisoModel');
 const userModel     = require('../models/userModel');
 const promocionModel = require('../models/promocionModel');
+const encargoModel  = require('../models/encargoModel');
 const { guiasPermitidas } = require('./conocimiento');
 const { METODO_PAGO } = require('../utils/metodosPago');
 const groq          = require('./groq');
@@ -142,6 +143,34 @@ const crearHerramientas = ({ usuario, esAdmin, permisos, guias }) => {
                 pedido: x.numero_dia ?? x.id_pedido, mesa: x.numero_mesa, estado: x.estado_pedido, monto: Number(x.monto_total),
                 minutos_esperando: Math.round((Date.now() - new Date(x.fecha_pedido)) / 60000),
                 productos: x.items.map(i => `${i.cantidad} x ${i.nombre_producto}`).join(', ')
+            }));
+        }
+    };
+
+    if (puede('encargos')) h.encargos = {
+        descripcion: 'Encargos para eventos (tortas, bocaditos) entre dos fechas de entrega: cliente, celular, evento, hora, productos, total, adelanto, saldo y si ya se entregó. Sin fechas = los pendientes de hoy en adelante y los atrasados.',
+        parametros: { type: 'object', properties: {
+            fecha_inicio: { type: ['string', 'null'], description: 'AAAA-MM-DD (fecha de entrega desde)' },
+            fecha_fin:    { type: ['string', 'null'], description: 'AAAA-MM-DD (fecha de entrega hasta, inclusive)' },
+            solo_pendientes: { type: ['boolean', 'null'], description: 'true = solo los que faltan entregar' },
+            ...parametroSucursal(esAdmin, 'Sucursal (omitir = todas las que puede ver).')
+        }},
+        ejecutar: async ({ fecha_inicio, fecha_fin, solo_pendientes, id_sucursal } = {}) => {
+            if ((fecha_inicio && !FECHA.test(fecha_inicio)) || (fecha_fin && !FECHA.test(fecha_fin)))
+                throw errorPublico('Las fechas deben tener el formato AAAA-MM-DD.');
+            const id = sucursal(id_sucursal);
+            const sinFechas = !fecha_inicio && !fecha_fin;
+            const lista = await encargoModel.listar({
+                id_sucursal: id || null, desde: fecha_inicio || null, hasta: fecha_fin || null,
+                estado: sinFechas || solo_pendientes ? 'Recibido' : null, limite: 60
+            });
+            return lista.map(e => ({
+                encargo: e.id_encargo, entrega: `${e.fecha} ${e.hora}`, cliente: e.nombre_cliente, celular: e.celular_cliente,
+                evento: e.tipo_evento, sucursal: e.nombre_sucursal, estado: e.atrasado ? 'Atrasado (no entregado)' : e.estado,
+                entrega_a_domicilio: e.a_domicilio ? e.direccion_entrega : false,
+                productos: e.items.map(i => `${i.cantidad} x ${i.descripcion}${i.detalle ? ' (' + i.detalle + ')' : ''}`).join(', '),
+                total: e.total, adelanto: e.adelanto, saldo: e.estado === 'Entregado' ? 0 : e.saldo,
+                ...(e.observaciones ? { observaciones: e.observaciones } : {})
             }));
         }
     };

@@ -13,6 +13,7 @@ const CAMPOS_PARAMETROS = ['moneda_simbolo', 'pago_efectivo', 'pago_qr', 'url_qr
                            'menu_max_pendientes_mesa', 'menu_max_pedidos_ip', 'menu_visita_horas',
                            'menu_visita_inactividad', 'menu_bloqueo_horas', 'menu_qr_visita', 'stock_minimo_defecto',
                            'vida_util_elaborado_horas', 'vida_util_comprado_dias', 'aviso_vence_elaborado_horas', 'aviso_vence_comprado_dias',
+                           'aviso_encargo_dias',
                            'captcha_activo', 'login_max_intentos', 'login_minutos_bloqueo', 'sesion_horas'];
 const CAMPOS_IA = ['ia_info_negocio'];
 
@@ -26,7 +27,7 @@ const POR_DEFECTO = {
     moneda_simbolo: 'Bs.', pago_efectivo: true, pago_qr: true, ticket_mensaje_pie: '¡Gracias por su compra!', ticket_ancho: '80',
     menu_activo: true, menu_minutos_expiracion: 15, menu_max_pendientes_mesa: 3, menu_max_pedidos_ip: 10,
     menu_visita_horas: 3, menu_visita_inactividad: 30, menu_bloqueo_horas: 6, menu_qr_visita: false,
-    stock_minimo_defecto: 5, vida_util_elaborado_horas: 48, vida_util_comprado_dias: 180, aviso_vence_elaborado_horas: 12, aviso_vence_comprado_dias: 7, captcha_activo: true, login_max_intentos: 5, login_minutos_bloqueo: 15, sesion_horas: 8, ia_info_negocio: null
+    stock_minimo_defecto: 5, vida_util_elaborado_horas: 48, vida_util_comprado_dias: 180, aviso_vence_elaborado_horas: 12, aviso_vence_comprado_dias: 7, aviso_encargo_dias: 1, captcha_activo: true, login_max_intentos: 5, login_minutos_bloqueo: 15, sesion_horas: 8, ia_info_negocio: null
 };
 
 const obtener = async () => {

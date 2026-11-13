@@ -8,7 +8,7 @@ import { DialogoService } from './dialogo.service';
 // ─── Notificaciones del usuario (campana del menú lateral) ───
 
 export type TipoNotificacion = 'STOCK_BAJO' | 'AGOTADO' | 'ARQUEO' | 'CAJA_SIN_CERRAR' | 'TRANSFERENCIA' | 'DESCUENTO'
-                             | 'POR_VENCER' | 'VENCIDO';
+                             | 'POR_VENCER' | 'VENCIDO' | 'ENCARGO';
 
 export interface Notificacion {
   id_notificacion: number;

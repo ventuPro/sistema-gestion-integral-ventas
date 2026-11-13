@@ -26,6 +26,7 @@ interface Parametros {
   vida_util_comprado_dias: number;
   aviso_vence_elaborado_horas: number;
   aviso_vence_comprado_dias: number;
+  aviso_encargo_dias: number;
   captcha_activo: boolean;
   login_max_intentos: number;
   login_minutos_bloqueo: number;
@@ -38,7 +39,7 @@ const ORIGINALES: Parametros = {
   menu_activo: true, menu_mensaje_bienvenida: '', menu_minutos_expiracion: 15, menu_max_pendientes_mesa: 3,
   menu_max_pedidos_ip: 10, menu_visita_horas: 3, menu_visita_inactividad: 30, menu_bloqueo_horas: 6,
   menu_qr_visita: false, stock_minimo_defecto: 5, vida_util_elaborado_horas: 48, vida_util_comprado_dias: 180,
-  aviso_vence_elaborado_horas: 12, aviso_vence_comprado_dias: 7, captcha_activo: true, login_max_intentos: 5,
+  aviso_vence_elaborado_horas: 12, aviso_vence_comprado_dias: 7, aviso_encargo_dias: 1, captcha_activo: true, login_max_intentos: 5,
   login_minutos_bloqueo: 15, sesion_horas: 8
 };
 
@@ -82,6 +83,10 @@ export class AjustesParametrosComponent implements OnInit {
     { clave: 'vida_util_comprado_dias', etiqueta: 'Vida útil de lo comprado', unidad: 'días', min: 1, max: 3650 },
     { clave: 'aviso_vence_elaborado_horas', etiqueta: 'Aviso «por vencer» de lo elaborado', unidad: 'horas antes', min: 1, max: 720 },
     { clave: 'aviso_vence_comprado_dias', etiqueta: 'Aviso «por vencer» de lo comprado', unidad: 'días antes', min: 1, max: 365 }
+  ];
+
+  readonly camposEncargos: CampoNumero[] = [
+    { clave: 'aviso_encargo_dias', etiqueta: 'Aviso de encargos', unidad: 'días antes', min: 0, max: 30 }
   ];
 
   readonly camposSeguridad: CampoNumero[] = [
@@ -194,7 +199,7 @@ export class AjustesParametrosComponent implements OnInit {
 
   async guardar() {
     const fuera = [...this.camposMenu, ...this.camposSeguridad,
-                   ...this.camposInventario]
+                   ...this.camposInventario, ...this.camposEncargos]
       .find(c => { const n = Number(this.p()[c.clave]); return !Number.isInteger(n) || n < c.min || n > c.max; });
     if (fuera) return this.dialogo.error(`${fuera.etiqueta}: debe ser un número entero entre ${fuera.min} y ${fuera.max}.`);
     if (!this.p().moneda_simbolo.trim()) return this.dialogo.error('El símbolo de moneda es obligatorio.');

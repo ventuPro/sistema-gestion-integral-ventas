@@ -85,6 +85,7 @@ app.use('/api/asistente',  asistenteRoutes);
 app.use('/api/promociones', promocionRoutes);
 app.use('/api/costos',     require('./routes/costoRoutes'));
 app.use('/api/notificaciones', require('./routes/notificacionRoutes'));
+app.use('/api/encargos',   require('./routes/encargoRoutes'));
 
 // Telegram: cada notificación también va a los celulares vinculados
 require('./procesos/telegramBot').registrarAvisos();

@@ -608,7 +608,61 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
     CREATE UNIQUE INDEX IF NOT EXISTS idx_reserva_activa ON reserva_caja (id_usuario, id_producto) WHERE id_venta IS NULL;
     CREATE INDEX IF NOT EXISTS idx_reserva_pendiente ON reserva_caja (fecha_actualizacion) WHERE id_venta IS NULL AND cantidad > 0;
     ALTER TABLE historial_inventario ADD COLUMN IF NOT EXISTS id_reserva INT REFERENCES reserva_caja(id_reserva);
-    CREATE INDEX IF NOT EXISTS idx_historial_reserva ON historial_inventario (id_reserva) WHERE id_reserva IS NOT NULL;`
+    CREATE INDEX IF NOT EXISTS idx_historial_reserva ON historial_inventario (id_reserva) WHERE id_reserva IS NOT NULL;`,
+
+    // ─── Encargos para eventos (2026-11-13): no tocan caja ni stock; el pago es solo informativo ───
+    // detalle_encargo: id_producto (del catálogo, el nombre sale de producto) o descripcion (personalizado).
+    // aviso: último aviso enviado (0 ninguno, 1 anticipado, 2 el día de entrega).
+    `CREATE TABLE IF NOT EXISTS encargo (
+        id_encargo         SERIAL PRIMARY KEY,
+        id_sucursal        INT NOT NULL REFERENCES sucursal(id_sucursal),
+        id_usuario         INT NOT NULL REFERENCES usuario(id_usuario),
+        nombre_cliente     VARCHAR(100) NOT NULL,
+        celular_cliente    VARCHAR(8) NOT NULL,
+        tipo_evento        VARCHAR(20) NOT NULL CONSTRAINT encargo_tipo_evento_check
+                           CHECK (tipo_evento IN ('CUMPLEAÑOS', 'BODA', 'QUINCE AÑOS', 'BAUTIZO', 'GRADUACIÓN', 'EMPRESA', 'OTRO')),
+        fecha_entrega      TIMESTAMP NOT NULL,
+        a_domicilio        BOOLEAN NOT NULL DEFAULT FALSE,
+        direccion_entrega  VARCHAR(200),
+        observaciones      VARCHAR(500),
+        adelanto           NUMERIC(10, 2) NOT NULL DEFAULT 0 CONSTRAINT encargo_adelanto_check CHECK (adelanto >= 0),
+        estado             VARCHAR(10) NOT NULL DEFAULT 'Recibido' CONSTRAINT encargo_estado_check
+                           CHECK (estado IN ('Recibido', 'Entregado')),
+        fecha_registro     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        fecha_entregado    TIMESTAMP,
+        id_usuario_entrega INT REFERENCES usuario(id_usuario),
+        aviso              SMALLINT NOT NULL DEFAULT 0 CONSTRAINT encargo_aviso_check CHECK (aviso BETWEEN 0 AND 2),
+        CONSTRAINT encargo_domicilio_check CHECK (NOT a_domicilio OR direccion_entrega IS NOT NULL),
+        CONSTRAINT encargo_entregado_check CHECK ((estado = 'Entregado') = (fecha_entregado IS NOT NULL))
+    );
+    CREATE TABLE IF NOT EXISTS detalle_encargo (
+        id_detalle      SERIAL PRIMARY KEY,
+        id_encargo      INT NOT NULL REFERENCES encargo(id_encargo) ON DELETE CASCADE,
+        id_producto     INT REFERENCES producto(id_producto),
+        descripcion     VARCHAR(100),
+        detalle         VARCHAR(300),
+        cantidad        INT NOT NULL CONSTRAINT detalle_encargo_cantidad_check CHECK (cantidad > 0),
+        precio_unitario NUMERIC(10, 2) NOT NULL CONSTRAINT detalle_encargo_precio_check CHECK (precio_unitario >= 0),
+        subtotal        NUMERIC(12, 2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
+        CONSTRAINT detalle_encargo_origen_check CHECK ((id_producto IS NULL) <> (descripcion IS NULL))
+    );
+    CREATE INDEX IF NOT EXISTS idx_encargo_sucursal_fecha ON encargo (id_sucursal, fecha_entrega);
+    CREATE INDEX IF NOT EXISTS idx_encargo_pendiente ON encargo (fecha_entrega) WHERE estado = 'Recibido';
+    CREATE INDEX IF NOT EXISTS idx_detalle_encargo ON detalle_encargo (id_encargo);
+    ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS aviso_encargo_dias INT NOT NULL DEFAULT 1
+        CONSTRAINT configuracion_aviso_encargo_check CHECK (aviso_encargo_dias BETWEEN 0 AND 30);
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'notificacion_tipo_check'
+                       AND pg_get_constraintdef(oid) LIKE '%ENCARGO%') THEN
+            ALTER TABLE notificacion DROP CONSTRAINT IF EXISTS notificacion_tipo_check;
+            ALTER TABLE notificacion ADD CONSTRAINT notificacion_tipo_check
+                CHECK (tipo IN ('STOCK_BAJO', 'AGOTADO', 'ARQUEO', 'CAJA_SIN_CERRAR', 'TRANSFERENCIA', 'DESCUENTO', 'POR_VENCER', 'VENCIDO', 'ENCARGO'));
+            -- Los cajeros con permisos guardados reciben el módulo nuevo (una sola vez)
+            INSERT INTO permiso_usuario (id_usuario, modulo, tiene_acceso)
+            SELECT DISTINCT p.id_usuario, 'encargos', TRUE FROM permiso_usuario p
+            ON CONFLICT (id_usuario, modulo) DO NOTHING;
+        END IF;
+    END $$;`
 ];
 
 const aplicarMigraciones = async () => {

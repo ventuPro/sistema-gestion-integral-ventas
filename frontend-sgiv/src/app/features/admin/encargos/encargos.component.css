@@ -1,0 +1,177 @@
+/* ─── Encargos ─── */
+
+/* Calendario del mes */
+.calendario {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.cabeza-dia {
+  padding: 8px 6px;
+  text-align: center;
+  font-size: calc(11.5px * var(--escala-texto));
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--i-tenue);
+  border-bottom: 1px solid var(--i-linea);
+}
+.dia {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-height: 104px;
+  padding: 6px;
+  text-align: left;
+  border-right: 1px solid var(--i-linea-suave);
+  border-bottom: 1px solid var(--i-linea-suave);
+  background: var(--i-papel);
+  transition: background-color 120ms ease;
+}
+.dia:nth-child(7n + 7) { border-right: none; }
+.dia:hover { background: var(--i-fondo); }
+.dia.fuera { background: var(--i-fondo); }
+.dia.fuera .numero { color: var(--i-sutil); }
+.dia.elegido { box-shadow: inset 0 0 0 2px var(--i-acento); }
+.numero {
+  width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  font-size: calc(13px * var(--escala-texto));
+  font-weight: 600;
+  color: var(--i-tinta);
+}
+.dia.hoy .numero { background: var(--i-acento); color: #fff; }
+.cuenta { display: none; }
+.fichas-dia { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ficha-encargo {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: calc(11.5px * var(--escala-texto));
+  font-weight: 500;
+  border-left: 3px solid currentColor;
+}
+.ficha-encargo.pendiente { color: var(--i-acento); background: var(--i-acento-suave); }
+.ficha-encargo.atrasado  { color: var(--i-baja); background: color-mix(in oklab, var(--i-baja) 12%, transparent); }
+.ficha-encargo.entregado { color: var(--i-sube); background: color-mix(in oklab, var(--i-sube) 12%, transparent); }
+.mas { font-size: calc(11px * var(--escala-texto)); color: var(--i-tenue); padding-left: 6px; }
+
+/* En el celular cada día muestra solo cuántos encargos tiene */
+@media (max-width: 639px) {
+  .dia { min-height: 54px; align-items: center; padding: 4px 2px; }
+  .fichas-dia { display: none; }
+  .cuenta {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 18px; padding: 0 5px;
+    border-radius: 999px;
+    font-size: calc(11px * var(--escala-texto));
+    font-weight: 700;
+    color: #fff;
+    background: var(--i-acento);
+  }
+}
+
+/* Encargos del día elegido */
+.tarjetas { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.tarjeta {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid var(--i-linea);
+  border-left: 4px solid var(--i-acento);
+  border-radius: 8px;
+  background: var(--i-papel);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.tarjeta:hover { background: var(--i-fondo); }
+.tarjeta.atrasado  { border-left-color: var(--i-baja); }
+.tarjeta.entregado { border-left-color: var(--i-sube); }
+.tarjeta .hora { font-size: calc(16px * var(--escala-texto)); font-weight: 700; color: var(--i-tinta); }
+.tarjeta .cliente { font-size: calc(14px * var(--escala-texto)); font-weight: 600; color: var(--i-tinta); }
+.tarjeta .fuerte { color: var(--i-tinta); font-weight: 600; font-size: calc(13.5px * var(--escala-texto)); }
+
+/* Formulario */
+.fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+.opcion {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--i-linea);
+  border-radius: 8px;
+  background: var(--i-papel);
+  color: var(--i-texto);
+  font-size: calc(13px * var(--escala-texto));
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.opcion:hover { border-color: var(--i-sutil); }
+.opcion.activa { border-color: var(--i-acento); background: var(--i-acento-suave); color: var(--i-tinta); box-shadow: 0 0 0 1px var(--i-acento); }
+.opcion.chica { padding: 5px 10px; font-size: calc(12.5px * var(--escala-texto)); border-radius: 999px; }
+
+.resultados {
+  position: absolute;
+  z-index: 10;
+  left: 0; right: 0; top: calc(100% + 4px);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--i-linea);
+  border-radius: 8px;
+  background: var(--i-papel);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+.resultados button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: calc(13px * var(--escala-texto));
+  color: var(--i-tinta);
+}
+.resultados button:hover, .resultados li:first-child button { background: var(--i-fondo); }
+
+.lineas { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.lineas li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--i-linea);
+  border-radius: 8px;
+}
+.linea-cabeza { display: flex; align-items: center; gap: 8px; }
+.linea-cabeza .nombre { flex: 1; font-weight: 600; color: var(--i-tinta); font-size: calc(13.5px * var(--escala-texto)); }
+.linea-datos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 120px 90px;
+  align-items: end;
+  gap: 8px;
+}
+.linea-datos .subtotal {
+  padding-bottom: 9px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--i-tinta);
+  font-size: calc(13.5px * var(--escala-texto));
+}
+@media (max-width: 639px) {
+  .linea-datos { grid-template-columns: 1fr 1fr; }
+  .linea-datos > :first-child { grid-column: 1 / -1; }
+}
+
+.totales { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.totales dl { margin-left: auto; display: flex; flex-direction: column; gap: 2px; min-width: 180px; }
+.totales dl div { display: flex; justify-content: space-between; gap: 16px; }
+.totales dt { color: var(--i-tenue); font-size: calc(13px * var(--escala-texto)); }
+.totales dd { color: var(--i-tinta); font-weight: 700; font-size: calc(15px * var(--escala-texto)); }

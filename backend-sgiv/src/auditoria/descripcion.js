@@ -11,6 +11,7 @@ const MODULOS = [
     { id: 'inventario',  nombre: 'Inventario',    rutas: ['/inventario'],            tablas: ['inventario_sucursal', 'historial_inventario', 'lote_inventario', 'movimiento_lote', 'transferencia', 'detalle_transferencia'] },
     { id: 'productos',   nombre: 'Productos',     rutas: ['/catalogo'],              tablas: ['producto', 'categoria_producto'] },
     { id: 'promociones', nombre: 'Promociones',   rutas: ['/promociones'],           tablas: ['promocion', 'promocion_producto', 'promocion_categoria', 'promocion_dia'] },
+    { id: 'encargos',    nombre: 'Encargos',      rutas: ['/encargos'],              tablas: ['encargo', 'detalle_encargo'] },
     { id: 'usuarios',    nombre: 'Usuarios',      rutas: ['/usuarios', '/permisos'], tablas: ['usuario', 'permiso_usuario', 'rol_usuario'] },
     { id: 'costos',      nombre: 'Costos',        rutas: ['/costos'],                tablas: ['insumo', 'historial_precio_insumo', 'receta', 'ingrediente_receta', 'historial_inversion_receta', 'unidad_medida'] },
     { id: 'ajustes',     nombre: 'Ajustes',       rutas: ['/ajustes', '/sucursales'], tablas: ['configuracion', 'sucursal', 'horario_sucursal', 'propietario'] }
@@ -31,6 +32,7 @@ const TABLAS = {
     promocion: ['promoción', 'promociones'], promocion_producto: ['producto en promoción', 'productos en promoción'],
     promocion_categoria: ['categoría en promoción', 'categorías en promoción'],
     promocion_dia: ['día de promoción', 'días de promoción'],
+    encargo: ['encargo', 'encargos'], detalle_encargo: ['producto de encargo', 'productos de encargo'],
     usuario: ['usuario', 'usuarios'], permiso_usuario: ['permiso', 'permisos'], rol_usuario: ['rol', 'roles'],
     insumo: ['insumo', 'insumos'], historial_precio_insumo: ['precio de insumo', 'precios de insumo'],
     receta: ['receta', 'recetas'], ingrediente_receta: ['ingrediente', 'ingredientes'],
@@ -73,6 +75,9 @@ const CAMPOS = {
     dias_semana: 'Días', hora_inicio: 'Hora de inicio', hora_fin: 'Hora de fin',
     cantidad_compra: 'Cantidad de compra', id_unidad_compra: 'Unidad de compra', precio_compra: 'Precio de compra',
     rendimiento: 'Rendimiento', inversion: 'Inversión', id_unidad: 'Unidad', motivo: 'Motivo',
+    celular_cliente: 'Celular', tipo_evento: 'Evento', fecha_entrega: 'Entrega', a_domicilio: 'A domicilio',
+    direccion_entrega: 'Dirección de entrega', observaciones: 'Observaciones', adelanto: 'Adelanto', detalle: 'Detalle',
+    fecha_entregado: 'Entregado', id_usuario_entrega: 'Entregado por', aviso: 'Aviso enviado',
     porcentaje_participacion: 'Participación (%)', ci: 'CI', cargo: 'Cargo', correo: 'Correo',
     detalle: 'Detalle', fecha_registro: 'Registro', fecha_venta: 'Fecha', fecha_pedido: 'Fecha',
     // Ajustes
@@ -330,6 +335,19 @@ op('PATCH /promociones/:id/estado', 'modificar', (c) => {
     return [f && !f.estado_activo ? 'Pausó una promoción' : 'Activó una promoción', promo(c)];
 });
 op('DELETE /promociones/:id',      'eliminar',  (c) => ['Eliminó una promoción', promo(c)]);
+
+// Encargos
+const encargoDe = (c) => {
+    const f = c.fila('encargo'), e = f?.nuevo || f?.anterior;
+    return e ? `Encargo #${e.id_encargo} · ${e.nombre_cliente}` : null;
+};
+op('POST /encargos',             'crear',     (c) => ['Registró un encargo', encargoDe(c)]);
+op('PUT /encargos/:id',          'modificar', (c) => ['Modificó un encargo', conDetalle(encargoDe(c), c.cambiosTexto(c.fila('encargo', 'UPDATE')))]);
+op('PATCH /encargos/:id/estado', 'modificar', (c) => {
+    const f = c.fila('encargo', 'UPDATE')?.nuevo;
+    return [f?.estado === 'Entregado' ? 'Entregó un encargo' : 'Deshizo la entrega de un encargo', encargoDe(c)];
+});
+op('DELETE /encargos/:id',       'eliminar',  (c) => ['Eliminó un encargo', encargoDe(c)]);
 
 // Usuarios
 const usuarioDe = (c) => { const f = c.fila('usuario'); return (f?.nuevo || f?.anterior)?.nombre_completo || c.nombre('usuario', c.ids[0]); };

@@ -14,6 +14,7 @@ import { colorCategoria, colorMetodo, coloresSignificado, indiceCategorias } fro
 import { METODO_PAGO } from '../../../core/utils/metodos-pago';
 import { sondeo } from '../../../core/utils/sondeo';
 import { SesionService } from '../../../core/services/sesion.service';
+import { PermisoService } from '../../../core/services/permiso.service';
 
 type Metrica = 'ingresos' | 'ventas';
 
@@ -32,6 +33,7 @@ export class ResumenComponent implements OnInit, OnDestroy {
   private productoService = inject(ProductoService);
   readonly ajustes        = inject(AjustesService);
   private injector        = inject(Injector);
+  private permisos        = inject(PermisoService);
   readonly moneda         = this.ajustes.moneda;
 
   @ViewChild('graficoHoras') graficoHorasRef?: ElementRef<HTMLCanvasElement>;
@@ -188,6 +190,12 @@ export class ResumenComponent implements OnInit, OnDestroy {
     const p = [...l].sort((a, b) => b.ingresos - a.ingresos)[0];
     return p && t ? { nombre: p.nombre_sucursal, porcentaje: porcentaje(p.ingresos, t) } : null;
   });
+
+  // ─── Encargos ───
+  readonly fechaISO = new Date().toLocaleDateString('en-CA');
+  readonly desdeDia = (f: string) => fechaDia(f).slice(0, 5);
+  puedeVerEncargos() { return this.sesion.esAdmin() || this.permisos.tienePermiso('encargos'); }
+  resumenEncargo(e: any): string { return (e.items || []).map((i: any) => `${i.cantidad} ${i.descripcion}`).join(', '); }
 
   /** "desde 17:36", o con fecha si el turno se abrió otro día */
   desde(f: string): string {

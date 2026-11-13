@@ -2,6 +2,7 @@ const cajaModel = require('../models/cajaModel');
 const notificacionModel = require('../models/notificacionModel');
 const loteModel = require('../models/loteModel');
 const reservaModel = require('../models/reservaModel');
+const encargoModel = require('../models/encargoModel');
 const db = require('../config/db');
 const contexto  = require('../auditoria/contexto');
 const { emitirUsuario, emitirCajeros, emitirStock } = require('../utils/tiempoReal');
@@ -13,7 +14,7 @@ const CONTEXTO = { usuario: 'Sistema', origen: 'Proceso automático: cierre del 
 // Lotes = stock: se revisa al arrancar y cada hora (corrige solo si alguien tocó la BD a mano)
 const CADA_HORA = 60 * 60_000;
 let ultimaRevisionLotes = 0;
-// Avisos de «por vencer» y «vencido» (campana y Telegram)
+// Avisos de «por vencer», «vencido» y encargos (campana y Telegram)
 const CADA_10_MIN = 10 * 60_000;
 let ultimaRevisionVencimientos = 0;
 
@@ -40,6 +41,7 @@ const ejecutar = () => contexto.ejecutar({ ...CONTEXTO }, async () => {
         if (Date.now() - ultimaRevisionVencimientos >= CADA_10_MIN) {
             ultimaRevisionVencimientos = Date.now();
             await notificacionModel.vencimientos();
+            await encargoModel.avisos();
         }
     } catch (e) {
         console.error('cierreDiario:', e.message);

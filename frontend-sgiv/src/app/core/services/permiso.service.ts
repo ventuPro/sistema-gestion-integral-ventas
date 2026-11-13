@@ -13,12 +13,13 @@ export const MODULOS = [
   { key: 'inventario',  label: 'Inventario'      },
   { key: 'reportes',    label: 'Reportes'        },
   { key: 'usuarios',    label: 'Usuarios'        },
-  { key: 'promociones', label: 'Promociones'     }
+  { key: 'promociones', label: 'Promociones'     },
+  { key: 'encargos',    label: 'Encargos'        }
 ];
 
 const DEFAULTS: Record<number, Record<string, boolean>> = {
-  [ROL.administrador]: { dashboard:true,  inventario:true,  punto_venta:true,  mesas:true,  arqueo:true,  reportes:true,  usuarios:true,  promociones:true  },
-  [ROL.cajero]:        { dashboard:true,  inventario:false, punto_venta:true,  mesas:true,  arqueo:true,  reportes:false, usuarios:false, promociones:false }
+  [ROL.administrador]: { dashboard:true,  inventario:true,  punto_venta:true,  mesas:true,  arqueo:true,  reportes:true,  usuarios:true,  promociones:true,  encargos:true },
+  [ROL.cajero]:        { dashboard:true,  inventario:false, punto_venta:true,  mesas:true,  arqueo:true,  reportes:false, usuarios:false, promociones:false, encargos:true }
 };
 
 @Injectable({ providedIn: 'root' })

@@ -3,6 +3,7 @@ const { METODO_PAGO } = require('../utils/metodosPago');
 const promocionModel = require('./promocionModel');
 const { CONDICION_VIGENTE } = promocionModel;
 const { AVISO } = require('./loteModel');
+const encargoModel = require('./encargoModel');
 
 // id_sucursal = 0 → todas las sucursales (solo administrador, lo controla el controlador)
 const deSucursal = (columna) => `($1::int = 0 OR ${columna} = $1)`;
@@ -21,6 +22,8 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, esAdmin = false) =
         WHERE ${deSucursal('id_sucursal')} AND fecha_venta >= ${desde} AND fecha_venta < ${hasta}
     `, p).then(r => r[0]);
 
+    const encargos = encargoModel.resumen(Number(id_sucursal) || null)
+        .catch(e => { console.error('panel encargos:', e.message); return null; });
     const [
         hoy, ayerHora, ayerTotal, semanaHora, metodos, porHora, promedioHora,
         productos, turnos, mesas, pedidos, stock, stockCritico, ultimas, sucursales, cajas, promociones,
@@ -226,7 +229,8 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, esAdmin = false) =
         ...(costoHoy ? { costo_hoy: costoHoy } : {}),
         categorias_hoy: categoriasHoy,
         vencimientos, por_vencer: porVencer,
-        descuentos_hoy: descuentosHoy
+        descuentos_hoy: descuentosHoy,
+        encargos: await encargos
     };
 };
 

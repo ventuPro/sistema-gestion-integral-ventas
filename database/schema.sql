@@ -431,6 +431,9 @@ CREATE TABLE configuracion (
         CONSTRAINT configuracion_aviso_elaborado_check CHECK (aviso_vence_elaborado_horas BETWEEN 1 AND 720),
     aviso_vence_comprado_dias   INT NOT NULL DEFAULT 7
         CONSTRAINT configuracion_aviso_comprado_check CHECK (aviso_vence_comprado_dias BETWEEN 1 AND 365),
+    -- Encargos: días antes de la entrega para el aviso anticipado (0 = solo el mismo día)
+    aviso_encargo_dias       INT NOT NULL DEFAULT 1
+        CONSTRAINT configuracion_aviso_encargo_check CHECK (aviso_encargo_dias BETWEEN 0 AND 30),
     -- Parámetros: seguridad
     captcha_activo           BOOLEAN NOT NULL DEFAULT TRUE,
     login_max_intentos       INT NOT NULL DEFAULT 5  CHECK (login_max_intentos BETWEEN 3 AND 20),
@@ -622,7 +625,7 @@ CREATE TABLE notificacion (
     id_notificacion SERIAL PRIMARY KEY,
     tipo           VARCHAR(20) NOT NULL CONSTRAINT notificacion_tipo_check
                    CHECK (tipo IN ('STOCK_BAJO', 'AGOTADO', 'ARQUEO', 'CAJA_SIN_CERRAR', 'TRANSFERENCIA', 'DESCUENTO',
-                                   'POR_VENCER', 'VENCIDO')),
+                                   'POR_VENCER', 'VENCIDO', 'ENCARGO')),
     titulo         VARCHAR(80)  NOT NULL,
     mensaje        VARCHAR(300) NOT NULL,
     ruta           VARCHAR(40),
@@ -641,3 +644,46 @@ CREATE TABLE notificacion_leida (
 );
 CREATE INDEX idx_notificacion_fecha ON notificacion (fecha_creacion DESC);
 CREATE INDEX idx_notificacion_producto ON notificacion (id_producto, id_sucursal, tipo, fecha_creacion);
+
+-- ==========================================
+-- ENCARGOS PARA EVENTOS (no tocan caja ni stock; el pago es solo informativo)
+-- detalle_encargo: id_producto (nombre desde producto) o descripcion (personalizado), con precio acordado.
+-- aviso: último aviso enviado (0 ninguno, 1 anticipado, 2 el día de entrega).
+-- ==========================================
+
+CREATE TABLE encargo (
+    id_encargo         SERIAL PRIMARY KEY,
+    id_sucursal        INT NOT NULL REFERENCES sucursal(id_sucursal),
+    id_usuario         INT NOT NULL REFERENCES usuario(id_usuario),
+    nombre_cliente     VARCHAR(100) NOT NULL,
+    celular_cliente    VARCHAR(8) NOT NULL,
+    tipo_evento        VARCHAR(20) NOT NULL CONSTRAINT encargo_tipo_evento_check
+                       CHECK (tipo_evento IN ('CUMPLEAÑOS', 'BODA', 'QUINCE AÑOS', 'BAUTIZO', 'GRADUACIÓN', 'EMPRESA', 'OTRO')),
+    fecha_entrega      TIMESTAMP NOT NULL,
+    a_domicilio        BOOLEAN NOT NULL DEFAULT FALSE,
+    direccion_entrega  VARCHAR(200),
+    observaciones      VARCHAR(500),
+    adelanto           NUMERIC(10, 2) NOT NULL DEFAULT 0 CONSTRAINT encargo_adelanto_check CHECK (adelanto >= 0),
+    estado             VARCHAR(10) NOT NULL DEFAULT 'Recibido' CONSTRAINT encargo_estado_check
+                       CHECK (estado IN ('Recibido', 'Entregado')),
+    fecha_registro     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_entregado    TIMESTAMP,
+    id_usuario_entrega INT REFERENCES usuario(id_usuario),
+    aviso              SMALLINT NOT NULL DEFAULT 0 CONSTRAINT encargo_aviso_check CHECK (aviso BETWEEN 0 AND 2),
+    CONSTRAINT encargo_domicilio_check CHECK (NOT a_domicilio OR direccion_entrega IS NOT NULL),
+    CONSTRAINT encargo_entregado_check CHECK ((estado = 'Entregado') = (fecha_entregado IS NOT NULL))
+);
+CREATE TABLE detalle_encargo (
+    id_detalle      SERIAL PRIMARY KEY,
+    id_encargo      INT NOT NULL REFERENCES encargo(id_encargo) ON DELETE CASCADE,
+    id_producto     INT REFERENCES producto(id_producto),
+    descripcion     VARCHAR(100),
+    detalle         VARCHAR(300),
+    cantidad        INT NOT NULL CONSTRAINT detalle_encargo_cantidad_check CHECK (cantidad > 0),
+    precio_unitario NUMERIC(10, 2) NOT NULL CONSTRAINT detalle_encargo_precio_check CHECK (precio_unitario >= 0),
+    subtotal        NUMERIC(12, 2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
+    CONSTRAINT detalle_encargo_origen_check CHECK ((id_producto IS NULL) <> (descripcion IS NULL))
+);
+CREATE INDEX idx_encargo_sucursal_fecha ON encargo (id_sucursal, fecha_entrega);
+CREATE INDEX idx_encargo_pendiente ON encargo (fecha_entrega) WHERE estado = 'Recibido';
+CREATE INDEX idx_detalle_encargo ON detalle_encargo (id_encargo);
