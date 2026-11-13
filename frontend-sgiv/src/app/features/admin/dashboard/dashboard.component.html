@@ -35,13 +35,6 @@
         }
       }
 
-      <button (click)="abrirNotificaciones()" class="enlace pedidos avisos" [class.hay-avisos]="notificaciones.noLeidas()"
-              data-titulo="Notificaciones" aria-label="Notificaciones">
-        <lucide-icon [img]="icons.campana" class="w-[18px] h-[18px] flex-shrink-0" [strokeWidth]="1.75"></lucide-icon>
-        <span class="texto flex-1 text-left">Notificaciones</span>
-        @if (notificaciones.noLeidas(); as n) { <span class="contador-pedidos bg-red-600 text-white">{{ n > 99 ? '99+' : n }}</span> }
-      </button>
-
       @if (bandeja(); as b) {
         <button (click)="abrirBandeja()" class="enlace pedidos" [class.hay]="b.conteo().pendientes"
                 data-titulo="Pedidos QR" aria-label="Pedidos QR">
@@ -99,7 +92,15 @@
   }
 
   <!-- ═══ CONTENIDO PRINCIPAL ═══ -->
-  <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
+  <div class="relative flex-1 min-w-0 flex flex-col overflow-hidden">
+
+    <!-- Notificaciones: esquina superior derecha (escritorio) -->
+    <button class="campana" [class.hay-avisos]="notificaciones.noLeidas()" (click)="abrirNotificaciones()"
+            [attr.aria-label]="notificaciones.noLeidas() ? 'Notificaciones: ' + notificaciones.noLeidas() + ' sin leer' : 'Notificaciones'"
+            title="Notificaciones">
+      <lucide-icon [img]="icons.campana" class="w-5 h-5" [strokeWidth]="1.75"></lucide-icon>
+      @if (notificaciones.noLeidas(); as n) { <span class="numero">{{ n > 99 ? '99+' : n }}</span> }
+    </button>
 
     <!-- Barra superior (celular y tablet) -->
     <header class="barra-movil bg-gray-900 text-white">
@@ -108,6 +109,14 @@
       </button>
       @if (ajustes.logo()) { <img [src]="ajustes.logo()" alt="" class="w-8 h-8 object-contain"> }
       <span class="font-semibold text-[length:calc(15px*var(--escala-texto))] truncate flex-1">{{ ajustes.nombre() }}</span>
+      <button class="boton-icono relative" (click)="abrirNotificaciones()" aria-label="Notificaciones">
+        <lucide-icon [img]="icons.campana" class="w-5 h-5"></lucide-icon>
+        @if (notificaciones.noLeidas(); as n) {
+          <span class="absolute top-0.5 right-0.5 contador-pedidos bg-red-600 text-white min-w-4! h-4! text-[length:calc(10px*var(--escala-texto))]!">
+            {{ n > 99 ? '99+' : n }}
+          </span>
+        }
+      </button>
       @if (bandeja(); as b) {
         <button class="boton-icono relative" (click)="abrirBandeja()" aria-label="Pedidos QR"
                 [class.text-amber-600]="b.conteo().pendientes">
