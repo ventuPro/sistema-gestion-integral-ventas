@@ -13,6 +13,9 @@ const MOTIVOS = {
 
 const TIPOS_PRODUCTO = ['ELABORADO', 'PREPARADO', 'COMPRADO'];
 
+// Salidas que apartan o venden: el aviso de stock sale al concluir la venta, no al apartar
+const SALIDAS_DE_VENTA = ['Venta en Caja', 'Cuenta de mesa', 'Pedido QR'];
+
 /** Devuelve el id del historial. referencia: { id_pedido, id_detalle_cuenta, id_reserva } */
 const registrarHistorial = async (cliente, { id_inventario, id_usuario, tipo, cantidad, motivo, detalle = null,
                                              stock_resultante, referencia = {} }) => {
@@ -24,8 +27,9 @@ const registrarHistorial = async (cliente, { id_inventario, id_usuario, tipo, ca
         [id_inventario, id_usuario || null, tipo, Math.abs(cantidad), motivo, detalle, stock_resultante,
          referencia.id_pedido || null, referencia.id_detalle_cuenta || null, referencia.id_reserva || null]
     );
-    // Toda salida pasa por aquí: aviso de stock bajo o agotado
-    if (tipo === 'SALIDA' && stock_resultante != null) {
+    // Aviso de stock bajo o agotado: mermas, transferencias y vencidos al momento; lo que se aparta para vender
+    // (carrito de caja, mesas, pedidos QR) recién al cobrar (notificacionModel.stockTrasVenta)
+    if (tipo === 'SALIDA' && stock_resultante != null && !SALIDAS_DE_VENTA.includes(motivo)) {
         const despues = Number(stock_resultante);
         await notificacionModel.revisarStock(cliente, { id_inventario, antes: despues + Math.abs(cantidad), despues });
     }

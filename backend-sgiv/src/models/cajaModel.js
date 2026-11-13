@@ -658,6 +658,7 @@ const registrarVenta = async ({
             const c = await reservaModel.devolver(client, fila, fila.cantidad, Number(id_usuario_cajero));
             if (c) cambiosStock.push(c);
         }
+        await notificacionModel.stockTrasVenta(client, Number(id_sucursal), cot.lineas);
 
         await client.query('COMMIT');
         return { id_venta, numero_dia, cambiosStock, cotizacion: promocionModel.enBolivianos(cot) };

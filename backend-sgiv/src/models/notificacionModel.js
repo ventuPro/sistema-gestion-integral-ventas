@@ -90,6 +90,25 @@ const revisarStock = async (cliente, { id_inventario, antes, despues }) => {
     });
 };
 
+/**
+ * Tras cobrar una venta (caja o mesa): stock bajo o agotado de lo vendido, con el stock que quedó.
+ * Se toma como si toda la venta saliera ahora: si cruza el mínimo avisa «Stock bajo»; si llega a 0, solo «Agotado».
+ */
+const stockTrasVenta = async (cliente, id_sucursal, lineas) => {
+    const vendido = new Map();
+    for (const l of lineas) vendido.set(Number(l.id_producto), (vendido.get(Number(l.id_producto)) || 0) + Number(l.cantidad));
+    if (!vendido.size) return;
+    const r = await cliente.query(`
+        SELECT i.id_inventario, i.id_producto, i.cantidad_actual
+        FROM inventario_sucursal i JOIN producto p ON p.id_producto = i.id_producto
+        WHERE i.id_sucursal = $1 AND i.id_producto = ANY($2::int[]) AND p.tipo_producto <> 'PREPARADO'`,
+        [id_sucursal, [...vendido.keys()]]);
+    for (const f of r.rows) {
+        const despues = Number(f.cantidad_actual);
+        await revisarStock(cliente, { id_inventario: f.id_inventario, antes: despues + vendido.get(f.id_producto), despues });
+    }
+};
+
 /** Cierre de caja con efectivo contado distinto del esperado */
 const arqueoConDiferencia = async (cliente, id_turno) => {
     const r = await cliente.query(`
@@ -208,6 +227,6 @@ const limpiarAntiguas = async () =>
                     [DIAS_GUARDADAS])).rowCount;
 
 module.exports = {
-    crear, alCrear, revisarStock, arqueoConDiferencia, cajaSinCerrar, transferencia, descuentoManual,
+    crear, alCrear, revisarStock, stockTrasVenta, arqueoConDiferencia, cajaSinCerrar, transferencia, descuentoManual,
     listar, marcarLeidas, limpiarAntiguas, vencimientos, DIAS_GUARDADAS
 };

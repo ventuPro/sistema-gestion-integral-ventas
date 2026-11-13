@@ -335,6 +335,7 @@ const cerrarCuenta = async (id_cuenta, metodo_pago, id_usuario_cajero, parte = n
         }
         await client.query(`UPDATE detalle_cuenta SET id_venta=$1 WHERE id_detalle_cuenta = ANY($2::int[])`,
                            [id_venta, rItems.rows.map(i => i.id_detalle_cuenta)]);
+        await notificacionModel.stockTrasVenta(client, cuenta.id_sucursal, rItems.rows);
 
         const rResto = await client.query(
             `SELECT COUNT(*)::int AS n FROM detalle_cuenta WHERE id_cuenta=$1 AND id_venta IS NULL`, [id_cuenta]);

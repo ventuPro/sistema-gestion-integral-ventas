@@ -132,6 +132,41 @@ describe('Notificaciones', () => {
         assert.equal(await contar('STOCK_BAJO'), 1);
     });
 
+    test('el carrito no avisa: recién al cobrar; si se vende todo de golpe solo «Agotado»', async () => {
+        const p = await crearProducto(3);
+        const nombre = `AVISO ${n}`;
+        const deEste = async (tipo) => Number((await bd.sql(
+            `SELECT COUNT(*) AS c FROM notificacion WHERE tipo = $1 AND titulo LIKE '%' || $2`, [tipo, nombre]))[0].c);
+        // Apartar en el carrito deja el stock en 0, pero todavía no es venta
+        assert.equal((await api('PUT', `/caja/reservas/${p}`, { token: cajero.token, body: { cantidad: 3 } })).status, 200);
+        assert.equal(await deEste('AGOTADO'), 0);
+        // Se devuelve: sin avisos falsos
+        assert.equal((await api('PUT', `/caja/reservas/${p}`, { token: cajero.token, body: { cantidad: 0 } })).status, 200);
+        assert.equal(await deEste('AGOTADO') + await deEste('STOCK_BAJO'), 0);
+        // Se vende todo de golpe: solo agotado
+        assert.equal((await api('PUT', `/caja/reservas/${p}`, { token: cajero.token, body: { cantidad: 3 } })).status, 200);
+        assert.equal((await cobrar(cajero, [{ id_producto: p, cantidad: 3 }])).status, 201);
+        assert.equal(await deEste('AGOTADO'), 1);
+        assert.equal(await deEste('STOCK_BAJO'), 0);
+    });
+
+    test('mesas: avisa al cobrar la cuenta, no al cargar el producto', async () => {
+        const p = await crearProducto(5);
+        const nombre = `AVISO ${n}`;
+        const deEste = async (tipo) => Number((await bd.sql(
+            `SELECT COUNT(*) AS c FROM notificacion WHERE tipo = $1 AND titulo LIKE '%' || $2`, [tipo, nombre]))[0].c);
+        const [m] = await bd.sql(`INSERT INTO mesa_local (id_sucursal, numero_mesa, codigo_qr) VALUES (1, 900 + $1, md5(random()::text)) RETURNING id_mesa`, [n]);
+        const ab = await api('POST', '/cuentas/abrir', { token: cajero.token, body: { id_mesa: m.id_mesa } });
+        assert.ok([200, 201].includes(ab.status), JSON.stringify(ab.body));
+        const id_cuenta = ab.body.id_cuenta ?? ab.body.cuenta?.id_cuenta;
+        const ag = await api('POST', `/cuentas/${id_cuenta}/producto`, { token: cajero.token, body: { id_producto: p, cantidad: 3 } });
+        assert.ok([200, 201].includes(ag.status), JSON.stringify(ag.body));
+        assert.equal(await deEste('STOCK_BAJO'), 0);   // 5 → 2 apartado en la mesa
+        const c = await api('POST', `/cuentas/${id_cuenta}/cerrar`, { token: cajero.token, body: { metodo_pago: 'Efectivo' } });
+        assert.ok([200, 201].includes(c.status), JSON.stringify(c.body));
+        assert.equal(await deEste('STOCK_BAJO'), 1);
+    });
+
     test('descuento manual: solo el administrador; si la venta falla no queda aviso', async () => {
         const p = await crearProducto(20, 50);
         const descuento = { tipo: 'PORCENTAJE', valor: 10, motivo: 'Cliente frecuente' };

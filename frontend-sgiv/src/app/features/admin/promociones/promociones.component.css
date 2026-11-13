@@ -1,6 +1,13 @@
 /* ─── Promociones ─── */
 tr.inactiva td { opacity: 0.6; }
 
+/* Los botones de cada promoción siempre a la vista, aunque la tabla sea más ancha que la pantalla */
+.col-acciones { position: sticky; right: 0; background: var(--i-papel); box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.15); }
+tr:hover .col-acciones { background: var(--i-fondo); }
+tr.inactiva td.col-acciones { opacity: 1; }
+.accion.inactiva { opacity: 0.35; }
+.accion.inactiva:hover { color: inherit; background: transparent; }
+
 .tipos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 640px) { .tipos { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 

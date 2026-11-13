@@ -117,7 +117,7 @@
                     <div class="foto">
                       @if (prod.url_imagen) { <img [src]="prod.url_imagen | imagenUrl" [alt]="prod.nombre_producto" loading="lazy"> }
                       @else { {{ prod.nombre_producto?.charAt(0) }} }
-                      @if (prod.stock_actual <= 0) { <span class="sello-agotado">Agotado</span> }
+
                     </div>
                     <div class="datos">
                       <span class="nombre">{{ prod.nombre_producto }}</span>

@@ -49,7 +49,7 @@
               @if (esAdmin()) { <th>Sucursal</th> }
               <th>Estado</th>
               <th class="num">Ventas</th>
-              <th></th>
+              <th class="col-acciones"></th>
             </tr>
           </thead>
           <tbody>
@@ -60,14 +60,17 @@
                   <span class="inf-secundario truncate" [title]="textoAlcance(p)">{{ textoAlcance(p) }}</span>
                 </td>
                 <td><span class="inf-ficha">{{ textoTipo(p) }}</span></td>
-                <td class="whitespace-nowrap">{{ textoVigencia(p) }}</td>
+                <td>
+                  <span class="whitespace-nowrap">{{ textoFechas(p) }}</span>
+                  @if (textoDias(p)) { <span class="inf-secundario">{{ textoDias(p) }}</span> }
+                </td>
                 @if (esAdmin()) { <td>{{ p.nombre_sucursal || 'Todas' }}</td> }
                 <td><span class="inf-estado" [ngClass]="estado(p).clase">{{ estado(p).texto }}</span></td>
                 <td class="num">
                   {{ entero(p.usos || 0) }}
                   @if (p.ahorro) { <span class="inf-secundario">−{{ moneda() }} {{ cifra(p.ahorro) }}</span> }
                 </td>
-                <td>
+                <td class="col-acciones">
                   <div class="flex justify-end gap-1">
                     @if (p.editable) {
                       <button class="accion" (click)="abrirEdicion(p)" title="Editar" aria-label="Editar promoción">
@@ -81,11 +84,16 @@
                         <button class="accion peligro" (click)="eliminar(p)" title="Eliminar" aria-label="Eliminar promoción">
                           <lucide-icon [img]="icons.eliminar" class="w-4 h-4"></lucide-icon>
                         </button>
+                      } @else {
+                        <button class="accion inactiva" (click)="avisarNoSeElimina(p)" title="Ya se usó en ventas"
+                                aria-label="Eliminar promoción (no disponible)">
+                          <lucide-icon [img]="icons.eliminar" class="w-4 h-4"></lucide-icon>
+                        </button>
                       }
                     } @else {
-                      <span class="accion cursor-default" title="La administra el administrador" aria-label="Solo lectura">
+                      <button class="accion" (click)="avisarBloqueada(p)" title="Solo la cambia el administrador" aria-label="Solo lectura">
                         <lucide-icon [img]="icons.bloqueada" class="w-4 h-4"></lucide-icon>
-                      </span>
+                      </button>
                     }
                   </div>
                 </td>

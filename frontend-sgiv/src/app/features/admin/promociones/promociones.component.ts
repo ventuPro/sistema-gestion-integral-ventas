@@ -137,11 +137,15 @@ export class PromocionesComponent implements OnInit {
     return [...cats, ...prods].join(', ');
   }
 
-  textoVigencia(p: Promocion): string {
-    const fechas = p.fecha_inicio === p.fecha_fin ? fechaCorta(p.fecha_inicio) : `${fechaCorta(p.fecha_inicio)} – ${fechaCorta(p.fecha_fin)}`;
+  textoFechas(p: Promocion): string {
+    return p.fecha_inicio === p.fecha_fin ? fechaCorta(p.fecha_inicio) : `${fechaCorta(p.fecha_inicio)} – ${fechaCorta(p.fecha_fin)}`;
+  }
+
+  /** Días y horario (segunda línea de la vigencia) */
+  textoDias(p: Promocion): string {
     const dias = p.dias_semana?.length ? DIAS.filter(d => p.dias_semana!.includes(d.n)).map(d => d.texto).join(' ') : '';
     const horas = p.hora_inicio ? `${p.hora_inicio}–${p.hora_fin}` : '';
-    return [fechas, dias, horas].filter(Boolean).join(' · ');
+    return [dias, horas].filter(Boolean).join(' · ');
   }
 
   // ─── Crear / editar ───
@@ -265,6 +269,17 @@ export class PromocionesComponent implements OnInit {
       next: (r) => { this.dialogo.avisar(r.mensaje); this.cargar(); },
       error: (e) => this.dialogo.error(e?.error?.error || 'No se pudo cambiar el estado.')
     });
+  }
+
+  avisarNoSeElimina(p: Promocion) {
+    const n = p.usos || 0;
+    this.dialogo.avisar(`«${p.nombre}» ya se usó en ${n} ${n === 1 ? 'venta' : 'ventas'}: no se elimina para conservar el historial. Desactívala con el botón de encendido.`);
+  }
+
+  avisarBloqueada(p: Promocion) {
+    this.dialogo.avisar(p.id_sucursal === null
+      ? `«${p.nombre}» es de todas las sucursales: solo la cambia el administrador.`
+      : `«${p.nombre}» es de otra sucursal: solo la cambia el administrador.`);
   }
 
   async eliminar(p: Promocion) {
