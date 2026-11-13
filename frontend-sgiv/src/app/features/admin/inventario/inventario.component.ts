@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, OnDestroy, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -67,6 +67,28 @@ export class InventarioComponent implements OnInit, OnDestroy {
   private stockSub?:      Subscription;
   private reconexionSub?: Subscription;
   readonly cifra          = cifra;
+
+  // ─── Menús de la cabecera (Categorías y la flecha de «Nuevo producto») ───
+  readonly menuCabecera = signal<'categorias' | 'nuevo' | null>(null);
+
+  alternarMenu(menu: 'categorias' | 'nuevo', evento: Event) {
+    evento.stopPropagation();
+    this.menuCabecera.update(m => m === menu ? null : menu);
+  }
+
+  /** Elegir una opción cierra el menú */
+  elegirMenu(accion: () => void) {
+    this.menuCabecera.set(null);
+    accion();
+  }
+
+  readonly abrirAgregarExistente = () => this.mostrarAgregarExistente.set(true);
+
+  @HostListener('document:click')
+  cerrarMenuCabecera() { if (this.menuCabecera()) this.menuCabecera.set(null); }
+
+  @HostListener('document:keydown.escape')
+  cerrarMenuConEsc() { this.cerrarMenuCabecera(); }
 
   // ─── Iconos ───
   readonly icons = {

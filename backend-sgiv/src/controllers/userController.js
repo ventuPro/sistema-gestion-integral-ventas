@@ -285,15 +285,17 @@ const actualizarUsuario = async (req, res) => {
     try {
         const id = Number(req.params.id);
         const { nombre_completo, correo_electronico } = datosUsuario(req.body);
+        // El rol y la sucursal se eligen solo al crear el usuario (decisión del autor: no se cambian después)
+        const actual = (await db.query(`SELECT id_rol, id_sucursal FROM usuario WHERE id_usuario = $1`, [id])).rows[0];
+        if (!actual) return res.status(404).json({ error: 'El usuario no existe' });
         const { id_rol, id_sucursal } = req.body || {};
-        if (!id_rol || !id_sucursal) return res.status(400).json({ error: 'Completa todos los campos' });
-        if (!esAdmin(req) && await tocaAdmin(id, id_rol))
+        if ((id_rol != null && Number(id_rol) !== actual.id_rol) || (id_sucursal != null && Number(id_sucursal) !== actual.id_sucursal))
+            return res.status(400).json({ error: 'El rol y la sucursal de un usuario no se pueden cambiar.' });
+        if (!esAdmin(req) && await tocaAdmin(id, actual.id_rol))
             return res.status(403).json({ error: 'Solo un administrador puede modificar administradores' });
-        if (id === Number(req.usuario.id_usuario) && Number(id_rol) !== Number(req.usuario.id_rol))
-            return res.status(400).json({ error: 'No puedes cambiar tu propio rol' });
         const ocupado = await motivoCorreoOcupado(correo_electronico, id);
         if (ocupado) return res.status(409).json({ error: ocupado });
-        const usuario = await userModel.actualizarUsuario(id, { nombre_completo, correo_electronico, id_rol, id_sucursal });
+        const usuario = await userModel.actualizarUsuario(id, { nombre_completo, correo_electronico });
         if (!usuario) return res.status(404).json({ error: 'El usuario no existe' });
         res.json({ mensaje: 'Usuario actualizado', usuario });
     } catch (e) {

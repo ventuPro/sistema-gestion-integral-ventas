@@ -466,4 +466,19 @@ describe('Usuarios: edición y correos', () => {
             nombre_completo: 'Admin propio', correo_electronico: 'admin.propio@prueba.com', id_rol: 2, id_sucursal: 1 } });
         assert.equal(r.status, 400);
     });
+
+    test('el rol y la sucursal no se cambian después de crear el usuario', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        const id = await crearUsuario('fijo@prueba.com', 2);
+        const [s2] = (await pool.query(`INSERT INTO sucursal (nombre_sucursal) VALUES ('OTRA FIJA') RETURNING id_sucursal`)).rows;
+        const datos = (extra) => ({ nombre_completo: 'Cajero Fijo', correo_electronico: 'fijo@prueba.com', id_rol: 2, id_sucursal: 1, ...extra });
+        const otraSucursal = await api('PUT', `/usuarios/${id}`, { token: tAdmin, body: datos({ id_sucursal: s2.id_sucursal }) });
+        assert.equal(otraSucursal.status, 400);
+        assert.match(otraSucursal.body.error, /no se pueden cambiar/);
+        assert.equal((await api('PUT', `/usuarios/${id}`, { token: tAdmin, body: datos({ id_rol: 1 }) })).status, 400);
+        // Sin rol ni sucursal (o con los mismos) se edita el nombre y el correo
+        assert.equal((await api('PUT', `/usuarios/${id}`, { token: tAdmin, body: { nombre_completo: 'Cajero Fijo', correo_electronico: 'fijo@prueba.com' } })).status, 200);
+        const [u] = (await pool.query(`SELECT id_rol, id_sucursal FROM usuario WHERE id_usuario = $1`, [id])).rows;
+        assert.deepEqual([u.id_rol, u.id_sucursal], [2, 1]);
+    });
 });

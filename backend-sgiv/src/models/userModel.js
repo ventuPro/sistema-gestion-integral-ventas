@@ -59,14 +59,15 @@ const listarUsuarios = async () => {
     return result.rows;
 };
 
+/** Nombre y correo (el rol y la sucursal no se cambian después de crear el usuario) */
 const actualizarUsuario = async (id_usuario, datos) => {
-    const { nombre_completo, correo_electronico, id_rol, id_sucursal } = datos;
+    const { nombre_completo, correo_electronico } = datos;
     const result = await db.query(`
         UPDATE usuario
-        SET nombre_completo=$1, correo_electronico=$2, id_rol=$3, id_sucursal=$4
-        WHERE id_usuario=$5
+        SET nombre_completo=$1, correo_electronico=$2
+        WHERE id_usuario=$3
         RETURNING id_usuario, nombre_completo, correo_electronico
-    `, [nombre_completo, correo_electronico, id_rol, id_sucursal, id_usuario]);
+    `, [nombre_completo, correo_electronico, id_usuario]);
     return result.rows[0];
 };
 

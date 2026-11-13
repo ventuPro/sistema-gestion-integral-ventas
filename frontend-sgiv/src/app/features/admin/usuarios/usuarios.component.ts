@@ -38,6 +38,7 @@ export class UsuariosComponent implements OnInit {
   private cajaService    = inject(CajaService);
 
   readonly icons = {
+    candado:     Lock,
     edit:        Pencil,
     password:    KeyRound,
     permissions: ShieldCheck,
@@ -126,11 +127,9 @@ export class UsuariosComponent implements OnInit {
       nombre_completo: usr.nombre_completo, correo_electronico: usr.correo_electronico,
       contrasena: '', id_rol: Number(usr.id_rol), id_sucursal: Number(usr.id_sucursal)
     });
-    this.usuarioAntes = { id_rol: Number(usr.id_rol), id_sucursal: Number(usr.id_sucursal) };
     this.mostrarModal.set(true);
   }
 
-  private usuarioAntes = { id_rol: 0, id_sucursal: 0 };
 
   cerrarModal() { this.mostrarModal.set(false); this.editandoId.set(null); this.mensajeError.set(''); }
 
@@ -140,20 +139,20 @@ export class UsuariosComponent implements OnInit {
       return this.mensajeError.set('Completa todos los campos.');
     if (!id && (f.contrasena || '').length < 6)
       return this.mensajeError.set('La contraseña debe tener al menos 6 caracteres.');
-    if (id) {
-      const advertencias = [
-        ...(Number(f.id_rol) !== this.usuarioAntes.id_rol ? ['Cambia su rol: cambian las pantallas a las que puede entrar.'] : []),
-        ...(Number(f.id_sucursal) !== this.usuarioAntes.id_sucursal ? ['Cambia de sucursal: venderá y verá el inventario de la nueva sucursal.'] : [])
-      ];
-      if (advertencias.length && !(await this.dialogo.confirmar({
-        titulo: `¿Guardar los cambios de ${f.nombre_completo}?`, advertencias, peligro: true, textoConfirmar: 'Guardar'
+    // El rol y la sucursal no se podrán cambiar después: se confirman al crear
+    if (!id) {
+      const rol = this.listaRoles().find(r => +r.id_rol === +f.id_rol)?.nombre_rol || '';
+      const sucursal = this.listaSucursales().find(s => +s.id_sucursal === +f.id_sucursal)?.nombre_sucursal || '';
+      if (!(await this.dialogo.confirmar({
+        titulo: `¿Crear a ${f.nombre_completo}?`, mensaje: 'El rol y la sucursal no se podrán cambiar después:',
+        advertencias: [`Rol: ${rol}`, `Sucursal: ${sucursal}`], peligro: true, textoConfirmar: 'Crear usuario'
       }))) return;
     }
     this.guardando.set(true); this.mensajeError.set('');
     const fallo = (e: any, msg: string) => { this.mensajeError.set(e?.error?.error || msg); this.guardando.set(false); };
 
     if (id) {
-      const d = { nombre_completo: f.nombre_completo, correo_electronico: f.correo_electronico, id_rol: f.id_rol, id_sucursal: f.id_sucursal };
+      const d = { nombre_completo: f.nombre_completo, correo_electronico: f.correo_electronico };
       this.usuarioService.actualizarUsuario(id, d).subscribe({
         next:  () => { this.cerrarModal(); this.dialogo.avisar('Usuario actualizado'); this.cargarDatos(); },
         error: (e) => fallo(e, 'No se pudo actualizar el usuario.')

@@ -8,18 +8,41 @@
       <button class="inf-boton" (click)="mostrarIngresos.set(true)">
         <lucide-icon [img]="icons.ingresos" class="w-3.5 h-3.5"></lucide-icon> Ingresos del día
       </button>
-      <button class="inf-boton" (click)="abrirOrdenCategorias()">
-        <lucide-icon [img]="icons.ordenar" class="w-3.5 h-3.5"></lucide-icon> Ordenar categorías
-      </button>
-      <button class="inf-boton" (click)="abrirModalCategoria()">
-        <lucide-icon [img]="icons.etiqueta" class="w-3.5 h-3.5"></lucide-icon> Nueva categoría
-      </button>
-      <button class="inf-boton" (click)="mostrarAgregarExistente.set(true)">
-        <lucide-icon [img]="icons.agregarExistente" class="w-3.5 h-3.5"></lucide-icon> Agregar de otra sucursal
-      </button>
-      <button class="boton-primario py-1.5! text-[length:calc(12.5px*var(--escala-texto))]!" (click)="abrirModalNuevo()">
-        <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon> Nuevo producto
-      </button>
+
+      <div class="menu-cabecera">
+        <button class="inf-boton" aria-haspopup="menu" [attr.aria-expanded]="menuCabecera() === 'categorias'"
+                (click)="alternarMenu('categorias', $event)">
+          <lucide-icon [img]="icons.etiqueta" class="w-3.5 h-3.5"></lucide-icon> Categorías
+          <lucide-icon [img]="icons.bajar" class="w-3.5 h-3.5 flecha" [class.girada]="menuCabecera() === 'categorias'"></lucide-icon>
+        </button>
+        @if (menuCabecera() === 'categorias') {
+          <div class="menu-desplegable" role="menu" (click)="$event.stopPropagation()">
+            <button role="menuitem" (click)="elegirMenu(abrirModalCategoria.bind(this))">
+              <lucide-icon [img]="icons.mas" class="w-4 h-4"></lucide-icon> Nueva categoría
+            </button>
+            <button role="menuitem" (click)="elegirMenu(abrirOrdenCategorias.bind(this))">
+              <lucide-icon [img]="icons.ordenar" class="w-4 h-4"></lucide-icon> Ordenar categorías
+            </button>
+          </div>
+        }
+      </div>
+
+      <div class="menu-cabecera boton-dividido">
+        <button class="boton-primario principal" (click)="abrirModalNuevo()">
+          <lucide-icon [img]="icons.mas" class="w-3.5 h-3.5"></lucide-icon> Nuevo producto
+        </button>
+        <button class="boton-primario flecha-sola" aria-haspopup="menu" aria-label="Más formas de agregar productos"
+                [attr.aria-expanded]="menuCabecera() === 'nuevo'" (click)="alternarMenu('nuevo', $event)">
+          <lucide-icon [img]="icons.bajar" class="w-3.5 h-3.5 flecha" [class.girada]="menuCabecera() === 'nuevo'"></lucide-icon>
+        </button>
+        @if (menuCabecera() === 'nuevo') {
+          <div class="menu-desplegable derecha" role="menu" (click)="$event.stopPropagation()">
+            <button role="menuitem" (click)="elegirMenu(abrirAgregarExistente)">
+              <lucide-icon [img]="icons.agregarExistente" class="w-4 h-4"></lucide-icon> Agregar de otra sucursal
+            </button>
+          </div>
+        }
+      </div>
     </div>
   </header>
 

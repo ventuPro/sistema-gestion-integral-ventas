@@ -144,15 +144,19 @@
         }
         <div class="grid grid-cols-2 gap-4">
           <div class="grupo">
-            <label class="inf-etiqueta" for="usr-rol">Rol</label>
-            <select id="usr-rol" class="campo" [(ngModel)]="formulario().id_rol">
+            <label class="inf-etiqueta flex items-center gap-1.5" for="usr-rol">
+              Rol @if (editandoId()) { <lucide-icon [img]="icons.candado" class="w-3.5 h-3.5" aria-label="No se puede cambiar"></lucide-icon> }
+            </label>
+            <select id="usr-rol" class="campo" [(ngModel)]="formulario().id_rol" [disabled]="!!editandoId()">
               <option value="" disabled>Elegir…</option>
               @for (r of listaRoles(); track r.id_rol) { <option [ngValue]="+r.id_rol">{{ r.nombre_rol }}</option> }
             </select>
           </div>
           <div class="grupo">
-            <label class="inf-etiqueta" for="usr-sucursal">Sucursal</label>
-            <select id="usr-sucursal" class="campo" [(ngModel)]="formulario().id_sucursal">
+            <label class="inf-etiqueta flex items-center gap-1.5" for="usr-sucursal">
+              Sucursal @if (editandoId()) { <lucide-icon [img]="icons.candado" class="w-3.5 h-3.5" aria-label="No se puede cambiar"></lucide-icon> }
+            </label>
+            <select id="usr-sucursal" class="campo" [(ngModel)]="formulario().id_sucursal" [disabled]="!!editandoId()">
               <option value="" disabled>Elegir…</option>
               @for (s of listaSucursales(); track s.id_sucursal) { <option [ngValue]="+s.id_sucursal">{{ s.nombre_sucursal }}</option> }
             </select>
