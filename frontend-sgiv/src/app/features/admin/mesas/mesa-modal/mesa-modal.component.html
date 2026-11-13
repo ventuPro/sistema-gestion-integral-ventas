@@ -193,12 +193,23 @@
                 <button class="inf-boton justify-center py-3!" (click)="irADescuento()" [disabled]="!itemsPendientes().length">
                   <lucide-icon [img]="icons.descuento" class="w-4 h-4"></lucide-icon> Descuento
                 </button>
+                <button class="inf-boton justify-center py-3!" (click)="verCuenta.set(true)" [disabled]="!itemsPendientes().length">
+                  <lucide-icon [img]="icons.cuenta" class="w-4 h-4"></lucide-icon> Cuenta
+                </button>
                 <button class="boton-primario cobrar" (click)="irAPago()" [disabled]="!itemsPendientes().length">Cobrar</button>
               </div>
             </div>
           </div>
         </div>
       </div>
+    }
+
+    <!-- Cuenta (antes de cobrar) -->
+    @if (verCuenta()) {
+      <app-vista-ticket titulo="Cuenta" [subtitulo]="'Mesa ' + mesa?.numero_mesa" (cerrar)="verCuenta.set(false)">
+        <app-ticket-cuenta [lineas]="itemsPendientes()" [cotizacion]="cotizacionCuenta()" [mesa]="mesa?.numero_mesa"
+                           [porCliente]="cuentaPorCliente()" />
+      </app-vista-ticket>
     }
 
     <!-- Cobro -->

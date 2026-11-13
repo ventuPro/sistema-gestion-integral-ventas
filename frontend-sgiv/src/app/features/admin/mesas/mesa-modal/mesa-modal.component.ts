@@ -9,7 +9,9 @@ import { TicketComponent } from '../../../shared/ticket/ticket.component';
 import { AjustesService } from '../../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../../core/services/impresion.service';
 import { cifra } from '../../../../core/utils/informe';
-import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent, Minus, Plus } from 'lucide-angular';
+import { LucideAngularModule, X, Search, Trash2, ShoppingCart, Banknote, QrCode, Check, Printer, Download, User, BadgePercent, Minus, Plus, ReceiptText } from 'lucide-angular';
+import { TicketCuentaComponent } from '../../../shared/ticket/ticket-cuenta.component';
+import { VistaTicketComponent } from '../../../shared/ticket/vista-ticket.component';
 import { DialogoService } from '../../../../core/services/dialogo.service';
 import { METODO_PAGO, MetodoPago } from '../../../../core/utils/metodos-pago';
 import { Cotizacion, DescuentoManual, FormDescuento, PromocionService } from '../../../../core/services/promocion.service';
@@ -40,7 +42,7 @@ const totalPendiente = (items: any[]) =>
   selector: 'app-mesa-modal',
   standalone: true,
   imports: [FondoModalDirective, CommonModule, NgTemplateOutlet, FormsModule, ImagenUrlPipe, TicketComponent, LucideAngularModule,
-            BarraCategoriasComponent, TecladoNumericoComponent, VentanaDescuentoComponent],
+            BarraCategoriasComponent, TecladoNumericoComponent, VentanaDescuentoComponent, TicketCuentaComponent, VistaTicketComponent],
   templateUrl: './mesa-modal.component.html',
   styleUrls: ['../../../shared/informe/informe.css', '../../../shared/venta/venta.css', './mesa-modal.component.css']
 })
@@ -61,7 +63,7 @@ export class MesaModalComponent implements OnInit, OnDestroy {
 
   readonly icons = {
     cerrar: X, buscar: Search, quitar: Trash2, carrito: ShoppingCart, efectivo: Banknote,
-    qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User, descuento: BadgePercent,
+    qr: QrCode, check: Check, imprimir: Printer, descargar: Download, cliente: User, descuento: BadgePercent, cuenta: ReceiptText,
     menos: Minus, mas: Plus
   };
 
@@ -118,6 +120,12 @@ export class MesaModalComponent implements OnInit, OnDestroy {
   readonly cambio     = computed(() => Math.max(0, this.pagado() - this.totalCobro()));
 
   readonly itemsPendientes = computed<any[]>(() => (this.cuentaActiva()?.items || []).filter((i: any) => !i.pagado));
+
+  /** Cuenta impresa antes de cobrar (no registra nada); con varios clientes, lo de cada uno */
+  readonly verCuenta = signal(false);
+  readonly cuentaPorCliente = computed(() => this.porCliente()
+    ? this.grupos().filter(g => g.pendiente > 0).map(g => ({ nombre: g.nombre, total: g.pendiente }))
+    : []);
 
   /** Agrupa por celular; los clientes sin nombre se numeran en orden de llegada */
   readonly grupos = computed(() => {

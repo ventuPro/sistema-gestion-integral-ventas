@@ -289,6 +289,9 @@
               <button class="inf-boton justify-center py-3!" [disabled]="carrito().length === 0 || !cotizacion() || cobrando()" (click)="abrirDescuento()">
                 <lucide-icon [img]="icons.descuento" class="w-4 h-4"></lucide-icon> Descuento
               </button>
+              <button class="inf-boton justify-center py-3!" [disabled]="carrito().length === 0 || cotizando() || cobrando()" (click)="verCuenta.set(true)">
+                <lucide-icon [img]="icons.cuenta" class="w-4 h-4"></lucide-icon> Cuenta
+              </button>
               <button class="boton-primario cobrar" [disabled]="carrito().length === 0 || cotizando() || cobrando()" (click)="abrirModalCobro()">
                 {{ cobrando() ? 'Registrando…' : 'Cobrar' }}
               </button>
@@ -416,4 +419,12 @@
       </div>
     </div>
   </div>
+}
+
+
+<!-- ═══ CUENTA (antes de cobrar) ═══ -->
+@if (verCuenta()) {
+  <app-vista-ticket titulo="Cuenta" (cerrar)="verCuenta.set(false)">
+    <app-ticket-cuenta [lineas]="carrito()" [cotizacion]="cotizacion()" />
+  </app-vista-ticket>
 }

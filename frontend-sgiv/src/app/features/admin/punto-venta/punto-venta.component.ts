@@ -13,6 +13,8 @@ import { TicketComponent } from '../../shared/ticket/ticket.component';
 import { LucideAngularModule,
          ShieldAlert, Landmark, RefreshCw, Check, Search, X, ReceiptText, Trash2,
          ShoppingCart, Banknote, QrCode, Printer, BadgePercent, Minus, Plus, ArrowLeft } from 'lucide-angular';
+import { TicketCuentaComponent } from '../../shared/ticket/ticket-cuenta.component';
+import { VistaTicketComponent } from '../../shared/ticket/vista-ticket.component';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { ImpresionService } from '../../../core/services/impresion.service';
 import { sondeo } from '../../../core/utils/sondeo';
@@ -30,7 +32,8 @@ import { VentanaDescuentoComponent } from '../../shared/venta/ventana-descuento.
 @Component({
   selector: 'app-punto-venta',
   standalone: true,
-  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent, BarraCategoriasComponent, TecladoNumericoComponent, VentanaDescuentoComponent],
+  imports: [FondoModalDirective, CommonModule, FormsModule, LucideAngularModule, ImagenUrlPipe, TicketComponent, BarraCategoriasComponent, TecladoNumericoComponent, VentanaDescuentoComponent,
+            TicketCuentaComponent, VistaTicketComponent],
   templateUrl: './punto-venta.component.html',
   styleUrls: ['../../shared/informe/informe.css', '../../shared/venta/venta.css', './punto-venta.component.css']
 })
@@ -68,6 +71,7 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
     qr:          QrCode,
     imprimir:    Printer,
     descuento:   BadgePercent,
+    cuenta:      ReceiptText,
     menos:       Minus,
     mas:         Plus
   };
@@ -163,6 +167,8 @@ export class PuntoVentaComponent implements OnInit, OnDestroy {
   };
 
   readonly cobrando = signal(false);
+  /** Cuenta impresa antes de cobrar (no registra nada) */
+  readonly verCuenta = signal(false);
 
   /** Líneas con más unidades que el stock (id → disponible) */
   readonly excedidos = computed(() => {
