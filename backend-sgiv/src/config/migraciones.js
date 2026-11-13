@@ -173,7 +173,11 @@ const MIGRACIONES = [
     -- Sin tope para el descuento manual (el parámetro existió unos días)
     ALTER TABLE configuracion DROP COLUMN IF EXISTS descuento_max_cajero;
     CREATE INDEX IF NOT EXISTS idx_promocion_vigencia      ON promocion (estado_activo, fecha_inicio, fecha_fin);
-    CREATE INDEX IF NOT EXISTS idx_promocion_sucursal      ON promocion (id_sucursal);
+    DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'promocion' AND column_name = 'id_sucursal') THEN
+            CREATE INDEX IF NOT EXISTS idx_promocion_sucursal ON promocion (id_sucursal);
+        END IF;
+    END $$;
     CREATE INDEX IF NOT EXISTS idx_promocion_producto_prod ON promocion_producto (id_producto);
     CREATE INDEX IF NOT EXISTS idx_promocion_categoria_cat ON promocion_categoria (id_categoria);
     CREATE INDEX IF NOT EXISTS idx_detalle_venta_promocion ON detalle_venta (id_promocion);`,
@@ -666,7 +670,23 @@ CREATE INDEX IF NOT EXISTS idx_historial_inversion_receta ON historial_inversion
 
     // ─── Reparto de la producción (2026-11-13): la entrada «Producción» que la originó (para «Ingresos del día») ───
     `ALTER TABLE transferencia ADD COLUMN IF NOT EXISTS id_historial_produccion INT REFERENCES historial_inventario(id_historial);
-    CREATE INDEX IF NOT EXISTS idx_transferencia_produccion ON transferencia (id_historial_produccion) WHERE id_historial_produccion IS NOT NULL;`
+    CREATE INDEX IF NOT EXISTS idx_transferencia_produccion ON transferencia (id_historial_produccion) WHERE id_historial_produccion IS NOT NULL;`,
+
+    // ─── Promoción en varias sucursales (2026-11-13): sin filas = todas las sucursales ───
+    // Reemplaza promocion.id_sucursal (una sola o todas). Respaldo previo en D:/Respaldos SGIV.
+    `CREATE TABLE IF NOT EXISTS promocion_sucursal (
+        id_promocion INT NOT NULL REFERENCES promocion(id_promocion) ON DELETE CASCADE,
+        id_sucursal  INT NOT NULL REFERENCES sucursal(id_sucursal),
+        PRIMARY KEY (id_promocion, id_sucursal)
+    );
+    CREATE INDEX IF NOT EXISTS idx_promocion_sucursal_suc ON promocion_sucursal (id_sucursal);
+    DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'promocion' AND column_name = 'id_sucursal') THEN
+            INSERT INTO promocion_sucursal (id_promocion, id_sucursal)
+            SELECT id_promocion, id_sucursal FROM promocion WHERE id_sucursal IS NOT NULL ON CONFLICT DO NOTHING;
+            ALTER TABLE promocion DROP COLUMN id_sucursal;
+        END IF;
+    END $$;`
 ];
 
 const aplicarMigraciones = async () => {

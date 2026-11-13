@@ -63,3 +63,19 @@ tr.inactiva td.col-acciones { opacity: 1; }
 .cantidad button:hover { background: var(--i-acento-suave); color: var(--i-acento); }
 
 .combo-resumen { min-width: 200px; margin-bottom: 2px; }
+
+/* Casilla de cada sucursal (varias a la vez; ninguna = todas) */
+.casilla {
+  width: 14px; height: 14px; flex-shrink: 0;
+  border: 1.5px solid var(--i-sutil);
+  border-radius: 4px;
+  background: var(--i-papel);
+}
+.casilla.marcada {
+  border-color: var(--i-acento);
+  background: var(--i-acento) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E") center / 11px no-repeat;
+}
+
+/* Sucursal sin los productos de la promoción: no se puede elegir */
+.opcion.no-disponible { opacity: 0.45; border-style: dashed; cursor: not-allowed; }
+.opcion.no-disponible:hover { border-color: var(--i-linea); }

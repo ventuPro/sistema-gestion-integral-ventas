@@ -109,7 +109,8 @@ const base = { nombre: 'Promo', tipo: 'PORCENTAJE', valor: 10, categorias: [1], 
 test('normaliza una promoción válida', () => {
     const d = normalizar({ ...base, dias_semana: [5, 1, 1], hora_inicio: '19:00', hora_fin: '21:00' });
     assert.deepEqual(d.dias_semana, [1, 5]);
-    assert.equal(d.id_sucursal, null);
+    assert.deepEqual(d.sucursales, []);
+    assert.deepEqual(normalizar({ ...base, sucursales: [3, 1, 3] }).sucursales, [1, 3]);
     assert.equal(normalizar({ ...base, dias_semana: [1, 2, 3, 4, 5, 6, 7] }).dias_semana, null);
 });
 

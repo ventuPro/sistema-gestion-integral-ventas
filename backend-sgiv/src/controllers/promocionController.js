@@ -1,4 +1,5 @@
 const promocionModel = require('../models/promocionModel');
+const db = require('../config/db');
 const { emitirCatalogo } = require('../utils/tiempoReal');
 
 // ─── Promociones ───
@@ -6,7 +7,8 @@ const { emitirCatalogo } = require('../utils/tiempoReal');
 // (las que valen en todas las sucursales las ve, pero no las cambia).
 const esAdmin = (req) => Number(req.usuario.id_rol) === 1;
 
-const puedeEditar = (req, promo) => esAdmin(req) || (promo.id_sucursal !== null && promo.id_sucursal === Number(req.usuario.id_sucursal));
+const puedeEditar = (req, promo) => esAdmin(req) ||
+    (promo.sucursales?.length === 1 && Number(promo.sucursales[0]) === Number(req.usuario.id_sucursal));
 
 const conPermiso = (req, promo) => ({ ...promo, editable: puedeEditar(req, promo) });
 
@@ -36,11 +38,22 @@ const listar = async (req, res) => {
     } catch (e) { responderError(res, e, 'listarPromociones'); }
 };
 
+// POST /api/promociones/sin-productos { tipo, productos, categorias }  sucursales donde no se puede elegir
+const sinProductos = async (req, res) => {
+    try {
+        const b = req.body || {};
+        res.json(await promocionModel.sucursalesSinProductos(db, {
+            tipo: b.tipo, productos: Array.isArray(b.productos) ? b.productos : [],
+            categorias: Array.isArray(b.categorias) ? b.categorias : []
+        }));
+    } catch (e) { responderError(res, e, 'promocionSinProductos'); }
+};
+
 // POST /api/promociones
 const crear = async (req, res) => {
     try {
         const datos = promocionModel.normalizar(req.body);
-        if (!esAdmin(req)) datos.id_sucursal = Number(req.usuario.id_sucursal);
+        if (!esAdmin(req)) datos.sucursales = [Number(req.usuario.id_sucursal)];
         const id = await promocionModel.guardar(datos, null, req.usuario.id_usuario);
         emitirCatalogo();
         res.status(201).json({ mensaje: 'Promoción creada', promocion: conPermiso(req, await promocionModel.obtener(id)) });
@@ -52,7 +65,7 @@ const actualizar = async (req, res) => {
     try {
         if (!(await cargarEditable(req, res))) return;
         const datos = promocionModel.normalizar(req.body);
-        if (!esAdmin(req)) datos.id_sucursal = Number(req.usuario.id_sucursal);
+        if (!esAdmin(req)) datos.sucursales = [Number(req.usuario.id_sucursal)];
         const id = await promocionModel.guardar(datos, Number(req.params.id));
         emitirCatalogo();
         res.json({ mensaje: 'Promoción actualizada', promocion: conPermiso(req, await promocionModel.obtener(id)) });
@@ -80,4 +93,4 @@ const eliminar = async (req, res) => {
     } catch (e) { responderError(res, e, 'eliminarPromocion'); }
 };
 
-module.exports = { listar, crear, actualizar, cambiarEstado, eliminar };
+module.exports = { sinProductos, listar, crear, actualizar, cambiarEstado, eliminar };

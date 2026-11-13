@@ -281,11 +281,19 @@
 
         @if (esAdmin()) {
           <div class="grupo">
-            <label class="inf-etiqueta" for="promo-sucursal">Sucursal</label>
-            <select id="promo-sucursal" name="sucursal" class="campo sm:w-72!" [(ngModel)]="formulario().id_sucursal">
-              <option [ngValue]="null">Todas las sucursales</option>
-              @for (s of sucursales(); track s.id_sucursal) { <option [ngValue]="s.id_sucursal">{{ s.nombre_sucursal }}</option> }
-            </select>
+            <span class="inf-etiqueta">Sucursales</span>
+            <div class="fichas">
+              <button type="button" class="opcion chica" [class.activa]="todasSucursales()" [attr.aria-pressed]="todasSucursales()"
+                      [class.no-disponible]="sinProductos().size > 0" (click)="alternarTodas()">Todas las sucursales</button>
+              @for (s of sucursalesActivas(); track s.id_sucursal) {
+                <button type="button" class="opcion chica" [class.activa]="sucursalMarcada(s.id_sucursal)"
+                        [class.no-disponible]="sinProductos().has(s.id_sucursal)" [attr.aria-disabled]="sinProductos().has(s.id_sucursal)"
+                        [attr.aria-pressed]="sucursalMarcada(s.id_sucursal)" (click)="alternarSucursal(s.id_sucursal)">
+                  <span class="casilla" [class.marcada]="sucursalMarcada(s.id_sucursal)" aria-hidden="true"></span>
+                  {{ s.nombre_sucursal }}
+                </button>
+              }
+            </div>
           </div>
         }
 

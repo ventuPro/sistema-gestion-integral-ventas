@@ -42,6 +42,9 @@ const crearProducto = async (nombre, precio, id_categoria, stock = 50, id_sucurs
         [id_categoria, nombre, precio]);
     await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES ($1, $2, $3)`,
                  [id_sucursal, p.id_producto, stock]);
+    // Las demás sucursales también lo tienen (sin stock): las promociones de todas las sucursales piden sus productos
+    await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual)
+                  SELECT id_sucursal, $1, 0 FROM sucursal WHERE id_sucursal <> $2 ON CONFLICT DO NOTHING`, [p.id_producto, id_sucursal]);
     return p.id_producto;
 };
 
@@ -111,11 +114,12 @@ describe('Promociones: acceso y gestión', () => {
 
     test('el cajero gestiona solo las de su sucursal; las globales solo el administrador', async () => {
         const cat = await crearCategoria('Alcance');
+        await crearProducto('Pan alcance', 4, cat);
         const global = await crearPromo(tAdmin, { categorias: [cat] });
-        assert.equal(global.id_sucursal, null);
+        assert.deepEqual(global.sucursales, []);
 
         const propia = await crearPromo(tCajero, { categorias: [cat], id_sucursal: idOtraSucursal });
-        assert.equal(propia.id_sucursal, 1, 'se fuerza a la sucursal del cajero');
+        assert.deepEqual(propia.sucursales, [1], 'se fuerza a la sucursal del cajero');
         assert.equal(propia.editable, true);
 
         const lista = (await api('GET', '/promociones', { token: tCajero })).body;
@@ -124,6 +128,35 @@ describe('Promociones: acceso y gestión', () => {
         assert.equal((await api('PATCH', `/promociones/${propia.id_promocion}/estado`, { token: tCajeroOtra, body: { activa: false } })).status, 403);
         assert.equal((await api('GET', '/promociones', { token: tCajeroOtra })).body.some(p => p.id_promocion === propia.id_promocion), false);
     });
+
+    test('una promoción en varias sucursales: vale en las elegidas; el cajero no la edita', async () => {
+        const [s3] = await bd.sql(`INSERT INTO sucursal (nombre_sucursal) VALUES ('TERCERA') RETURNING id_sucursal`);
+        const cat = await crearCategoria('Varias');
+        await crearProducto('Pan varias', 5, cat, 10, 1);
+        await crearProducto('Pan varias otra', 5, cat, 10, idOtraSucursal);
+        const p = await crearPromo(tAdmin, { categorias: [cat], sucursales: [idOtraSucursal, 1] });
+        assert.deepEqual(p.sucursales, [1, idOtraSucursal]);
+        assert.equal((await api('GET', `/promociones?id_sucursal=${s3.id_sucursal}`, { token: tAdmin })).body.some(x => x.id_promocion === p.id_promocion), false);
+        const delCajero = (await api('GET', '/promociones', { token: tCajero })).body.find(x => x.id_promocion === p.id_promocion);
+        assert.equal(delCajero.editable, false);
+        assert.equal((await api('PUT', `/promociones/${p.id_promocion}`, { token: tCajero, body: promo({ categorias: [cat] }) })).status, 403);
+        await bd.sql(`UPDATE sucursal SET estado_activo = FALSE WHERE id_sucursal = $1`, [s3.id_sucursal]);
+    });
+
+    test('no se elige una sucursal que no tiene los productos de la promoción', async () => {
+        const cat = await crearCategoria('Solo matriz');
+        const [p] = await bd.sql(`INSERT INTO producto (id_categoria, nombre_producto, precio_unitario) VALUES ($1, 'TORTA SOLO MATRIZ', 20) RETURNING id_producto`, [cat]);
+        await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES (1, $1, 10)`, [p.id_producto]);
+        const sin = await api('POST', '/promociones/sin-productos', { token: tAdmin, body: { tipo: 'PORCENTAJE', categorias: [cat] } });
+        assert.deepEqual(sin.body.map(x => x.id_sucursal), [idOtraSucursal]);
+        for (const sucursales of [[], [idOtraSucursal]]) {
+            const r = await api('POST', '/promociones', { token: tAdmin, body: promo({ categorias: [cat], sucursales }) });
+            assert.equal(r.status, 400);
+            assert.match(r.body.error, /no cuenta con los productos/);
+        }
+        assert.equal((await api('POST', '/promociones', { token: tAdmin, body: promo({ categorias: [cat], sucursales: [1] }) })).status, 201);
+    });
+
 });
 
 describe('Promociones: precios al cobrar', () => {
@@ -277,6 +310,7 @@ describe('Promociones en mesas', () => {
         assert.ok(usada);
         assert.equal((await api('DELETE', `/promociones/${usada.id_promocion}`, { token: tAdmin })).status, 400);
         const cat = await crearCategoria('Borrable');
+        await crearProducto('Pan borrable', 4, cat);
         const nueva = await crearPromo(tAdmin, { categorias: [cat] });
         assert.equal((await api('DELETE', `/promociones/${nueva.id_promocion}`, { token: tAdmin })).status, 200);
     });
@@ -457,7 +491,7 @@ describe('Número del día', () => {
     test('las ventas se numeran desde 1 cada día y en cada sucursal, sin repetir aunque lleguen a la vez', async () => {
         const cat = await crearCategoria('Numeros del dia');
         const id = await crearProducto('Pan numerado', 5, cat, 100);
-        await bd.sql(`INSERT INTO inventario_sucursal (id_sucursal, id_producto, cantidad_actual) VALUES ($1, $2, 20)`, [idOtraSucursal, id]);
+        await bd.sql(`UPDATE inventario_sucursal SET cantidad_actual = 20 WHERE id_sucursal = $1 AND id_producto = $2`, [idOtraSucursal, id]);
         const maximo = async (suc) => (await bd.sql(`SELECT COALESCE(MAX(numero_dia), 0)::int AS n FROM venta_caja
                                                      WHERE id_sucursal = $1 AND fecha_venta::date = CURRENT_DATE`, [suc]))[0].n;
         const vender = (token, id_sucursal) => api('POST', '/caja/cobrar', { token, body: {

@@ -170,6 +170,50 @@ const CONDICION_VIGENTE = `
             THEN LOCALTIME BETWEEN p.hora_inicio AND p.hora_fin
             ELSE LOCALTIME >= p.hora_inicio OR LOCALTIME <= p.hora_fin END)`;
 
+// ─── Sucursales de la promoción (sin filas en promocion_sucursal = todas) ───
+const EN_SUCURSAL = (s) => `(NOT EXISTS (SELECT 1 FROM promocion_sucursal ps WHERE ps.id_promocion = p.id_promocion)
+    OR EXISTS (SELECT 1 FROM promocion_sucursal ps WHERE ps.id_promocion = p.id_promocion AND ps.id_sucursal = ${s}))`;
+
+/** La sucursal tiene los productos de la promoción (activos): el combo, todos; las demás, al menos uno */
+const DISPONIBLE = (s) => `(CASE WHEN p.tipo = 'COMBO' THEN NOT EXISTS (
+        SELECT 1 FROM promocion_producto pp WHERE pp.id_promocion = p.id_promocion AND NOT EXISTS (
+            SELECT 1 FROM inventario_sucursal i JOIN producto pr ON pr.id_producto = i.id_producto AND pr.estado_activo
+            WHERE i.id_producto = pp.id_producto AND i.id_sucursal = ${s}))
+    ELSE EXISTS (
+        SELECT 1 FROM promocion_producto pp
+        JOIN producto pr ON pr.id_producto = pp.id_producto AND pr.estado_activo
+        JOIN inventario_sucursal i ON i.id_producto = pp.id_producto AND i.id_sucursal = ${s}
+        WHERE pp.id_promocion = p.id_promocion)
+      OR EXISTS (
+        SELECT 1 FROM promocion_categoria pc
+        JOIN producto pr ON pr.id_categoria = pc.id_categoria AND pr.estado_activo
+        JOIN inventario_sucursal i ON i.id_producto = pr.id_producto AND i.id_sucursal = ${s}
+        WHERE pc.id_promocion = p.id_promocion) END)`;
+
+/**
+ * Sucursales activas que no tienen los productos de la promoción (combo: todos; las demás: al menos uno).
+ * ids: las elegidas (vacío = todas las activas). Devuelve [{ id_sucursal, nombre_sucursal }].
+ */
+const sucursalesSinProductos = async (client, { tipo, productos = [], categorias = [] }, ids = []) => {
+    const idsProd = productos.map(p => Number(p.id_producto ?? p)).filter(Boolean);
+    const idsCat = categorias.map(c => Number(c.id_categoria ?? c)).filter(Boolean);
+    const r = await client.query(`
+        SELECT s.id_sucursal, s.nombre_sucursal,
+               COALESCE((SELECT array_agg(i.id_producto) FROM inventario_sucursal i
+                         JOIN producto pr ON pr.id_producto = i.id_producto AND pr.estado_activo
+                         WHERE i.id_sucursal = s.id_sucursal AND i.id_producto = ANY($2::int[])), '{}') AS tiene,
+               EXISTS (SELECT 1 FROM inventario_sucursal i
+                       JOIN producto pr ON pr.id_producto = i.id_producto AND pr.estado_activo
+                       WHERE i.id_sucursal = s.id_sucursal AND pr.id_categoria = ANY($3::int[])) AS tiene_categoria
+        FROM sucursal s
+        WHERE s.estado_activo AND (cardinality($1::int[]) = 0 OR s.id_sucursal = ANY($1::int[]))
+        ORDER BY s.id_sucursal`, [ids, idsProd, idsCat]);
+    return r.rows.filter(s => tipo === 'COMBO'
+            ? idsProd.some(id => !s.tiene.includes(id))
+            : !s.tiene.length && !s.tiene_categoria)
+        .map(({ id_sucursal, nombre_sucursal }) => ({ id_sucursal, nombre_sucursal }));
+};
+
 const vigentes = async (client, id_sucursal) => {
     const r = await client.query(`
         SELECT p.id_promocion, p.nombre, p.tipo, p.valor::float8 AS valor, p.lleva, p.paga,
@@ -178,7 +222,7 @@ const vigentes = async (client, id_sucursal) => {
                COALESCE((SELECT array_agg(pc.id_categoria)
                          FROM promocion_categoria pc WHERE pc.id_promocion = p.id_promocion), '{}') AS categorias
         FROM promocion p
-        WHERE (p.id_sucursal IS NULL OR p.id_sucursal = $1) AND ${CONDICION_VIGENTE}
+        WHERE ${EN_SUCURSAL('$1')} AND ${DISPONIBLE('$1')} AND ${CONDICION_VIGENTE}
     `, [id_sucursal]);
     return r.rows;
 };
@@ -192,12 +236,13 @@ const vigentesDetalle = async (id_sucursal) => {
                COALESCE((SELECT json_agg(json_build_object('id_producto', pp.id_producto, 'cantidad', pp.cantidad,
                                                            'nombre_producto', pr.nombre_producto) ORDER BY pr.nombre_producto)
                          FROM promocion_producto pp JOIN producto pr ON pr.id_producto = pp.id_producto
-                         WHERE pp.id_promocion = p.id_promocion), '[]') AS productos,
+                         WHERE pp.id_promocion = p.id_promocion AND pr.estado_activo
+                           AND EXISTS (SELECT 1 FROM inventario_sucursal i WHERE i.id_producto = pp.id_producto AND i.id_sucursal = $1)), '[]') AS productos,
                COALESCE((SELECT json_agg(json_build_object('id_categoria', c.id_categoria, 'nombre_categoria', c.nombre_categoria))
                          FROM promocion_categoria pc JOIN categoria_producto c ON c.id_categoria = pc.id_categoria
                          WHERE pc.id_promocion = p.id_promocion), '[]') AS categorias
         FROM promocion p
-        WHERE (p.id_sucursal IS NULL OR p.id_sucursal = $1) AND ${CONDICION_VIGENTE}
+        WHERE ${EN_SUCURSAL('$1')} AND ${DISPONIBLE('$1')} AND ${CONDICION_VIGENTE}
         ORDER BY p.nombre
     `, [id_sucursal]);
     return r.rows;
@@ -377,14 +422,21 @@ const normalizar = (b = {}) => {
     if (hora_inicio && (!HORA.test(hora_inicio) || !HORA.test(hora_fin) || hora_inicio.slice(0, 5) === hora_fin.slice(0, 5)))
         throw invalida('Horario inválido.');
 
-    const id_sucursal = b.id_sucursal ? Number(b.id_sucursal) : null;
+    // Sucursales: lista vacía = todas
+    const lista = Array.isArray(b.sucursales) ? b.sucursales : (b.id_sucursal ? [b.id_sucursal] : []);
+    const sucursales = [...new Set(lista.map(Number))].sort((x, y) => x - y);
+    if (sucursales.some(x => !Number.isInteger(x) || x <= 0)) throw invalida('Sucursal inválida.');
     return { nombre, tipo, valor, lleva, paga, productos, categorias, fecha_inicio: b.fecha_inicio, fecha_fin: b.fecha_fin,
-             dias_semana: dias, hora_inicio, hora_fin, id_sucursal, estado_activo: b.estado_activo !== false };
+             dias_semana: dias, hora_inicio, hora_fin, sucursales, estado_activo: b.estado_activo !== false };
 };
 
 // ─── Consultas ───
 const SELECT_PROMOCION = `
-    SELECT p.id_promocion, p.nombre, p.tipo, p.valor::float8 AS valor, p.lleva, p.paga, p.id_sucursal, s.nombre_sucursal,
+    SELECT p.id_promocion, p.nombre, p.tipo, p.valor::float8 AS valor, p.lleva, p.paga,
+           COALESCE((SELECT array_agg(ps.id_sucursal ORDER BY ps.id_sucursal) FROM promocion_sucursal ps
+                     WHERE ps.id_promocion = p.id_promocion), '{}') AS sucursales,
+           (SELECT string_agg(s.nombre_sucursal, ', ' ORDER BY s.id_sucursal) FROM promocion_sucursal ps
+            JOIN sucursal s ON s.id_sucursal = ps.id_sucursal WHERE ps.id_promocion = p.id_promocion) AS nombre_sucursal,
            to_char(p.fecha_inicio, 'YYYY-MM-DD') AS fecha_inicio, to_char(p.fecha_fin, 'YYYY-MM-DD') AS fecha_fin,
            (SELECT array_agg(pd.dia ORDER BY pd.dia) FROM promocion_dia pd WHERE pd.id_promocion = p.id_promocion) AS dias_semana,
            to_char(p.hora_inicio, 'HH24:MI') AS hora_inicio, to_char(p.hora_fin, 'HH24:MI') AS hora_fin,
@@ -400,7 +452,6 @@ const SELECT_PROMOCION = `
                      WHERE pc.id_promocion = p.id_promocion), '[]') AS categorias,
            u.usos, u.ahorro
     FROM promocion p
-    LEFT JOIN sucursal s ON s.id_sucursal = p.id_sucursal
     CROSS JOIN LATERAL (
         SELECT COUNT(DISTINCT dv.id_venta)::int AS usos, COALESCE(SUM(dv.descuento_promocion), 0)::float8 AS ahorro
         FROM detalle_venta dv WHERE dv.id_promocion = p.id_promocion
@@ -409,7 +460,9 @@ const SELECT_PROMOCION = `
 /** id_sucursal: null = todas; conGlobales: suma las que valen en todas las sucursales */
 const listar = async ({ id_sucursal = null, conGlobales = true } = {}) => {
     const r = await db.query(`${SELECT_PROMOCION}
-        WHERE ($1::int IS NULL OR p.id_sucursal = $1 OR ($2 AND p.id_sucursal IS NULL))
+        WHERE ($1::int IS NULL
+               OR EXISTS (SELECT 1 FROM promocion_sucursal ps WHERE ps.id_promocion = p.id_promocion AND ps.id_sucursal = $1)
+               OR ($2 AND NOT EXISTS (SELECT 1 FROM promocion_sucursal ps WHERE ps.id_promocion = p.id_promocion)))
         ORDER BY p.estado_activo DESC, p.fecha_fin DESC, p.nombre`, [id_sucursal, conGlobales]);
     return r.rows;
 };
@@ -442,28 +495,41 @@ const guardar = async (datos, id = null, id_usuario = null) => {
             const r = await client.query(`SELECT COUNT(*)::int AS n FROM categoria_producto WHERE id_categoria = ANY($1::int[])`, [datos.categorias]);
             if (r.rows[0].n !== datos.categorias.length) throw invalida('Una categoría no existe.');
         }
-        if (datos.id_sucursal) {
-            const r = await client.query(`SELECT 1 FROM sucursal WHERE id_sucursal = $1`, [datos.id_sucursal]);
-            if (!r.rows.length) throw invalida('La sucursal no existe.');
+        if (datos.sucursales.length) {
+            const r = await client.query(`SELECT COUNT(*)::int AS n FROM sucursal WHERE id_sucursal = ANY($1::int[])`, [datos.sucursales]);
+            if (r.rows[0].n !== datos.sucursales.length) throw invalida('Una sucursal no existe.');
         }
 
-        const valores = [datos.nombre, datos.tipo, datos.valor, datos.lleva, datos.paga, datos.id_sucursal, datos.fecha_inicio,
+        // No se elige una sucursal que no tiene los productos de la promoción
+        const sin = await sucursalesSinProductos(client, datos, datos.sucursales);
+        if (sin.length) {
+            const nombres = sin.map(s => s.nombre_sucursal).join(', ');
+            throw invalida(sin.length === 1 ? `${nombres} no cuenta con los productos de la promoción.`
+                                            : `${nombres} no cuentan con los productos de la promoción.`);
+        }
+
+        const valores = [datos.nombre, datos.tipo, datos.valor, datos.lleva, datos.paga, datos.fecha_inicio,
                          datos.fecha_fin, datos.hora_inicio, datos.hora_fin, datos.estado_activo];
         if (id) {
             const r = await client.query(`
-                UPDATE promocion SET nombre=$1, tipo=$2, valor=$3, lleva=$4, paga=$5, id_sucursal=$6, fecha_inicio=$7,
-                       fecha_fin=$8, hora_inicio=$9, hora_fin=$10, estado_activo=$11
-                WHERE id_promocion = $12 RETURNING id_promocion`, [...valores, id]);
+                UPDATE promocion SET nombre=$1, tipo=$2, valor=$3, lleva=$4, paga=$5, fecha_inicio=$6,
+                       fecha_fin=$7, hora_inicio=$8, hora_fin=$9, estado_activo=$10
+                WHERE id_promocion = $11 RETURNING id_promocion`, [...valores, id]);
             if (!r.rows.length) throw errorCodigo('NO_ENCONTRADA', 'La promoción no existe.');
+            await client.query(`DELETE FROM promocion_sucursal  WHERE id_promocion = $1`, [id]);
             await client.query(`DELETE FROM promocion_producto  WHERE id_promocion = $1`, [id]);
             await client.query(`DELETE FROM promocion_categoria WHERE id_promocion = $1`, [id]);
             await client.query(`DELETE FROM promocion_dia       WHERE id_promocion = $1`, [id]);
         } else {
             id = (await client.query(`
-                INSERT INTO promocion (nombre, tipo, valor, lleva, paga, id_sucursal, fecha_inicio, fecha_fin,
+                INSERT INTO promocion (nombre, tipo, valor, lleva, paga, fecha_inicio, fecha_fin,
                                        hora_inicio, hora_fin, estado_activo, id_usuario_creador)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id_promocion`, [...valores, id_usuario])).rows[0].id_promocion;
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id_promocion`, [...valores, id_usuario])).rows[0].id_promocion;
         }
+        // Sin filas = todas las sucursales
+        if (datos.sucursales.length)
+            await client.query(`INSERT INTO promocion_sucursal (id_promocion, id_sucursal) SELECT $1, unnest($2::int[])`,
+                               [id, datos.sucursales]);
         for (const p of datos.productos)
             await client.query(`INSERT INTO promocion_producto (id_promocion, id_producto, cantidad) VALUES ($1, $2, $3)`,
                                [id, p.id_producto, p.cantidad]);
@@ -494,6 +560,7 @@ const eliminar = async (id) => {
 };
 
 module.exports = {
+    EN_SUCURSAL, DISPONIBLE, sucursalesSinProductos,
     TIPOS, CONDICION_VIGENTE, repartir, aplicarPromociones, descuentoManual, normalizar, netoDeCuentas, conPromociones, porCobrarMesas, pedidosConPromociones,
     vigentes, vigentesDetalle, textoPromocion, promocionDeProducto, cotizar, enBolivianos, listar, obtener, guardar, cambiarEstado, eliminar
 };

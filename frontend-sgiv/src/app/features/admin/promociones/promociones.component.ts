@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, Plus, Pencil, Trash2, X, Search, Power, Lock, Percent, Tag, Gift, PackagePlus,
@@ -152,7 +152,7 @@ export class PromocionesComponent implements OnInit {
   private vacia(): Promocion {
     return {
       nombre: '', tipo: 'PORCENTAJE', valor: 10, lleva: null, paga: null,
-      id_sucursal: this.sesion?.esAdmin() ? null : this.sesion?.idSucursal() ?? null,
+      sucursales: this.sesion?.esAdmin() ? [] : [this.sesion?.idSucursal()].filter((x): x is number => !!x),
       fecha_inicio: hoyISO(), fecha_fin: hoyISO(30), dias_semana: null, hora_inicio: null, hora_fin: null,
       estado_activo: true, productos: [], categorias: []
     };
@@ -162,7 +162,7 @@ export class PromocionesComponent implements OnInit {
 
   abrirEdicion(p: Promocion) {
     this.abrir({ ...p, productos: p.productos.map(x => ({ ...x })), categorias: p.categorias.map(c => ({ ...c })),
-                 dias_semana: p.dias_semana ? [...p.dias_semana] : null });
+                 dias_semana: p.dias_semana ? [...p.dias_semana] : null, sucursales: [...(p.sucursales || [])] });
   }
 
   private abrir(p: Promocion) {
@@ -215,6 +215,51 @@ export class PromocionesComponent implements OnInit {
         : [...f.categorias, { id_categoria: cat.id_categoria, nombre_categoria: cat.nombre_categoria }]
     }));
   }
+
+  // ─── Sucursales (casillas): ninguna marcada = todas ───
+  readonly todasSucursales = () => !this.formulario().sucursales.length;
+
+  sucursalMarcada(id: number): boolean { return this.formulario().sucursales.includes(id); }
+
+  // Sucursales que no tienen los productos elegidos: no se pueden marcar
+  readonly sinProductos = signal<Map<number, string>>(new Map());
+  private esperaSinProductos?: ReturnType<typeof setTimeout>;
+  private readonly revisarSucursales = effect(() => {
+    const f = this.formulario(), abierto = this.modalAbierto();
+    clearTimeout(this.esperaSinProductos);
+    if (!abierto || !this.esAdmin() || (!f.productos.length && !f.categorias.length)) return this.sinProductos.set(new Map());
+    const datos = { tipo: f.tipo, productos: f.productos, categorias: f.categorias };
+    this.esperaSinProductos = setTimeout(() => this.servicio.sinProductos(datos).subscribe({
+      next: (l) => {
+        this.sinProductos.set(new Map(l.map(s => [s.id_sucursal, s.nombre_sucursal])));
+        // Lo marcado que ya no sirve se desmarca
+        const quitar = this.formulario().sucursales.filter(id => this.sinProductos().has(id));
+        if (quitar.length) this.formulario.update(x => ({ ...x, sucursales: x.sucursales.filter(id => !quitar.includes(id)) }));
+      }
+    }), 250);
+  });
+
+  private avisarSinProductos(nombres: string[]) {
+    this.dialogo.avisar(nombres.length === 1 ? `${nombres[0]} no cuenta con los productos de la promoción.`
+                                             : `${nombres.join(', ')} no cuentan con los productos de la promoción.`);
+  }
+
+  alternarTodas() {
+    if (this.sinProductos().size) return this.avisarSinProductos([...this.sinProductos().values()]);
+    this.formulario.update(f => ({ ...f, sucursales: [] }));
+  }
+
+  alternarSucursal(id: number) {
+    const falta = this.sinProductos().get(id);
+    if (falta && !this.sucursalMarcada(id)) return this.avisarSinProductos([falta]);
+    this.formulario.update(f => {
+      const lista = f.sucursales.includes(id) ? f.sucursales.filter(x => x !== id) : [...f.sucursales, id].sort((a, b) => a - b);
+      // Marcar todas una por una equivale a «Todas las sucursales»
+      return { ...f, sucursales: lista.length === this.sucursalesActivas().length && !this.sinProductos().size ? [] : lista };
+    });
+  }
+
+  readonly sucursalesActivas = computed(() => this.sucursales().filter(s => s.estado_activo !== false));
 
   diaActivo(n: number): boolean { return !this.formulario().dias_semana || this.formulario().dias_semana!.includes(n); }
 
@@ -277,9 +322,9 @@ export class PromocionesComponent implements OnInit {
   }
 
   avisarBloqueada(p: Promocion) {
-    this.dialogo.avisar(p.id_sucursal === null
+    this.dialogo.avisar(!p.sucursales?.length
       ? `«${p.nombre}» es de todas las sucursales: solo la cambia el administrador.`
-      : `«${p.nombre}» es de otra sucursal: solo la cambia el administrador.`);
+      : `«${p.nombre}» es de varias sucursales: solo la cambia el administrador.`);
   }
 
   async eliminar(p: Promocion) {

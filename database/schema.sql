@@ -127,7 +127,6 @@ CREATE TABLE promocion (
     valor         DECIMAL(10, 2) NOT NULL DEFAULT 0 CHECK (valor >= 0),
     lleva         SMALLINT CHECK (lleva BETWEEN 2 AND 20),
     paga          SMALLINT CHECK (paga >= 1),
-    id_sucursal   INT REFERENCES sucursal(id_sucursal),
     fecha_inicio  DATE NOT NULL,
     fecha_fin     DATE NOT NULL,
     hora_inicio   TIME,
@@ -545,7 +544,13 @@ CREATE INDEX idx_lote_inventario          ON lote_inventario (id_inventario);
 CREATE INDEX idx_lote_vence               ON lote_inventario (fecha_vencimiento) WHERE cantidad_actual > 0;
 CREATE INDEX idx_movimiento_lote_lote     ON movimiento_lote (id_lote);
 CREATE INDEX idx_promocion_vigencia      ON promocion (estado_activo, fecha_inicio, fecha_fin);
-CREATE INDEX idx_promocion_sucursal      ON promocion (id_sucursal);
+-- Sucursales de cada promoción: sin filas = todas las sucursales
+CREATE TABLE promocion_sucursal (
+    id_promocion INT NOT NULL REFERENCES promocion(id_promocion) ON DELETE CASCADE,
+    id_sucursal  INT NOT NULL REFERENCES sucursal(id_sucursal),
+    PRIMARY KEY (id_promocion, id_sucursal)
+);
+CREATE INDEX idx_promocion_sucursal_suc ON promocion_sucursal (id_sucursal);
 CREATE INDEX idx_promocion_producto_prod ON promocion_producto (id_producto);
 CREATE INDEX idx_promocion_categoria_cat ON promocion_categoria (id_categoria);
 CREATE INDEX idx_detalle_venta_promocion ON detalle_venta (id_promocion);

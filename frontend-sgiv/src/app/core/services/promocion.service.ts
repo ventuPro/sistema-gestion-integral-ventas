@@ -12,7 +12,8 @@ export interface Promocion {
   valor:           number;
   lleva:           number | null;
   paga:            number | null;
-  id_sucursal:     number | null;
+  /** Sucursales donde vale; vacío = todas */
+  sucursales:      number[];
   nombre_sucursal?: string | null;
   fecha_inicio:    string;
   fecha_fin:       string;
@@ -87,6 +88,13 @@ export interface Cotizacion {
 export class PromocionService {
   private http = inject(HttpClient);
   private api  = `${environment.apiUrl}/promociones`;
+
+  /** Sucursales que no tienen los productos de la promoción (no se pueden elegir) */
+  sinProductos(p: Pick<Promocion, 'tipo' | 'productos' | 'categorias'>): Observable<{ id_sucursal: number; nombre_sucursal: string }[]> {
+    return this.http.post<{ id_sucursal: number; nombre_sucursal: string }[]>(`${this.api}/sin-productos`, {
+      tipo: p.tipo, productos: p.productos.map(x => x.id_producto), categorias: p.categorias.map(c => c.id_categoria)
+    });
+  }
 
   /** Administrador: id_sucursal null = todas */
   listar(id_sucursal: number | null = null): Observable<Promocion[]> {

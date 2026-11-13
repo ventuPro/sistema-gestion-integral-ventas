@@ -152,7 +152,8 @@ const obtenerPanel = async (id_sucursal, id_categoria = null, esAdmin = false) =
             .then(r => r.map(x => x.id_sucursal)),
         filas(`
             SELECT (SELECT COUNT(*) FROM promocion p
-                    WHERE ($1::int = 0 OR p.id_sucursal IS NULL OR p.id_sucursal = $1) AND ${CONDICION_VIGENTE})::int AS vigentes,
+                    WHERE ($1::int = 0 OR (${promocionModel.EN_SUCURSAL('$1')} AND ${promocionModel.DISPONIBLE('$1')}))
+                      AND ${CONDICION_VIGENTE})::int AS vigentes,
                    ROUND(COALESCE(SUM(v.descuento_promociones), 0), 2)::float8 AS ahorro,
                    ROUND(COALESCE(SUM(v.descuento_manual), 0), 2)::float8 AS descuentos,
                    COUNT(*) FILTER (WHERE v.descuento_manual > 0)::int AS ventas_con_descuento
