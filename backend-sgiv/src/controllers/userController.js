@@ -9,6 +9,7 @@ const captcha     = require('../utils/captcha');
 const telegram    = require('../utils/telegram');
 const codigosLogin = require('../utils/codigosLogin');
 const contexto    = require('../auditoria/contexto');
+const { emitirUsuario } = require('../utils/tiempoReal');
 const { marcarEvento, huellaSesion } = require('../auditoria/registroAcceso');
 const { JWT_SECRET, JWT_OPCIONES, COOKIE_SESION, opcionesCookie, leerToken, verificarJWT } = require('../config/seguridad');
 
@@ -297,6 +298,8 @@ const actualizarUsuario = async (req, res) => {
         if (ocupado) return res.status(409).json({ error: ocupado });
         const usuario = await userModel.actualizarUsuario(id, { nombre_completo, correo_electronico });
         if (!usuario) return res.status(404).json({ error: 'El usuario no existe' });
+        // Su sesión abierta muestra el nombre nuevo (menú de la cuenta) sin volver a entrar
+        emitirUsuario(id, 'usuario:actualizado', { nombre_completo: usuario.nombre_completo, correo_electronico: usuario.correo_electronico });
         res.json({ mensaje: 'Usuario actualizado', usuario });
     } catch (e) {
         if (e instanceof ErrorValidacion) return res.status(400).json({ error: e.message });
@@ -307,12 +310,27 @@ const actualizarUsuario = async (req, res) => {
     }
 };
 
+// GET /api/usuarios/perfil  datos visibles de la propia sesión (nombre y sucursal al día)
+const miPerfil = async (req, res) => {
+    try {
+        const p = await userModel.obtenerPerfil(req.usuario.id_usuario);
+        if (!p) return res.status(404).json({ error: 'El usuario no existe' });
+        res.json({ ...p, id_rol: req.usuario.id_rol, id_sucursal: req.usuario.id_sucursal });
+    } catch (e) {
+        res.status(500).json({ error: 'No se pudo leer el perfil' });
+    }
+};
+
 const desactivarUsuario = async (req, res) => {
     try {
         if (!esAdmin(req) && await tocaAdmin(req.params.id))
             return res.status(403).json({ error: 'Solo un administrador puede desactivar administradores' });
         if (Number(req.params.id) === Number(req.usuario.id_usuario))
             return res.status(400).json({ error: 'No puedes desactivar tu propia cuenta' });
+        // Con la caja abierta quedaría un turno sin contar: primero se cierra
+        const caja = await db.query(`SELECT 1 FROM turno_caja WHERE id_usuario_cajero = $1 AND estado_turno = 'Abierto' LIMIT 1`,
+                                    [Number(req.params.id)]);
+        if (caja.rowCount) return res.status(409).json({ error: 'Tiene la caja abierta: primero ciérrala con «Cerrar caja».', codigo: 'CAJA_ABIERTA' });
         await userModel.desactivarUsuario(req.params.id);
         res.json({ mensaje: 'Usuario desactivado' });
     } catch (e) {
@@ -360,6 +378,6 @@ const obtenerDatosFormulario = async (req, res) => {
 module.exports = {
     registrarUsuario, loginUsuario, verificarCodigoLogin, verificarAlternoLogin, reenviarCodigoLogin,
     cerrarSesion, obtenerCaptcha, listarUsuarios,
-    actualizarUsuario, desactivarUsuario, reactivarUsuario,
+    actualizarUsuario, desactivarUsuario, reactivarUsuario, miPerfil,
     cambiarContrasena, obtenerDatosFormulario
 };

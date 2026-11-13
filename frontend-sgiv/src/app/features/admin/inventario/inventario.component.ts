@@ -1,3 +1,4 @@
+import { firstValueFrom } from 'rxjs';
 import { Component, computed, inject, OnInit, OnDestroy, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -510,9 +511,17 @@ export class InventarioComponent implements OnInit, OnDestroy {
   }
 
   async toggleEstadoProducto(prod: any) {
+    // Mientras se vende (carritos, mesas, pedidos QR) no se desactiva: no se podría cobrar
+    let encargos = 0;
+    if (prod.estado_activo) {
+      const uso = await firstValueFrom(this.productoService.usoProducto(prod.id_producto)).catch(() => null);
+      if (uso?.en_venta) return this.dialogo.error(`No se puede desactivar «${prod.nombre_producto}»: se está vendiendo ${uso.en_venta}.`);
+      encargos = uso?.encargos || 0;
+    }
     if (!(await this.dialogo.confirmar(prod.estado_activo
       ? { titulo: `¿Desactivar «${prod.nombre_producto}»?`, textoConfirmar: 'Desactivar', peligro: true,
-          mensaje: 'Dejará de venderse en Punto de venta y Mesas y no aparecerá en el menú QR. Su historial se conserva.' }
+          mensaje: 'Dejará de venderse en Punto de venta y Mesas y no aparecerá en el menú QR. Su historial se conserva.',
+          advertencias: encargos ? [`Está en ${encargos} ${encargos === 1 ? 'encargo por entregar' : 'encargos por entregar'}.`] : [] }
       : { titulo: `¿Reactivar «${prod.nombre_producto}»?`, textoConfirmar: 'Reactivar',
           mensaje: 'Volverá a venderse y a aparecer en el menú QR si tiene stock.' }))) return;
     const accion = prod.estado_activo
@@ -521,7 +530,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     const texto  = prod.estado_activo ? 'desactivado' : 'reactivado';
     accion.subscribe({
       next:  () => { this.dialogo.avisar(`«${prod.nombre_producto}» ${texto}`); this.cargarProductos(); },
-      error: () => this.dialogo.error(`No se pudo dejar el producto ${texto}.`)
+      error: (e: any) => this.dialogo.error(e?.error?.error || `No se pudo dejar el producto ${texto}.`)
     });
   }
 

@@ -65,6 +65,11 @@ export class ProductoService {
     return this.http.put(`${this.apiUrl}/catalogo/productos/${id}`, foto ? { ...datos, url_imagen: foto } : datos);
   }
 
+  /** Dónde se está vendiendo (antes de desactivarlo) */
+  usoProducto(id: number): Observable<{ en_venta: string | null; encargos: number }> {
+    return this.http.get<{ en_venta: string | null; encargos: number }>(`${this.apiUrl}/catalogo/productos/${id}/uso`);
+  }
+
   desactivarProducto(id: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/catalogo/productos/${id}`);
   }

@@ -13,6 +13,7 @@ router.post  ('/login/codigo',      ctrl.verificarCodigoLogin);
 router.post  ('/login/alterno',     ctrl.verificarAlternoLogin);
 router.post  ('/login/reenviar',    ctrl.reenviarCodigoLogin);
 router.post  ('/logout',            ctrl.cerrarSesion);
+router.get   ('/perfil',            verificarToken, ctrl.miPerfil);
 router.get   ('/',                  gestion, ctrl.listarUsuarios);
 router.get   ('/form-data',         gestion, ctrl.obtenerDatosFormulario);
 router.put   ('/:id',               gestion, ctrl.actualizarUsuario);

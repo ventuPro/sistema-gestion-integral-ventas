@@ -168,6 +168,9 @@ export class UsuariosComponent implements OnInit {
   // ─── Confirmaciones ───
   pedirCambioEstado(usr: any) {
     const id = Number(usr.id_usuario), nombre = usr.nombre_completo;
+    // Con la caja abierta quedaría un turno sin contar
+    if (usr.estado_activo && usr.caja_habilitada)
+      return this.dialogo.error(`${nombre} tiene la caja abierta: primero ciérrala con «Cerrar caja».`);
     this.abrirConfirmacion(usr.estado_activo
       ? { titulo: `¿Desactivar a ${nombre}?`, mensaje: 'No podrá iniciar sesión. Sus ventas y registros se conservan.',
           boton: 'Desactivar', peligro: true,

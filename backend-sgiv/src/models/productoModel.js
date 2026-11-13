@@ -91,6 +91,23 @@ const obtenerProductos = async (id_sucursal = 1, incluirInactivos = false) => {
 const desactivarProducto = async (id) =>
     (await db.query(`UPDATE producto SET estado_activo=FALSE WHERE id_producto=$1 RETURNING *`,[id])).rows[0];
 
+/**
+ * Dónde se está vendiendo ahora: carritos de caja con stock apartado, mesas con la cuenta abierta y
+ * pedidos QR sin confirmar (desactivarlo impediría cobrarlos). encargos: pendientes (solo aviso).
+ */
+const usoEnVenta = async (id) => (await db.query(`
+    SELECT
+        (SELECT COALESCE(json_agg(DISTINCT u.nombre_completo), '[]') FROM reserva_caja r JOIN usuario u ON u.id_usuario = r.id_usuario
+          WHERE r.id_producto = $1 AND r.id_venta IS NULL AND r.cantidad > 0) AS carritos,
+        (SELECT COALESCE(json_agg(DISTINCT s.nombre_sucursal || ' · mesa ' || m.numero_mesa), '[]')
+           FROM detalle_cuenta d JOIN cuenta_mesa c ON c.id_cuenta = d.id_cuenta
+           JOIN mesa_local m ON m.id_mesa = c.id_mesa JOIN sucursal s ON s.id_sucursal = m.id_sucursal
+          WHERE d.id_producto = $1 AND d.id_venta IS NULL AND c.estado = 'Abierta') AS mesas,
+        (SELECT COUNT(DISTINCT p.id_pedido)::int FROM detalle_pedido d JOIN pedido_mesa p ON p.id_pedido = d.id_pedido
+          WHERE d.id_producto = $1 AND p.estado_pedido = 'Pendiente_Cajero') AS pedidos,
+        (SELECT COUNT(DISTINCT e.id_encargo)::int FROM detalle_encargo d JOIN encargo e ON e.id_encargo = d.id_encargo
+          WHERE d.id_producto = $1 AND e.estado = 'Recibido') AS encargos`, [id])).rows[0];
+
 const reactivarProducto = async (id) =>
     (await db.query(`UPDATE producto SET estado_activo=TRUE WHERE id_producto=$1 RETURNING *`,[id])).rows[0];
 
@@ -152,7 +169,7 @@ const paraComparar = async (id_sucursal = null) => (await db.query(`
     GROUP BY p.id_producto`, [id_sucursal])).rows;
 
 module.exports = {
-    productosFaltantes, mismoNombre, paraComparar,
+    productosFaltantes, mismoNombre, paraComparar, usoEnVenta,
     crearCategoria,
     obtenerCategorias,
     ordenarCategorias,

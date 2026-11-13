@@ -369,8 +369,32 @@ const actualizarProducto = async (req, res) => {
     }
 };
 
+/** Texto de dónde se está vendiendo, o null si no está en ninguna venta en curso */
+const textoEnVenta = (uso) => {
+    const partes = [
+        uso.carritos.length && `en el carrito de ${uso.carritos.join(', ')}`,
+        uso.mesas.length && `en ${uso.mesas.join(', ')}`,
+        uso.pedidos && `en ${uso.pedidos} ${uso.pedidos === 1 ? 'pedido QR sin confirmar' : 'pedidos QR sin confirmar'}`
+    ].filter(Boolean);
+    return partes.length ? partes.join('; ') : null;
+};
+
+// GET /api/catalogo/productos/:id/uso  (antes de desactivarlo)
+const usoProducto = async (req, res) => {
+    try {
+        const uso = await m.usoEnVenta(Number(req.params.id));
+        res.json({ ...uso, en_venta: textoEnVenta(uso) });
+    } catch (e) {
+        console.error('usoProducto:', e.message);
+        res.status(500).json({ error: 'No se pudo revisar el producto' });
+    }
+};
+
 const eliminarProducto  = async (req, res) => {
     try {
+        // Desactivarlo mientras se vende impediría cobrar esas cuentas y carritos
+        const enVenta = textoEnVenta(await m.usoEnVenta(Number(req.params.id)));
+        if (enVenta) return res.status(409).json({ error: `No se puede desactivar: se está vendiendo ${enVenta}.`, codigo: 'EN_VENTA' });
         await m.desactivarProducto(req.params.id);
         emitirCatalogo();
         res.json({ mensaje: 'Producto desactivado' });
@@ -388,5 +412,5 @@ const reactivarProducto = async (req, res) => {
 
 module.exports = {
     agregarCategoria, listarCategorias, ordenarCategorias, eliminarCategoria, listarProductos,
-    agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto, listarFaltantes, agregarASucursal, listarParecidos
+    agregarProducto,  actualizarProducto, eliminarProducto, reactivarProducto, listarFaltantes, agregarASucursal, listarParecidos, usoProducto
 };

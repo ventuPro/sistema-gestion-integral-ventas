@@ -12,7 +12,7 @@ import { SocketService }  from '../../../core/services/socket.service';
 import { AjustesService } from '../../../core/services/ajustes.service';
 import { BandejaPedidosComponent } from '../bandeja-pedidos/bandeja-pedidos.component';
 import { HttpClient } from '@angular/common/http';
-import { Subscription, filter } from 'rxjs';
+import { Subscription, filter, merge } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { componenteDiferido } from '../../../core/utils/diferido';
 import type { MensajeChat } from '../../shared/asistente/asistente-chat.component';
@@ -156,6 +156,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.socketService.conectar('cajeros');
     this.notificaciones.iniciar();
     this.revisarEncargosDelDia();
+
+    // Nombre y sucursal al día en el menú de la cuenta: al entrar, al reconectar y cuando el administrador lo edita
+    this.refrescarPerfil();
+    this.subPerfil = merge(this.socketService.reconexiones, this.socketService.escuchar('sala_unida')).subscribe(() => this.refrescarPerfil());
+    this.subPerfil.add(this.socketService.escuchar<any>('usuario:actualizado').subscribe(d => this.sesion.actualizar(d || {})));
+  }
+
+  private subPerfil?: Subscription;
+
+  private refrescarPerfil() {
+    this.http.get<any>(`${environment.apiUrl}/usuarios/perfil`).subscribe({
+      next: (p) => this.sesion.actualizar({ nombre_completo: p.nombre_completo, correo_electronico: p.correo_electronico,
+                                           nombre_sucursal: p.nombre_sucursal }),
+      error: () => {}
+    });
   }
 
   // ─── Encargos para hoy ───
@@ -184,6 +199,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.subPermisos?.unsubscribe();
     this.subRuta?.unsubscribe();
+    this.subPerfil?.unsubscribe();
     this.notificaciones.detener();
     this.permisoService.dejarDeEscuchar();
   }

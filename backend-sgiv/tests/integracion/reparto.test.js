@@ -166,3 +166,18 @@ describe('Nombres de productos parecidos', () => {
         assert.ok(p.sucursales.length > 0);
     });
 });
+
+describe('Desactivar un producto que se está vendiendo', () => {
+    test('con stock apartado en un carrito no se desactiva; libre sí', async () => {
+        const id = await crearProducto('PRODUCTO EN CARRITO');
+        const [u] = await bd.sql(`SELECT id_usuario FROM usuario WHERE correo_electronico = 'repartidor@prueba.com'`);
+        await bd.sql(`INSERT INTO reserva_caja (id_usuario, id_sucursal, id_producto, cantidad) VALUES ($1, 1, $2, 2)`, [u.id_usuario, id]);
+        const uso = await api('GET', `/catalogo/productos/${id}/uso`, { token: tAdmin });
+        assert.match(uso.body.en_venta, /carrito/);
+        const r = await api('DELETE', `/catalogo/productos/${id}`, { token: tAdmin });
+        assert.equal(r.status, 409);
+        assert.equal(r.body.codigo, 'EN_VENTA');
+        await bd.sql(`UPDATE reserva_caja SET cantidad = 0 WHERE id_producto = $1`, [id]);
+        assert.equal((await api('DELETE', `/catalogo/productos/${id}`, { token: tAdmin })).status, 200);
+    });
+});

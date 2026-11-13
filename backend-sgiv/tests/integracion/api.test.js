@@ -467,6 +467,18 @@ describe('Usuarios: edición y correos', () => {
         assert.equal(r.status, 400);
     });
 
+    test('no se desactiva a quien tiene la caja abierta', async () => {
+        const tAdmin = await login('admin@rickys.com', 'password');
+        const id = await crearUsuario('caja.abierta@prueba.com', 2);
+        const t = await login('caja.abierta@prueba.com');
+        assert.equal((await api('POST', '/caja/turnos/abrir', { token: t, body: { id_sucursal: 1, monto_inicial: 50 } })).status, 201);
+        const r = await api('PATCH', `/usuarios/${id}/desactivar`, { token: tAdmin });
+        assert.equal(r.status, 409);
+        assert.equal(r.body.codigo, 'CAJA_ABIERTA');
+        await pool.query(`UPDATE turno_caja SET estado_turno = 'Cerrado', fecha_hora_cierre = CURRENT_TIMESTAMP WHERE id_usuario_cajero = $1`, [id]);
+        assert.equal((await api('PATCH', `/usuarios/${id}/desactivar`, { token: tAdmin })).status, 200);
+    });
+
     test('el rol y la sucursal no se cambian después de crear el usuario', async () => {
         const tAdmin = await login('admin@rickys.com', 'password');
         const id = await crearUsuario('fijo@prueba.com', 2);

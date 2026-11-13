@@ -48,6 +48,16 @@ export class SesionService {
     this.usuario.set(usuario);
   }
 
+  /** Datos que cambió el administrador (nombre, correo) o la sucursal renombrada */
+  actualizar(cambios: Partial<UsuarioSesion>) {
+    const actual = this.usuario();
+    if (!actual) return;
+    const usuario = { ...actual, ...Object.fromEntries(Object.entries(cambios).filter(([, v]) => v != null)) } as UsuarioSesion;
+    if (JSON.stringify(usuario) === JSON.stringify(actual)) return;
+    try { localStorage.setItem(CLAVE, JSON.stringify(usuario)); } catch { }
+    this.usuario.set(usuario);
+  }
+
   cerrar() {
     try { localStorage.removeItem(CLAVE); } catch { }
     this.usuario.set(null);
